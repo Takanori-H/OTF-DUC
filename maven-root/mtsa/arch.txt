@@ -1,0 +1,4 @@
+Node DINERS.phil.1:PHIL -> [DINERS.{phil.0.left,phil.1.right}::FORK, weight=2] [DINERS.phil.1:PHIL, weight=3] [DINERS.{phil.1.left,phil.0.right}::FORK, weight=2] 
+Node DINERS.{phil.0.left,phil.1.right}::FORK -> [DINERS.phil.0:PHIL, weight=2] [DINERS.phil.1:PHIL, weight=2] 
+Node DINERS.{phil.1.left,phil.0.right}::FORK -> [DINERS.phil.0:PHIL, weight=2] [DINERS.phil.1:PHIL, weight=2] 
+Node DINERS.phil.0:PHIL -> [DINERS.phil.0:PHIL, weight=3] [DINERS.{phil.0.left,phil.1.right}::FORK, weight=2] [DINERS.{phil.1.left,phil.0.right}::FORK, weight=2] 

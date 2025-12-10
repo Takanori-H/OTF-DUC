@@ -1,0 +1,41 @@
+//es.4
+//leader election in a synchronous ring
+ set UID = {[19],[14],[7],[2]}
+ const K = #UID
+ set M = {null,msg.UID}
+ set Status = {unknown, leader}
+ //links or channels hold at most a single message
+ CHAN = (put[m:M]-> get[m]-> CHAN).
+ //the synchronous model proceeds in two steps
+ ROUND = (step1-> step2-> ROUND).
+ //the processes
+ PROCESS(U=1)
+ = (init[U]->STATE['unknown]['msg[U]]),
+ STATE[status:Status][send:M]
+ = (step1-> put[send]-> STATE[status][send]
+ |step2->
+ (get.null-> DSTATE[status]['null]
+ |get.msg[v:UID]->
+ if (v>U) then
+ DSTATE[status]['msg[v]]
+ else if (v==U) then
+ DSTATE['leader]['null]
+ else
+ DSTATE[status]['null]
+ )
+ ),
+ DSTATE[status:Status][send:M]
+ = ([send]->[status]->STATE[status][send]).
+ ||LCR = ( ROUND
+ || chan[1..K]:CHAN
+ || proc[i:1..K]:PROCESS(@(UID,i-1))
+ )/{
+ forall[i:1..K] {
+ proc[i].get/chan[i].get,
+ proc[i].put/chan[i%K+1].put,
+ step1/proc[i].step1,
+ step2/proc[i].step2
+ }
+}.
+
+progress P = {proc[1].leader}

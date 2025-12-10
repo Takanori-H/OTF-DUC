@@ -1,0 +1,602 @@
+Controller0 = Q0,
+	Q0	= (setPackageLocation[0].l0.c1 -> Q1
+		  |setPackageLocation[0].la.c0 -> Q21
+		  |setPackageLocation[0].l0.c0 -> Q22
+		  |setPackageLocation[0].la.c1 -> Q23
+		  |setTruckLocation.t0.l0 -> Q24
+		  |setTruckLocation.t0.la -> Q25),
+	Q1	= (load[0].a1.l0.c1 -> Q2
+		  |load[0].a0.l0.c1 -> Q17
+		  |load[0].t1.l0.c1 -> Q18
+		  |setTruckLocation.t0.l0 -> Q19
+		  |setTruckLocation.t0.la -> Q20),
+	Q2	= (unload[0].a1.l0.c1 -> Q1
+		  |setTruckLocation.t0.l0 -> Q3
+		  |setTruckLocation.t0.la -> Q16
+		  |unload[0].a1.la.c0 -> Q21
+		  |unload[0].a1.l0.c0 -> Q22
+		  |unload[0].a1.la.c1 -> Q23),
+	Q3	= ({drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q3
+		  |unload[0].a1.la.c0 -> Q4
+		  |unload[0].a1.la.c1 -> Q14
+		  |unload[0].a1.l0.c0 -> Q15
+		  |drive.l0.la.t0 -> Q16
+		  |unload[0].a1.l0.c1 -> Q19),
+	Q4	= (load[0].a1.la.c0 -> Q3
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q4
+		  |load[0].t1.la.c0 -> Q5
+		  |load[0].a0.la.c0 -> Q12
+		  |drive.l0.la.t0 -> Q13),
+	Q5	= (unload[0].t1.la.c0 -> Q4
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q5
+		  |drive.l0.la.t0 -> Q6
+		  |unload[0].t1.la.c1 -> Q14
+		  |unload[0].t1.l0.c0 -> Q15
+		  |unload[0].t1.l0.c1 -> Q19),
+	Q6	= (drive.la.l0.t0 -> Q5
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q6
+		  |unload[0].t1.l0.c0 -> Q7
+		  |unload[0].t1.la.c1 -> Q9
+		  |unload[0].t1.la.c0 -> Q13
+		  |unload[0].t1.l0.c1 -> Q20),
+	Q7	= (load[0].t1.l0.c0 -> Q6
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q7
+		  |load[0].a0.l0.c0 -> Q8
+		  |drive.la.l0.t0 -> Q15
+		  |load[0].a1.l0.c0 -> Q16),
+	Q8	= (unload[0].a0.l0.c0 -> Q7
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q8
+		  |unload[0].a0.la.c1 -> Q9
+		  |drive.la.l0.t0 -> Q12
+		  |unload[0].a0.la.c0 -> Q13
+		  |unload[0].a0.l0.c1 -> Q20),
+	Q9	= (load[0].t1.la.c1 -> Q6
+		  |load[0].a0.la.c1 -> Q8
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q9
+		  |load[0].t0.la.c1 -> Q10
+		  |drive.la.l0.t0 -> Q14
+		  |load[0].a1.la.c1 -> Q16),
+	Q10	= (unload[0].t0.la.c1 -> Q9
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q10
+		  |drive.la.l0.t0 -> Q11),
+	Q11	= (drive.l0.la.t0 -> Q10
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q11
+		  |unload[0].t0.l0.c1 -> Q19),
+	Q12	= (unload[0].a0.la.c0 -> Q4
+		  |drive.l0.la.t0 -> Q8
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q12
+		  |unload[0].a0.la.c1 -> Q14
+		  |unload[0].a0.l0.c0 -> Q15
+		  |unload[0].a0.l0.c1 -> Q19),
+	Q13	= (drive.la.l0.t0 -> Q4
+		  |load[0].t1.la.c0 -> Q6
+		  |load[0].a0.la.c0 -> Q8
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q13
+		  |load[0].a1.la.c0 -> Q16),
+	Q14	= (load[0].a1.la.c1 -> Q3
+		  |load[0].t1.la.c1 -> Q5
+		  |drive.l0.la.t0 -> Q9
+		  |load[0].a0.la.c1 -> Q12
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q14),
+	Q15	= (load[0].a1.l0.c0 -> Q3
+		  |load[0].t1.l0.c0 -> Q5
+		  |drive.l0.la.t0 -> Q7
+		  |load[0].a0.l0.c0 -> Q12
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q15),
+	Q16	= (drive.la.l0.t0 -> Q3
+		  |unload[0].a1.l0.c0 -> Q7
+		  |unload[0].a1.la.c1 -> Q9
+		  |unload[0].a1.la.c0 -> Q13
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q16
+		  |unload[0].a1.l0.c1 -> Q20),
+	Q17	= (unload[0].a0.l0.c1 -> Q1
+		  |setTruckLocation.t0.la -> Q8
+		  |setTruckLocation.t0.l0 -> Q12
+		  |unload[0].a0.la.c0 -> Q21
+		  |unload[0].a0.l0.c0 -> Q22
+		  |unload[0].a0.la.c1 -> Q23),
+	Q18	= (unload[0].t1.l0.c1 -> Q1
+		  |setTruckLocation.t0.l0 -> Q5
+		  |setTruckLocation.t0.la -> Q6
+		  |unload[0].t1.la.c0 -> Q21
+		  |unload[0].t1.l0.c0 -> Q22
+		  |unload[0].t1.la.c1 -> Q23),
+	Q19	= (load[0].a1.l0.c1 -> Q3
+		  |load[0].t1.l0.c1 -> Q5
+		  |load[0].t0.l0.c1 -> Q11
+		  |load[0].a0.l0.c1 -> Q12
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q19
+		  |drive.l0.la.t0 -> Q20),
+	Q20	= (load[0].t1.l0.c1 -> Q6
+		  |load[0].a0.l0.c1 -> Q8
+		  |load[0].a1.l0.c1 -> Q16
+		  |drive.la.l0.t0 -> Q19
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q20),
+	Q21	= (load[0].a1.la.c0 -> Q2
+		  |setTruckLocation.t0.l0 -> Q4
+		  |setTruckLocation.t0.la -> Q13
+		  |load[0].a0.la.c0 -> Q17
+		  |load[0].t1.la.c0 -> Q18),
+	Q22	= (load[0].a1.l0.c0 -> Q2
+		  |setTruckLocation.t0.la -> Q7
+		  |setTruckLocation.t0.l0 -> Q15
+		  |load[0].a0.l0.c0 -> Q17
+		  |load[0].t1.l0.c0 -> Q18),
+	Q23	= (load[0].a1.la.c1 -> Q2
+		  |setTruckLocation.t0.la -> Q9
+		  |setTruckLocation.t0.l0 -> Q14
+		  |load[0].a0.la.c1 -> Q17
+		  |load[0].t1.la.c1 -> Q18),
+	Q24	= (setPackageLocation[0].la.c0 -> Q4
+		  |setPackageLocation[0].la.c1 -> Q14
+		  |setPackageLocation[0].l0.c0 -> Q15
+		  |setPackageLocation[0].l0.c1 -> Q19
+		  |{drive.l0.l0.t0, {load, unload}[1].t0.l0.c1} -> Q24
+		  |drive.l0.la.t0 -> Q25),
+	Q25	= (setPackageLocation[0].l0.c0 -> Q7
+		  |setPackageLocation[0].la.c1 -> Q9
+		  |setPackageLocation[0].la.c0 -> Q13
+		  |setPackageLocation[0].l0.c1 -> Q20
+		  |drive.la.l0.t0 -> Q24
+		  |{drive.la.la.t0, {load, unload}[1].t0.la.c1} -> Q25)+{{load, unload}[0..1].t0.{l0, la}.c0.
+ 
+Controller1 = Q0,
+	Q0	= (setPackageLocation[1].la.c1 -> Q1
+		  |setPackageLocation[1].la.c0 -> Q21
+		  |setPackageLocation[1].l0.c0 -> Q22
+		  |setPackageLocation[1].l0.c1 -> Q23
+		  |setAirPlaneLocation.a1.c0 -> Q24
+		  |setAirPlaneLocation.a1.c1 -> Q25),
+	Q1	= (load[1].a0.la.c1 -> Q2
+		  |load[1].t0.la.c1 -> Q17
+		  |load[1].t1.la.c1 -> Q18
+		  |setAirPlaneLocation.a1.c0 -> Q19
+		  |setAirPlaneLocation.a1.c1 -> Q20),
+	Q2	= (unload[1].a0.la.c1 -> Q1
+		  |setAirPlaneLocation.a1.c0 -> Q3
+		  |setAirPlaneLocation.a1.c1 -> Q16
+		  |unload[1].a0.la.c0 -> Q21
+		  |unload[1].a0.l0.c0 -> Q22
+		  |unload[1].a0.l0.c1 -> Q23),
+	Q3	= ({fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q3
+		  |unload[1].a0.la.c0 -> Q4
+		  |unload[1].a0.l0.c1 -> Q14
+		  |unload[1].a0.l0.c0 -> Q15
+		  |fly.c0.c1.a1 -> Q16
+		  |unload[1].a0.la.c1 -> Q19),
+	Q4	= (load[1].a0.la.c0 -> Q3
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q4
+		  |load[1].t0.la.c0 -> Q5
+		  |load[1].t1.la.c0 -> Q10
+		  |load[1].a1.la.c0 -> Q11
+		  |fly.c0.c1.a1 -> Q13),
+	Q5	= (unload[1].t0.la.c0 -> Q4
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q5
+		  |fly.c0.c1.a1 -> Q6
+		  |unload[1].t0.l0.c1 -> Q14
+		  |unload[1].t0.l0.c0 -> Q15
+		  |unload[1].t0.la.c1 -> Q19),
+	Q6	= (fly.c1.c0.a1 -> Q5
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q6
+		  |unload[1].t0.l0.c0 -> Q7
+		  |unload[1].t0.l0.c1 -> Q9
+		  |unload[1].t0.la.c0 -> Q13
+		  |unload[1].t0.la.c1 -> Q20),
+	Q7	= (load[1].t0.l0.c0 -> Q6
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q7
+		  |load[1].t1.l0.c0 -> Q8
+		  |fly.c1.c0.a1 -> Q15
+		  |load[1].a0.l0.c0 -> Q16),
+	Q8	= (unload[1].t1.l0.c0 -> Q7
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q8
+		  |unload[1].t1.l0.c1 -> Q9
+		  |fly.c1.c0.a1 -> Q10
+		  |unload[1].t1.la.c0 -> Q13
+		  |unload[1].t1.la.c1 -> Q20),
+	Q9	= (load[1].t0.l0.c1 -> Q6
+		  |load[1].t1.l0.c1 -> Q8
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q9
+		  |fly.c1.c0.a1 -> Q14
+		  |load[1].a0.l0.c1 -> Q16),
+	Q10	= (unload[1].t1.la.c0 -> Q4
+		  |fly.c0.c1.a1 -> Q8
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q10
+		  |unload[1].t1.l0.c1 -> Q14
+		  |unload[1].t1.l0.c0 -> Q15
+		  |unload[1].t1.la.c1 -> Q19),
+	Q11	= (unload[1].a1.la.c0 -> Q4
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q11
+		  |fly.c0.c1.a1 -> Q12),
+	Q12	= (fly.c1.c0.a1 -> Q11
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q12
+		  |unload[1].a1.la.c1 -> Q20),
+	Q13	= (fly.c1.c0.a1 -> Q4
+		  |load[1].t0.la.c0 -> Q6
+		  |load[1].t1.la.c0 -> Q8
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q13
+		  |load[1].a0.la.c0 -> Q16),
+	Q14	= (load[1].a0.l0.c1 -> Q3
+		  |load[1].t0.l0.c1 -> Q5
+		  |fly.c0.c1.a1 -> Q9
+		  |load[1].t1.l0.c1 -> Q10
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q14),
+	Q15	= (load[1].a0.l0.c0 -> Q3
+		  |load[1].t0.l0.c0 -> Q5
+		  |fly.c0.c1.a1 -> Q7
+		  |load[1].t1.l0.c0 -> Q10
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q15),
+	Q16	= (fly.c1.c0.a1 -> Q3
+		  |unload[1].a0.l0.c0 -> Q7
+		  |unload[1].a0.l0.c1 -> Q9
+		  |unload[1].a0.la.c0 -> Q13
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q16
+		  |unload[1].a0.la.c1 -> Q20),
+	Q17	= (unload[1].t0.la.c1 -> Q1
+		  |setAirPlaneLocation.a1.c0 -> Q5
+		  |setAirPlaneLocation.a1.c1 -> Q6
+		  |unload[1].t0.la.c0 -> Q21
+		  |unload[1].t0.l0.c0 -> Q22
+		  |unload[1].t0.l0.c1 -> Q23),
+	Q18	= (unload[1].t1.la.c1 -> Q1
+		  |setAirPlaneLocation.a1.c1 -> Q8
+		  |setAirPlaneLocation.a1.c0 -> Q10
+		  |unload[1].t1.la.c0 -> Q21
+		  |unload[1].t1.l0.c0 -> Q22
+		  |unload[1].t1.l0.c1 -> Q23),
+	Q19	= (load[1].a0.la.c1 -> Q3
+		  |load[1].t0.la.c1 -> Q5
+		  |load[1].t1.la.c1 -> Q10
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q19
+		  |fly.c0.c1.a1 -> Q20),
+	Q20	= (load[1].t0.la.c1 -> Q6
+		  |load[1].t1.la.c1 -> Q8
+		  |load[1].a1.la.c1 -> Q12
+		  |load[1].a0.la.c1 -> Q16
+		  |fly.c1.c0.a1 -> Q19
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q20),
+	Q21	= (load[1].a0.la.c0 -> Q2
+		  |setAirPlaneLocation.a1.c0 -> Q4
+		  |setAirPlaneLocation.a1.c1 -> Q13
+		  |load[1].t0.la.c0 -> Q17
+		  |load[1].t1.la.c0 -> Q18),
+	Q22	= (load[1].a0.l0.c0 -> Q2
+		  |setAirPlaneLocation.a1.c1 -> Q7
+		  |setAirPlaneLocation.a1.c0 -> Q15
+		  |load[1].t0.l0.c0 -> Q17
+		  |load[1].t1.l0.c0 -> Q18),
+	Q23	= (load[1].a0.l0.c1 -> Q2
+		  |setAirPlaneLocation.a1.c1 -> Q9
+		  |setAirPlaneLocation.a1.c0 -> Q14
+		  |load[1].t0.l0.c1 -> Q17
+		  |load[1].t1.l0.c1 -> Q18),
+	Q24	= (setPackageLocation[1].la.c0 -> Q4
+		  |setPackageLocation[1].l0.c1 -> Q14
+		  |setPackageLocation[1].l0.c0 -> Q15
+		  |setPackageLocation[1].la.c1 -> Q19
+		  |{fly.c0.c0.a1, {load, unload}[0].a1.la.c0} -> Q24
+		  |fly.c0.c1.a1 -> Q25),
+	Q25	= (setPackageLocation[1].l0.c0 -> Q7
+		  |setPackageLocation[1].l0.c1 -> Q9
+		  |setPackageLocation[1].la.c0 -> Q13
+		  |setPackageLocation[1].la.c1 -> Q20
+		  |fly.c1.c0.a1 -> Q24
+		  |{fly.c1.c1.a1, {load, unload}[0].a1.la.c1} -> Q25)+{{load, unload}[0..1].a1.l0.{c0, c1}.
+ 
+Controller2 = Q0,
+	Q0	= ({drive.{l0, la}.{l0, la}.t0, load[1].t0.{l0, la}.c1, setTruckLocation.t0.{l0, la}, unload[1].t0.{l0, la}.c1} -> Q0
+		  |setAirPlaneLocation.a0.c0 -> Q1
+		  |setAirPlaneLocation.a0.c1 -> Q16
+		  |setPackageLocation[0].l0.c1 -> Q17
+		  |setPackageLocation[0].l0.c0 -> Q20
+		  |setPackageLocation[0].la.c0 -> Q21
+		  |setPackageLocation[0].la.c1 -> Q22),
+	Q1	= ({drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q1
+		  |setPackageLocation[0].l0.c1 -> Q2
+		  |setPackageLocation[0].l0.c0 -> Q13
+		  |setPackageLocation[0].la.c0 -> Q14
+		  |setPackageLocation[0].la.c1 -> Q15
+		  |fly.c0.c1.a0 -> Q16),
+	Q2	= ({drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load.{[0].t0.l0.c1, [1].{a0.la.c0, t0.{l0, la}.c1}}, setTruckLocation.t0.{l0, la}, unload.{[0].t0.l0.c1, [1].{a0.la.c0, t0.{l0, la}.c1}}} -> Q2
+		  |fly.c0.c1.a0 -> Q3
+		  |load[0].a1.l0.c1 -> Q11
+		  |load[0].t1.l0.c1 -> Q12
+		  |unload[0].t0.la.c1 -> Q15),
+	Q3	= (fly.c1.c0.a0 -> Q2
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load.{[0].t0.l0.c1, [1].{a0.la.c1, t0.{l0, la}.c1}}, setTruckLocation.t0.{l0, la}, unload.{[0].t0.l0.c1, [1].{a0.la.c1, t0.{l0, la}.c1}}} -> Q3
+		  |load[0].a1.l0.c1 -> Q4
+		  |unload[0].t0.la.c1 -> Q7
+		  |load[0].t1.l0.c1 -> Q10),
+	Q4	= (unload[0].a1.l0.c1 -> Q3
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q4
+		  |unload[0].a1.l0.c0 -> Q5
+		  |unload[0].a1.la.c0 -> Q6
+		  |unload[0].a1.la.c1 -> Q7
+		  |fly.c1.c0.a0 -> Q11),
+	Q5	= (load[0].a1.l0.c0 -> Q4
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q5
+		  |load[0].t1.l0.c0 -> Q10
+		  |fly.c1.c0.a0 -> Q13),
+	Q6	= (load[0].a1.la.c0 -> Q4
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q6
+		  |load[0].t1.la.c0 -> Q10
+		  |fly.c1.c0.a0 -> Q14),
+	Q7	= (load[0].t0.la.c1 -> Q3
+		  |load[0].a1.la.c1 -> Q4
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q7
+		  |load[0].a0.la.c1 -> Q8
+		  |load[0].t1.la.c1 -> Q10
+		  |fly.c1.c0.a0 -> Q15),
+	Q8	= (unload[0].a0.la.c1 -> Q7
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q8
+		  |fly.c1.c0.a0 -> Q9),
+	Q9	= (fly.c0.c1.a0 -> Q8
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q9
+		  |unload[0].a0.la.c0 -> Q14),
+	Q10	= (unload[0].t1.l0.c1 -> Q3
+		  |unload[0].t1.l0.c0 -> Q5
+		  |unload[0].t1.la.c0 -> Q6
+		  |unload[0].t1.la.c1 -> Q7
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q10
+		  |fly.c1.c0.a0 -> Q12),
+	Q11	= (unload[0].a1.l0.c1 -> Q2
+		  |fly.c0.c1.a0 -> Q4
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q11
+		  |unload[0].a1.l0.c0 -> Q13
+		  |unload[0].a1.la.c0 -> Q14
+		  |unload[0].a1.la.c1 -> Q15),
+	Q12	= (unload[0].t1.l0.c1 -> Q2
+		  |fly.c0.c1.a0 -> Q10
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q12
+		  |unload[0].t1.l0.c0 -> Q13
+		  |unload[0].t1.la.c0 -> Q14
+		  |unload[0].t1.la.c1 -> Q15),
+	Q13	= (fly.c0.c1.a0 -> Q5
+		  |load[0].a1.l0.c0 -> Q11
+		  |load[0].t1.l0.c0 -> Q12
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q13),
+	Q14	= (fly.c0.c1.a0 -> Q6
+		  |load[0].a0.la.c0 -> Q9
+		  |load[0].a1.la.c0 -> Q11
+		  |load[0].t1.la.c0 -> Q12
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q14),
+	Q15	= (load[0].t0.la.c1 -> Q2
+		  |fly.c0.c1.a0 -> Q7
+		  |load[0].a1.la.c1 -> Q11
+		  |load[0].t1.la.c1 -> Q12
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c0.c0.a0, load[1].{a0.la.c0, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c0, t0.{l0, la}.c1}} -> Q15),
+	Q16	= (fly.c1.c0.a0 -> Q1
+		  |setPackageLocation[0].l0.c1 -> Q3
+		  |setPackageLocation[0].l0.c0 -> Q5
+		  |setPackageLocation[0].la.c0 -> Q6
+		  |setPackageLocation[0].la.c1 -> Q7
+		  |{drive.{l0, la}.{l0, la}.t0, fly.c1.c1.a0, load[1].{a0.la.c1, t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload[1].{a0.la.c1, t0.{l0, la}.c1}} -> Q16),
+	Q17	= (setAirPlaneLocation.a0.c0 -> Q2
+		  |setAirPlaneLocation.a0.c1 -> Q3
+		  |{drive.{l0, la}.{l0, la}.t0, load.{[0].t0.l0.c1, [1].t0.{l0, la}.c1}, setTruckLocation.t0.{l0, la}, unload.{[0].t0.l0.c1, [1].t0.{l0, la}.c1}} -> Q17
+		  |load[0].a1.l0.c1 -> Q18
+		  |load[0].t1.l0.c1 -> Q19
+		  |unload[0].t0.la.c1 -> Q22),
+	Q18	= (setAirPlaneLocation.a0.c1 -> Q4
+		  |setAirPlaneLocation.a0.c0 -> Q11
+		  |unload[0].a1.l0.c1 -> Q17
+		  |{drive.{l0, la}.{l0, la}.t0, load[1].t0.{l0, la}.c1, setTruckLocation.t0.{l0, la}, unload[1].t0.{l0, la}.c1} -> Q18
+		  |unload[0].a1.l0.c0 -> Q20
+		  |unload[0].a1.la.c0 -> Q21
+		  |unload[0].a1.la.c1 -> Q22),
+	Q19	= (setAirPlaneLocation.a0.c1 -> Q10
+		  |setAirPlaneLocation.a0.c0 -> Q12
+		  |unload[0].t1.l0.c1 -> Q17
+		  |{drive.{l0, la}.{l0, la}.t0, load[1].t0.{l0, la}.c1, setTruckLocation.t0.{l0, la}, unload[1].t0.{l0, la}.c1} -> Q19
+		  |unload[0].t1.l0.c0 -> Q20
+		  |unload[0].t1.la.c0 -> Q21
+		  |unload[0].t1.la.c1 -> Q22),
+	Q20	= (setAirPlaneLocation.a0.c1 -> Q5
+		  |setAirPlaneLocation.a0.c0 -> Q13
+		  |load[0].a1.l0.c0 -> Q18
+		  |load[0].t1.l0.c0 -> Q19
+		  |{drive.{l0, la}.{l0, la}.t0, load[1].t0.{l0, la}.c1, setTruckLocation.t0.{l0, la}, unload[1].t0.{l0, la}.c1} -> Q20),
+	Q21	= (setAirPlaneLocation.a0.c1 -> Q6
+		  |setAirPlaneLocation.a0.c0 -> Q14
+		  |load[0].a1.la.c0 -> Q18
+		  |load[0].t1.la.c0 -> Q19
+		  |{drive.{l0, la}.{l0, la}.t0, load[1].t0.{l0, la}.c1, setTruckLocation.t0.{l0, la}, unload[1].t0.{l0, la}.c1} -> Q21),
+	Q22	= (setAirPlaneLocation.a0.c1 -> Q7
+		  |setAirPlaneLocation.a0.c0 -> Q15
+		  |load[0].t0.la.c1 -> Q17
+		  |load[0].a1.la.c1 -> Q18
+		  |load[0].t1.la.c1 -> Q19
+		  |{drive.{l0, la}.{l0, la}.t0, load[1].t0.{l0, la}.c1, setTruckLocation.t0.{l0, la}, unload[1].t0.{l0, la}.c1} -> Q22)+{{load, unload}[0..1].{a0.l0.{c0, c1}, t0.{l0, la}.c0}.
+ 
+Controller3 = Q0,
+	Q0	= ({fly.{c0, c1}.{c0, c1}.a1, load[0].a1.la.{c0, c1}, setAirPlaneLocation.a1.{c0, c1}, unload[0].a1.la.{c0, c1}} -> Q0
+		  |setTruckLocation.t1.l0 -> Q1
+		  |setTruckLocation.t1.la -> Q14
+		  |setPackageLocation[1].la.{c0, c1} -> Q15
+		  |setPackageLocation[1].l0.c0 -> Q18
+		  |setPackageLocation[1].l0.c1 -> Q19),
+	Q1	= ({drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.l0.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.l0.c0}} -> Q1
+		  |setPackageLocation[1].la.{c0, c1} -> Q2
+		  |setPackageLocation[1].l0.c0 -> Q12
+		  |setPackageLocation[1].l0.c1 -> Q13
+		  |drive.l0.la.t1 -> Q14),
+	Q2	= ({drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load.{[0].{a1.la.{c0, c1}, t1.l0.c0}, [1].a1.la.{c0, c1}}, setAirPlaneLocation.a1.{c0, c1}, unload.{[0].{a1.la.{c0, c1}, t1.l0.c0}, [1].a1.la.{c0, c1}}} -> Q2
+		  |drive.l0.la.t1 -> Q3
+		  |load[1].a0.la.{c0, c1} -> Q10
+		  |load[1].t0.la.{c0, c1} -> Q11),
+	Q3	= (drive.la.l0.t1 -> Q2
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load.{[0].{a1.la.{c0, c1}, t1.la.c0}, [1].a1.la.{c0, c1}}, setAirPlaneLocation.a1.{c0, c1}, unload.{[0].{a1.la.{c0, c1}, t1.la.c0}, [1].a1.la.{c0, c1}}} -> Q3
+		  |load[1].a0.la.{c0, c1} -> Q4
+		  |load[1].t0.la.{c0, c1} -> Q7
+		  |load[1].t1.la.c0 -> Q8),
+	Q4	= (unload[1].a0.la.{c0, c1} -> Q3
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.la.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.la.c0}} -> Q4
+		  |unload[1].a0.l0.c1 -> Q5
+		  |unload[1].a0.l0.c0 -> Q6
+		  |drive.la.l0.t1 -> Q10),
+	Q5	= (load[1].a0.l0.c1 -> Q4
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.la.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.la.c0}} -> Q5
+		  |load[1].t0.l0.c1 -> Q7
+		  |drive.la.l0.t1 -> Q13),
+	Q6	= (load[1].a0.l0.c0 -> Q4
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.la.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.la.c0}} -> Q6
+		  |load[1].t0.l0.c0 -> Q7
+		  |drive.la.l0.t1 -> Q12),
+	Q7	= (unload[1].t0.la.{c0, c1} -> Q3
+		  |unload[1].t0.l0.c1 -> Q5
+		  |unload[1].t0.l0.c0 -> Q6
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.la.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.la.c0}} -> Q7
+		  |drive.la.l0.t1 -> Q11),
+	Q8	= (unload[1].t1.la.c0 -> Q3
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.la.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.la.c0}} -> Q8
+		  |drive.la.l0.t1 -> Q9),
+	Q9	= (drive.l0.la.t1 -> Q8
+		  |{drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.l0.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.l0.c0}} -> Q9
+		  |unload[1].t1.l0.c0 -> Q12),
+	Q10	= (unload[1].a0.la.{c0, c1} -> Q2
+		  |drive.l0.la.t1 -> Q4
+		  |{drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.l0.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.l0.c0}} -> Q10
+		  |unload[1].a0.l0.c0 -> Q12
+		  |unload[1].a0.l0.c1 -> Q13),
+	Q11	= (unload[1].t0.la.{c0, c1} -> Q2
+		  |drive.l0.la.t1 -> Q7
+		  |{drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.l0.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.l0.c0}} -> Q11
+		  |unload[1].t0.l0.c0 -> Q12
+		  |unload[1].t0.l0.c1 -> Q13),
+	Q12	= (drive.l0.la.t1 -> Q6
+		  |load[1].t1.l0.c0 -> Q9
+		  |load[1].a0.l0.c0 -> Q10
+		  |load[1].t0.l0.c0 -> Q11
+		  |{drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.l0.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.l0.c0}} -> Q12),
+	Q13	= (drive.l0.la.t1 -> Q5
+		  |load[1].a0.l0.c1 -> Q10
+		  |load[1].t0.l0.c1 -> Q11
+		  |{drive.l0.l0.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.l0.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.l0.c0}} -> Q13),
+	Q14	= (drive.la.l0.t1 -> Q1
+		  |setPackageLocation[1].la.{c0, c1} -> Q3
+		  |setPackageLocation[1].l0.c1 -> Q5
+		  |setPackageLocation[1].l0.c0 -> Q6
+		  |{drive.la.la.t1, fly.{c0, c1}.{c0, c1}.a1, load[0].{a1.la.{c0, c1}, t1.la.c0}, setAirPlaneLocation.a1.{c0, c1}, unload[0].{a1.la.{c0, c1}, t1.la.c0}} -> Q14),
+	Q15	= (setTruckLocation.t1.l0 -> Q2
+		  |setTruckLocation.t1.la -> Q3
+		  |{fly.{c0, c1}.{c0, c1}.a1, load[0..1].a1.la.{c0, c1}, setAirPlaneLocation.a1.{c0, c1}, unload[0..1].a1.la.{c0, c1}} -> Q15
+		  |load[1].a0.la.{c0, c1} -> Q16
+		  |load[1].t0.la.{c0, c1} -> Q17),
+	Q16	= (setTruckLocation.t1.la -> Q4
+		  |setTruckLocation.t1.l0 -> Q10
+		  |unload[1].a0.la.{c0, c1} -> Q15
+		  |{fly.{c0, c1}.{c0, c1}.a1, load[0].a1.la.{c0, c1}, setAirPlaneLocation.a1.{c0, c1}, unload[0].a1.la.{c0, c1}} -> Q16
+		  |unload[1].a0.l0.c0 -> Q18
+		  |unload[1].a0.l0.c1 -> Q19),
+	Q17	= (setTruckLocation.t1.la -> Q7
+		  |setTruckLocation.t1.l0 -> Q11
+		  |unload[1].t0.la.{c0, c1} -> Q15
+		  |{fly.{c0, c1}.{c0, c1}.a1, load[0].a1.la.{c0, c1}, setAirPlaneLocation.a1.{c0, c1}, unload[0].a1.la.{c0, c1}} -> Q17
+		  |unload[1].t0.l0.c0 -> Q18
+		  |unload[1].t0.l0.c1 -> Q19),
+	Q18	= (setTruckLocation.t1.la -> Q6
+		  |setTruckLocation.t1.l0 -> Q12
+		  |load[1].a0.l0.c0 -> Q16
+		  |load[1].t0.l0.c0 -> Q17
+		  |{fly.{c0, c1}.{c0, c1}.a1, load[0].a1.la.{c0, c1}, setAirPlaneLocation.a1.{c0, c1}, unload[0].a1.la.{c0, c1}} -> Q18),
+	Q19	= (setTruckLocation.t1.la -> Q5
+		  |setTruckLocation.t1.l0 -> Q13
+		  |load[1].a0.l0.c1 -> Q16
+		  |load[1].t0.l0.c1 -> Q17
+		  |{fly.{c0, c1}.{c0, c1}.a1, load[0].a1.la.{c0, c1}, setAirPlaneLocation.a1.{c0, c1}, unload[0].a1.la.{c0, c1}} -> Q19)+{{load, unload}[0..1].{a1.l0.{c0, c1}, t1.{l0, la}.c1}.
+ 
+Controller4 = Q0,
+	Q0	= (setPackageLocation[1].l0.c1 -> Q4
+		  |setPackageLocation[0].la.{c0, c1} -> Q7
+		  |setPackageLocation[1].la.{c0, c1} -> Q12
+		  |setPackageLocation[0].l0.c0 -> Q14
+		  |setPackageLocation[1].l0.c0 -> Q16
+		  |setPackageLocation[0].l0.c1 -> Q23),
+	Q1	= (unload[0].t1.la.c0 -> Q7
+		  |setPackageLocation[1].l0.c0 -> Q20
+		  |setPackageLocation[1].l0.c1 -> Q28
+		  |setPackageLocation[1].la.{c0, c1} -> Q30),
+	Q2	= (unload[1].t0.la.c1 -> Q6),
+	Q3	= (setPackageLocation[0].l0.c0 -> Q5
+		  |unload[1].t0.la.c1 -> Q12
+		  |setPackageLocation[0].la.{c0, c1} -> Q26
+		  |setPackageLocation[0].l0.c1 -> Q32),
+	Q4	= (load[1].t0.l0.c1 -> Q3
+		  |setPackageLocation[0].l0.c1 -> Q15
+		  |setPackageLocation[0].l0.c0 -> Q19
+		  |setPackageLocation[0].la.{c0, c1} -> Q35),
+	Q5	= (unload[1].t0.la.c1 -> Q11
+		  |load[0].t1.l0.c0 -> Q22),
+	Q6	= (unload[1].t1.l0.c0 -> Q13),
+	Q7	= (load[0].t0.la.c1 -> Q23
+		  |setPackageLocation[1].l0.c0 -> Q27
+		  |setPackageLocation[1].la.{c0, c1} -> Q31
+		  |setPackageLocation[1].l0.c1 -> Q35),
+	Q8	= (load[0].t1.l0.c0 -> Q21),
+	Q9	= (load[1].t0.l0.c1 -> Q2),
+	Q10	= (load[1].t1.l0.c0 -> Q25
+		  |unload[0].t0.la.c1 -> Q29),
+	Q11	= (unload[1].t1.l0.c0 -> Q8
+		  |load[0].t1.l0.c0 -> Q30),
+	Q12	= (setPackageLocation[0].l0.c0 -> Q11
+		  |setPackageLocation[0].l0.c1 -> Q25
+		  |setPackageLocation[0].la.{c0, c1} -> Q31
+		  |unload[1].t1.l0.c0 -> Q33),
+	Q13	= (load[1].t1.l0.c0 -> Q6
+		  |{drive.{l0, la}.{l0, la}.{t0, t1}, fly.{c0, c1}.{c0, c1}.{a0, a1}, load[0].a0.la.{c0, c1}, setAirPlaneLocation.{a0, a1}.{c0, c1}, setTruckLocation.{t0, t1}.{l0, la}, unload[0].a0.la.{c0, c1}} -> Q13
+		  |load[0].t0.la.c1 -> Q18
+		  |load[0].t1.la.c0 -> Q21
+		  |load[0].a1.la.{c0, c1} -> Q34),
+	Q14	= (load[0].t1.l0.c0 -> Q1
+		  |setPackageLocation[1].la.{c0, c1} -> Q11
+		  |setPackageLocation[1].l0.c1 -> Q19
+		  |setPackageLocation[1].l0.c0 -> Q36),
+	Q15	= (unload[0].t0.la.c1 -> Q9
+		  |load[1].t0.l0.c1 -> Q32),
+	Q16	= (setPackageLocation[0].l0.c1 -> Q10
+		  |load[1].t1.l0.c0 -> Q12
+		  |setPackageLocation[0].la.{c0, c1} -> Q27
+		  |setPackageLocation[0].l0.c0 -> Q36),
+	Q17	= (setPackageLocation[1].la.{c0, c1} -> Q6
+		  |setPackageLocation[1].l0.c1 -> Q9
+		  |setPackageLocation[1].l0.c0 -> Q29),
+	Q18	= (unload[0].t0.la.c1 -> Q13),
+	Q19	= (load[1].t0.l0.c1 -> Q5
+		  |load[0].t1.l0.c0 -> Q28),
+	Q20	= (unload[0].t1.la.c0 -> Q27
+		  |load[1].t1.l0.c0 -> Q30),
+	Q21	= (unload[0].t1.la.c0 -> Q37),
+	Q22	= (unload[0].t1.la.c0 -> Q26
+		  |unload[1].t0.la.c1 -> Q30),
+	Q23	= (setPackageLocation[1].l0.c0 -> Q10
+		  |setPackageLocation[1].l0.c1 -> Q15
+		  |unload[0].t0.la.c1 -> Q17
+		  |setPackageLocation[1].la.{c0, c1} -> Q25),
+	Q24	= (unload[1].t1.l0.c0 -> Q34),
+	Q25	= (unload[0].t0.la.c1 -> Q6
+		  |unload[1].t1.l0.c0 -> Q18),
+	Q26	= (unload[1].t0.la.c1 -> Q31
+		  |load[0].t0.la.c1 -> Q32),
+	Q27	= (load[0].t0.la.c1 -> Q10
+		  |load[1].t1.l0.c0 -> Q31),
+	Q28	= (load[1].t0.l0.c1 -> Q22
+		  |unload[0].t1.la.c0 -> Q35),
+	Q29	= (load[1].t1.l0.c0 -> Q6),
+	Q30	= (unload[1].t1.l0.c0 -> Q21
+		  |unload[0].t1.la.c0 -> Q31),
+	Q31	= (load[0].t0.la.c1 -> Q25
+		  |unload[1].t1.l0.c0 -> Q37),
+	Q32	= (unload[0].t0.la.c1 -> Q2
+		  |unload[1].t0.la.c1 -> Q25),
+	Q33	= (setPackageLocation[0].l0.c0 -> Q8
+		  |setPackageLocation[0].l0.c1 -> Q18
+		  |setPackageLocation[0].la.{c0, c1} -> Q37),
+	Q34	= (unload[0].a1.la.{c0, c1} -> Q13
+		  |load[1].t1.l0.c0 -> Q24
+		  |{drive.{l0, la}.{l0, la}.{t0, t1}, fly.{c0, c1}.{c0, c1}.{a0, a1}, setAirPlaneLocation.{a0, a1}.{c0, c1}, setTruckLocation.{t0, t1}.{l0, la}} -> Q34),
+	Q35	= (load[0].t0.la.c1 -> Q15
+		  |load[1].t0.l0.c1 -> Q26),
+	Q36	= (load[1].t1.l0.c0 -> Q11
+		  |load[0].t1.l0.c0 -> Q20),
+	Q37	= (load[0].t0.la.c1 -> Q18)+{{load.{[0].{{a0, a1}.l0.{c0, c1}, t0.{l0.{c0, c1}, la.c0}, t1.{l0, la}.c1}, [1].{{a0, a1}.{l0, la}.{c0, c1}, t0.{l0.c0, la.{c0, c1}}, t1.{l0.c1, la.{c0, c1}}}}, unload.{[0].{{a0, a1}.l0.{c0, c1}, t0.{l0.{c0, c1}, la.c0}, t1.{l0.{c0, c1}, la.c1}}, [1].{{a0, a1}.{l0, la}.{c0, c1}, t0.{l0.{c0, c1}, la.c0}, t1.{l0.c1, la.{c0, c1}}}}}.
+ 
+||ControllerComposed = (Controller0 || Controller1 || Controller2 || Controller3 || Controller4).

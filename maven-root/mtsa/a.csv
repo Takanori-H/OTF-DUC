@@ -1,0 +1,2 @@
+iteration;machineStates;compositionStates;localControllerStates;controlablePathStates;countTransitions;controllablePathms;findPathMS;minimizedStates;totalTimeMS;wsoeTimeMS;localControllerMS;heuristicRunningTimeMS;preprocessMinimizationStates;preprocessMinimizationMS;lastIterationMS
+1;[8, 8, 8, 8, 8, 8, 8];262144;-1;-1;-1;-1;-1;-1;7181;-1;-1;5;-1;-1;-1

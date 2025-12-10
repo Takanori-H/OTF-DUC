@@ -1,0 +1,63 @@
+# This is a GitLab CI/CD configuration file for building, testing, and deploying a Maven project.
+# It defines multiple stages: build, test, and deploy.
+# The configuration includes jobs for compiling, packaging, testing, and deploying the application.
+# The deployment jobs handle both regular builds and tagged releases.
+
+stages:
+  - build
+  - test
+  - deploy
+
+build-job:
+  stage: build
+  script:
+    - echo "Hello, $GITLAB_USER_LOGIN!"
+    - cd maven-root/mtsa
+    - mvn clean compile
+
+package-job:
+  stage: build
+  script:
+    - cd maven-root/mtsa
+    - mvn package -DskipTests
+
+test-job1:
+  stage: test
+  script:
+    - echo "This job tests something"
+    - cd maven-root/mtsa
+    - mvn -B -s settings.xml test
+
+
+copy-artifact:
+  stage: deploy
+  needs: ["package-job"]
+  script:
+    - cd maven-root/mtsa
+    - echo "Packaging with tests skipped"
+    - mvn package -DskipTests
+    - echo "Copying JAR file to /var/www/mtsa/download"
+    - TIMESTAMP=$(date +%Y%m%d%H%M%S)
+    - mkdir -p /var/www/mtsa/download/builds
+    - cp target/mtsa-1.0-SNAPSHOT.jar /var/www/mtsa/download/builds/mtsa-build.${TIMESTAMP}.jar
+    - echo "Creating symlink to mtsa-latest-build.jar"
+    - rm -f /var/www/mtsa/download/builds/mtsa-latest-build.jar
+    - ln -s /var/www/mtsa/download/builds/mtsa-build.${TIMESTAMP}.jar /var/www/mtsa/download/builds/mtsa-latest-build.jar
+  only:
+    - master
+
+deploy_tag:
+  stage: deploy
+  script:
+    - echo "Deploying tag ${CI_COMMIT_TAG}"
+    - cd maven-root/mtsa
+    - echo "Packaging with tests skipped"
+    - mvn package -DskipTests
+    - echo "Copying JAR file to /var/www/mtsa/download"
+    - cp target/mtsa-1.0-SNAPSHOT.jar /var/www/mtsa/download/releases/mtsa-${CI_COMMIT_TAG}.jar
+    - rm -f /var/www/mtsa/download/mtsa-latest.jar
+    - ln -s /var/www/mtsa/download/releases/mtsa-${CI_COMMIT_TAG}.jar /var/www/mtsa/download/releases/mtsa-latest.jar
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: always
+    - when: never
