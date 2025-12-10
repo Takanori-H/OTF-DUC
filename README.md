@@ -30,3 +30,10 @@ Some research projects, with associated papers, case studies, and experimental d
 ## Publications ##
 
 Refer to our [main webpage](http://mtsa.dc.uba.ar/#publications) for more information on publications with MTSA.
+
+## Build Instructions
+
+```bash
+cd ./maven-root/mtsa/
+mvn clean
+mvn install -DskipTests=true
