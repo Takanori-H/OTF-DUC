@@ -41,7 +41,9 @@ public class UpdatingEnvironmentGenerator {
      */
     private void linkWithBeginUpdate() {
 
-        updEnv.addAction(UpdateConstants.BEGIN_UPDATE);
+        //beginUpdateからhotswap_beginに変更
+        // updEnv.addAction(UpdateConstants.BEGIN_UPDATE);
+        updEnv.addAction(UpdateConstants.HOTSWAP_BEGIN);
         addBeginUpdateTransition(updEnv.getInitialState(), mapping.getInitialState());
         eParallelCStates.add(updEnv.getInitialState());
 
@@ -89,10 +91,14 @@ public class UpdatingEnvironmentGenerator {
 
         if (mappingToUpdEnv.containsKey(originalMappingState)) {
             Long toState = mappingToUpdEnv.get(originalMappingState);
-            updEnv.addTransition(from, UpdateConstants.BEGIN_UPDATE, toState);
+            //beginUpdateからhotswap_beginに変更
+            // updEnv.addTransition(from, UpdateConstants.BEGIN_UPDATE, toState);
+            updEnv.addTransition(from, UpdateConstants.HOTSWAP_BEGIN, toState);
         } else {
             Long freshState = updEnv.newState();
-            updEnv.addTransition(from, UpdateConstants.BEGIN_UPDATE, freshState);
+            //beginUpdateからhotswap_beginに変更
+            // updEnv.addTransition(from, UpdateConstants.BEGIN_UPDATE, freshState);
+            updEnv.addTransition(from, UpdateConstants.HOTSWAP_BEGIN, freshState);
 
             mappingToUpdEnv.put(originalMappingState, freshState);
             addStopOldAndStartNewSpecActions(freshState);

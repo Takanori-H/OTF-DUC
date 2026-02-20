@@ -430,6 +430,21 @@ public class Symbol {
 			return "\\";
 			// _______________________________________________________________________________________
 			// Special
+		
+		// _______________________________________________________________________________________
+		// OTF-DUC
+		case ON_THE_FLY:
+			return "on_the_fly";
+		case NEW_CONTROLLER:
+			return "new controller";
+		case RELATION:
+			return "relation";
+		case OLD_ENVIRONMENT:
+			return "old environment";
+		case NEW_ENVIRONMENT:
+			return "new environment";
+		case MAP_RELATION:
+			return "map relation";
 
 		// _______________________________________________________________________________________
 		// Probabilistic
@@ -643,7 +658,16 @@ public class Symbol {
 	// Probabilistic
 	public static final int PROBABILISTIC= 5000;
 	public static final int MDP= 5001;
-	
+
+	// _______________________________________________________________________________________
+	// OTF-DUC
+	public static final int ON_THE_FLY = 3500;
+	public static final int NEW_CONTROLLER = 3501;
+	public static final int RELATION = 3502;
+    public static final int OLD_ENVIRONMENT = 3503;
+    public static final int NEW_ENVIRONMENT = 3504;
+    public static final int MAP_RELATION = 3505;
+	public static final int MAP = 3506;
 	
 	static {
 		blueSymbols.add(OPTIMISTIC);
@@ -708,6 +732,15 @@ public class Symbol {
 		blueSymbols.add(MARKING);
 		blueSymbols.add(DISTURBANCE);
 		blueSymbols.add(ENACTMENT);
+
+		//OTF-DUC
+		blueSymbols.add(ON_THE_FLY);
+		blueSymbols.add(NEW_CONTROLLER);
+		blueSymbols.add(RELATION);
+		blueSymbols.add(OLD_ENVIRONMENT);
+		blueSymbols.add(NEW_ENVIRONMENT);
+		blueSymbols.add(MAP_RELATION);
+		blueSymbols.add(MAP);
 	}
 
 	@Override

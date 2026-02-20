@@ -113,6 +113,15 @@ public class SymbolTable {
         addSymbols("marking", Symbol.MARKING);
         addSymbols("disturbances", Symbol.DISTURBANCE);
         addSymbols("partialOrderReduction", Symbol.PARTIAL_ORDER_REDUCTION);
+
+        //OTF-DUC
+        addSymbols("on_the_fly", Symbol.ON_THE_FLY);
+        addSymbols("newController", Symbol.NEW_CONTROLLER);
+        addSymbols("relation", Symbol.RELATION);
+        addSymbols("map", Symbol.MAP);
+        addSymbols("oldEnvironment", Symbol.OLD_ENVIRONMENT);
+        addSymbols("newEnvironment", Symbol.NEW_ENVIRONMENT);
+        addSymbols("mapRelation", Symbol.MAP_RELATION);
     }
 
     private static void addSymbols(String key, Integer elem) {

@@ -52,7 +52,6 @@ import java.util.List;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import java.io.File;
 
 public class HPWindow extends JFrame implements Runnable {
     private static final String VERSION = "j1.2 v14-10-99, amimation support";
@@ -2179,15 +2178,22 @@ public class HPWindow extends JFrame implements Runnable {
         EnvConfiguration.getInstance().setOpenFileName(openFile);
 
         ltsOutput.clearOutput();
+
+        // 1. コンパイル（FSP記述の解析とモデル構造の生成）
+        // 変更があれば再コンパイルし、結果をフィールド変数 'current' に格納
         compileIfChange();
+
         if (current != null) {
             try {
+                // 2. 合成処理の実行（Dispatcherへ委譲）
+                // ここで実際の計算（Updating Controllerの合成含む）が走ります
                 TransitionSystemDispatcher.applyComposition(current, ltsOutput);
                 
             } catch (LTSCompositionException e) {
                 return;
             }
             
+            // 3. 結果の判定とGUIへの反映
             boolean isControllable = current.composition != null;
             if (!isControllable) {
                 return;
@@ -2196,6 +2202,7 @@ public class HPWindow extends JFrame implements Runnable {
             }
             
             postState(current);
+            // ... (初期状態のセットなど描画更新処理)
             int[] current_states = new int[current.machines.size() + 1];
             for (int i = 0; i < current.machines.size() + 1; i++)
                 current_states[i] = 0;

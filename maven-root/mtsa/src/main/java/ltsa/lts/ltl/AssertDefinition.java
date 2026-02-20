@@ -260,6 +260,12 @@ public class AssertDefinition {
 			return null;
 		}
 	}
+
+	// ▼▼▼ 追加: パラメータ取得用ゲッター ▼▼▼
+    public Hashtable getInitParams() {
+        return init_params;
+    }
+    // ▲▲▲ 追加ここまで ▲▲▲
 	
 }
 

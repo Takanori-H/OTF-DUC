@@ -46,6 +46,11 @@ public class LTSCompiler {
 
     private int compositionType = -1;
 
+    //追加
+    // static Hashtable<String, RelationDefinition> relations;
+    private static Hashtable<String, RelationDefinition> relations = new Hashtable<>();
+    private Hashtable<String, MapDefinition> maps = new Hashtable<>();
+
     public LTSCompiler(LTSInput input, LTSOutput output, String currentDirectory) {
         lex = new Lex(input);
         this.output = output;
@@ -89,7 +94,7 @@ public class LTSCompiler {
         return explorers;
     }
 
-    public Hashtable<String, ProcessSpec> getProcesses() {
+    public static Hashtable<String, ProcessSpec> getProcesses() {
         return processes;
     }
 
@@ -121,6 +126,11 @@ public class LTSCompiler {
         }
     }
 
+    // ▼▼▼ 追加: getterメソッド ▼▼▼
+    public static Hashtable<String, RelationDefinition> getRelations() {
+        return relations;
+    }
+
     /**
      * Compiles the process specified by <i>name</i>.
      *
@@ -133,7 +143,13 @@ public class LTSCompiler {
         compiled = new Hashtable<>(); // compiled
         allComposites = new Hashtable<>(); // All composites
 
+        //追加
+        relations.clear(); // または relations = new Hashtable<>();
+        maps.clear();      // または maps = new Hashtable<>();
+
+        // 1. パース実行 (ここで parseMap -> createMapComposite が呼ばれ、定義が maps に入る)
         doparse(composites, processes, compiled);
+
     }
 
     public CompositeState continueCompilation(String name) {
@@ -329,6 +345,10 @@ public class LTSCompiler {
 			compiled.put(compiledProcess.name, compiledProcess);
 		}*/
         AssertDefinition.compileConstraints(output, compiled);
+
+        // ▼▼▼ 追加: リレーションのコンパイルを実行 ▼▼▼
+        // compileRelations();
+        // ▲▲▲ 追加終了 ▲▲▲
     }
 
     private CompactState compileSingleProcess(ProcessSpec processSpec) {
@@ -416,12 +436,19 @@ public class LTSCompiler {
 
                     output.outln("Explorer: " + explorerDefinition.getName());
 
+                } else if (current.kind == Symbol.RELATION) {
+                    //relationを解析する分岐
+                    parseRelation();
+                    // continue;
+                } else if (current.kind == Symbol.MAP) {
+                    parseMap(composites, processes);
+                    // continue;
                 } else if (current.kind == Symbol.UPDATING_CONTROLLER) {
                     next_symbol();
 
                     current_is(Symbol.UPPERIDENT, "updating controller identifier expected");
 
-                    UpdatingControllersDefinition cuDefinition = new UpdatingControllersDefinition(current);
+                    UpdatingControllersDefinition cuDefinition = new UpdatingControllersDefinition(current, output);
 
                     this.updateControllerDefinition(cuDefinition);
 
@@ -2330,54 +2357,462 @@ public class LTSCompiler {
         expectBecomes();
         expectLeftCurly();
         next_symbol();
+        
+        while(current.kind != Symbol.RCURLY)
+        {
+            if(current.kind == Symbol.OLD_CONTROLLER)
+            {
+                ucDefinition.setOldController(this.controllerSubUpdateController());
+            }
+            else if(current.kind == Symbol.MAPPING)
+            {
+                ucDefinition.setMapping(this.controllerSubUpdateController());
+            }
+            // ▼▼▼ 追加: Old Environment (リスト形式) ▼▼▼
+            else if (current.kind == Symbol.OLD_ENVIRONMENT) {
+                this.expectBecomes();
+                // componentsNotEmpty() は { A, B } 形式のリストを解析して List<Symbol> を返す既存メソッドです
+                ucDefinition.setOldEnvironment(this.componentsNotEmpty());
+            }
+            // ▼▼▼ 追加: New Environment (リスト形式) ▼▼▼
+            else if(current.kind == Symbol.NEW_ENVIRONMENT)
+            {
+                this.expectBecomes();
+                ucDefinition.setNewEnvironment(this.componentsNotEmpty());
+            }
+            // ▼▼▼ 追加: Map Relation (リスト形式) ▼▼▼
+            else if(current.kind == Symbol.MAP_RELATION)
+            {
+                this.expectBecomes();
+                ucDefinition.setMapRelation(this.componentsNotEmpty());
+            }
+            // ▲▲▲ 追加ここまで ▲▲▲
+            else if(current.kind == Symbol.OLD_GOAL)
+            {
+                this.expectBecomes();
+                next_symbol();
+                current_is(Symbol.UPPERIDENT, "old goal identifier expected");
+                ucDefinition.setOldGoal(current);
+                next_symbol();
+            }
+            else if(current.kind == Symbol.NEW_GOAL)
+            {
+                this.expectBecomes();
+                next_symbol();
+                current_is(Symbol.UPPERIDENT, "new goal identifier expected");
+                ucDefinition.setNewGoal(current);
+                next_symbol();
+            }
+            else if(current.kind == Symbol.TRANSITION)
+            {
+                this.expectBecomes();
+                next_symbol();
+                current_is(Symbol.UPPERIDENT, "T definition expected");
+                ucDefinition.addTransitionGoal(current);
+                next_symbol();
+            }
+            else if(current.kind == Symbol.CONTROLLER_NB)
+            {
+                ucDefinition.setNonblocking();
+                next_symbol();
+            }
 
-        if (current.kind == Symbol.OLD_CONTROLLER) {
-            ucDefinition.setOldController(this.controllerSubUpdateController());
-            current_is(Symbol.COMMA, ", expected");
-            next_symbol();
+            //OTF用
+            else if(current.kind == Symbol.ON_THE_FLY)
+            {
+                ucDefinition.setIsOTF();
+                next_symbol();
+            }
+            else if(current.kind == Symbol.NEW_CONTROLLER)
+            {
+                ucDefinition.setNewController(this.controllerSubUpdateController());
+            }
+            else
+            {
+                error("Updating Controller symbol expected");
+            }
+
+            // カンマがあれば消費して次の要素へ
+            if (current.kind == Symbol.COMMA) {
+                next_symbol();
+            }
         }
 
-        if (current.kind == Symbol.MAPPING) {
-            ucDefinition.setMapping(this.controllerSubUpdateController());
-            current_is(Symbol.COMMA, ", expected");
-            next_symbol();
-        }
-
-        if (current.kind == Symbol.OLD_GOAL) {
-            this.expectBecomes();
-            next_symbol();
-            current_is(Symbol.UPPERIDENT, "old goal identifier expected");
-            ucDefinition.setOldGoal(current);
-            next_symbol();
-            current_is(Symbol.COMMA, ", expected");
-            next_symbol();
-        }
-        if (current.kind == Symbol.NEW_GOAL) {
-            this.expectBecomes();
-            next_symbol();
-            current_is(Symbol.UPPERIDENT, "new goal identifier expected");
-            ucDefinition.setNewGoal(current);
-            next_symbol();
-            current_is(Symbol.COMMA, ", expected");
-            next_symbol();
-        }
-        if (current.kind == Symbol.TRANSITION) {
-            this.expectBecomes();
-            next_symbol();
-            current_is(Symbol.UPPERIDENT, "T definition expected");
-            ucDefinition.addTransitionGoal(current);
-            next_symbol();
-            current_is(Symbol.COMMA, ", expected");
-            next_symbol();
-        }
-
-        if (current.kind == Symbol.CONTROLLER_NB) {
-            next_symbol();
-            ucDefinition.setNonblocking();
-        }
-
-
+        // ループ終了時は RCURLY であるはず
         current_is(Symbol.RCURLY, "} expected");
+    }
+    
+    private void parseRelation(){
+        // デバッグ: 開始時のトークンを表示
+        output.outln("DEBUG: parseRelation started. Current token: " + current);
+
+        next_symbol(); // 'relation' を消費
+
+        // デバッグ: 消費後のトークン（名前のはず）を表示
+        output.outln("DEBUG: After next_symbol(). Current token: " + current);
+
+        if (current.kind != Symbol.UPPERIDENT) {
+            error("Relation name expected");
+        }
+        Symbol name = current;
+
+        /*
+        // 重複チェックを先に行う（または最後に行う位置を一貫させる）
+        if (relations.containsKey(name.toString())) {
+            error("Duplicate relation definition: " + name);
+        }
+        */
+        // パース開始時に重複をチェック (Parseボタン押下時の対策)
+        // 注意: Parseボタンで既存の定義をクリアしたい場合は、
+        // relations.clear() を呼び出し元で行う必要があります
+        if (relations.containsKey(name.toString())) {
+            output.outln("DEBUG: Duplicate found for " + name + ". Overwriting for re-parse.");
+            relations.remove(name.toString());
+        }
+
+        RelationDefinition relDef = new RelationDefinition(name);
+
+        // 名前を消費して'=' を確認
+        output.outln("DEBUG: Calling expectBecomes()...");
+        expectBecomes();
+        output.outln("DEBUG: expectBecomes passed.");
+        // '='を消費して'{' を確認
+        expectLeftCurly();
+        // '{' の次のトークンへ進める
+        next_symbol();
+        // '}' が来るまでルールを解析
+        while (current.kind != Symbol.RCURLY && current.kind != Symbol.EOFSYM) {
+            parseRelationRule(relDef);
+            
+            if (current.kind == Symbol.COMMA) {
+                next_symbol();
+            }
+        }
+
+        if (current.kind == Symbol.RCURLY) {
+            // ここで relations.put を行う
+            relations.put(name.toString(), relDef);
+            output.outln("DEBUG: Parsed [" + name + "] successfully.");
+            next_symbol(); // '}' を消費
+            output.outln("DEBUG: Parsed [" + name + "] with " + relDef.rules.size() + " rules.");
+        } else {
+            error("} expected at the end of relation");
+        }
+
+        /*
+        // ループ終了時は '}' のはず
+        if (current.kind != Symbol.RCURLY) {
+            error("} expected");
+        }
+        next_symbol(); // '}' を消費
+
+        // 重複チェックと保存
+        if (relations.put(name.toString(), relDef) != null) {
+            error("Duplicate relation definition: " + name);
+        }
+        */
+
+        // ▼▼▼ デバッグ用追加 ▼▼▼
+        output.outln("DEBUG: Parsed relation definition [" + name + "] with " + relDef.rules.size() + " rules.");
+        // ▲▲▲ 追加ここまで ▲▲▲
+        
+        // 最後にピリオドがあればスキップ
+        if (current.kind == Symbol.DOT) {
+            next_symbol();
+        }
+        // ▼▼▼ 追加: 読み込んだトークンを戻す ▼▼▼
+        push_symbol();
+        // ▲▲▲ 追加ここまで ▲▲▲
+
+        output.outln("DEBUG: parseRelation finished. Next token: " + current);
+        // output.outln("DEBUG: parseRelation finished successfully.");
+    }
+
+    private ActionLabels parseStateSelector() {
+        ActionLabels e = null;
+
+        // 大文字(UPPERIDENT)も許可する
+        // ただし、Set定義({..})や範囲([..])の可能性もあるため、識別子の場合のみ特別扱いする
+        if (current.kind == Symbol.UPPERIDENT && !isLabelSet()) {
+            // 大文字をActionNameとしてラップする
+            e = new ActionName(current);
+            next_symbol();
+        } else {
+            // それ以外（小文字、セット、範囲など）は既存の labelElement に任せる
+            e = labelElement();
+        }
+
+        // ドット記法 (.sub) や インデックス ([i]) の処理
+        // 再帰的に呼ぶことで、Mix.Case[i] や State.subState 等に対応
+        if (current.kind == Symbol.DOT || current.kind == Symbol.LSQUARE) {
+            if (current.kind == Symbol.DOT)
+                next_symbol();
+            e.addFollower(parseStateSelector());
+        }
+
+        return e;
+    }
+
+    private void parseRelationRule(RelationDefinition relDef) {
+        RelationDefinition.RelationRule rule = new RelationDefinition.RelationRule();
+
+        // 1. forall [range] の解析
+        if (current.kind == Symbol.FORALL) {
+            next_symbol(); // 'forall' を消費
+            if (current.kind == Symbol.LSQUARE) {
+                 // parseActionLabels は既存メソッドを利用 (BAT[i]などの解析用)
+                 rule.range = labelElement();
+            } else {
+                error("Range [i:..] expected after forall");
+            }
+        }
+
+        // 2. 左辺: OldState@OldProcess
+        // ★ここを修正
+        rule.oldStateSelector = parseStateSelector();
+        
+        if (current.toString().equals("@")) {
+            next_symbol(); 
+        } else {
+            error("@ expected in relation (State@Process)");
+        }
+
+        if (current.kind != Symbol.UPPERIDENT) error("Process name expected after @");
+        rule.oldProcessName = current;
+
+        // ProcessNameを消費して '=' に進む
+        next_symbol(); 
+
+        // 3. = (遷移の開始)
+        // 修正: expectBecomes() は使わず、文字列表現も含めた堅牢なチェックを行う
+        if (current.kind == Symbol.BECOMES || current.toString().equals("=")) {
+            next_symbol(); // '=' を消費して次(最初のアクション)へ
+        } else {
+            error("= expected in relation rule. Found: " + current);
+        }
+
+        // ▼▼▼ デバッグ: ここでトークンがアクション（reconfigure等）になっているはず ▼▼▼
+        output.outln("DEBUG: Start parsing actions. Current: " + current + " Kind: " + current.kind);
+
+        // ▼▼▼ デバッグ用出力（動作確認後削除可） ▼▼▼
+        output.outln("DEBUG: Parsing rule body. First token: " + current);
+
+        // ▼▼▼ 修正: アクションチェーンの解析 ▼▼▼
+        // 4. アクションチェーンの解析
+        boolean foundReconfigure = false;
+
+        while (true) {
+            // 現在のトークンが RHS (State@Process) の開始かどうかをチェックする必要がある
+            // しかし、パーサの構造上、先読みは難しい。
+            // そこで、「ActionLabelsをパースしてみて、その直後に @ があれば RHS とみなす」
+            // という戦略をとるか、あるいは reconfigure 前後はアクションであることが確定しているので、
+            // ループ条件で判断する。
+
+            // FSPの文法上、アクション定義の終わりや、次の要素への区切りを判断する。
+            // ここでは簡易的に「ActionLabelsを読み込み、次が @ なら右辺、-> ならアクション継続」と判断します。
+
+            // ヘルパーメソッドでアクションを取得（予約語対応済み）
+            ActionLabels action = parseRobustAction();
+
+            // 直後の区切り文字判定
+            if (current.toString().equals("@")) {
+                // 右辺の状態定義へ
+                rule.newStateSelector = action;
+                next_symbol(); // '@' を消費
+                break;
+            } else if (current.kind == Symbol.ARROW) {
+                // アクション連鎖の続き ->
+                
+                // reconfigure判定
+                String actStr = action.toString();
+                if (action instanceof ActionName) {
+                    actStr = ((ActionName)action).name.toString();
+                }
+
+                if (!foundReconfigure && actStr.equals("reconfigure")) {
+                    foundReconfigure = true;
+                } else {
+                    if (foundReconfigure) {
+                        rule.postReconfigureActions.add(action);
+                    } else {
+                        rule.preReconfigureActions.add(action);
+                    }
+                }
+                
+                next_symbol(); // '->' を消費して次のアクションへ
+            } else {
+                // 期待しない区切り文字
+                error("-> or @ expected after action: " + action + ". Found: " + current);
+            }
+        }
+
+        if (!foundReconfigure) {
+            error("'reconfigure' action is mandatory in relation rule");
+        }
+
+        // 5. 右辺の残り: ProcessName
+        if (current.kind != Symbol.UPPERIDENT) error("Process name expected after @");
+        rule.newProcessName = current;
+        
+        next_symbol();
+        relDef.addRule(rule);
+    }
+
+    /**
+     * 予約語(Keyword)であってもアクション名として許容して読み込むヘルパーメソッド
+     */
+    private ActionLabels parseRobustAction() {
+        // 通常の識別子なら、標準のパーサ(parseStateSelector)を使う
+        // これにより配列 [i] やドット記法 a.b もサポートされる
+        if (current.kind == Symbol.IDENTIFIER || current.kind == Symbol.UPPERIDENT) {
+            return parseStateSelector();
+        }
+
+        // 識別子ではない場合（予約語 reconfigure や when, range 等）
+        // 区切り文字でなければ、強制的にActionNameとして扱う
+        if (isRelationSeparator(current)) {
+             error("Action name expected. Found: " + current);
+        }
+
+        ActionLabels act = new ActionName(current);
+        next_symbol(); // トークンを消費
+        return act;
+    }
+
+    /**
+     * relation定義における区切り文字かどうかを判定
+     */
+    private boolean isRelationSeparator(Symbol s) {
+        return s.kind == Symbol.ARROW ||        // ->
+               s.toString().equals("@") ||      // @
+               s.kind == Symbol.RCURLY ||       // }
+               s.kind == Symbol.EOFSYM;         // EOF
+    }
+
+    private void parseMap(Hashtable<String, CompositionExpression> composites, Hashtable<String, ProcessSpec> processes) {
+        // 1. 'map' キーワードの処理
+        if (current.kind == Symbol.MAP || (current.kind == Symbol.IDENTIFIER && current.toString().equals("map"))) {
+            next_symbol();
+        }
+        // もし既に消費されていて Identifier (Map名) になっている場合は何もしない
+
+        // 2. Map名
+        if (current.kind != Symbol.UPPERIDENT) {
+            error("Map Environment identifier expected");
+        }
+        Symbol mapName = current;
+        MapDefinition mapDef = new MapDefinition(mapName);
+
+        // Name -> '=' へ移動
+        next_symbol();
+
+        // 3. '=' のチェック
+        if (current.kind == Symbol.BECOMES || current.toString().equals("=")) {
+            // OK
+        } else {
+            error("= expected");
+        }
+
+        // '=' -> '{' へ移動
+        next_symbol();
+
+        // 4. '{' のチェック
+        if (current.kind != Symbol.LCURLY) {
+             error("{ expected");
+        }
+        next_symbol(); // '{' を消費して中身へ
+
+        // 5. Old Process Name
+        if (current.kind != Symbol.UPPERIDENT) error("Old process identifier expected. Found: " + current);
+        mapDef.oldProcess = current;
+        next_symbol();
+
+        if (current.kind != Symbol.COMMA) error(", expected");
+        next_symbol();
+
+        // 6. New Process Name
+        if (current.kind != Symbol.UPPERIDENT) error("New process identifier expected");
+        mapDef.newProcess = current;
+        next_symbol();
+
+        if (current.kind != Symbol.COMMA) error(", expected");
+        next_symbol();
+
+        // 7. Relation Name
+        if (current.kind != Symbol.UPPERIDENT) error("Relation identifier expected");
+        mapDef.relationName = current;
+        next_symbol();
+
+        // 8. 終了処理
+        if (current.kind != Symbol.RCURLY) {
+            error("} expected");
+        }
+        next_symbol(); // '}' を消費。ここで次のトークン（'.' や次の 'map'）になる
+
+        // Debug: } 消費前のトークン
+        output.outln("DEBUG: parseMap body finished. Current token: " + current);
+
+        // ▼▼▼ ピリオド処理（あれば消費、なければ何もしない） ▼▼▼
+        if (current.kind == Symbol.DOT) {
+            next_symbol(); 
+        }
+        // ▲▲▲ ▲▲▲
+
+        // Map定義の登録
+        createMapComposite(mapDef, composites, processes);
+        
+        // mapsフィールドへの登録が必要な場合（createMapComposite内でやっていれば不要だが念のため）
+        if (maps != null) {
+            maps.put(mapName.toString(), mapDef);
+        }
+
+        // ▼▼▼ 追加: 読み込んだトークンを戻す ▼▼▼
+        push_symbol();
+        // ▲▲▲ 追加ここまで ▲▲▲
+        
+        output.outln("DEBUG: parseMap returning. Next parsing should start from: " + current);
+    }
+
+    private void createMapComposite(MapDefinition mapDef,
+                                    Hashtable<String, CompositionExpression> composites,
+                                    Hashtable<String, ProcessSpec> processes) {
+        // 1. 定義を専用のテーブルに保存 (後でGeneratorが使います)
+        if (maps.put(mapDef.name.toString(), mapDef) != null) {
+            Diagnostics.fatal("duplicate map definition: " + mapDef.name, mapDef.name);
+        }
+
+        // 2. CompositionExpression として登録
+        // これを行うことで、他のプロセスから "||Sys = (MAP_ENV)." のように参照された際、
+        // 「未定義のプロセス」というエラーになるのを防ぎます。
+        CompositionExpression c = new CompositionExpression();
+        c.name = mapDef.name;
+
+        // 通常の合成と区別するため、空の状態にしておきます。
+        // 実際のLTSは compileMaps() フェーズで生成され、compiledテーブルに格納されるため、
+        // LTSAの仕組み上、ここが空でも compiled に実体があればそちらが優先して使われます。
+
+        // ▼▼▼ 修正: MapBody を生成して body にセットする (遅延評価の実現) ▼▼▼
+        // relations は LTSCompiler のフィールドにあるものを渡す
+        c.body = new MapBody(mapDef, this.relations); 
+        // ▲▲▲ 修正ここまで ▲▲▲
+
+        // 必要なフィールドへの参照を渡しておく（念のため）
+        c.setComposites(composites);
+        c.processes = processes;
+        c.compiledProcesses = compiled;
+        c.output = output;
+
+        // compositesテーブルへの登録
+        if (composites.put(c.name.toString(), c) != null) {
+            Diagnostics.fatal("duplicate composite definition: " + c.name, c.name);
+        }
+
+        // GUIのプルダウンメニュー用リストへの登録
+        if (allComposites != null) {
+            allComposites.put(c.name.toString(), c);
+        }
+
+        output.outln("INFO: Registered Map Environment: " + mapDef.name);
     }
 
     private Symbol parseInitialState() {

@@ -141,6 +141,22 @@ class StateMachine {
         // state to submachine map for ROLES feature definitions for ML
         CompactState c = new CompactState(kludgeName, stateToRole);
 
+        // ▼▼▼ 追加コード (CompactState生成直後に挿入) ▼▼▼
+        // 状態名(ラベル)とIDの対応情報をCompactStateに保存する
+        if (explicit_states != null) {
+            Enumeration<String> eLabels = explicit_states.keys();
+            while (eLabels.hasMoreElements()) {
+                String label = eLabels.nextElement();
+                Integer id = explicit_states.get(label);
+                c.addStateLabel(label, id.intValue());
+
+                // ▼▼▼ デバッグ用追加 (出力が多すぎる場合はコメントアウトしてください) ▼▼▼
+                output.outln("DEBUG: Mapped state label " + label + " -> " + id + " in process " + name);
+                // ▲▲▲ 追加ここまで ▲▲▲
+            }
+        }
+        // ▲▲▲ 追加コード終了 ▲▲▲
+
         c.maxStates = stateLabel.lastLabel().intValue();
         Integer ii = (Integer) explicit_states.get("END");
         if (ii != null) c.endseq = ii.intValue();

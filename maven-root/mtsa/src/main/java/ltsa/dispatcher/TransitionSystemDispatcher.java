@@ -5,8 +5,6 @@ import MTSSynthesis.ac.ic.doc.distribution.model.AlphabetDistribution;
 import MTSSynthesis.ac.ic.doc.distribution.model.DistributionFeedbackItem;
 import MTSSynthesis.ac.ic.doc.distribution.model.DistributionResult;
 import MTSSynthesis.ar.dc.uba.model.condition.*;
-import MTSSynthesis.ar.dc.uba.model.condition.FluentImpl;
-import MTSSynthesis.ar.dc.uba.model.condition.FluentPropositionalVariable;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.ar.dc.uba.util.FormulaToMarkedLTS;
 import MTSSynthesis.controller.*;
@@ -204,8 +202,11 @@ public class TransitionSystemDispatcher {
      * @param ltsOutput used for process output
      */
     public static void applyComposition(CompositeState toCompose, LTSOutput ltsOutput, Statistics ...stats) {
+        // 1. 合成の実行
+        // Dynamic Updateの場合、この中で applyUpdatingController が呼ばれます
         compose(toCompose, ltsOutput);
         try {
+            // 2. 追加オペレーション（最小化、決定化など）の適用
             toCompose.applyOperations(ltsOutput, stats);
         } catch (Exception e) {
             throw new LTSCompositionException("Error composing");
@@ -213,6 +214,8 @@ public class TransitionSystemDispatcher {
 
         // switch old actions to actions without old after having the winning
         // game
+        // 3. Dynamic Update特有の後処理
+        // 合成に成功した場合、古い遷移（Old Transitions）を削除する処理などがここで行われます
         if (Symbol.UPDATING_CONTROLLER == toCompose.getCompositionType() && toCompose.composition != null) {
             UpdatingControllersUtils.removeOldTransitions(toCompose);
         }
@@ -232,19 +235,26 @@ public class TransitionSystemDispatcher {
                 applyPlusCAOperator(toCompose, ltsOutput);
                 break;
             case Symbol.UPDATING_CONTROLLER:
+                // ★ここが重要★
+                // FSPで "updatingController" が指定されている場合、ここを通ります
                 applyUpdatingController(toCompose, ltsOutput);
                 break;
             case Symbol.OR:
             default:
+                // 通常の並列合成 "||" はこちら
                 parallelComposition(toCompose, ltsOutput);
         }
     }
 
     private static void applyUpdatingController(CompositeState toCompose, LTSOutput output) {
+        // 型チェック: UpdatingController用の特別なデータ構造か確認
         if (!(toCompose instanceof UpdatingControllerCompositeState)) {
             output.outln("MTSA tool is trying to solve an updatingController problem but the CompositeState given "
                     + "is not appropiated");
         }
+        // if(isOTF)
+        // {
+        // }
         UpdatingControllerSynthesizer.generateController((UpdatingControllerCompositeState) toCompose, output);
     }
 

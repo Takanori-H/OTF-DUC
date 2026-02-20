@@ -10,12 +10,16 @@ import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.DirectedControllerSynthe
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.gr1.Statistics;
 
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HAction;
+import ltsa.lts.LTSOutput;
 
 import java.util.*;
-import java.util.Set;
+
+import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 
 import static java.util.Collections.*;
 import static org.junit.Assert.*;
+
+import MTSSynthesis.ar.dc.uba.model.condition.Formula;
 
 
 /** This class contains the logic to synthesize a controller for
@@ -980,6 +984,4 @@ public class DirectedControllerSynthesisNonBlocking<State, Action> extends Direc
         }
         return result;
     }
-
-
 }

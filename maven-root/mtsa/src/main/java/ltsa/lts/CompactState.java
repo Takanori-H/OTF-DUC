@@ -32,6 +32,13 @@ public class CompactState implements Automata {
     private StateCodec coder;
 	private MyHashStack stateMap; // TODO: refactor
 
+    //状態名と状態番号の対応のための追加
+    /**
+     * 状態ラベル（ソースコード上の定義名）と、コンパイル後の状態番号の対応表。
+     * 例: "HEIGHT" -> 2, "BAT.5" -> 5
+     */
+    private Hashtable<String, Integer> stateLabelMap;
+
     public CompactState() {
     }
 
@@ -1382,5 +1389,38 @@ public class CompactState implements Automata {
         return stateRepr;
     }
     
-    
+    // /**
+    //  * 状態ラベルとIDの対応を登録する。コンパイラから呼び出される。
+    //  * @param label ソースコード上の状態名（例: "HEIGHT"）
+    //  * @param stateId 状態番号
+    //  */
+    // public void addStateLabel(String label, int stateId) {
+    //     if (stateLabelMap == null) {
+    //         stateLabelMap = new Hashtable<>();
+    //     }
+    //     stateLabelMap.put(label, stateId);
+    // }
+
+    // /**
+    //  * 状態ラベルに対応する状態番号を取得する。
+    //  * @param label 状態名
+    //  * @return 状態番号（存在しない場合は null）
+    //  */
+    // public Integer getStateId(String label) {
+    //     if (stateLabelMap == null) return null;
+    //     return stateLabelMap.get(label);
+    // }
+    // 追加コードから呼ばれるメソッド
+    public void addStateLabel(String label, int id) {
+        if (stateLabelMap == null) {
+            stateLabelMap = new Hashtable<>();
+        }
+        stateLabelMap.put(label, id);
+    }
+
+    // Generatorから呼ばれるメソッド：ラベルからIDを引く
+    public Integer getStateId(String label) {
+        if (stateLabelMap == null) return null;
+        return stateLabelMap.get(label);
+    }
 }

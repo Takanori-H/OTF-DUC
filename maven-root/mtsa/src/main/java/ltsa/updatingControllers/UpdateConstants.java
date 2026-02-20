@@ -12,4 +12,7 @@ public class UpdateConstants {
 	public static final String OLD_SUFFIX = "_UPD_OLD";
 	public static final String NEW_SUFFIX = "_UPD_NEW";
 
+	//ON-THE-FLY UPDATING CONTROLLER SYNTHESIS
+	public static final String HOTSWAP_BEGIN = "hotswap_begin";
+	public static final String HOTSWAP_END = "hotswap_end";
 }

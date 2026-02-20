@@ -3,6 +3,7 @@ package ltsa.updatingControllers.synthesis;
 import MTSSynthesis.ar.dc.uba.model.language.*;
 import MTSTools.ac.ic.doc.commons.relations.Pair;
 import MTSTools.ac.ic.doc.mtstools.model.MTS;
+import MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType;
 import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 import MTSTools.ac.ic.doc.mtstools.utils.GraphUtils;
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
@@ -20,8 +21,11 @@ import ltsa.lts.ltl.AssertDefinition;
 import ltsa.updatingControllers.UpdateConstants;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static ltsa.updatingControllers.UpdateConstants.*;
+
+import ltsa.lts.util.MTSUtils; // 追加
 
 public class UpdatingControllersUtils {
 
@@ -37,12 +41,16 @@ public class UpdatingControllersUtils {
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> stopAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> reconfigureAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> startAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
-		beginAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
+		//beginUpdateからhotswap_beginに変更
+		// beginAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
+		beginAction.add(new SingleSymbol(UpdateConstants.HOTSWAP_BEGIN));
 		stopAction.add(new SingleSymbol(UpdateConstants.STOP_OLD_SPEC));
 		reconfigureAction.add(new SingleSymbol(UpdateConstants.RECONFIGURE));
 		startAction.add(new SingleSymbol(UpdateConstants.START_NEW_SPEC));
 
-		beginFluent = new FluentImpl("BeginUpdate", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
+		//beginUpdateからhotswap_beginに変更
+		// beginFluent = new FluentImpl("BeginUpdate", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
+		beginFluent = new FluentImpl("HotswapBegin", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
 		stopFluent = new FluentImpl("StopOldSpec", stopAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
 		reconFluent = new FluentImpl("Reconfigure", reconfigureAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
 		startFluent = new FluentImpl("StartNewSpec", startAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
@@ -81,7 +89,9 @@ public class UpdatingControllersUtils {
 		grcg.addAllControllableActions(controllableSet);
 		Set<Fluent> involvedFluents = new HashSet<Fluent>();
 
-		addFluentAndAssumption(grcg, involvedFluents, BEGIN_UPDATE);
+		//beginUpdateからhotswap_beginに変更
+		// addFluentAndAssumption(grcg, involvedFluents, BEGIN_UPDATE);
+		addFluentAndAssumption(grcg, involvedFluents, HOTSWAP_BEGIN);
 		addFluentAndGuarantee(grcg, involvedFluents, STOP_OLD_SPEC);
 		addFluentAndGuarantee(grcg, involvedFluents, START_NEW_SPEC);
 		addFluentAndGuarantee(grcg, involvedFluents, RECONFIGURE);
@@ -274,5 +284,118 @@ public class UpdatingControllersUtils {
 
 		return action.contains(UpdateConstants.OLD_LABEL);
 	}
+
+	/**
+     * Transition Requirements (Symbol list) を CompactState (LTS) の Vector に変換する。
+     * FSP記述において、ltl_property T = [](...) のように Always演算子が含まれている必要がある。
+     *
+     * @param transitionGoals FSPで定義された遷移要件のシンボルリスト
+     * @param output ログ出力用
+     * @return コンパイルされたCompactStateのベクター
+     */
+    public static Vector<CompactState> compileTransitionRequirements(List<Symbol> transitionGoals, LTSOutput output) {
+        Vector<CompactState> transitionLTSs = new Vector<>();
+
+        if (transitionGoals == null) {
+            return transitionLTSs;
+        }
+
+        for (Symbol transitionSym : transitionGoals) {
+            String name = transitionSym.getName();
+            
+            // FSP内の ltl_property 定義を利用して LTS (CompactState) にコンパイル
+            // AssertDefinition.compileConstraint は定義名からProperty LTSを生成します
+            CompactState cs = AssertDefinition.compileConstraint(output, name);
+
+            if (cs != null) {
+                cs.name = name; // 名前を確実に設定
+                
+                // 【重要】FSP記述で [] (Always) を忘れている場合の警告
+                // OTF合成ではLTSの構造として制約を表現する必要があるため、全受理LTSは無意味です。
+                if (isUniversal(cs)) {
+                    output.outln("WARNING: Transition Requirement '" + name + "' produced a Universal LTS (accepts everything).");
+                    output.outln("       This usually happens if the LTL formula lacks '[]' (Always).");
+                    output.outln("       Please ensure the FSP definition is 'ltl_property " + name + " = [](...)' for OTF synthesis.");
+                }
+
+                transitionLTSs.add(cs);
+                // output.outln("Compiled Transition Requirement: " + name);
+            } else {
+                // 定義が見つからない、またはコンパイル失敗時
+                output.outln("Error: Transition Requirement '" + name + "' could not be compiled. Check if 'ltl_property' is defined correctly.");
+            }
+        }
+        return transitionLTSs;
+    }
+
+    /**
+     * LTSが実質的に制約なし（全受理）かどうかを判定するヘルパーメソッド。
+     * 状態数が1で、かつエラー状態(-1)への遷移を持たない場合、それは制約として機能していないとみなす。
+     * * @param cs 判定対象のCompactState
+     * @return 全受理(Universal)であれば true
+     */
+    private static boolean isUniversal(CompactState cs) {
+        // 状態数が1以外なら、何らかの状態変化（制約）があるか、または受理/非受理の区別があるはず
+        if (cs.maxStates != 1) return false;
+
+        // 唯一の状態 (index 0) からの遷移リストを確認
+        // CompactStateのstatesフィールドはpublicなので直接アクセス可能
+        EventState current = cs.states[0];
+        
+        while (current != null) {
+            // フィールド .next の代わりに getNext() を使用
+            if (current.getNext() == -1) return false;
+            
+            // 注: Property LTSは通常決定化(determinise)されているため、
+            // nondet (非決定性遷移) のチェックは省略していますが、
+            // 念のためチェックするならここで current.nondet も走査が必要です。
+            // 現状の用途(AssertDefinition経由)では決定化されている前提で進めます。
+
+            // フィールド .list の代わりに getList() を使用
+            current = current.getList();
+        }
+
+        // 状態が1つだけで、どこからもエラー状態への遷移がない
+        // = どんなアクションが来ても自分自身(0)に戻る = 全てを許容する
+        return true;
+    }
+
+	/**
+     * CompactStateの構造を詳細にログ出力するメソッド
+     * デバッグ用：LTLプロパティが正しく変換されているか確認する
+     */
+    public static void logCompactState(CompactState cs, LTSOutput output) {
+        if (cs == null) {
+            output.outln("CompactState is null.");
+            return;
+        }
+
+        output.outln("--- Debug: CompactState Structure [" + cs.name + "] ---");
+        output.outln("States: " + cs.maxStates);
+        output.outln("Alphabet: " + java.util.Arrays.toString(cs.alphabet));
+
+        for (int i = 0; i < cs.maxStates; i++) {
+            output.outln("State " + i + ":");
+            ltsa.lts.EventState current = cs.states[i];
+            
+            if (current == null) {
+                // 遷移がない場合（通常ありえないが、末端状態など）
+                output.outln("  (no transitions)");
+            }
+
+            while (current != null) {
+                int eventIdx = current.getEvent();
+                int nextState = current.getNext();
+                
+                String eventName = (eventIdx < cs.alphabet.length) ? cs.alphabet[eventIdx] : "Unknown(" + eventIdx + ")";
+                String dest = (nextState == -1) ? "ERROR (-1)" : String.valueOf(nextState);
+
+                output.outln("  -> " + eventName + " -> " + dest);
+
+                current = current.getList();
+            }
+        }
+        output.outln("-------------------------------------------------------");
+    }
 
 }

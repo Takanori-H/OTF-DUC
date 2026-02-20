@@ -228,13 +228,34 @@ public class CompositionExpression {
         // Vector references; // list of parsed process references
         if (actuals != null)
             doParams(actuals);
-        if (!makeControlStack) {// there is no body 
-        	try {
-            	body.compose(this, machines, locals);
-        	} catch (StackOverflowError e) {
-        		Diagnostics.fatal("recursive expression while parallel composing (2): " + name, name);
-			}
+        // if (!makeControlStack) {// there is no body 
+        // 	try {
+        //     	body.compose(this, machines, locals);
+        // 	} catch (StackOverflowError e) {
+        // 		Diagnostics.fatal("recursive expression while parallel composing (2): " + name, name);
+		// 	}
 
+        // }
+        if (!makeControlStack) {
+            // ▼▼▼ 修正箇所: bodyがnullの場合のガードと、コンパイル済みプロセスの取得ロジックを追加 ▼▼▼
+            if (body != null) {
+                try {
+                    body.compose(this, machines, locals);
+                } catch (StackOverflowError e) {
+                    Diagnostics.fatal("recursive expression while parallel composing (2): " + name, name);
+                }
+            } else {
+                // bodyがない場合（MapEnvironmentなど）、すでにコンパイル済みのプロセスが存在するか確認して追加する
+                String targetName = name.toString();
+                // パラメータがある場合は名前が変わる可能性があるが、現時点ではMapはパラメータなしとする
+                if (compiledProcesses.containsKey(targetName)) {
+                    machines.addElement(compiledProcesses.get(targetName));
+                } else {
+                    // bodyもなくコンパイル済みでもない場合はエラー
+                     Diagnostics.fatal("Composition body is null and no compiled process found for: " + name, name);
+                }
+            }
+            // ▲▲▲ 修正ここまで ▲▲▲
         }
         Vector<CompactState> flatmachines = new Vector<CompactState>();
         for (Object o : machines) { // machines contains a mixture of two
