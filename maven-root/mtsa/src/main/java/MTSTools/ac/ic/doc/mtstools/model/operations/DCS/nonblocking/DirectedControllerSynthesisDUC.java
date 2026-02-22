@@ -24,7 +24,6 @@ import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.
 import ltsa.lts.LTSOutput;
 import ltsa.updatingControllers.UpdateConstants;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.gr1.Statistics;
-import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.TransitionSet;
 
 public class DirectedControllerSynthesisDUC<State, Action> extends DirectedControllerSynthesis<State, Action> {
 
@@ -159,10 +158,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 // ※詳細な内訳を測る場合は getNextState 内に埋めますが、
                 //   まずは外側で「選択にかかる総時間」を測ります。
                 long startHeuristic = System.nanoTime();
-
-                // Pair<CompostateDUC<State, Action>, HAction<State, Action>> action = heuristic.getNextAction();
-                // statistics.endHeuristicTime();
-                // expandDUC(action.getFirst(), action.getSecond());
 
                 Pair<CompostateDUC<State, Action>, HAction<State, Action>> next = heuristic.getNextAction();
 
@@ -431,23 +426,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public boolean isTrace(int ltsIndex, long markingState) {
-        // 1. Old Controller (OC)
-        // hotswap後 (State 1-9) は Trace しない (切り離し)
-        // if (ltsIndex == idxOC && markingState >= 1 && markingState <= 9) return
-        // false;
-
-        // // 1. Old Controller (OC)
-        // // ★修正: hotswap後でも、stopOldSpecが発火するまではTraceし続ける
-        // if (ltsIndex == idxOC) {
-        // if (markingState >= 1 && markingState <= 9) {
-        // // mask = markingState - 1
-        // // Bit 1 (Value 1) = stopOldSpec done
-        // // ((markingState - 1) & 1) == 0 ならば stopOldSpec 未完了 -> Trace=TRUE
-        // return ((markingState - 1) & 1) == 0;
-        // }
-        // // State 0 (Pre-Update) は常に Trace=TRUE
-        // return true;
-        // }
 
         // 1. Old Controller (OC)
         // ★修正：hotswap_begin が発火した瞬間（State 1以上）にトレースを OFF にする。
@@ -556,8 +534,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // expandDUC メソッド内の buildCompostate 呼び出し直後
         if (child != null && isError(child)) {
             if(debugLogEnabled){
-            System.out.println(String.format("  [Safety-Violation] Action '%s' leads to ERROR state from %s", action, state.getStates()));
-            System.out.println("    -> Error Vector: " + child.getStates());
+                System.out.println(String.format("  [Safety-Violation] Action '%s' leads to ERROR state from %s", action, state.getStates()));
+                System.out.println("    -> Error Vector: " + child.getStates());
             }
         }
 
@@ -617,18 +595,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             transSb.append("]");
 
             log("  Available Transitions:     " + transSb.toString());
-
-            // log(" Available Transitions: " + state.getTransitions());
-
-            // // ★追加: drill と out が候補にない場合、その理由を診断する
-            // String transitionsStr = state.getTransitions().toString();
-
-            // if (!transitionsStr.contains("drill")) {
-            // debugCheckActionAvailability(state, "drill");
-            // }
-            // if (!transitionsStr.contains("out")) {
-            // debugCheckActionAvailability(state, "out");
-            // }
 
             log("  Selected Action:           " + action);
 
@@ -728,36 +694,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         return isSafeInNC;
     }
-    /*
-    private boolean checkHotswapEndCondition(CompostateDUC<State, Action> state) {
-        for (int i = mappingStart; i <= mappingEnd; i++) {
-            Object mapEnvStateObj = state.getStates().get(i);
-
-            Integer mapEnvStateInt = null;
-            if (mapEnvStateObj instanceof Long) {
-                mapEnvStateInt = ((Long) mapEnvStateObj).intValue();
-            } else if (mapEnvStateObj instanceof Integer) {
-                mapEnvStateInt = (Integer) mapEnvStateObj;
-            } else {
-                if (debugLogEnabled) {
-                    log("  [HotswapEnd Check] Unknown State Type at LTS " + i + ": "
-                            + mapEnvStateObj.getClass().getName());
-                }
-                return false;
-            }
-
-            Map<Integer, Integer> map = mappingMapEnvToNewEnv.get(i - mappingStart);
-            if (!map.containsKey(mapEnvStateInt)) {
-                if (debugLogEnabled) {
-                    log("  [HotswapEnd Check] FAILED at LTS " + i + ". Current State=" + mapEnvStateInt
-                            + " not found in Map.");
-                }
-                return false;
-            }
-        }
-        return true;
-    }
-    */
 
     private List<State> getChildStatesDUC(CompostateDUC<State, Action> state, HAction<State, Action> action) {
         List<State> parentStates = state.getStates();
@@ -767,9 +703,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         String actionName = action.toString();
         boolean isOldAction = actionName.endsWith("_old");
         String strippedActionName = isOldAction ? actionName.replace("_old", "") : actionName;
-
-        // ★追加: 更新アクションかどうかの判定
-        boolean isUpdate = isUpdateAction(actionName);
 
         // 1. まず全コンポーネントの標準的な遷移を計算する
         // (これにより、Action Fluent は startNewSpec に反応して False/State0 に遷移する)
@@ -795,32 +728,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 if (!found)
                     childStates.add(curr);
             }
-            // // ★修正 Case B: Update Phase (State >= 1) + OC (i == idxOC)
-            // // OCがトレース中の場合、システムアクションを _old に変換して追従させる
-            // else if (markingState >= 1 && i == idxOC) {
-            // if (isUpdate) {
-            // // 更新事象(hotswap等)はOCは知らないため、_oldはつけず、状態維持(無視)する
-            // childStates.add(curr);
-            // } else {
-            // // システムアクション(drill等)は _old をつけて遷移を探す
-            // String ocActionName = actionName + "_old";
-            // boolean found = false;
-            // for (Pair<Action, State> trans : lts.getTransitions(curr)) {
-            // if (trans.getFirst().toString().equals(ocActionName)) {
-            // childStates.add(trans.getSecond());
-            // found = true;
-            // break;
-            // }
-            // }
-
-            // if (found) {
-            // // 遷移が見つかればそれに従う
-            // } else {
-            // // Traceすべきアクションが見つからない場合、同期失敗としてブロック(null)
-            // return null;
-            // }
-            // }
-            // }
             // Standard Case
             else {
                 Set<State> image = lts.getTransitions(curr).getImage(rawAction);
@@ -868,15 +775,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return childStates;
     }
 
-    // ★追加: ヘルパーメソッド
-    private boolean isUpdateAction(String actionName) {
-        return actionName.equals(UpdateConstants.HOTSWAP_BEGIN) ||
-                actionName.equals(UpdateConstants.HOTSWAP_BEGIN) ||
-                actionName.equals(UpdateConstants.STOP_OLD_SPEC) ||
-                actionName.equals(UpdateConstants.RECONFIGURE) ||
-                actionName.equals(UpdateConstants.START_NEW_SPEC);
-    }
-
     private void explore(CompostateDUC<State, Action> parent, HAction<State, Action> action,
             CompostateDUC<State, Action> child) {
         if (isError(child) || child.heuristicStronglySuggestsIsError) {
@@ -900,74 +798,42 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             DUCProfiler.timePropagation += (System.nanoTime() - sProp);
         }
         else {
-        // --- 計測：ループ検知 ---
-        long sLoop = System.nanoTime();
-        boolean isLoop = closingALoop(parent, child);
-        if (isLoop) {
-            gatherLoopStates(child);
-        }
-        DUCProfiler.timeLoopCheck += (System.nanoTime() - sLoop);
+            // --- 計測：ループ検知 ---
+            long sLoop = System.nanoTime();
+            boolean isLoop = closingALoop(parent, child);
+            if (isLoop) {
+                gatherLoopStates(child);
+            }
+            DUCProfiler.timeLoopCheck += (System.nanoTime() - sLoop);
 
-        if (isLoop) {
-            // ループ処理ロジック
-            boolean isPreUpdateLoop = true;
-            for (CompostateDUC<State, Action> s : loop) {
-                if (getMarkingState(s) != 0) {
-                    isPreUpdateLoop = false;
-                    break;
+            if (isLoop) {
+                // ループ処理ロジック
+                boolean isPreUpdateLoop = true;
+                for (CompostateDUC<State, Action> s : loop) {
+                    if (getMarkingState(s) != 0) {
+                        isPreUpdateLoop = false;
+                        break;
+                    }
                 }
-            }
 
-            if (isPreUpdateLoop) {
-                // --- 計測：Phase 2 強制起動 (伝播扱い) ---
-                long sProp = System.nanoTime();
-                propagateGoal(new HashSet<>(), singleton(parent));
-                DUCProfiler.timePropagation += (System.nanoTime() - sProp);
-            } else {
-                // --- 計測：不動点計算 (Heavy!) ---
-                long sFP = System.nanoTime();
-                if (probablyWinningStates.size() > 0)
-                    findNewGoals();
-                else
-                    findNewErrors();
-                DUCProfiler.timeFixedPoint += (System.nanoTime() - sFP);
-            }
-        } else {
-            heuristic.notifyExpansionDidntFindAnything(parent, action, child);
-        }
-    }
-        /*
-        else if (closingALoop(parent, child)) {
-            gatherLoopStates(child);
-            // ★追加: Marking State 0 (Pre-Update) のループチェック
-            boolean isPreUpdateLoop = true;
-            for (CompostateDUC<State, Action> s : loop) {
-                if (getMarkingState(s) != 0) {
-                    isPreUpdateLoop = false;
-                    break;
+                if (isPreUpdateLoop) {
+                    // --- 計測：Phase 2 強制起動 (伝播扱い) ---
+                    long sProp = System.nanoTime();
+                    propagateGoal(new HashSet<>(), singleton(parent));
+                    DUCProfiler.timePropagation += (System.nanoTime() - sProp);
+                } else {
+                    // --- 計測：不動点計算 (Heavy!) ---
+                    long sFP = System.nanoTime();
+                    if (probablyWinningStates.size() > 0)
+                        findNewGoals();
+                    else
+                        findNewErrors();
+                    DUCProfiler.timeFixedPoint += (System.nanoTime() - sFP);
                 }
-            }
-            if (isPreUpdateLoop) {
-                // Marking 0 でのループは OC の正常動作なのでエラーとしない。
-                // hotswap_begin という「逃げ道(Controllable)」がある限り、
-                // このループに留まり続けることは「負け」ではない。
-                // 探索はこのパスについてはここで打ち切り（既に展開済みへ合流したため）。
-                // 何もしなくて良い。
-
-                // ★修正: ループが閉じたことをきっかけに、不動点計算（Phase 2）を強制起動する
-                System.out.println("  [Loop-Closed] OC-loop closed. Triggering Phase 2 verification...");
-                propagateGoal(new HashSet<>(), singleton(parent));
             } else {
-                // 更新プロセス中のループは Livelock (更新完了しない) なのでエラー
-                if (probablyWinningStates.size() > 0)
-                    findNewGoals();
-                else
-                    findNewErrors();
+                heuristic.notifyExpansionDidntFindAnything(parent, action, child);
             }
-        } else {
-            heuristic.notifyExpansionDidntFindAnything(parent, action, child);
         }
-        */
         dag.clear();
     }
 
@@ -1313,160 +1179,92 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     */
 
     /**
- * キュー（Worklist）方式によるエラーの逆伝播処理。
- * 先祖の全スキャンを避け、ステータスが変化したノードの親のみを再評価します。
- */
-private void propagateError(Set<CompostateDUC<State, Action>> newErrors, Set<CompostateDUC<State, Action>> seedParents) {
-    long start = System.nanoTime();
-    statistics.incPropagateErrorsCalls();
+     * キュー（Worklist）方式によるエラーの逆伝播処理。
+     * 先祖の全スキャンを避け、ステータスが変化したノードの親のみを再評価します。
+     */
+    private void propagateError(Set<CompostateDUC<State, Action>> newErrors, Set<CompostateDUC<State, Action>> seedParents) {
+        long start = System.nanoTime();
+        statistics.incPropagateErrorsCalls();
 
-    // 1. 処理対象を管理するキュー (重複を許さない集合も併用)
-    Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
-    if (newErrors != null) queue.addAll(newErrors);
-    if (seedParents != null) {
-        for (CompostateDUC<State, Action> p : seedParents) {
-            if (!queue.contains(p)) queue.add(p);
+        // 1. 処理対象を管理するキュー (重複を許さない集合も併用)
+        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
+        if (newErrors != null) queue.addAll(newErrors);
+        if (seedParents != null) {
+            for (CompostateDUC<State, Action> p : seedParents) {
+                if (!queue.contains(p)) queue.add(p);
+            }
         }
-    }
 
-    // 2. Worklist 処理
-    while (!queue.isEmpty()) {
-        CompostateDUC<State, Action> current = queue.poll();
+        // 2. Worklist 処理
+        while (!queue.isEmpty()) {
+            CompostateDUC<State, Action> current = queue.poll();
 
-        // すでにエラー確定済みの場合は、その親たちをチェックリストに入れる
-        if (isError(current)) {
-            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : current.getParents()) {
-                CompostateDUC<State, Action> parent = pRel.getSecond();
-                if (!isError(parent) && !isGoal(parent)) {
-                    if (!queue.contains(parent)) queue.add(parent);
+            // すでにエラー確定済みの場合は、その親たちをチェックリストに入れる
+            if (isError(current)) {
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : current.getParents()) {
+                    CompostateDUC<State, Action> parent = pRel.getSecond();
+                    if (!isError(parent) && !isGoal(parent)) {
+                        if (!queue.contains(parent)) queue.add(parent);
+                    }
+                }
+                continue;
+            }
+
+            // 3. エラー判定の再評価 (AND/OR グラフの標準論理)
+            if (checkIfShouldBecomeError(current)) {
+                if (debugLogEnabled) {
+                    output.outln("  [Propagate-Error] State " + current.getStates() + " is now ERROR.");
+                }
+            
+                setError(current); // 内部で Status.ERROR をセット
+            
+                // 自身がエラーになったので、その親たちをキューへ追加
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : current.getParents()) {
+                    CompostateDUC<State, Action> parent = pRel.getSecond();
+                    if (!isError(parent) && !isGoal(parent)) {
+                        if (!queue.contains(parent)) queue.add(parent);
+                    }
                 }
             }
-            continue;
         }
-
-        // 3. エラー判定の再評価 (AND/OR グラフの標準論理)
-        if (checkIfShouldBecomeError(current)) {
-            if (debugLogEnabled) {
-                output.outln("  [Propagate-Error] State " + current.getStates() + " is now ERROR.");
-            }
-            
-            setError(current); // 内部で Status.ERROR をセット
-            
-            // 自身がエラーになったので、その親たちをキューへ追加
-            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : current.getParents()) {
-                CompostateDUC<State, Action> parent = pRel.getSecond();
-                if (!isError(parent) && !isGoal(parent)) {
-                    if (!queue.contains(parent)) queue.add(parent);
-                }
-            }
-        }
+        DUCProfiler.timePropagateErrorTotal += (System.nanoTime() - start);
     }
-    DUCProfiler.timePropagateErrorTotal += (System.nanoTime() - start);
-}
 
-/**
- * 補助メソッド: 指定された状態がエラーになるべきか判定する
- */
-private boolean checkIfShouldBecomeError(CompostateDUC<State, Action> state) {
-    // A. 環境によって強制的にエラー（安全性違反やデッドロック）へ連れて行かれるか
-    if (forcedToError(state)) return true;
+    /**
+     * 補助メソッド: 指定された状態がエラーになるべきか判定する
+     */
+    private boolean checkIfShouldBecomeError(CompostateDUC<State, Action> state) {
+        // A. 環境によって強制的にエラー（安全性違反やデッドロック）へ連れて行かれるか
+        if (forcedToError(state)) return true;
 
-    // B. 勝ち筋（GOALへのパス）が残っているか
-    // Controllableな遷移のうち、少なくとも1つが「エラーでない（＝勝てる可能性がある）」ならまだ生き残れる
-    boolean hasPotentialWinningMove = false;
+        // B. 勝ち筋（GOALへのパス）が残っているか
+        // Controllableな遷移のうち、少なくとも1つが「エラーでない（＝勝てる可能性がある）」ならまだ生き残れる
+        boolean hasPotentialWinningMove = false;
     
-    // 現在展開済みの遷移をチェック
-    for (HAction<State, Action> action : state.getTransitions()) {
-        if (action.isControllable()) {
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+        // 現在展開済みの遷移をチェック
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (action.isControllable()) {
+                Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
             
-            // まだ展開していないアクションがあるなら、それは勝てる可能性があるとみなす
-            if (children == null || children.isEmpty()) {
-                hasPotentialWinningMove = true;
-                break;
-            }
-            
-            // 展開済みの子の中に、エラーでないものが1つでもあればOK
-            for (CompostateDUC<State, Action> child : children) {
-                if (!isError(child)) {
+                // まだ展開していないアクションがあるなら、それは勝てる可能性があるとみなす
+                if (children == null || children.isEmpty()) {
                     hasPotentialWinningMove = true;
                     break;
                 }
-            }
-        }
-        if (hasPotentialWinningMove) break;
-    }
-
-    // Controllable な手が一つも残っていない場合はエラー
-    return !hasPotentialWinningMove;
-}
-
-    private Set<CompostateDUC<State, Action>> ancestorsUpToGoalOrError(Set<CompostateDUC<State, Action>> states) {
-        Set<CompostateDUC<State, Action>> ancestorsSet = new HashSet<>();
-        auxiliarListStates.clear();
-        auxiliarListStates.addAll(states);
-        visited.clear();
-        visited.addAll(states);
-
-        for (int i = 0; i < auxiliarListStates.size(); ++i) {
-            CompostateDUC<State, Action> state = auxiliarListStates.get(i);
-
-            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> ancestorActionAndState : state
-                    .getParents()) {
-                CompostateDUC<State, Action> ancestor = ancestorActionAndState.getSecond();
-
-                // まだ判定が出ていない(NONE)親だけを遡る
-                if (!isGoal(ancestor) && !isError(ancestor) && visited.add(ancestor)) {
-                    ancestorsSet.add(ancestor);
-                    auxiliarListStates.add(ancestor);
+            
+                // 展開済みの子の中に、エラーでないものが1つでもあればOK
+                for (CompostateDUC<State, Action> child : children) {
+                    if (!isError(child)) {
+                        hasPotentialWinningMove = true;
+                        break;
+                    }
                 }
             }
+            if (hasPotentialWinningMove) break;
         }
-        visited.clear();
-        auxiliarListStates.clear();
-        return ancestorsSet;
-    }
 
-    private Set<CompostateDUC<State, Action>> gatherWinningTargetsForPropagateError(
-            Set<CompostateDUC<State, Action>> c) {
-        Set<CompostateDUC<State, Action>> targets = new HashSet<>();
-        for (CompostateDUC<State, Action> state : c) {
-            if (!heuristic.fullyExplored(state)) {
-                targets.add(state);
-            }
-            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : state.getExploredChildren()) {
-                CompostateDUC<State, Action> child = transition.getSecond();
-                if (!isError(child) && !c.contains(child)) {
-                    targets.add(child);
-                }
-            }
-        }
-        return gatherTargetAncestors(c, targets);
-    }
-
-    private Set<CompostateDUC<State, Action>> gatherTargetAncestors(Set<CompostateDUC<State, Action>> c,
-            Set<CompostateDUC<State, Action>> targets) {
-        Set<CompostateDUC<State, Action>> targetsAncestors = new HashSet<>(targets);
-        auxiliarListStates.clear();
-        auxiliarListStates.addAll(targets);
-
-        for (int i = 0; i < auxiliarListStates.size(); ++i) {
-            CompostateDUC<State, Action> state = auxiliarListStates.get(i);
-
-            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> predecesorActionAndState : state
-                    .getParents()) {
-                CompostateDUC<State, Action> parent = predecesorActionAndState.getSecond();
-
-                if (isGoal(parent) || isError(parent) || !c.contains(parent))
-                    continue;
-
-                if (targetsAncestors.add(parent)) {
-                    auxiliarListStates.add(parent);
-                }
-            }
-        }
-        auxiliarListStates.clear();
-        return targetsAncestors;
+        // Controllable な手が一つも残っていない場合はエラー
+        return !hasPotentialWinningMove;
     }
 
     /**
@@ -1802,237 +1600,6 @@ private boolean checkIfShouldBecomeError(CompostateDUC<State, Action> state) {
 
         return sb.toString();
     }
-    /*
-    private String generateNCSignature(CompostateDUC<State, Action> child) {
-        List<State> states = child.getStates();
-        StringBuilder sb = new StringBuilder();
-
-        // 1. Environment セグメントの翻訳
-        for (int k = mappingStart; k <= mappingEnd; k++) {
-            if (k > mappingStart) sb.append(",");
-            Object mapEnvState = states.get(k);
-            Integer mapEnvId = (mapEnvState instanceof Long) ? ((Long) mapEnvState).intValue() : (Integer) mapEnvState;
-            
-            // MappingEnv ID -> NewEnv ID への変換
-            Integer newEnvId = mappingMapEnvToNewEnv.get(k - mappingStart).get(mapEnvId);
-            sb.append(newEnvId);
-        }
-
-        sb.append("|");
-
-        // 2. New Safety セグメント (startNewSpec 時に変換済みのため、そのまま使用)
-        for (int k = newSafeStart; k <= newSafeEnd; k++) {
-            if (k > newSafeStart) sb.append(",");
-            Object safeState = states.get(k);
-            // Long 型で入っているため単純に連結
-            sb.append(safeState);
-        }
-
-        return sb.toString();
-    }
-    */
-
-    // private LTS<Long, Action> buildDirectorDUC() {
-    //     long i = 0;
-    //     LTSImpl<Long, Action> result = new LTSImpl<>(i);
-    //     Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
-
-    //     ids.put(initial, i++);
-    //     result.addActions(alphabet.getActions());
-    //     @SuppressWarnings("unchecked")
-    //     Set<Action> ncActions = (Set<Action>) newController.getActions();
-    //     result.addActions(ncActions);
-
-    //     Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
-    //     queue.add(initial);
-    //     result.addState(ids.get(initial));
-
-    //     while (!queue.isEmpty()) {
-    //         CompostateDUC<State, Action> current = queue.remove();
-    //         Long currentId = ids.get(current);
-
-    //         for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : current
-    //                 .getExploredChildren()) {
-    //             HAction<State, Action> hAction = transition.getFirst();
-    //             CompostateDUC<State, Action> child = transition.getSecond();
-
-    //             // 1. Uncontrollable は常に含める
-    //             boolean toAdd = !hAction.isControllable();
-                
-    //             // 2. Controllable のフィルタリング
-    //             if (hAction.isControllable()) {
-    //                 // ★修正：Anytime Hotswap のための非決定的な許可
-    //                 // hotswap_begin が勝利（Goal）に繋がるなら、他の最善手に関わらず必ず追加する。
-    //                 // これにより、Transition Requirement で禁止されていない限りいつでも更新を開始できる。
-    //                 if (hAction.toString().equals("hotswap_begin") && isGoal(child)) {
-    //                     toAdd = true;
-    //                     log("  [Director] Forcing Anytime Hotswap transition: " + hAction + " from " + current.getStates());
-    //                 } 
-    //                 // 3. 通常の勝利パス（actionToGoal）または距離計算上の最善手の採用
-    //                 else if (current.actionToGoal != null && current.actionToGoal.equals(hAction)) {
-    //                     toAdd = true;
-    //                     log("  [Director] Adding ActionToGoal: " + hAction);
-    //                 } else {
-    //                     Pair<Integer, CompostateDUC<State, Action>> best = current.getBestControllable();
-    //                     // best.getSecond() は CompostateDUC オブジェクト
-    //                     if (best != null && best.getSecond() == child) {
-    //                         toAdd = true;
-    //                         log("  [Director] Adding BestControllable: " + hAction);
-    //                     } else {
-    //                         // 最善手でない勝利アクションは通常どおりスキップ（非決定的分岐を抑制）
-    //                     }
-    //                 }
-    //             }
-
-    //             if (toAdd) {
-    //                 Long childId;
-    //                 boolean isTerminalGoal = (getMarkingState(child) == 9);
-
-    //                 if (isTerminalGoal) {
-    //                     if (!ids.containsKey(child)) {
-    //                         childId = i++;
-    //                         ids.put(child, childId);
-    //                         result.addState(childId);
-    //                         log("Goal Reached (Stitching disabled). State ID: " + childId);
-    //                     } else {
-    //                         childId = ids.get(child);
-    //                     }
-    //                 } else {
-    //                     if (!ids.containsKey(child)) {
-    //                         childId = i++;
-    //                         ids.put(child, childId);
-    //                         result.addState(childId);
-    //                         queue.add(child);
-    //                     } else {
-    //                         childId = ids.get(child);
-    //                     }
-    //                 }
-
-    //                 String actionName = hAction.toString().replace("_old", "");
-    //                 @SuppressWarnings("unchecked")
-    //                 Action finalAction = (Action) actionName;
-    //                 result.addTransition(currentId, finalAction, childId);
-    //             }
-    //         }
-    //     }
-    //     statistics.setControllerUsedStates(result.getStates().size());
-    //     return result;
-    // }
-    
-    // private LTS<Long, Action> buildDirectorDUC() {
-    //     long i = 0;
-    //     LTSImpl<Long, Action> result = new LTSImpl<>(i);
-    //     Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
-
-    //     ids.put(initial, i++);
-    //     result.addActions(alphabet.getActions());
-    //     @SuppressWarnings("unchecked")
-    //     Set<Action> ncActions = (Set<Action>) newController.getActions();
-    //     result.addActions(ncActions);
-
-    //     Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
-    //     queue.add(initial);
-    //     result.addState(ids.get(initial));
-
-    //     while (!queue.isEmpty()) {
-    //         CompostateDUC<State, Action> current = queue.remove();
-    //         Long currentId = ids.get(current);
-
-    //         for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : current
-    //                 .getExploredChildren()) {
-    //             HAction<State, Action> hAction = transition.getFirst();
-    //             CompostateDUC<State, Action> child = transition.getSecond();
-
-    //             boolean toAdd = !hAction.isControllable();
-    //             if (hAction.isControllable()) {
-    //                 // ゴールへのパスとしてマークされたもの、またはBestとして選ばれたものを採用
-    //                 if (current.actionToGoal != null && current.actionToGoal.equals(hAction)) {
-    //                     toAdd = true;
-    //                     log("  [Director] Adding ActionToGoal: " + hAction);
-    //                 } else {
-    //                     Pair<Integer, CompostateDUC<State, Action>> best = current.getBestControllable();
-    //                     if (best != null && best.getSecond() == child) {
-    //                         toAdd = true;
-    //                         log("  [Director] Adding BestControllable: " + hAction);
-    //                     } else {
-    //                         log("  [Director] Skip " + hAction + " (Not Best: "
-    //                                 + (best == null ? "null" : best.getSecond()) + ")");
-    //                     }
-    //                 }
-    //             }
-
-    //             if (toAdd) {
-    //                 Long childId;
-
-    //                 // ★修正: 単に isGoal(child) ではなく、Marking 9 (Stitching対象) かどうかで判定
-    //                 boolean isTerminalGoal = (getMarkingState(child) == 9);
-
-    //                 if (isTerminalGoal) {
-    //                     // ★修正: デバッグのため NC との接続 (Stitching) を一時的に無効化
-    //                     /*
-    //                      * StringBuilder keyBuilder = new StringBuilder();
-    //                      * for (int k = mappingStart; k <= mappingEnd; k++) {
-    //                      * Object mapEnvStateObj = child.getStates().get(k);
-    //                      * Map<Integer, Integer> map = mappingMapEnvToNewEnv.get(k - mappingStart);
-    //                      * Integer newEnvState = map.get(mapEnvStateObj);
-    //                      * keyBuilder.append(newEnvState).append(",");
-    //                      * }
-    //                      * 
-    //                      * if (newSafeStart != -1) {
-    //                      * for (int k = newSafeStart; k <= newSafeEnd; k++) {
-    //                      * Object newSafeStateObj = child.getStates().get(k);
-    //                      * keyBuilder.append(newSafeStateObj);
-    //                      * if (k < newSafeEnd) keyBuilder.append(",");
-    //                      * }
-    //                      * }
-    //                      * 
-    //                      * String key = keyBuilder.toString();
-    //                      * Long ncStateID = newControllerConnectionMap.get(key);
-    //                      * 
-    //                      * if (!ids.containsKey(child)) {
-    //                      * childId = i++;
-    //                      * ids.put(child, childId);
-    //                      * result.addState(childId);
-    //                      * if (ncStateID != null) {
-    //                      * log("Stitching to NC State: " + ncStateID + " (Key=" + key + ")");
-    //                      * } else {
-    //                      * log("Warning: No NC State found for Key=" + key);
-    //                      * }
-    //                      * } else {
-    //                      * childId = ids.get(child);
-    //                      * }
-    //                      */
-
-    //                     // ★代替処理: 単純にグラフ上のノードとして追加する
-    //                     if (!ids.containsKey(child)) {
-    //                         childId = i++;
-    //                         ids.put(child, childId);
-    //                         result.addState(childId);
-    //                         log("Goal Reached (Stitching disabled). State ID: " + childId);
-    //                     } else {
-    //                         childId = ids.get(child);
-    //                     }
-    //                 } else {
-    //                     if (!ids.containsKey(child)) {
-    //                         childId = i++;
-    //                         ids.put(child, childId);
-    //                         result.addState(childId);
-    //                         queue.add(child);
-    //                     } else {
-    //                         childId = ids.get(child);
-    //                     }
-    //                 }
-
-    //                 String actionName = hAction.toString().replace("_old", "");
-    //                 @SuppressWarnings("unchecked")
-    //                 Action finalAction = (Action) actionName;
-    //                 result.addTransition(currentId, finalAction, childId);
-    //             }
-    //         }
-    //     }
-    //     statistics.setControllerUsedStates(result.getStates().size());
-    //     return result;
-    // }
 
     public boolean isGoal(CompostateDUC<State, Action> state) {
         return state.isStatus(Status.GOAL);
