@@ -1141,43 +1141,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      * Uncontrollableな遷移先がエラーなら親もエラー、
      * Controllableな遷移先が全てエラーなら親もエラー、という論理で伝播します。
      */
-    /*
-    private void propagateError(Set<CompostateDUC<State, Action>> newErrors, Set<CompostateDUC<State, Action>> parent) {
-        statistics.incPropagateErrorsCalls();
-
-        Set<CompostateDUC<State, Action>> ancestors;
-        if (parent != null && !parent.isEmpty()) {
-            ancestors = ancestorsUpToGoalOrError(parent);
-            ancestors.addAll(parent);
-        } else {
-            ancestors = ancestorsUpToGoalOrError(newErrors);
-        }
-
-        Set<CompostateDUC<State, Action>> potentialErrors = new HashSet<>(ancestors);
-        int previous_size = 0;
-
-        while (previous_size != potentialErrors.size()) {
-            previous_size = potentialErrors.size();
-
-            Set<CompostateDUC<State, Action>> targetsAncestors = gatherWinningTargetsForPropagateError(ancestors);
-
-            Iterator<CompostateDUC<State, Action>> it = potentialErrors.iterator();
-            while (it.hasNext()) {
-                CompostateDUC<State, Action> state = it.next();
-                // 環境に強制されてエラーになる、または勝ち筋（ターゲット）へ到達できない場合
-                if (forcedToError(state) || !targetsAncestors.contains(state)) {
-                    it.remove();
-                    setError(state);
-                }
-            }
-        }
-
-        for (CompostateDUC<State, Action> state : potentialErrors) {
-            heuristic.notifyStateIsNone(state);
-        }
-    }
-    */
-
     /**
      * キュー（Worklist）方式によるエラーの逆伝播処理。
      * 先祖の全スキャンを避け、ステータスが変化したノードの親のみを再評価します。
