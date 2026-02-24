@@ -1356,81 +1356,77 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      * ゴールまでの距離を更新し、Director構築用の最善手(BestChild)を設定する。
      * propagateGoalから呼ばれる想定。
      */
-    private void updateDistances(Set<CompostateDUC<State, Action>> alreadyChecked,
-            Set<CompostateDUC<State, Action>> goalsToUpdate, int amountToUpdate) {
-        int allChecked = 0;
+    private void updateDistances(Set<CompostateDUC<State, Action>> seeds,
+        Set<CompostateDUC<State, Action>> goalsToUpdate, int amountToUpdate) {
+    
+        long startTime = System.nanoTime();
+    
+        // 1. ArrayDequeを使用して、ループごとのHashSet生成（new HashSet）を排除
+        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
 
-        // 初期化：ゴール状態自体の距離設定など（既に設定されていればスキップ）
-        if (alreadyChecked.isEmpty()) {
+        // 2. 初期シードのセットアップ
+        if (seeds.isEmpty()) {
+            // すでにGOAL判定されているノードの中から、終端GOAL（Marking 9等）への直接の親を探す
             for (CompostateDUC<State, Action> s : goalsToUpdate) {
-                if (s.hasGoalChild()) {
-                    for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> childPair : s
-                            .getExploredChildren()) {
-                        CompostateDUC<State, Action> child = childPair.getSecond();
-                        HAction<State, Action> action = childPair.getFirst();
+                if (!s.hasGoalChild()) continue;
+            
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> childPair : s.getExploredChildren()) {
+                    CompostateDUC<State, Action> child = childPair.getSecond();
+                    if (isGoal(child)) {
+                        int childDist = child.getBestControllable().getFirst();
+                        int newDist = (childDist == -1) ? 0 : childDist + 1;
 
-                        if (isGoal(child)) {
-                            // 距離更新
-                            int newDist = (child.getBestControllable().getFirst() == -1) ? 0
-                                    : child.getBestControllable().getFirst() + 1;
+                        // 最短距離を更新できた場合のみシードに追加
+                        int currentDist = s.getBestControllable().getFirst();
+                        if (currentDist == -1 || newDist < currentDist) {
+                            s.setBestControllable(newDist, childPair.getFirst().isControllable() ? child : null);
+                            if (!queue.contains(s)) queue.add(s);
+                        }
+                        break; 
+                    }
+                }
+            }
+        } else {
+            queue.addAll(seeds);
+        }
 
-                            if (action.isControllable()) {
-                                s.setBestControllable(newDist, child);
-                                // ★追加: ゴール直前の距離設定ログ
-                                log("  [DistUpdate] Goal Parent set: " + s.getStates() + " -> Dist=" + newDist + " via "
-                                        + action);
-                            } else {
-                                // Uncontrollableの場合、距離は更新するが「操作」ではないのでnull
-                                s.setBestControllable(newDist, null);
-                                log("  [DistUpdate] Goal Parent set (Uncontrollable): " + s.getStates() + " -> Dist="
-                                        + newDist);
-                            }
-                            alreadyChecked.add(s);
-                            --amountToUpdate;
-                            break;
+        // 3. Queueベースの最短経路伝播 (Dijkstra-style BFS)
+        // 「距離が縮まった場合のみ親をキューに入れる」ことで、探索範囲を最小化
+        while (!queue.isEmpty()) {
+            CompostateDUC<State, Action> s = queue.poll();
+            int sDist = s.getBestControllable().getFirst();
+            if (sDist == -1) continue;
+
+            int newDistForParent = sDist + 1;
+
+            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : s.getParents()) {
+                CompostateDUC<State, Action> parent = pRel.getSecond();
+            
+                // 距離更新の対象は、今回勝者となった（または既に勝者である）GOAL状態のみ
+                if (isGoal(parent) && goalsToUpdate.contains(parent)) {
+                    int parentCurrentDist = parent.getBestControllable().getFirst();
+
+                    // 最短距離が更新される場合のみ処理
+                    if (parentCurrentDist == -1 || newDistForParent < parentCurrentDist) {
+                        parent.setBestControllable(newDistForParent, pRel.getFirst().isControllable() ? s : null);
+                    
+                        // 距離が変わったので、その親たちも再計算の必要があるためQueueへ
+                        if (!queue.contains(parent)) {
+                            queue.add(parent);
+                        }
+
+                        if (debugLogEnabled) {
+                            String type = pRel.getFirst().isControllable() ? "C" : "U";
+                            log(String.format("  [DistUpdate] Propagated: %s -> Dist=%d via %s (%s)", 
+                                parent.getStates(), newDistForParent, pRel.getFirst(), type));
                         }
                     }
                 }
             }
         }
 
-        // BFS的に親へ距離を伝播
-        while (allChecked != amountToUpdate && !alreadyChecked.isEmpty()) {
-            Set<CompostateDUC<State, Action>> toCheck = new HashSet<>();
-            for (CompostateDUC<State, Action> s : alreadyChecked) {
-                int sDist = s.getBestControllable().getFirst();
-                if (sDist == -1)
-                    continue;
-
-                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> p : s.getParents()) {
-                    CompostateDUC<State, Action> parent = p.getSecond();
-                    HAction<State, Action> action = p.getFirst();
-
-                    // 親がゴール判定済みだが、距離が未設定 または もっと短いパスが見つかった場合
-                    if (isGoal(parent) && goalsToUpdate.contains(parent)) {
-                        int parentCurrentDist = parent.getBestControllable().getFirst();
-                        int newDist = sDist + 1;
-
-                        if (parentCurrentDist == -1 || newDist < parentCurrentDist) {
-                            toCheck.add(parent);
-                            if (action.isControllable()) {
-                                parent.setBestControllable(newDist, s);
-                                // ★追加: 親への距離伝播ログ
-                                log("  [DistUpdate] Propagated to: " + parent.getStates() + " -> Dist=" + newDist
-                                        + " via " + action);
-                            } else {
-                                parent.setBestControllable(newDist, null);
-                                // ★追加
-                                log("  [DistUpdate] Propagated to (Unc): " + parent.getStates() + " -> Dist="
-                                        + newDist);
-                            }
-                        }
-                    }
-                }
-            }
-            allChecked += toCheck.size();
-            alreadyChecked = toCheck;
-        }
+        // 以前の13msの正体をDUCProfilerに記録
+        DUCProfiler.timeGoalDistUpdate += (System.nanoTime() - startTime);
     }
 
     private LTS<Long, Action> buildDirectorDUC() {
@@ -1721,6 +1717,7 @@ public static class DUCProfiler {
     public static long timeGoalPhase1 = 0;      // 通常の波及 (Queue)
     public static long timeGoalPhase2Init = 0;  // Phase 2 の準備 (全状態スキャン)
     public static long timeGoalPhase2Loop = 0;  // Phase 2 の不動点計算ループ
+    public static long timeGoalDistUpdate = 0;
 
     // --- 実行回数と密度のカウンタ ---
     public static int countPropGoalCalls = 0;   // propagateGoal が呼ばれた回数
@@ -1737,6 +1734,7 @@ public static class DUCProfiler {
         output.outln("   -> Phase 1 (Queue)     : " + String.format("%.2f", timeGoalPhase1 / 1_000_000.0));
         output.outln("   -> Phase 2 Init (Scan) : " + String.format("%.2f", timeGoalPhase2Init / 1_000_000.0));
         output.outln("   -> Phase 2 Loop        : " + String.format("%.2f", timeGoalPhase2Loop / 1_000_000.0));
+        output.outln("   -> UpdateDistances        : " + String.format("%.2f", timeGoalDistUpdate / 1_000_000.0));
         output.outln("-------------------------------------------");
 
         output.outln("---- OTF-DUC explore Breakdown (ms) ----");
