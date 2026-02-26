@@ -595,9 +595,9 @@ public class UpdatingControllerSynthesizer {
         Set<String> fullAlphabet = new HashSet<>(alphabet);
         fullAlphabet.add(startAction);       // hotswap_begin
         fullAlphabet.add(endAction);         // hotswap_end
-        fullAlphabet.add("stopOldSpec");
-        fullAlphabet.add("reconfigure");
-        fullAlphabet.add("startNewSpec");
+        fullAlphabet.add(UpdateConstants.STOP_OLD_SPEC);
+        fullAlphabet.add(UpdateConstants.RECONFIGURE);
+        fullAlphabet.add(UpdateConstants.START_NEW_SPEC);
         
         markingMTS.addActions(fullAlphabet);
 
@@ -621,9 +621,9 @@ public class UpdatingControllerSynthesizer {
                 markingMTS.addTransition(STATE_PRE, action, STATE_OFFSET, TransitionType.REQUIRED);
             } 
             else if (action.equals(endAction) || 
-                     action.equals("stopOldSpec") || 
-                     action.equals("reconfigure") || 
-                     action.equals("startNewSpec")) {
+                     action.equals(UpdateConstants.STOP_OLD_SPEC) || 
+                     action.equals(UpdateConstants.RECONFIGURE) || 
+                     action.equals(UpdateConstants.START_NEW_SPEC)) {
                 // 更新イベントはブロック
             }
             else {
@@ -639,7 +639,7 @@ public class UpdatingControllerSynthesizer {
                 long nextState = currentState;
                 boolean isUpdateAction = false; // 更新制御アクションかどうかのフラグ
 
-                if (action.equals("stopOldSpec")) {
+                if (action.equals(UpdateConstants.STOP_OLD_SPEC)) {
                     isUpdateAction = true;
                     // ★修正: 既に完了している(ビットが立っている)場合はブロック
                     if ((mask & BIT_STOP) != 0) continue; 
@@ -647,7 +647,7 @@ public class UpdatingControllerSynthesizer {
                     int newMask = mask | BIT_STOP;
                     nextState = STATE_OFFSET + newMask;
                 } 
-                else if (action.equals("reconfigure")) {
+                else if (action.equals(UpdateConstants.RECONFIGURE)) {
                     isUpdateAction = true;
                     // ★修正: 既に完了している場合はブロック
                     if ((mask & BIT_RECONFIG) != 0) continue;
@@ -655,7 +655,7 @@ public class UpdatingControllerSynthesizer {
                     int newMask = mask | BIT_RECONFIG;
                     nextState = STATE_OFFSET + newMask;
                 } 
-                else if (action.equals("startNewSpec")) {
+                else if (action.equals(UpdateConstants.START_NEW_SPEC)) {
                     isUpdateAction = true;
                     // ★修正: 既に完了している場合はブロック
                     if ((mask & BIT_START) != 0) continue;
@@ -687,9 +687,9 @@ public class UpdatingControllerSynthesizer {
             // ゴール後はシステムアクションのみ許可し、更新イベントはブロックする
             if (!action.equals(startAction) && 
                 !action.equals(endAction) &&
-                !action.equals("stopOldSpec") &&
-                !action.equals("reconfigure") &&
-                !action.equals("startNewSpec")) {
+                !action.equals(UpdateConstants.STOP_OLD_SPEC) &&
+                !action.equals(UpdateConstants.RECONFIGURE) &&
+                !action.equals(UpdateConstants.START_NEW_SPEC)) {
                 
                 markingMTS.addTransition(STATE_GOAL, action, STATE_GOAL, TransitionType.REQUIRED);
             }

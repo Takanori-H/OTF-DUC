@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,7 +39,19 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     public List<State> facilitators;
     public DUCExplorationHeuristic<State, Action> heuristic;
-    public Map<List<State>, CompostateDUC<State, Action>> compostates;
+    // public Map<List<State>, CompostateDUC<State, Action>> compostates;
+
+    // Mapの型を専用キーに変更
+    public Map<StateKey, CompostateDUC<State, Action>> compostates;
+
+    // --- 最適化用バッファ ---
+    private int[] traceMasks = new int[10];     // isTrace判定用ビットマスク
+    private long[] lookupBuffer;               // アンボクシング＆正規化用
+    private StateKey reusableKey;              // 検索専用（new しない）
+
+    // ボクシング抑制用定数
+    private final State NORMALIZED_VAL = (State) Long.valueOf(-2L);
+    private final State ERROR_VAL = (State) Long.valueOf(-1L);
 
     private Deque<Set<State>> transitions;
     private Set<CompostateDUC<State, Action>> visited;
@@ -172,7 +185,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 HAction<State, Action> action = next.getSecond();
 
                 // ★追加ログ1：ヒューリスティックが何を提案したか
-                if(debugLogEnabled) System.out.println(String.format("[Heuristic-Next] State: %s, Action: %s (%s)", state.getStates(), action, action.isControllable() ? "C" : "U"));
+                log(String.format("[Heuristic-Next] State: %s, Action: %s (%s)", state.getStates(), action, action.isControllable() ? "C" : "U"));
 
                 // ★修正点: 探索の効率化ロジック (AND/OR Pruning)
                 // 既にその状態で Controllable な勝ち筋 (hasGoalChild) が見つかっている場合、
@@ -186,14 +199,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     // これにより、ヒューリスティックは次のアクション（Uなど）を提案できるようになる
 
                     // ★追加ログ2：枝刈りが発生した瞬間を記録
-                    if(debugLogEnabled) System.out.println(String.format("  [Pruning-Action] SKIPPING controllable '%s' because state already has a winning path.", action));
+                    log(String.format("  [Pruning-Action] SKIPPING controllable '%s' because state already has a winning path.", action));
                     heuristic.expansionDone(state, action, null);
                     continue;
                 }
                 // Uncontrollable アクションなら、AND条件（すべてのUでの勝利）を満たすために探索を続行
                 else{
                     // ★追加ログ3：勝利パスがあるのにUを探索しようとしている場合
-                    if(debugLogEnabled) System.out.println(String.format("  [Verification-Action] MUST expand environment '%s' even with winning path.", action));
+                    log(String.format("  [Verification-Action] MUST expand environment '%s' even with winning path.", action));
                 }
 
                 // --- 2. 状態展開（Expansion）の計測 ---
@@ -239,6 +252,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         statistics.clear();
         statistics.start();
         compostates = new HashMap<>();
+        setupLookupOptimizations();
         transitions = new ArrayDeque<>(ltss.size());
         visited = new HashSet<>();
         loop = new HashSet<>();
@@ -250,6 +264,25 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         base = new TransitionSet<>(this.ltss, alphabet);
         allowed = base.clone();
         defaultTargets = buildDefaultTargets();
+    }
+
+    /**
+     * [最適化] 探索開始前に一度だけ実行し、重い判定処理を事前計算する。
+     */
+    private void setupLookupOptimizations() {
+        this.lookupBuffer = new long[ltssSize];
+        this.reusableKey = new StateKey(); // 検索専用インスタンス
+    
+        // isTraceの結果をビットマスク化 (Marking 0-9)
+        // [最適化] ループ内での isTrace メソッド呼び出し(仮想関数オーバーヘッド)を排除するため、
+        // 各フェーズにおける Trace 対象コンポーネントをビットマスク(int)として保持。
+        for (int m = 0; m <= 9; m++) {
+            int mask = 0;
+            for (int i = 0; i < ltssSize; i++) {
+                if (isTrace(i, (long) m)) mask |= (1 << i);
+            }
+            traceMasks[m] = mask;
+        }
     }
 
     private List<Set<State>> buildDefaultTargets() {
@@ -286,37 +319,54 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public CompostateDUC<State, Action> buildCompostate(List<State> states, CompostateDUC<State, Action> parent) {
-
-        // ★修正点：状態の正規化（Canonicalization）ロジック
+        // 状態の正規化（Canonicalization）ロジック
         // 現在の更新フェーズにおいて追跡（Trace）対象外となっているコンポーネントは、
         // 将来の挙動に影響を与えないため、状態IDを固定値 -2L に統一する。
         // これにより、インターリービングの順序違いなどで生じる等価な状態がハッシュキーレベルで一致するようになる。
+
+        // [最適化] getMarkingStateFromList 内の instanceof 呼び出しを削減するための型キャスト
         long mState = getMarkingStateFromList(states);
+        // [最適化] ビットマスクを取得。これにより 19要素のループ内での分岐が極めて高速になる。
+        int currentMask = traceMasks[(int) mState];
+
+        // 1. プリミティブ配列バッファへの転記と同時に正規化
+        // 1. 正規化とアンボクシングの同時実行
         for (int i = 0; i < ltssSize; i++) {
-            if (!isTrace(i, mState)) {
-                // 安全性違反（-1L）の状態は判定に必要であるため保持し、それ以外の正常状態を正規化する。
-                if (!(states.get(i) instanceof Long && (Long) states.get(i) == -1L)) {
-                    states.set(i, (State) Long.valueOf(-2L));
-                }
+            // [最適化] 一度だけ Long -> long に変換。以降、Map照合まで数値として扱う。
+            long val = (Long) states.get(i); // ここで一度だけアンボクシング
+            // i番目のビットが 0 (Trace対象外) かつ エラー状態でない場合
+            if (((currentMask >> i) & 1) == 0 && val != -1L) {
+                // [最適化] ループ内での Long.valueOf 呼び出しを避けるため、事前に作成した定数を代入。
+                // これによりメモリ上のポインタ書き換えだけで正規化が完了する。
+                val = -2L;
+                states.set(i, NORMALIZED_VAL); // リスト側も更新（戻り値の型維持のため）
             }
+            // [最適化] Map検索用のプリミティブ配列バッファを構築
+            lookupBuffer[i] = val;
         }
 
-        CompostateDUC<State, Action> result = compostates.get(states);
+        // 2. Map検索
+        // [最適化] 検索のたびに new StateKey(...) せず、既存の reusableKey の中身を書き換えて再利用。
+        // Mapにヒットする場合、ここでのヒープメモリ確保は一切発生しない。
+        reusableKey.wrap(lookupBuffer);
+        CompostateDUC<State, Action> result = compostates.get(reusableKey);
+
         if (result == null) {
+            // 新しい状態が見つかったときのみ、永続化のためのオブジェクトを生成
             statistics.incExpandedStates();
-            result = new CompostateDUC<>(this, states);
-            compostates.put(states, result);
+        
+            // 3. 新しい状態の場合のみ、永続的なオブジェクトを生成
+            List<State> persistentList = new ArrayList<>(states);
+            StateKey permanentKey = new StateKey(lookupBuffer);
+        
+            result = new CompostateDUC<>(this, persistentList);
+            compostates.put(permanentKey, result);
+        
             heuristic.newState(result, parent);
-
-            // Marking LTSが9ならゴール状態
-            if (getMarkingState(result) == 9) {
+            if (mState == 9) {
                 result.setStatus(Status.GOAL);
-
-                // ★追加: ゴール状態の距離を0に初期化する (Base Case)
-                // これがないと updateDistances が機能しない
                 result.setBestControllable(0, null);
             }
-
             if (checkErrorWithEnforce(result) || heuristic.fullyExplored(result)) {
                 setError(result);
             }
@@ -1744,4 +1794,41 @@ public static class DUCProfiler {
         timeNewStateInit = 0; 
     }
 }
+
+    /**
+     * [最適化] 高速Map検索のためのキー。
+     * 1. ArrayList のイテレータを介したハッシュ計算を避け、Arrays.hashCode(long[]) を使用。
+     * 2. 検索時にインスタンスを new しないための wrap メソッドを提供。
+     */
+    private static class StateKey {
+        private long[] values;
+        private int hash;
+
+        public StateKey() {} // 検索用(reusableKey)の空コンストラクタ
+
+        /**
+         * [最適化] 既存のバッファを一時的に借用してハッシュを計算する。
+         * 既知の状態を Map から探す際、このメソッドによりオブジェクト生成(Allocation)をゼロにする。
+         */
+        public void wrap(long[] buffer) {
+            this.values = buffer;
+            this.hash = Arrays.hashCode(buffer);
+        }
+
+        /**
+         * [保存用] Map に新しく登録する際、配列をコピーして永続化する。
+         */
+        public StateKey(long[] buffer) {
+            this.values = Arrays.copyOf(buffer, buffer.length);
+            this.hash = Arrays.hashCode(this.values);
+        }
+
+        @Override public int hashCode() { return hash; }
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof StateKey)) return false;
+            // [最適化] Longオブジェクトの equals ではなく、CPUネイティブな数値配列比較を実行
+            return Arrays.equals(this.values, ((StateKey) o).values);
+        }
+    }
 }

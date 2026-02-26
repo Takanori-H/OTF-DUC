@@ -64,10 +64,14 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 	@Override
 	protected CompositeState compose(Vector<Value> actuals) {
 
+		long start = System.currentTimeMillis();
+
 		// ---------------------------------------------------------
     	// 1. Old Controller のコンパイル (Monolithic)
     	// ---------------------------------------------------------
         CompositeState oldC = composeLTS(this.getOldController().toString());
+
+		output.outln("UpdatingControllersDefinition Generate OldController time : " + (System.currentTimeMillis() - start) + "ms");
 
 		// ---------------------------------------------------------
     	// 2. Goal 定義の準備
@@ -183,6 +187,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             Diagnostics.fatal("Mapping environment not defined.");
         }
 
+		output.outln("UpdatingControllersDefinition Generate MappingEnvironment time : " + (System.currentTimeMillis() - start) + "ms");
+		long tmp = System.currentTimeMillis();
+
 		// ---------------------------------------------------------
         // 4. モード別処理 (OTF / Traditional)
         // ---------------------------------------------------------
@@ -196,6 +203,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             controllableSet.add(UpdateConstants.HOTSWAP_BEGIN);
             controllableSet.add(UpdateConstants.HOTSWAP_END);
 
+			long newCgenerate = System.currentTimeMillis();
 			// =========================================================
         	// New Controller の内部合成
         	// =========================================================
@@ -255,6 +263,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             	Diagnostics.fatal("Failed to synthesize New Controller (uncontrollable or deadlock).");
         	}
         	output.outln(" - New Controller synthesized successfully. States: " + newC.composition.maxStates);
+
+			output.outln("UpdatingControllersDefinition NewC generate time : " + (System.currentTimeMillis() - newCgenerate) + "ms");
 
 			// ▼▼▼ デバッグ出力：状態数と遷移数のカウント ▼▼▼
         	int stateCount = newC.composition.maxStates;
@@ -363,7 +373,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 					for (String action : sortedErrorActions) {
 						if (!globalFluentCache.containsKey(action)) {
 							// キャッシュになければ生成して登録
-							output.outln("   -> Generating unique Action Fluent: " + action);
+							//output.outln("   -> Generating unique Action Fluent: " + action);
 							CompactState fluent = buildActionFluentLTS(action, monitorAlphabet);
 							//buildActionFluentLTSには全体のアクションが必要ではないか？
 							//mapping componentからとupdateconstant
@@ -383,15 +393,17 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     safetyStateMapping.put(originalSafe, stateMap);
 
 					//デバッグ用
+					/*
 					output.outln("--------------------------");
 					output.outln(originalSafe.name + " Mapped");
 					for(CompactState fluent : components){
 						output.outln(fluent.name);
 					}
+					*/
 					// =========================================================
                     // Debug: State Mapping Visualization
                     // =========================================================
-                    
+                    /*
                     // 1. ヘッダーの作成: [MonitorName, FluentName1, FluentName2...] -> [PropertyName]
                     StringBuilder headerBuilder = new StringBuilder();
                     headerBuilder.append("Mapping Table [").append(monitor.name);
@@ -433,6 +445,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                         output.outln(keyStateList.toString() + " -> " + targetState);
                     }
                     output.outln("--------------------------");
+					*/
 				}
 			}
 
@@ -463,6 +476,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
             ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal, name.getName());
 		}
+
+		output.outln("UpdatingControllersDefinition mode time : " + (System.currentTimeMillis() - tmp) + "ms");
+		output.outln("UpdatingControllersDefinition total time : " + (System.currentTimeMillis() - start) + "ms");
+
 		return ucce;
 	}
 	

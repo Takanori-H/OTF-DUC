@@ -2,6 +2,8 @@ package ltsa.lts;
 
 import java.util.*;
 
+import ltsa.updatingControllers.UpdateConstants;
+
 public class MappingEnvironmentGenerator {
 
     // 生成されたMappingEnvironmentの状態ID -> NewEnvironmentの状態ID の対応表
@@ -88,7 +90,7 @@ public class MappingEnvironmentGenerator {
             if (!alphabet.contains(s)) alphabet.add(s);
         }
         
-        if (!alphabet.contains("reconfigure")) alphabet.add("reconfigure");
+        if (!alphabet.contains(UpdateConstants.RECONFIGURE)) alphabet.add(UpdateConstants.RECONFIGURE);
 
         // フラットルール内のアクションもアルファベットに追加
         for (FlattenedRule fr : flatRules) {
@@ -134,7 +136,7 @@ public class MappingEnvironmentGenerator {
 
             // アクションシーケンスの構築: pre + reconfigure + post
             Vector<String> sequence = new Vector<>(fr.preActions);
-            sequence.add("reconfigure");
+            sequence.add(UpdateConstants.RECONFIGURE);
             sequence.addAll(fr.postActions);
 
             int currentNode = startNode;

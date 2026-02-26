@@ -2023,12 +2023,16 @@ public class HPWindow extends JFrame implements Runnable {
         CompositeState cs = null;
         LTSCompiler comp = new LTSCompiler(ltsInputString, ltsOutput, currentDirectory);
         try {
+            long tmp = System.currentTimeMillis();
             comp.compile();
+            ltsOutput.outln("comp.compile time : " + (System.currentTimeMillis()-tmp) + "ms");
             if (!parse(comp.getComposites(), comp.getProcesses(), comp.getExplorers())) {
                 return null;
             }
 
+            tmp = System.currentTimeMillis();
             cs = comp.continueCompilation((String) targetChoice.getSelectedItem());
+            ltsOutput.outln("comp.continueCompilation time : " + (System.currentTimeMillis()-tmp) + "ms");
 
         } catch (LTSCompositionException x) {
             ltsOutput.outln("Construction of " + targetChoice.getSelectedItem() + " aborted.");
@@ -2175,15 +2179,23 @@ public class HPWindow extends JFrame implements Runnable {
     // ------------------------------------------------------------------------
 
     private void doComposition() {
+
         EnvConfiguration.getInstance().setOpenFileName(openFile);
 
         ltsOutput.clearOutput();
+
+        long start = System.currentTimeMillis();
 
         // 1. コンパイル（FSP記述の解析とモデル構造の生成）
         // 変更があれば再コンパイルし、結果をフィールド変数 'current' に格納
         compileIfChange();
 
+        ltsOutput.outln("Compile time : " + (System.currentTimeMillis()-start) + "ms");
+
+
         if (current != null) {
+            long tmp = System.currentTimeMillis();
+
             try {
                 // 2. 合成処理の実行（Dispatcherへ委譲）
                 // ここで実際の計算（Updating Controllerの合成含む）が走ります
@@ -2192,7 +2204,10 @@ public class HPWindow extends JFrame implements Runnable {
             } catch (LTSCompositionException e) {
                 return;
             }
-            
+
+            ltsOutput.outln("Composition time : " + (System.currentTimeMillis()-tmp) + "ms");
+            tmp = System.currentTimeMillis();
+
             // 3. 結果の判定とGUIへの反映
             boolean isControllable = current.composition != null;
             if (!isControllable) {
@@ -2207,7 +2222,11 @@ public class HPWindow extends JFrame implements Runnable {
             for (int i = 0; i < current.machines.size() + 1; i++)
                 current_states[i] = 0;
             layouts.setCurrentState(current_states);
+
+            ltsOutput.outln("Draw time : " + (System.currentTimeMillis()-tmp) + "ms");
         }
+
+        ltsOutput.outln("Total time : " + (System.currentTimeMillis()-start) + "ms");
     }
 
 
