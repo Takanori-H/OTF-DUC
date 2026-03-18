@@ -248,11 +248,11 @@ public class UpdatingControllerSynthesizer {
         allActions.remove("tau");
         
         // 10状態の Marking LTS を作成
-        // 0:Pre ->(hotswap_begin)-> 1-8:In ->(hotswap_end)-> 9:Post
+        // 0:Pre ->(beginUpdate)-> 1-8:In ->(finishUpdate)-> 9:Post
         // OTF用の進捗管理Marking LTSを作成 (createOTFMarkingLTS使用)
         MTS<Long, String> markingMTS = createOTFMarkingLTS(
-            UpdateConstants.HOTSWAP_BEGIN, 
-            UpdateConstants.HOTSWAP_END, 
+            UpdateConstants.BEGIN_UPDATE, 
+            UpdateConstants.FINISH_UPDATE, 
             allActions
         );
         
@@ -561,18 +561,18 @@ public class UpdatingControllerSynthesizer {
 
     /**
      * OTF探索用の進捗管理機能付き Marking LTS を作成する。
-     * 4つの更新事象が全て完了するまで hotswap_end を許可しないロジックをLTS構造として埋め込む。
+     * 4つの更新事象が全て完了するまで finishUpdate を許可しないロジックをLTS構造として埋め込む。
      * * ■ 状態定義 (States):
-     * - State 0: Pre-Update (hotswap_begin 前)
+     * - State 0: Pre-Update (beginUpdate 前)
      * - State 1..8: In-Update (更新中。3つの事象の完了状況をビットマスクで管理)
      * - Base Offset = 1
      * - State ID = 1 + mask (mask: 0..7)
      * - Bit 0 (1): stopOldSpec 完了
      * - Bit 1 (2): reconfigure 完了
      * - Bit 2 (4): startNewSpec 完了
-     * - State 9: Post-Update (Goal。hotswap_end 後)
-     * * @param startAction 更新開始アクション (例: hotswap_begin)
-     * @param endAction   更新終了アクション (例: hotswap_end)
+     * - State 9: Post-Update (Goal。finishUpdate 後)
+     * * @param startAction 更新開始アクション (例: beginUpdate)
+     * @param endAction   更新終了アクション (例: finishUpdate)
      * @param alphabet    システム全体のアルファベット集合
      * @return 進捗管理ロジックを含むMTS
      */
@@ -593,8 +593,8 @@ public class UpdatingControllerSynthesizer {
 
         // --- 2. アルファベットの設定 ---
         Set<String> fullAlphabet = new HashSet<>(alphabet);
-        fullAlphabet.add(startAction);       // hotswap_begin
-        fullAlphabet.add(endAction);         // hotswap_end
+        fullAlphabet.add(startAction);       // beginUpdate
+        fullAlphabet.add(endAction);         // finishUpdate
         fullAlphabet.add(UpdateConstants.STOP_OLD_SPEC);
         fullAlphabet.add(UpdateConstants.RECONFIGURE);
         fullAlphabet.add(UpdateConstants.START_NEW_SPEC);

@@ -15,4 +15,5 @@ public class UpdateConstants {
 	//ON-THE-FLY UPDATING CONTROLLER SYNTHESIS
 	public static final String HOTSWAP_BEGIN = "hotswap_begin";
 	public static final String HOTSWAP_END = "hotswap_end";
+	public static final String FINISH_UPDATE = "finishUpdate";
 }

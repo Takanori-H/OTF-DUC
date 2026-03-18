@@ -19,11 +19,11 @@ import ltsa.updatingControllers.UpdateConstants;
 
 public class DUCAbstraction<State, Action> {
 
-    private static final int COST_HOTSWAP_END = 0;
+    private static final int COST_FINISH_UPDATE = 0;
     private static final int COST_STOP_OLD = 10;
     private static final int COST_RECONFIGURE = 20;
     private static final int COST_START_NEW = 30;
-    private static final int COST_HOTSWAP_BEGIN = 40;
+    private static final int COST_BEGIN_UPDATE = 40;
     private static final int COST_DEFAULT = 100;
 
     private static final int W_MARKING = 1000;
@@ -113,11 +113,11 @@ public class DUCAbstraction<State, Action> {
     // ★追加: Marking State ID を更新プロセスの深さ (0-5) に変換するヘルパーメソッド
     private int getMarkingDepth(long markingState) {
         if (markingState == 0) return 0; // 初期状態
-        if (markingState == 1) return 1; // hotswap_begin 完了
+        if (markingState == 1) return 1; // beginUpdate 完了
         if (markingState == 2 || markingState == 3 || markingState == 5) return 2; // 更新イベントのいずれか1つ完了 (stopOld, reconfig, startNew)
         if (markingState == 4 || markingState == 6 || markingState == 7) return 3; // いずれか2つ完了
-        if (markingState == 8) return 4; // 3つ全て完了 (Ready for hotswap_end)
-        if (markingState == 9) return 5; // hotswap_end 完了 (Goal)
+        if (markingState == 8) return 4; // 3つ全て完了 (Ready for finishUpdate)
+        if (markingState == 9) return 5; // finishUpdate 完了 (Goal)
         return 0; // Fallback
     }
 
@@ -151,7 +151,7 @@ public class DUCAbstraction<State, Action> {
                 int predictedDepth = currentDepth;
                 
                 // 更新事象によって Marking Depth が進むと予想される場合、スコアを大幅に良くする
-                if (actionName.equals(UpdateConstants.HOTSWAP_BEGIN) && currentDepth == 0) {
+                if (actionName.equals(UpdateConstants.BEGIN_UPDATE) && currentDepth == 0) {
                     predictedDepth = 1;
                 } else if (actionName.equals(UpdateConstants.STOP_OLD_SPEC) || 
                            actionName.equals(UpdateConstants.RECONFIGURE) || 
@@ -159,7 +159,7 @@ public class DUCAbstraction<State, Action> {
                     if (currentDepth >= 1 && currentDepth < 4) {
                         predictedDepth = currentDepth + 1;
                     }
-                } else if (actionName.equals(UpdateConstants.HOTSWAP_END) && currentDepth == 4) {
+                } else if (actionName.equals(UpdateConstants.FINISH_UPDATE) && currentDepth == 4) {
                     predictedDepth = 5;
                 }
 
@@ -426,11 +426,11 @@ public class DUCAbstraction<State, Action> {
     */
 
     private int getActionPriorityCost(String actionName) {
-        if (actionName.equals(UpdateConstants.HOTSWAP_END)) return COST_HOTSWAP_END;
+        if (actionName.equals(UpdateConstants.FINISH_UPDATE)) return COST_FINISH_UPDATE;
         if (actionName.equals(UpdateConstants.STOP_OLD_SPEC)) return COST_STOP_OLD;
         if (actionName.equals(UpdateConstants.RECONFIGURE)) return COST_RECONFIGURE;
         if (actionName.equals(UpdateConstants.START_NEW_SPEC)) return COST_START_NEW;
-        if (actionName.equals(UpdateConstants.HOTSWAP_BEGIN)) return COST_HOTSWAP_BEGIN;
+        if (actionName.equals(UpdateConstants.BEGIN_UPDATE)) return COST_BEGIN_UPDATE;
         return COST_DEFAULT;
     }
 }

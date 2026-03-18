@@ -66,7 +66,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     final public Statistics statistics = new Statistics();
 
-    private boolean debugLogEnabled = false;
+    private boolean debugLogEnabled = true;
     private PrintWriter logWriter;
     private static final String LOG_FILE_PATH = "duc_debug.txt";
 
@@ -404,7 +404,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 3. フェーズ依存
         if (markingState == 0) {
-            // --- Pre-hotswap (State 0) ---
+            // --- Pre-beginUpdate (State 0) ---
             if (ltsIndex == idxOC)
                 return true;
             if (isInRange(ltsIndex, oldSafeStart, oldSafeEnd))
@@ -413,7 +413,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // Mapping, New Safety は False (ここで return false されるため)
             return false;
         } else if (markingState >= 1 && markingState <= 9) {
-            // --- Post-hotswap (State 1-9) ---
+            // --- Post-beginUpdate (State 1-9) ---
             if (ltsIndex == idxOC)
                 return false;
             if (isInRange(ltsIndex, mappingStart, mappingEnd))
@@ -445,7 +445,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 3. フェーズ依存
         if (markingState == 0) {
-            // --- Pre-hotswap (State 0) ---
+            // --- Pre-beginUpdate (State 0) ---
             if (ltsIndex == idxOC)
                 return true;
             if (isInRange(ltsIndex, oldSafeStart, oldSafeEnd))
@@ -454,7 +454,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // Mapping, New Safety は False
             return false;
         } else if (markingState >= 1 && markingState <= 9) {
-            // --- Post-hotswap (State 1-9) ---
+            // --- Post-beginUpdate (State 1-9) ---
             if (ltsIndex == idxOC)
                 return false;
 
@@ -478,7 +478,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     public boolean isTrace(int ltsIndex, long markingState) {
 
         // 1. Old Controller (OC)
-        // ★修正：hotswap_begin が発火した瞬間（State 1以上）にトレースを OFF にする。
+        // ★修正：beginUpdate が発火した瞬間（State 1以上）にトレースを OFF にする。
         if (ltsIndex == idxOC) {
             return (markingState == 0);
         }
@@ -545,7 +545,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 1. ブロック条件のチェック
         boolean blocked = false;
-        if (action.toString().equals(UpdateConstants.HOTSWAP_END) && !checkHotswapEndCondition(state)) {
+        if (action.toString().equals(UpdateConstants.FINISH_UPDATE) && !checkHotswapEndCondition(state)) {
             blocked = true;
         }
 
@@ -675,7 +675,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (blocked || nextStates == null) {
             // 前回の追加: デッドロック/ブロック検出ログをここでも出力（debugLogEnabledがfalseの場合も考慮）
             if (blocked)
-                log("[BLOCKED] Transition blocked by HotswapEnd condition: " + action);
+                log("[BLOCKED] Transition blocked by finishUpdate condition: " + action);
             else
                 log("[DEADLOCK/INVALID] No valid next states for action: " + action + " at state: "
                         + state.getStates());
@@ -720,7 +720,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     /**
-     * hotswap_end の実行可否を判定するガード条件
+     * finishUpdate の実行可否を判定するガード条件
      * 1. 環境状態が新環境へ翻訳可能であること
      * 2. 翻訳後の環境と現在の安全性状態の組み合わせが、新コントローラ(NC)に存在すること
      */
@@ -730,7 +730,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         
         // 翻訳に失敗した（環境状態がマップにない）場合は null が返る想定
         if (signature == null) {
-            if (debugLogEnabled) log("  [HotswapEnd Guard] BLOCKED: Environment state translation failed.");
+            if (debugLogEnabled) log("  [finishUpdate Guard] BLOCKED: Environment state translation failed.");
             return false;
         }
 
@@ -739,7 +739,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         if (!isSafeInNC && debugLogEnabled) {
             // ユーザー様の不整合発見を検証するためのログ
-            log("  [HotswapEnd Guard] BLOCKED: Signature '" + signature + "' is NOT found in New Controller's safe states.");
+            log("  [finishUpdate Guard] BLOCKED: Signature '" + signature + "' is NOT found in New Controller's safe states.");
         }
 
         return isSafeInNC;
@@ -1504,7 +1504,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 // 採用判定 (Anytime Hotswap 含む)
                 boolean toAdd = !hAction.isControllable();
                 if (hAction.isControllable()) {
-                    if (hAction.toString().equals(UpdateConstants.HOTSWAP_BEGIN) && isGoal(child)) {
+                    if (hAction.toString().equals(UpdateConstants.BEGIN_UPDATE) && isGoal(child)) {
                         toAdd = true;
                     } else if (current.actionToGoal != null && current.actionToGoal.equals(hAction)) {
                         toAdd = true;
@@ -1517,8 +1517,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
 
                 if (toAdd) {
-                    // hotswap_end の場合は NC への接続を試みる
-                    if (hAction.toString().equals(UpdateConstants.HOTSWAP_END) && getMarkingState(child) == 9) {
+                    // finishUpdate の場合は NC への接続を試みる
+                    if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
 
                         // 【検証ログ 1】利用可能なマップのキーをすべて出力（最初の1回のみでOK）
                         if(debugLogEnabled) System.out.println("  [Debug-Stitch] Available keys in NC map: " + newControllerConnectionMap.keySet());
@@ -1548,7 +1548,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                         if (ncStateId != null) {
                             // NC マップで見つかった ID へ直接リンクを張る
-                            if(debugLogEnabled) log("  [Stitch] Connecting " + current.getStates() + " --(hotswap_end)--> NC State " + ncStateId);
+                            if(debugLogEnabled) log("  [Stitch] Connecting " + current.getStates() + " --(finishUpdate)--> NC State " + ncStateId);
                             result.addTransition(currentId, hAction.getAction(), ncStateId);
                         } else {
                             // 制約5に基づき、エラー時は詳細なベクトルを出力

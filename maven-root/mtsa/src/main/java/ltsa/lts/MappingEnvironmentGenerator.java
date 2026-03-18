@@ -22,23 +22,21 @@ public class MappingEnvironmentGenerator {
     private static class FlattenedRule {
         String oldLabel;
         String newLabel;
-        Vector<String> preActions;  // 展開済みのアクション文字列リスト
+        Vector<String> preActions; // 展開済みのアクション文字列リスト
         Vector<String> postActions; // 展開済みのアクション文字列リスト
     }
 
-    public CompactState generate(MapDefinition mapDef, 
-                                 Hashtable<String, CompactState> compiled, 
-                                 Hashtable<String, RelationDefinition> relations,
-                                 LTSOutput output) {
+    public CompactState generate(MapDefinition mapDef,
+            Hashtable<String, CompactState> compiled,
+            Hashtable<String, RelationDefinition> relations,
+            LTSOutput output) {
 
         // 生成のたびにマップを初期化
         this.stateMapping.clear();
-        
         String oldName = mapDef.oldProcess.toString();
         String newName = mapDef.newProcess.toString();
         String relName = mapDef.relationName.toString();
         String mapEnvName = mapDef.name.toString();
-
         CompactState oldM = compiled.get(oldName);
         CompactState newM = compiled.get(newName);
         RelationDefinition relDef = relations.get(relName);
@@ -56,7 +54,6 @@ public class MappingEnvironmentGenerator {
         for (RelationDefinition.RelationRule rule : relDef.rules) {
             Vector<FlattenedRule> expanded = expandRule(rule);
             flatRules.addAll(expanded);
-            
             for (FlattenedRule fr : expanded) {
                 // 必要なステップ数: preActions + reconfigure(1) + postActions
                 int steps = fr.preActions.size() + 1 + fr.postActions.size();
@@ -75,7 +72,6 @@ public class MappingEnvironmentGenerator {
         int totalStates = oldSize + newSize + extraStatesCount;
         int newOffset = oldSize;
         int extraOffset = oldSize + newSize;
-        
         CompactState res = new CompactState();
         res.name = mapEnvName;
         res.maxStates = totalStates;
@@ -84,38 +80,34 @@ public class MappingEnvironmentGenerator {
 
         // 3. アルファベット統合 (中間アクションもアルファベットに追加が必要)
         Vector<String> alphabet = new Vector<>();
-        for (String s : oldM.alphabet) alphabet.add(s);
-
+        for (String s : oldM.alphabet)
+            alphabet.add(s);
         for (String s : newM.alphabet) {
-            if (!alphabet.contains(s)) alphabet.add(s);
+            if (!alphabet.contains(s))
+                alphabet.add(s);
         }
-        
-        if (!alphabet.contains(UpdateConstants.RECONFIGURE)) alphabet.add(UpdateConstants.RECONFIGURE);
-
+        if (!alphabet.contains(UpdateConstants.RECONFIGURE))
+            alphabet.add(UpdateConstants.RECONFIGURE);
         // フラットルール内のアクションもアルファベットに追加
         for (FlattenedRule fr : flatRules) {
             addActionsToAlphabet(alphabet, fr.preActions);
             addActionsToAlphabet(alphabet, fr.postActions);
         }
 
-        
-        
         res.alphabet = alphabet.toArray(new String[0]);
 
         // 4. 既存遷移コピー
         // --- 4. 遷移のコピー & 一時的なマッピング作成 ---
         // ここで作るのは「到達性確認前」の生IDに対するマップ
         Map<Integer, Integer> rawStateMapping = new HashMap<>();
-
         for (int i = 0; i < oldSize; i++) {
             res.states[i] = copyTransitions(oldM.states[i], oldM.alphabet, res.alphabet);
         }
         for (int i = 0; i < newSize; i++) {
             int mappingStateId = i + newOffset;
             int newEnvStateId = i;
-
-            res.states[i + newOffset] = copyTransitionsWithOffset(newM.states[i], newM.alphabet, res.alphabet, newOffset);
-
+            res.states[i + newOffset] = copyTransitionsWithOffset(newM.states[i], newM.alphabet, res.alphabet,
+                    newOffset);
             // マップに記録 (MappingEnv State -> NewEnv State)
             // 生IDでのマッピングを記録
             rawStateMapping.put(mappingStateId, newEnvStateId);
@@ -123,11 +115,9 @@ public class MappingEnvironmentGenerator {
 
         // 5. ルールに基づく遷移の追加（シーケンス処理）
         int currentExtraState = extraOffset;
-
         for (FlattenedRule fr : flatRules) {
             Integer startNode = oldM.getStateId(fr.oldLabel);
             Integer endNode = newM.getStateId(fr.newLabel);
-
             if (startNode == null || endNode == null) {
                 output.outln("Warning: State label not found: " + fr.oldLabel + " -> " + fr.newLabel);
                 continue;
@@ -138,13 +128,10 @@ public class MappingEnvironmentGenerator {
             Vector<String> sequence = new Vector<>(fr.preActions);
             sequence.add(UpdateConstants.RECONFIGURE);
             sequence.addAll(fr.postActions);
-
             int currentNode = startNode;
-
             for (int i = 0; i < sequence.size(); i++) {
                 String action = sequence.get(i);
                 int actionIdx = getIndex(action, res.alphabet);
-                
                 int nextNode;
                 if (i == sequence.size() - 1) {
                     // 最後のアクションなら、ターゲットは新環境の状態
@@ -155,8 +142,8 @@ public class MappingEnvironmentGenerator {
                 }
 
                 // 遷移追加: currentNode --action--> nextNode
-                res.states[currentNode] = EventStateUtils.add(res.states[currentNode], new EventState(actionIdx, nextNode));
-                
+                res.states[currentNode] = EventStateUtils.add(res.states[currentNode],
+                        new EventState(actionIdx, nextNode));
                 // 次のステップへ
                 currentNode = nextNode;
             }
@@ -172,7 +159,6 @@ public class MappingEnvironmentGenerator {
     }
 
     // --- Helper Methods ---
-
     /**
      * LTSA標準の EventStateUtils を使用して到達可能状態を計算し、
      * 状態IDの振り直しに合わせてマッピング情報(stateMapping)も更新する
@@ -187,7 +173,6 @@ public class MappingEnvironmentGenerator {
         for (Map.Entry<Integer, Integer> entry : rawMapping.entrySet()) {
             int oldId = entry.getKey();
             int newEnvId = entry.getValue();
-
             // この状態が到達可能(otnに含まれる)であれば、新しいIDで登録し直す
             if (otn.containsKey(oldId)) {
                 int newId = otn.get(oldId);
@@ -199,7 +184,6 @@ public class MappingEnvironmentGenerator {
         EventState[] oldStates = machine.states;
         machine.maxStates = otn.size(); // 到達可能状態数
         machine.states = new EventState[machine.maxStates];
-
         for (int oldi = 0; oldi < oldStates.length; ++oldi) {
             // 到達可能な状態のみを処理
             if (otn.containsKey(oldi)) {
@@ -208,7 +192,7 @@ public class MappingEnvironmentGenerator {
                 machine.states[newi] = EventStateUtils.renumberStates(oldStates[oldi], otn);
             }
         }
-        
+
         // endseq (終了シーケンス番号) の更新 (念のため)
         if (machine.endseq > 0 && otn.containsKey(machine.endseq)) {
             machine.endseq = otn.get(machine.endseq);
@@ -217,7 +201,8 @@ public class MappingEnvironmentGenerator {
 
     private void addActionsToAlphabet(Vector<String> alpha, Vector<String> actions) {
         for (String s : actions) {
-            if (!alpha.contains(s)) alpha.add(s);
+            if (!alpha.contains(s))
+                alpha.add(s);
         }
     }
 
@@ -229,17 +214,15 @@ public class MappingEnvironmentGenerator {
             // forall [i:R] の展開
             // イテレータを使って変数をバインドしながら展開する
             Hashtable<String, Value> locals = new Hashtable<>();
-            Hashtable<String, Value> globals = new Hashtable<>(); 
-            
+            Hashtable<String, Value> globals = new Hashtable<>();
             rule.range.initContext(locals, globals);
 
             while (rule.range.hasMoreNames()) {
-                rule.range.nextName(); 
-                
+                rule.range.nextName();
                 // 現在のコンテキストで各要素を展開
                 Vector<String> oldLabels = rule.oldStateSelector.getActions(locals, globals);
                 Vector<String> newLabels = rule.newStateSelector.getActions(locals, globals);
-                
+
                 // アクションリストも展開 (変数が含まれる可能性があるため)
                 Vector<String> pre = expandActionList(rule.preReconfigureActions, locals, globals);
                 Vector<String> post = expandActionList(rule.postReconfigureActions, locals, globals);
@@ -260,8 +243,7 @@ public class MappingEnvironmentGenerator {
         } else {
             // 単一ルール
             Hashtable<String, Value> locals = new Hashtable<>();
-            Hashtable<String, Value> globals = new Hashtable<>(); 
-            
+            Hashtable<String, Value> globals = new Hashtable<>();
             Vector<String> oldLabels = rule.oldStateSelector.getActions(locals, globals);
             Vector<String> newLabels = rule.newStateSelector.getActions(locals, globals);
             Vector<String> pre = expandActionList(rule.preReconfigureActions, locals, globals);
@@ -281,7 +263,8 @@ public class MappingEnvironmentGenerator {
         return result;
     }
 
-    private Vector<String> expandActionList(Vector<ActionLabels> actions, Hashtable<String, Value> locals, Hashtable<String, Value> globals) {
+    private Vector<String> expandActionList(Vector<ActionLabels> actions, Hashtable<String, Value> locals,
+            Hashtable<String, Value> globals) {
         Vector<String> res = new Vector<>();
         for (ActionLabels al : actions) {
             // getActionsはVectorを返すが、通常アクション列定義では単一の展開結果を期待する
@@ -290,7 +273,6 @@ public class MappingEnvironmentGenerator {
             // ActionLabelsごとに1つのアクション文字列になると仮定する（あるいは全ての展開結果を追加する）
             // 仕様として「パス」なので、セットの使用は避けるべきだが、サポートするなら展開結果を並列ではなく直列にするか？
             // -> 文脈上、 直列(Sequence)として扱うのが自然。
-            
             Vector<String> expanded = al.getActions(locals, globals);
             res.addAll(expanded);
         }
@@ -299,10 +281,11 @@ public class MappingEnvironmentGenerator {
 
     // 既存のヘルパーメソッド (convertFspLabelToInternal, copyTransitions など) はそのまま維持
     private String convertFspLabelToInternal(String fspLabel) {
-        if (!fspLabel.contains("[")) return fspLabel;
+        if (!fspLabel.contains("["))
+            return fspLabel;
         return fspLabel.replace("[", ".").replace("]", "");
     }
-    
+
     private EventState copyTransitions(EventState src, String[] srcAlpha, String[] destAlpha) {
         EventState head = null;
         EventState current = src;
@@ -333,7 +316,8 @@ public class MappingEnvironmentGenerator {
 
     private int getIndex(String action, String[] alphabet) {
         for (int i = 0; i < alphabet.length; i++) {
-            if (alphabet[i].equals(action)) return i;
+            if (alphabet[i].equals(action))
+                return i;
         }
         return -1;
     }

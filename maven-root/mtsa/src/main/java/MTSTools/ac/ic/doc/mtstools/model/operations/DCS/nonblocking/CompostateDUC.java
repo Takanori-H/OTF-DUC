@@ -116,7 +116,7 @@ public class CompostateDUC<State, Action> {
             for (String cand : candidates) {
                 String baseName = cand.replace("_old", "");
                 String ocName = baseName + "_old"; 
-                boolean isHotswap = cand.startsWith("hotswap");
+                boolean isHotswap = cand.endsWith("Update");
                 if (isHotswap) ocName = cand; 
 
                 boolean allAgreed = true;

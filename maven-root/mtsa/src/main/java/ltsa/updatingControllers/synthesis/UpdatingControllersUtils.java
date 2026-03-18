@@ -43,14 +43,14 @@ public class UpdatingControllersUtils {
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> startAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
 		//beginUpdateからhotswap_beginに変更
 		// beginAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
-		beginAction.add(new SingleSymbol(UpdateConstants.HOTSWAP_BEGIN));
+		beginAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
 		stopAction.add(new SingleSymbol(UpdateConstants.STOP_OLD_SPEC));
 		reconfigureAction.add(new SingleSymbol(UpdateConstants.RECONFIGURE));
 		startAction.add(new SingleSymbol(UpdateConstants.START_NEW_SPEC));
 
 		//beginUpdateからhotswap_beginに変更
-		// beginFluent = new FluentImpl("BeginUpdate", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
-		beginFluent = new FluentImpl("HotswapBegin", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
+		beginFluent = new FluentImpl("BeginUpdate", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
+		//beginFluent = new FluentImpl("HotswapBegin", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
 		stopFluent = new FluentImpl("StopOldSpec", stopAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
 		reconFluent = new FluentImpl("Reconfigure", reconfigureAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
 		startFluent = new FluentImpl("StartNewSpec", startAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
@@ -90,8 +90,8 @@ public class UpdatingControllersUtils {
 		Set<Fluent> involvedFluents = new HashSet<Fluent>();
 
 		//beginUpdateからhotswap_beginに変更
-		// addFluentAndAssumption(grcg, involvedFluents, BEGIN_UPDATE);
-		addFluentAndAssumption(grcg, involvedFluents, HOTSWAP_BEGIN);
+		addFluentAndAssumption(grcg, involvedFluents, BEGIN_UPDATE);
+		// addFluentAndAssumption(grcg, involvedFluents, HOTSWAP_BEGIN);
 		addFluentAndGuarantee(grcg, involvedFluents, STOP_OLD_SPEC);
 		addFluentAndGuarantee(grcg, involvedFluents, START_NEW_SPEC);
 		addFluentAndGuarantee(grcg, involvedFluents, RECONFIGURE);
@@ -108,6 +108,7 @@ public class UpdatingControllersUtils {
 																 LTSOutput output) {
 		ControllerGoalDefinition cgd = new ControllerGoalDefinition(updContDef.getName());
 		cgd.addAssumeDefinition(new Symbol(123, "BeginUpdate")); //is this useless?we use the assumption in GR not here
+		// cgd.addAssumeDefinition(new Symbol(123, "HotswapBegin"));
 		cgd.addGuaranteeDefinition(new Symbol(123, "StopOldSpec")); //is this useless? we use Guarantee in GR not here
 		cgd.addGuaranteeDefinition(new Symbol(123, "StartNewSpec")); //besides the symbol redirects to nothing.
 		cgd.addGuaranteeDefinition(new Symbol(123, "Reconfigure"));
