@@ -296,6 +296,7 @@ public class CompactState implements Automata {
         this.mtsControlProblemAnswer = answer;
     }
 
+    /*
     public void reachable() {
         MyIntHash otn = EventStateUtils.reachable(states);
 //        //System.out.println("reachable states "+otn.size()+" total states "+maxStates);
@@ -311,6 +312,33 @@ public class CompactState implements Automata {
             }
         }
         if (endseq > 0) endseq = otn.get(endseq);
+    }
+    */
+
+    public void reachable() {
+        MyIntHash otn = EventStateUtils.reachable(states);
+        EventState[] oldStates = states;
+        maxStates = otn.size();
+        states = new EventState[maxStates];
+        for (int oldi = 0; oldi < oldStates.length; ++oldi) {
+            int newi = otn.get(oldi);
+            if (newi > -2) {
+                states[newi] = EventStateUtils.renumberStates(oldStates[oldi], otn);
+            }
+        }
+        if (endseq > 0) endseq = otn.get(endseq);
+
+        if (stateLabelMap != null) {
+            Hashtable<String, Integer> newLabelMap = new Hashtable<>();
+            for (Map.Entry<String, Integer> entry : stateLabelMap.entrySet()) {
+                int oldId = entry.getValue();
+                if (otn.containsKey(oldId)) {
+                    int newId = otn.get(oldId);
+                    newLabelMap.put(entry.getKey(), newId);
+                }
+            }
+            stateLabelMap = newLabelMap;
+        }
     }
 
     // change (a ->(tau->P|tau->Q)) to (a->P | a->Q)

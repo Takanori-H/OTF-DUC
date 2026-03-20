@@ -467,6 +467,18 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             mappingComposite.name = "MAPPING_ENV";
             // 合成を実行
             mappingComposite.compose(output);
+
+            // ▼▼▼ 制約5に基づく構造の一致確認用デバッグ表示 ▼▼▼
+        output.outln("========== DEBUG: VERIFYING LTS ISOMORPHISM ==========");
+        for (CompactState cs : mappingComponents) {
+            if (cs.name.equals("MAP_PRODUCTION_CELL") || cs.name.equals("PRODUCTION_CELL_MAP")) {
+                output.outln("--- Component: " + cs.name + " ---");
+                printLTSStructure(cs, output);
+            }
+        }
+        output.outln("======================================================");
+        // ▲▲▲ デバッグ表示ここまで ▲▲▲
+        
             ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal, name.getName());
         }
 
