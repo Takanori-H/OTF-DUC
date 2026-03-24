@@ -235,7 +235,7 @@ public class UpdatingControllerSynthesizer {
         // --- A. Marking LTS (Goal & Process Management) ---
         // システム全体のアクション集合を収集して、Marking LTSのアルファベットとする
         Set<String> allActions = new HashSet<>();
-        allActions.addAll(uccs.getControllableActions());
+        //allActions.addAll(uccs.getControllableActions());
         for(CompactState cs : uccs.getMappingComponents()) {
             if(cs.getAlphabet() != null) Collections.addAll(allActions, cs.getAlphabet());
         }
@@ -244,6 +244,11 @@ public class UpdatingControllerSynthesizer {
         if (uccs.getNewController() != null) {
             allActions.addAll(uccs.getNewController().getActions());
         }
+        allActions.add(UpdateConstants.BEGIN_UPDATE);
+        allActions.add(UpdateConstants.STOP_OLD_SPEC);
+        allActions.add(UpdateConstants.RECONFIGURE);
+        allActions.add(UpdateConstants.START_NEW_SPEC);
+        allActions.add(UpdateConstants.FINISH_UPDATE);
         // 内部遷移(tau)は除外
         allActions.remove("tau");
         
@@ -443,6 +448,14 @@ public class UpdatingControllerSynthesizer {
         // }
         // output.outln("========== DEBUG: StateMapper Verification END ==========\n");
         // // ▲▲▲▲▲▲▲▲▲▲▲▲ END RESULT LOGGING ▲▲▲▲▲▲▲▲▲▲▲▲
+
+        // ▼▼▼ ここにデバッグ出力を追加 ▼▼▼
+        output.outln("\n========== DEBUG: NC Connection Map Signatures ==========");
+        for (String sig : newControllerConnectionMap.keySet()) {
+            output.outln("NC Map Key: " + sig);
+        }
+        output.outln("=========================================================\n");
+        // ▲▲▲ 追加ここまで ▲▲▲
 
         output.outln(" - State Mapper generated " + newControllerConnectionMap.size() + " mapping entries.");
 

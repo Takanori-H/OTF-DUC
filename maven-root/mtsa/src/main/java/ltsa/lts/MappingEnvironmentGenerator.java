@@ -320,7 +320,8 @@ public class MappingEnvironmentGenerator {
             if (otn.containsKey(oldi)) {
                 int newi = otn.get(oldi);
                 // 遷移先のIDも otn を使って書き換える (renumberStates)
-                machine.states[newi] = EventStateUtils.renumberStates(oldStates[oldi], otn);
+                //machine.states[newi] = EventStateUtils.renumberStates(oldStates[oldi], otn);
+                machine.states[newi] = safeRenumberStates(oldStates[oldi], otn);
             }
         }
 
@@ -451,5 +452,40 @@ public class MappingEnvironmentGenerator {
                 return i;
         }
         return -1;
+    }
+
+    /**
+     * LTSA標準の EventStateUtils.renumberStates が nondet (非決定性遷移) を
+     * 切り捨ててしまう問題を回避するため、nondet リストも完全に走査して
+     * 状態IDを振り直す安全なメソッド。
+     */
+    private EventState safeRenumberStates(EventState head, ltsa.lts.MyIntHash otn) {
+        if (head == null) return null;
+
+        EventState newHead = null;
+        EventState current = head;
+
+        // メインの遷移リストを走査
+        while (current != null) {
+            // 行き先が到達可能(otnに含まれる)場合のみ追加
+            if (otn.containsKey(current.next)) {
+                int newNext = otn.get(current.next);
+                newHead = EventStateUtils.add(newHead, new EventState(current.event, newNext));
+            }
+
+            // 非決定性遷移 (nondet) のリストも走査して追加
+            EventState nd = current.nondet;
+            while (nd != null) {
+                if (otn.containsKey(nd.next)) {
+                    int newNdNext = otn.get(nd.next);
+                    newHead = EventStateUtils.add(newHead, new EventState(current.event, newNdNext));
+                }
+                nd = nd.nondet;
+            }
+
+            current = current.list;
+        }
+
+        return newHead;
     }
 }

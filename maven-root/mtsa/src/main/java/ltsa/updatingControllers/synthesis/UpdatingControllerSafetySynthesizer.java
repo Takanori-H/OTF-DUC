@@ -27,7 +27,7 @@ public class UpdatingControllerSafetySynthesizer {
 
     public static MTS<Long, String> synthesizeSafety(MTS<Long, String> metaEnvironment, Set<Fluent> goalFluents, List<Formula> safetyFormulas, Set<String> controllableActions) {
 
-        /*
+        // /*
         // ▼▼▼ 追加: 追跡しているFluentの名前を一覧表示 ▼▼▼
         System.out.println("=========================================");
         System.out.println(" DEBUG: Tracking Fluents for New Safety");
@@ -45,7 +45,7 @@ public class UpdatingControllerSafetySynthesizer {
         }
         System.out.println("=========================================");
         // ▲▲▲ 追加ここまで ▲▲▲
-        */
+        // */
 
         makeOldActionsUncontrollable(controllableActions, metaEnvironment);
 
