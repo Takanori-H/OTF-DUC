@@ -40,7 +40,11 @@ public class CompostateDUC<State, Action> {
     private boolean wasExpanded = false;
     private HEstimate<State, Action> estimate;
     public List<RecommendationDUC> recommendations;
-    private Iterator<RecommendationDUC> recommendit;
+
+    // --- 変更箇所：フィールドの追加と削除 ---
+    private int nextRecommendationIndex = 0; // 探索済みの境界線
+    // private Iterator<RecommendationDUC> recommendit;
+
     RecommendationDUC recommendation;
     public boolean live;
     boolean inOpen;
@@ -423,16 +427,26 @@ public class CompostateDUC<State, Action> {
         return result;
     }
     public RecommendationDUC peekRecommendation() { return recommendation; }
+
+    public void initRecommendations() {
+        // 修正：イテレータの初期化を廃止し、初回のみ updateRecommendation を呼ぶ
+        if (recommendation == null && nextRecommendationIndex == 0) {
+            updateRecommendation();
+        }
+    }
+    /*
     public void initRecommendations() {
         recommendit = recommendations.iterator();
         updateRecommendation();
     }
+    */
 
     /**
      * アクション候補を更新する。
      * 子状態のステータスを確認し、既に勝利(GOAL)が確定したControllableな枝があるなら、
      * 他のControllableアクションは探索せずにスキップする。
      */
+    /*
     private void updateRecommendation() {
         while (recommendit.hasNext()) {
             recommendation = recommendit.next();
@@ -467,6 +481,42 @@ public class CompostateDUC<State, Action> {
 
             estimate = recommendation.getEstimate(); 
             return; 
+        }
+        recommendation = null;
+    }
+        */
+    private void updateRecommendation() {
+        // 修正：インデックスを用いてリストを走査。
+        // リセット（seq更新）が発生しても nextRecommendationIndex は維持されるため、
+        // 構造的に重複探索を防止する。
+        while (nextRecommendationIndex < recommendations.size()) {
+
+            // 現在のインデックスを保持
+            int currentIndex = nextRecommendationIndex;
+
+            recommendation = recommendations.get(nextRecommendationIndex++);
+            HAction<State, Action> action = recommendation.getAction();
+
+            // ★追加: 構造的管理の確認ログ
+            dcs.log("    [Debug-Structural] State " + this.states + ": Yielding action at index [" + currentIndex + "/" + recommendations.size() + "]: " + action);
+
+            // OR条件の枝刈り（Pruning）ロジックは維持
+            if (action.isControllable()) {
+                boolean alreadyWon = false;
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> explored : getExploredChildren()) {
+                    if (explored.getFirst().isControllable() && explored.getSecond().isStatus(Status.GOAL)) {
+                        alreadyWon = true;
+                        break;
+                    }
+                }
+                if (alreadyWon){
+                    dcs.log("    [Debug-Structural]   -> Skipped (Already won)");
+                    continue;
+                }
+            }
+
+            estimate = recommendation.getEstimate();
+            return;
         }
         recommendation = null;
     }
@@ -510,12 +560,27 @@ public class CompostateDUC<State, Action> {
     }
     */
 
+    /*
     public void clearRecommendations() {
         if (isEvaluated()) {
             recommendations.clear();
             recommendit = null;
             recommendation = null;
         }
+    }
+        */
+
+    public void clearRecommendations() {
+        if (isEvaluated()) {
+            recommendations.clear();
+            // 修正：イテレータの代わりにインデックスをリセットし、現在の候補をnullにする
+            nextRecommendationIndex = 0; 
+            recommendation = null;
+        }
+    }
+
+    public int getNextRecommendationIndex() {
+        return nextRecommendationIndex;
     }
     public boolean isLive() { return live; }
     public boolean isControlled() { return controlled; }
@@ -525,4 +590,9 @@ public class CompostateDUC<State, Action> {
         return result;
     }
     @Override public String toString() { return states.toString(); }
+    public void log(String message) {
+        if (this.dcs != null) {
+            this.dcs.log(message);
+        }
+    }
 }

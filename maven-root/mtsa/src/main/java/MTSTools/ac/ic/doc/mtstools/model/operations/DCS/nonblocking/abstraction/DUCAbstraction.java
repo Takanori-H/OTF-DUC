@@ -127,6 +127,116 @@ public class DUCAbstraction<State, Action> {
      * 2. スコアが同じ場合は、安全性の検証のために Uncontrollable を優先する。
      */
     public void eval(CompostateDUC<State, Action> compostate, List<Set<State>> knownMarked, List<Set<State>> goals) {
+        long start = System.nanoTime();
+        
+        // ケース1：初回評価（リストの構築と初期ソート）
+        if (!compostate.isEvaluated()) {
+            compostate.setupRecommendations();
+            for (HAction<State, Action> action : compostate.getTransitions()) {
+                HEstimate<State, Action> estimate = calculateEstimate(compostate, action);
+                compostate.addRecommendation(action, estimate);
+            }
+            // 最初はインデックス 0 から全件ソート
+            sortRecommendations(compostate.recommendations, 0);
+            compostate.initRecommendations();
+        } 
+        // ケース2：再評価（構造的管理：ポインタを維持したまま未探索分を更新）
+        else {
+            int startIndex = compostate.getNextRecommendationIndex();
+            int totalSize = compostate.recommendations.size();
+            
+            // 未探索のアクションが残っている場合のみ処理
+            if (startIndex < totalSize) {
+
+                // ★追加: 構造的管理の確認ログ (再評価の範囲を表示)
+                // ※Compostateに getDcs() メソッドがあるか、dcsフィールドが可視であることを前提としています
+                compostate.log("    [Debug-Abstraction] Knowledge Update: Re-evaluating/sorting indices [" + startIndex + " to " + (totalSize - 1) + "] for state " + compostate.getStates());
+
+                // startIndex 以降の要素（未探索セクション）のみスコアを計算し直す
+                for (int i = startIndex; i < totalSize; i++) {
+                    CompostateDUC<State, Action>.RecommendationDUC rec = compostate.recommendations.get(i);
+                    rec.estimate = calculateEstimate(compostate, rec.getAction());
+                }
+
+                // startIndex 以降のサブリストのみをソート（既探索領域の順序は固定）
+                sortRecommendations(compostate.recommendations, startIndex);
+            }
+            else{compostate.log("    [Debug-Abstraction] Knowledge Update: All branches already explored for state " + compostate.getStates());}
+        }
+        
+        DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);
+    }
+
+    /**
+     * 指定されたインデックス以降のサブリストをソートする。
+     */
+    private void sortRecommendations(List<CompostateDUC<State, Action>.RecommendationDUC> list, int fromIndex) {
+        if (fromIndex >= list.size()) return;
+        
+        // サブリストを取得（Javaの subList は元のリストと連動しているため、これでソートが可能）
+        List<CompostateDUC<State, Action>.RecommendationDUC> subList = list.subList(fromIndex, list.size());
+        
+        Collections.sort(subList, new Comparator<CompostateDUC<State, Action>.RecommendationDUC>() {
+            @Override
+            public int compare(CompostateDUC<State, Action>.RecommendationDUC r1, 
+                               CompostateDUC<State, Action>.RecommendationDUC r2) {
+                // 1. 進捗スコア (HEstimate) で比較
+                int costCompare = r1.compareTo(r2);
+                if (costCompare != 0) return costCompare;
+
+                // 2. スコアが同じなら Uncontrollable を優先 (false < true)
+                boolean c1 = r1.getAction().isControllable();
+                boolean c2 = r2.getAction().isControllable();
+                if (c1 != c2) {
+                    return c1 ? 1 : -1;
+                }
+                return 0;
+            }
+        });
+    }
+
+    /**
+     * 個別のアクションに対するヒューリスティック評価値を計算する（共通ロジック）。
+     */
+    private HEstimate<State, Action> calculateEstimate(CompostateDUC<State, Action> compostate, HAction<State, Action> action) {
+        List<State> currentStates = compostate.getStates();
+        
+        // 現在の進捗状況 (Marking Depth) の取得
+        long currentMarkingId = -1;
+        Object mStateObj = currentStates.get(markingLTSIndex);
+        if (mStateObj instanceof Long) {
+            currentMarkingId = (Long) mStateObj;
+        } else if (mStateObj instanceof Integer) {
+            currentMarkingId = ((Integer) mStateObj).longValue();
+        }
+        
+        int currentDepth = (currentMarkingId != -1) ? getMarkingDepth(currentMarkingId) : 0;
+        String actionName = action.toString();
+        int actionCost = getActionPriorityCost(actionName);
+        int predictedDepth = currentDepth;
+
+        // 更新事象による進捗予測
+        if (actionName.equals(UpdateConstants.BEGIN_UPDATE) && currentDepth == 0) {
+            predictedDepth = 1;
+        } else if (actionName.equals(UpdateConstants.STOP_OLD_SPEC) || 
+                   actionName.equals(UpdateConstants.RECONFIGURE) || 
+                   actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+            if (currentDepth >= 1 && currentDepth < 4) {
+                predictedDepth = currentDepth + 1;
+            }
+        } else if (actionName.equals(UpdateConstants.FINISH_UPDATE) && currentDepth == 4) {
+            predictedDepth = 5;
+        }
+
+        // スコア計算: Marking重み * (最大深さ - 予測深さ) + 環境距離 + アクション固有コスト
+        double markingScore = W_MARKING * (5 - predictedDepth);
+        int envDist = getEnvHeuristic(currentStates);
+        int totalScore = (int) markingScore + envDist + actionCost;
+
+        return new HEstimate<>(1, new HDist(totalScore, 1));
+    }
+    /*
+    public void eval(CompostateDUC<State, Action> compostate, List<Set<State>> knownMarked, List<Set<State>> goals) {
         // 1. 計測開始（ナノ秒単位）
         long start = System.nanoTime();
         if (!compostate.isEvaluated()) {
@@ -205,6 +315,7 @@ public class DUCAbstraction<State, Action> {
         // プロファイラが定義されている場所に合わせてアクセスしてください。
         DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);
     }
+        */
 
     private int getActionPriorityCost(String actionName) {
         if (actionName.equals(UpdateConstants.FINISH_UPDATE)) return COST_FINISH_UPDATE;

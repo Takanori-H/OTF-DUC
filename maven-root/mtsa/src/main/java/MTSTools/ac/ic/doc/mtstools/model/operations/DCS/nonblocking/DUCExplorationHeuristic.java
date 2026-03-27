@@ -129,9 +129,9 @@ public class DUCExplorationHeuristic<State, Action> {
                 if (fullyExplored(s) || !s.isLive() || !s.isStatus(Status.NONE)) continue;
                 if (s.seq < this.seq) {
                     // ★追加: どの状態がリセットされたか記録
-                    dcs.log("    Resetting state: " + s.getStates() + " (old seq: " + s.seq + ")");
-                    s.clearRecommendations();
-                    s.recommendations = null;
+                    // dcs.log("    Resetting state: " + s.getStates() + " (old seq: " + s.seq + ")");
+                    // s.clearRecommendations();
+                    // s.recommendations = null;
                     // ここで eval -> updateRecommendation が呼ばれ、最新の「子のStatus」がチェックされる
                     abstraction.eval(s, this.knownMarked, this.goals);
                     s.seq = this.seq;
