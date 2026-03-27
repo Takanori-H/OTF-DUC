@@ -1,8 +1,13 @@
 package ltsa.lts;
 
+import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.controller.model.ControllerGoal;
 import ltsa.control.ControllerGoalDefinition;
 import ltsa.control.util.GoalDefToControllerGoal;
+import ltsa.lts.ltl.AssertDefinition;
+import ltsa.lts.ltl.FormulaFactory;
+import ltsa.lts.ltl.FormulaSyntax;
+import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
@@ -356,95 +361,151 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // 配列に変換 (これがモニタの最終的なアルファベットになる)
             String[] monitorAlphabet = cleanAlphaSet.toArray(new String[0]);
             if (newSafeCol != null) {
-                for (CompactState originalSafe : newSafeCol) {
-                    Set<String> errorActions = new HashSet<>();
-                    List<CompactState> components = new ArrayList<>();
+                List<Symbol> newSafetySpecs = newGoalDef.getSafetyDefinitions();
+                
+                // ▼▼▼ 修正: Collectionのイテレータ順序ズレを防ぐため、名前で引けるMapを作成 ▼▼▼
+                Map<String, CompactState> newSafeMap = new HashMap<>();
+                for (CompactState cs : newSafeCol) {
+                    newSafeMap.put(cs.name, cs);
+                }
 
-                    // 1. モニター変換 (同時に errorActions を収集)
-                    CompactState monitor = convertToMonitor(originalSafe, errorActions);
-                    synthesisMachines.add(monitor); // モニターはプロパティごとに固有なので追加
-                    components.add(monitor); // リストの0番目は常にモニター
+                output.outln(" - Extracting New Safety Fluents and Building Look-up Tables...");
 
-                    // 2. アクションFluentの取得 (キャッシュ利用)
-                    // ListとMapの整合性を保つため、ソートして順序を固定
-                    List<String> sortedErrorActions = new ArrayList<>(errorActions);
-                    Collections.sort(sortedErrorActions);
-                    for (String action : sortedErrorActions) {
-                        if (!globalFluentCache.containsKey(action)) {
-                            // キャッシュになければ生成して登録
-                            // output.outln(" -> Generating unique Action Fluent: " + action);
-                            CompactState fluent = buildActionFluentLTS(action, monitorAlphabet);
-                            // buildActionFluentLTSには全体のアクションが必要ではないか？
-                            // mapping componentからとupdateconstant
-                            globalFluentCache.put(action, fluent);
-                            synthesisMachines.add(fluent); // ユニークなものだけを合成用リストに追加
+                for (Symbol sym : newSafetySpecs) {
+                    String name = sym.getName();
+
+                    // 名前を使って確実に正しいCompactState(LTS)を取得する
+                    CompactState originalSafe = newSafeMap.get(name);
+
+                    // (フェイルセーフ) もしLTSAの内部処理で名前に接頭辞がついていた場合の検索
+                    if (originalSafe == null) {
+                        for (CompactState cs : newSafeCol) {
+                            if (cs.name.endsWith(name)) {
+                                originalSafe = cs;
+                                break;
+                            }
                         }
-                        // このプロパティの構成要素リストに追加 (1番目以降はFluent)
-                        components.add(globalFluentCache.get(action));
+                    }
+                    
+                    if (originalSafe == null) {
+                        Diagnostics.fatal("Compiled LTS not found for safety property: " + name);
+                    }
+                    
+                    Set<Fluent> propertyFluents = new HashSet<>();
+
+                    AssertDefinition def = AssertDefinition.getDefinition(name);
+                    if (def == null) {
+                        def = AssertDefinition.getConstraint(name);
                     }
 
-                    // 3. 状態マッピングの生成 (MonitorState + FluentStates -> OriginalState)
-                    // ★Integer型で生成
-                    Map<List<Integer>, Integer> stateMap = generateStateMapping(originalSafe, sortedErrorActions);
+                    if (def != null) {
+                        // 1. 構文木(Syntax Tree)を取得
+                        FormulaSyntax syntax = def.getLTLFormula();
 
-                    // 4. マップへの登録
-                    safetyComponentsMap.put(originalSafe, components);
+                        if (syntax != null) {
+                            // 2. 時間演算子(Always/Until)を構文レベルで除去
+                            // UpdatingControllersGoalsMakerと同じロジックを使用
+                            FormulaSyntax strippedSyntax = syntax.removeLeftTemporalOperators();
+
+                            // 3. 一時的なFormulaFactoryを作成して再コンパイル
+                            // これにより、時間演算子を含まない単純な論理式(Formula)が生成される
+                		    FormulaFactory tempFactory = new FormulaFactory();
+
+                            // パラメータ展開 (init_paramsを取得するために手順1のゲッターが必要)
+                		    // もしゲッター追加が不可なら new Hashtable() で代用(パラメータ無しと仮定)
+                		    Hashtable params = (def.getInitParams() != null) ? def.getInitParams() : new Hashtable();
+
+                            tempFactory.setFormula(strippedSyntax.expand(tempFactory, new Hashtable(), params));
+
+                            // 4. コンパイル済みFormulaからFluentを抽出
+                		    // (これでVisitorはUntilに遭遇しないためエラーにならない)
+                		    FormulaUtils.adaptFormulaAndCreateFluents(tempFactory.getFormula(), propertyFluents);
+                        }
+                    }
+                    else {
+                        Diagnostics.fatal("Assertion/Property not defined [" + name + "].");
+                    }
+
+                    // 順序を固定するためにソート
+                    List<Fluent> sortedFluents = new ArrayList<>(propertyFluents);
+                    Collections.sort(sortedFluents, new Comparator<Fluent>() {
+                        public int compare(Fluent f1, Fluent f2) {
+                            return f1.getName().compareTo(f2.getName());
+                        }
+                    });
+
+                    // 抽出したFluentをLTSに変換しキャッシュ・リストに登録
+                    List<CompactState> propertyFluentAutomata = new ArrayList<>();
+                    for (Fluent f : sortedFluents) {
+                        // ① キャッシュにそのFluent名が存在しない場合のみ中に入る
+                        if (!globalFluentCache.containsKey(f.getName())) {
+                            CompactState fLts = convertFluentToLTS(f, monitorAlphabet);
+                            globalFluentCache.put(f.getName(), fLts);
+                            synthesisMachines.add(fLts); // ← ② 新規のときだけここが実行される
+                        }
+                        // ③ 現在処理中のSafety Property用のリストには、キャッシュから取得して追加する
+                        // (新規作成されたものも、既存のものもここを通る)
+                        propertyFluentAutomata.add(globalFluentCache.get(f.getName()));
+                    }
+
+                    // 元のSafetyプロパティに対応するFluentのLTSリストをマッピング
+                    safetyComponentsMap.put(originalSafe, propertyFluentAutomata);
+
+                    // BFSで全状態空間を探索し、状態追跡マップ（Look-up Table）を生成
+                    Map<List<Integer>, Integer> stateMap = generateStateMappingBFS(originalSafe, sortedFluents, propertyFluentAutomata, monitorAlphabet);
                     safetyStateMapping.put(originalSafe, stateMap);
+                
 
                     // デバッグ用
-                    /*
+                    // /*
                     output.outln("--------------------------");
                     output.outln(originalSafe.name + " Mapped");
-                    for(CompactState fluent : components){
-                        output.outln(fluent.name);
+                    for(Fluent fluent : sortedFluents){
+                        output.outln(fluent.getName());
                     }
-                     */
+                    //  */
 
                     // =========================================================
                     // Debug: State Mapping Visualization
                     // =========================================================
-                    /*
-                    // 1. ヘッダーの作成: [MonitorName, FluentName1, FluentName2...] -> [PropertyName]
-                    StringBuilder headerBuilder = new StringBuilder();
-                    headerBuilder.append("Mapping Table [").append(monitor.name);
-                    // sortedErrorActions の順序に従ってFluent名を追加
-                    for (String action : sortedErrorActions) {
-                        // buildActionFluentLTS で生成した命名規則 ("FLUENT_" + action + "_a") に合わせる
-                        String fluentName = "FLUENT_" + action + "_a";
-                        headerBuilder.append(", ").append(fluentName);
-                    }
-                    headerBuilder.append("] -> [").append(originalSafe.name).append("]");
-                    output.outln(headerBuilder.toString());
-                    // 2. マップのエントリーをキー（List<Integer>）でソート
-                    // ([0,0] -> [0,1] -> [1,0]... の順に並べるため)
-                    List<Map.Entry<List<Integer>, Integer>> sortedEntries = new
-                    ArrayList<>(stateMap.entrySet());
-                    Collections.sort(sortedEntries, new Comparator<Map.Entry<List<Integer>,
-                    Integer>>() {
-                        @Override
-                        public int compare(Map.Entry<List<Integer>, Integer> e1,
-                                            Map.Entry<List<Integer>, Integer> e2) {
-                            List<Integer> k1 = e1.getKey();
-                            List<Integer> k2 = e2.getKey();
-                            int size = Math.min(k1.size(), k2.size());
-                            for (int i = 0; i < size; i++) {
-                                int cmp = k1.get(i).compareTo(k2.get(i));
-                                if (cmp != 0) return cmp;
+                    // ▼▼▼ デバッグ出力処理の追加箇所（Monitor廃止版） ▼▼▼
+                    if (output != null) {
+                        StringBuilder headerBuilder = new StringBuilder();
+                        headerBuilder.append("    Mapping Table [");
+                        boolean firstFluent = true;
+                        for (Fluent f : sortedFluents) {
+                            if (!firstFluent) {
+                                headerBuilder.append(", ");
                             }
-                            return Integer.compare(k1.size(), k2.size());
+                            headerBuilder.append(f.getName());
+                            firstFluent = false;
                         }
-                    });
+                        headerBuilder.append("] -> [").append(originalSafe.name).append("]");
+                        output.outln(headerBuilder.toString());
 
-                    // 3. ソートされたエントリーの出力
-                    // 形式: [MonitorState, FluentState...] -> SafetyState
-                    for (Map.Entry<List<Integer>, Integer> entry : sortedEntries) {
-                        List<Integer> keyStateList = entry.getKey();
-                        Integer targetState = entry.getValue();
-                        // JavaのList.toString()は "[0, 1, 0]" のような形式になるため、そのまま利用できます
-                        output.outln(keyStateList.toString() + " -> " + targetState);
+                        // 状態の組み合わせ（List<Integer>）を辞書順にソート
+                        List<Map.Entry<List<Integer>, Integer>> sortedEntries = new ArrayList<>(stateMap.entrySet());
+                        Collections.sort(sortedEntries, new Comparator<Map.Entry<List<Integer>, Integer>>() {
+                            public int compare(Map.Entry<List<Integer>, Integer> e1, Map.Entry<List<Integer>, Integer> e2) {
+                                List<Integer> k1 = e1.getKey();
+                                List<Integer> k2 = e2.getKey();
+                                int size = Math.min(k1.size(), k2.size());
+                                for (int i = 0; i < size; i++) {
+                                    int cmp = k1.get(i).compareTo(k2.get(i));
+                                    if (cmp != 0) return cmp;
+                                }
+                                return Integer.compare(k1.size(), k2.size());
+                            }
+                        });
+
+                        // ソートしたマッピングの出力
+                        for (Map.Entry<List<Integer>, Integer> entry : sortedEntries) {
+                            String targetStateStr = (entry.getValue() == ltsa.lts.Declaration.ERROR) ? "ERROR (-1)" : String.valueOf(entry.getValue());
+                            output.outln("      " + entry.getKey().toString() + " -> " + targetStateStr);
+                        }
+                        output.outln("--------------------------------------------------");
                     }
-                    output.outln("--------------------------");
-                     */
+                    // ▲▲▲ デバッグ出力処理の追加箇所ここまで ▲▲▲
                 }
             }
 
@@ -478,7 +539,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         }
         output.outln("======================================================");
         // ▲▲▲ デバッグ表示ここまで ▲▲▲
-        
+
             ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal, name.getName());
         }
 
@@ -756,135 +817,151 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     }
 
     /**
-    Safety LTS を Monitor Automaton に変換するメソッド。
-    ERROR (-1) への遷移を、現在の状態への自己ループに書き換えます。
-    同時に、ERROR遷移を引き起こすアクション名を収集します。
+     * BFS探索のキュー要素を保持するための内部クラス
      */
-    private CompactState convertToMonitor(CompactState original, Set<String> errorActionsCollector) {
-        CompactState monitor = original.myclone();
-        monitor.name = "MONITOR_" + original.name;
-        String[] alphabet = monitor.alphabet;
-        output.outln(" -> Converting Safety Property '" + original.name + "' to Error-Free Monitor.");
-        for (int i = 0; i < monitor.maxStates; i++) {
-            EventState current = monitor.states[i];
-            while (current != null) {
-                if (current.next == Declaration.ERROR) {
-                    current.next = i; // 自己ループ
-                    errorActionsCollector.add(alphabet[current.event]);
-                }
-                EventState nd = current.nondet;
-                while (nd != null) {
-                    if (nd.next == Declaration.ERROR) {
-                        nd.next = i; // 自己ループ
-                        errorActionsCollector.add(alphabet[current.event]);
-                    }
-                    nd = nd.nondet;
-                }
-                current = current.list;
-            }
+    private static class StateCombo {
+        int safeState;
+        List<Integer> fluentStates;
+        StateCombo(int s, List<Integer> f) {
+            this.safeState = s;
+            this.fluentStates = f;
         }
-        return monitor;
     }
 
-    /*
-    指定されたアクションに対する Action Fluent LTS を構築する。
+    /**
+     * 区間FluentをCompactStateに変換する。
+     * initiating/terminatingアクションに基づき、システムフェーズをまたいで状態を正しく保持する。
      */
-    private CompactState buildActionFluentLTS(String targetAction, String[] originalAlphabet) {
-        String name = "FLUENT_" + targetAction + "_a";
-        CompactState fluent = new CompactState();
-        fluent.name = name;
-        fluent.maxStates = 2;
-        fluent.alphabet = originalAlphabet;
-        fluent.states = new EventState[2];
+    private CompactState convertFluentToLTS(Fluent fluent, String[] alphabet) {
+        String name = fluent.getName();
+        CompactState machine = new CompactState();
+        machine.name = name;
+        machine.maxStates = 2; // State 0 (False), State 1 (True)
+        machine.alphabet = alphabet;
+        machine.states = new EventState[2];
 
-        int targetEventIdx = -1;
-        for (int i = 0; i < originalAlphabet.length; i++) {
-            if (originalAlphabet[i].equals(targetAction)) {
-                targetEventIdx = i;
+        Set<String> initiating = new HashSet<>();
+        for (MTSSynthesis.ar.dc.uba.model.language.Symbol s : fluent.getInitiatingActions()) {
+            initiating.add(s.toString());
+        }
+
+        Set<String> terminating = new HashSet<>();
+        for (MTSSynthesis.ar.dc.uba.model.language.Symbol s : fluent.getTerminatingActions()) {
+            terminating.add(s.toString());
+        }
+
+        for (int i = 0; i < alphabet.length; i++) {
+            String action = alphabet[i];
+
+            // State 0 (False) からの遷移
+            int nextFrom0 = 0; 
+            if (initiating.contains(action)) {
+                nextFrom0 = 1;
+            }
+            machine.states[0] = EventStateUtils.add(machine.states[0], new EventState(i, nextFrom0));
+
+            // State 1 (True) からの遷移
+            int nextFrom1 = 1; 
+            if (terminating.contains(action) || terminating.contains("*")) {
+                if (!initiating.contains(action)) {
+                    nextFrom1 = 0;
+                }
+            }
+            machine.states[1] = EventStateUtils.add(machine.states[1], new EventState(i, nextFrom1));
+        }
+        return machine;
+    }
+
+    /**
+     * BFSを用いてSafety Propertyと各Fluentを並行探索し、
+     * [Fluent1状態, Fluent2状態...] -> Safety状態 の完全な対応マップを構築する。
+     */
+    private Map<List<Integer>, Integer> generateStateMappingBFS(CompactState originalSafe, List<Fluent> fluents, List<CompactState> fluentAutomata, String[] alphabet) {
+        Map<List<Integer>, Integer> mapping = new HashMap<>();
+        Queue<StateCombo> queue = new LinkedList<>();
+        Set<String> visited = new HashSet<>();
+
+        // 初期状態の特定
+        int initialSafe = 0; // LTSAのCompactStateにおける初期状態は常に0
+        List<Integer> initialFluents = new ArrayList<>();
+        for (Fluent f : fluents) {
+            initialFluents.add(f.getInitialValue() ? 1 : 0);
+        }
+
+        mapping.put(initialFluents, initialSafe);
+        queue.add(new StateCombo(initialSafe, initialFluents));
+        visited.add(initialSafe + "|" + initialFluents.toString());
+
+        while (!queue.isEmpty()) {
+            StateCombo current = queue.poll();
+            int currSafe = current.safeState;
+            List<Integer> currFluents = current.fluentStates;
+
+            for (String action : alphabet) {
+                int nextSafe = getNextState(originalSafe, currSafe, action);
+
+                List<Integer> nextFluents = new ArrayList<>();
+                for (int fIdx = 0; fIdx < fluentAutomata.size(); fIdx++) {
+                    CompactState fLts = fluentAutomata.get(fIdx);
+                    int fCurrState = currFluents.get(fIdx);
+                    int fNextState = getNextState(fLts, fCurrState, action);
+                    nextFluents.add(fNextState);
+                }
+
+                String sig = nextSafe + "|" + nextFluents.toString();
+                if (!visited.contains(sig)) {
+                    visited.add(sig);
+                    
+                    // ★修正: 既にマップに登録されていて、かつ今回がERRORでないなら上書きしない
+                    // (ただし、ERRORに行き着くパスがあるならERRORを優先して上書きする)
+                    if (!mapping.containsKey(nextFluents)) {
+                        mapping.put(nextFluents, nextSafe);
+                    } else if (nextSafe == ltsa.lts.Declaration.ERROR) {
+                        mapping.put(nextFluents, nextSafe);
+                    }
+
+                    // エラー状態からは遷移しないためキューに入れない
+                    if (nextSafe != ltsa.lts.Declaration.ERROR) {
+                        queue.add(new StateCombo(nextSafe, nextFluents));
+                    }
+                }
+            }
+        }
+        return mapping;
+    }
+
+    /**
+     * 指定されたアクションに対するLTSの次状態を取得するヘルパーメソッド。
+     * (修正版: アルファベット外のアクションは自己ループとして無視する)
+     */
+    private int getNextState(CompactState lts, int currState, String actionStr) {
+        // すでにエラー状態ならエラーのまま
+        if (currState == ltsa.lts.Declaration.ERROR) return ltsa.lts.Declaration.ERROR;
+
+        // 1. そのアクションが自身のアルファベットに含まれているかチェック
+        boolean inAlphabet = false;
+        for (String a : lts.alphabet) {
+            if (a.equals(actionStr)) {
+                inAlphabet = true;
                 break;
             }
         }
 
-        EventState state0 = null;
-        EventState state1 = null;
-
-        for (int i = 0; i < originalAlphabet.length; i++) {
-            if (i == targetEventIdx) {
-                state0 = EventStateUtils.add(state0, new EventState(i, 1));
-                state1 = EventStateUtils.add(state1, new EventState(i, 1));
-            } else {
-                state0 = EventStateUtils.add(state0, new EventState(i, 0));
-                state1 = EventStateUtils.add(state1, new EventState(i, 0));
-            }
+        // 2. アルファベットに含まれていない場合は「無視(自己ループ)」
+        if (!inAlphabet) {
+            return currState;
         }
 
-        fluent.states[0] = state0;
-        fluent.states[1] = state1;
-
-        return fluent;
-    }
-
-    /**
-    元のSafetyプロパティに基づいて、MonitorとFluentの状態の組み合わせから、
-    元のSafetyプロパティの状態へのマッピングを生成する。
-    ★修正: 遷移先が ERROR (-1) の場合のみ登録する。
-    (正常な遷移はMonitorが正しく追跡しているため、Mapでの上書き衝突を防ぐためにも登録しない)
-    Key: [MonitorState(Int), Fluent1State(Int)...]
-    Value: OriginalState(Int) -> 常に -1 (ERROR)
-     */
-    private Map<List<Integer>, Integer> generateStateMapping(CompactState originalSafe,
-            List<String> sortedErrorActions) {
-        Map<List<Integer>, Integer> mapping = new HashMap<>();
-        String[] alphabet = originalSafe.alphabet;
-
-        // 全状態を走査
-        for (int s = 0; s < originalSafe.maxStates; s++) {
-            EventState current = originalSafe.states[s];
-
-            // 存在する遷移だけをトレース
-            while (current != null) {
-                int eventIdx = current.event;
-                String actionName = alphabet[eventIdx];
-                int nextState = current.next;
-
-                // ★重要: ERROR (-1) に遷移する場合のみマップに登録する
-                if (nextState == Declaration.ERROR) {
-                    // キーの生成: [MonitorState, Fluent1, Fluent2...]
-                    List<Integer> key = new ArrayList<>();
-                    key.add(s); // Monitor State
-
-                    // 各Fluentの状態を決定
-                    for (String errorAction : sortedErrorActions) {
-                        if (errorAction.equals(actionName)) {
-                            key.add(1); // True
-                        } else {
-                            key.add(0); // False
-                        }
-                    }
-
-                    // マップに登録 (値は常に -1)
-                    mapping.put(key, nextState);
-                }
-
-                // 非決定性遷移の考慮（Safety Propertyでは稀だが念のため）
-                EventState nd = current.nondet;
-                while (nd != null) {
-                    if (nd.next == Declaration.ERROR) {
-                        List<Integer> key = new ArrayList<>();
-                        key.add(s);
-                        for (String errorAction : sortedErrorActions) {
-                            if (errorAction.equals(actionName))
-                                key.add(1);
-                            else
-                                key.add(0);
-                        }
-                        mapping.put(key, nd.next);
-                    }
-                    nd = nd.nondet;
-                }
-                current = current.list;
+        // 3. アルファベットに含まれている場合は遷移を探す
+        EventState current = lts.states[currState];
+        while (current != null) {
+            if (lts.alphabet[current.event].equals(actionStr)) {
+                return current.next; // 遷移先を返す
             }
+            current = current.list;
         }
-        return mapping;
+
+        // 4. アルファベットに含まれているのに遷移定義がない場合は「安全性違反 (ERROR)」
+        return ltsa.lts.Declaration.ERROR;
     }
 }

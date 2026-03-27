@@ -438,6 +438,15 @@ public class CompostateDUC<State, Action> {
             recommendation = recommendit.next();
             HAction<State, Action> action = recommendation.getAction();
 
+            // === 修正箇所：重複探索防止のためのフィルタリング ===
+            // 既に expandDUC によって探索（同期・展開）が行われたアクションであれば、
+            // リストの順序変更やリセットに関わらずスキップして次の未探索アクションを探す。
+            Set<CompostateDUC<State, Action>> alreadyExplored = exploredChildren.getImage(action);
+            if (alreadyExplored != null && !alreadyExplored.isEmpty()) {
+                continue;
+            }
+            // ===============================================
+
             // ★修正：子状態の状態を直接確認する（ご指摘のデバッグポイント）
             if (action.isControllable()) {
                 boolean alreadyWon = false;
