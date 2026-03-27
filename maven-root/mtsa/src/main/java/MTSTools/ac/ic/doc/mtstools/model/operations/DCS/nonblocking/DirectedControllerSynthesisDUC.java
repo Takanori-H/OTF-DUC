@@ -600,10 +600,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             log("  Selected Action:           " + action);
             if (blocked) log("  Result:                    BLOCKED");
             else if (allNextStates == null) log("  Result:                    INVALID");
-            else {
-                for(List<State> s : allNextStates)
-                log("  Next Compostate States:    " + s);
-            }
+            // else {
+            //     for(List<State> s : allNextStates)
+            //     log("  Next Compostate States:    " + s);
+            // }
             // else log("  Generated Branches:        " + allNextStates.size() + " possible outcomes");
         }
 
@@ -612,7 +612,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (blocked) log("[BLOCKED] Transition blocked by finishUpdate condition: " + action);
             else log("[DEADLOCK/INVALID] No valid next states for action: " + action);
             heuristic.expansionDone(state, action, null);
-            if (debugLogEnabled) log("--------------------------------------------------------------------------------");
+            // if (debugLogEnabled) log("--------------------------------------------------------------------------------");
             return;
         }
 
@@ -631,6 +631,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             child.addParent(action, state);
             children.add(child);
 
+            log("  Next Compostate States:    " + child.getStates());
+
             long s3 = System.nanoTime();
             heuristic.notifyExpandingState(state, action, child);
             explore(state, action, child);
@@ -638,7 +640,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             DUCProfiler.timeNewStateInit += (System.nanoTime() - s3);
         }
 
-        if (debugLogEnabled) log("--------------------------------------------------------------------------------");
+        // if (debugLogEnabled) log("--------------------------------------------------------------------------------");
 
         // 4. heuristic.expansionDone への完了通知
         // 複数分岐のうち、まだGoalに到達していないものがあればそれを代表として渡す

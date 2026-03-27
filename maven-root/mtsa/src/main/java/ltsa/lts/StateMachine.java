@@ -151,7 +151,7 @@ class StateMachine {
                 c.addStateLabel(label, id.intValue());
 
                 // ▼▼▼ デバッグ用追加 (出力が多すぎる場合はコメントアウトしてください) ▼▼▼
-                output.outln("DEBUG: Mapped state label " + label + " -> " + id + " in process " + name);
+                // output.outln("DEBUG: Mapped state label " + label + " -> " + id + " in process " + name);
                 // ▲▲▲ 追加ここまで ▲▲▲
             }
         }

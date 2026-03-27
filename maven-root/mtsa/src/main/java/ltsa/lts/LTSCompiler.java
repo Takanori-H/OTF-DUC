@@ -2444,12 +2444,12 @@ public class LTSCompiler {
     
     private void parseRelation(){
         // デバッグ: 開始時のトークンを表示
-        output.outln("DEBUG: parseRelation started. Current token: " + current);
+        // output.outln("DEBUG: parseRelation started. Current token: " + current);
 
         next_symbol(); // 'relation' を消費
 
         // デバッグ: 消費後のトークン（名前のはず）を表示
-        output.outln("DEBUG: After next_symbol(). Current token: " + current);
+        // output.outln("DEBUG: After next_symbol(). Current token: " + current);
 
         if (current.kind != Symbol.UPPERIDENT) {
             error("Relation name expected");
@@ -2473,9 +2473,9 @@ public class LTSCompiler {
         RelationDefinition relDef = new RelationDefinition(name);
 
         // 名前を消費して'=' を確認
-        output.outln("DEBUG: Calling expectBecomes()...");
+        // output.outln("DEBUG: Calling expectBecomes()...");
         expectBecomes();
-        output.outln("DEBUG: expectBecomes passed.");
+        // output.outln("DEBUG: expectBecomes passed.");
         // '='を消費して'{' を確認
         expectLeftCurly();
         // '{' の次のトークンへ進める
@@ -2492,9 +2492,9 @@ public class LTSCompiler {
         if (current.kind == Symbol.RCURLY) {
             // ここで relations.put を行う
             relations.put(name.toString(), relDef);
-            output.outln("DEBUG: Parsed [" + name + "] successfully.");
+            // output.outln("DEBUG: Parsed [" + name + "] successfully.");
             next_symbol(); // '}' を消費
-            output.outln("DEBUG: Parsed [" + name + "] with " + relDef.rules.size() + " rules.");
+            // output.outln("DEBUG: Parsed [" + name + "] with " + relDef.rules.size() + " rules.");
         } else {
             error("} expected at the end of relation");
         }
@@ -2524,7 +2524,7 @@ public class LTSCompiler {
         push_symbol();
         // ▲▲▲ 追加ここまで ▲▲▲
 
-        output.outln("DEBUG: parseRelation finished. Next token: " + current);
+        // output.outln("DEBUG: parseRelation finished. Next token: " + current);
         // output.outln("DEBUG: parseRelation finished successfully.");
     }
 
@@ -2592,10 +2592,10 @@ public class LTSCompiler {
         }
 
         // ▼▼▼ デバッグ: ここでトークンがアクション（reconfigure等）になっているはず ▼▼▼
-        output.outln("DEBUG: Start parsing actions. Current: " + current + " Kind: " + current.kind);
+        // output.outln("DEBUG: Start parsing actions. Current: " + current + " Kind: " + current.kind);
 
         // ▼▼▼ デバッグ用出力（動作確認後削除可） ▼▼▼
-        output.outln("DEBUG: Parsing rule body. First token: " + current);
+        // output.outln("DEBUG: Parsing rule body. First token: " + current);
 
         // ▼▼▼ 修正: アクションチェーンの解析 ▼▼▼
         // 4. アクションチェーンの解析
@@ -2750,7 +2750,7 @@ public class LTSCompiler {
         next_symbol(); // '}' を消費。ここで次のトークン（'.' や次の 'map'）になる
 
         // Debug: } 消費前のトークン
-        output.outln("DEBUG: parseMap body finished. Current token: " + current);
+        // output.outln("DEBUG: parseMap body finished. Current token: " + current);
 
         // ▼▼▼ ピリオド処理（あれば消費、なければ何もしない） ▼▼▼
         if (current.kind == Symbol.DOT) {
@@ -2770,7 +2770,7 @@ public class LTSCompiler {
         push_symbol();
         // ▲▲▲ 追加ここまで ▲▲▲
         
-        output.outln("DEBUG: parseMap returning. Next parsing should start from: " + current);
+        // output.outln("DEBUG: parseMap returning. Next parsing should start from: " + current);
     }
 
     private void createMapComposite(MapDefinition mapDef,

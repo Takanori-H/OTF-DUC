@@ -498,7 +498,7 @@ public class CompostateDUC<State, Action> {
             HAction<State, Action> action = recommendation.getAction();
 
             // ★追加: 構造的管理の確認ログ
-            dcs.log("    [Debug-Structural] State " + this.states + ": Yielding action at index [" + currentIndex + "/" + recommendations.size() + "]: " + action);
+            // dcs.log("    [Debug-Structural] State " + this.states + ": Yielding action at index [" + currentIndex + "/" + recommendations.size() + "]: " + action);
 
             // OR条件の枝刈り（Pruning）ロジックは維持
             if (action.isControllable()) {
@@ -510,7 +510,7 @@ public class CompostateDUC<State, Action> {
                     }
                 }
                 if (alreadyWon){
-                    dcs.log("    [Debug-Structural]   -> Skipped (Already won)");
+                    // dcs.log("    [Debug-Structural]   -> Skipped (Already won)");
                     continue;
                 }
             }

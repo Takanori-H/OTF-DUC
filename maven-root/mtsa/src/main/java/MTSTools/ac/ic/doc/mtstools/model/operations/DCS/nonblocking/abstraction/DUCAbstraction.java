@@ -150,7 +150,7 @@ public class DUCAbstraction<State, Action> {
 
                 // ★追加: 構造的管理の確認ログ (再評価の範囲を表示)
                 // ※Compostateに getDcs() メソッドがあるか、dcsフィールドが可視であることを前提としています
-                compostate.log("    [Debug-Abstraction] Knowledge Update: Re-evaluating/sorting indices [" + startIndex + " to " + (totalSize - 1) + "] for state " + compostate.getStates());
+                // compostate.log("    [Debug-Abstraction] Knowledge Update: Re-evaluating/sorting indices [" + startIndex + " to " + (totalSize - 1) + "] for state " + compostate.getStates());
 
                 // startIndex 以降の要素（未探索セクション）のみスコアを計算し直す
                 for (int i = startIndex; i < totalSize; i++) {
@@ -161,7 +161,7 @@ public class DUCAbstraction<State, Action> {
                 // startIndex 以降のサブリストのみをソート（既探索領域の順序は固定）
                 sortRecommendations(compostate.recommendations, startIndex);
             }
-            else{compostate.log("    [Debug-Abstraction] Knowledge Update: All branches already explored for state " + compostate.getStates());}
+            // else{compostate.log("    [Debug-Abstraction] Knowledge Update: All branches already explored for state " + compostate.getStates());}
         }
         
         DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);

@@ -291,9 +291,13 @@ public class UpdatingControllerSynthesizer {
         mappingStartIndex = boxList.size();
         if(uccs.getMappingComponents() != null)
         {
+            int i = mappingStartIndex;
             for(CompactState cs : uccs.getMappingComponents())
             {
+
+                output.outln("MapEnv (index" + i + "): " + cs.name);
                 boxList.add(new LTSAdapter<>(converter.convert(cs), TransitionType.REQUIRED));
+                i++;
             }
         }
         mappingEndIndex = boxList.size() - 1;

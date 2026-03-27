@@ -123,7 +123,7 @@ public class DUCExplorationHeuristic<State, Action> {
         }
         if (updateNeeded) {
             // ★追加: リセットが走ったことを記録
-            dcs.log("  [Debug-Heuristic] Global seq updated to " + this.seq + ". Recomputing frontier...");
+            // dcs.log("  [Debug-Heuristic] Global seq updated to " + this.seq + ". Recomputing frontier...");
             Queue<CompostateDUC<State, Action>> newFrontier = new PriorityQueue<>(this.compostateRanker);
             for (CompostateDUC<State, Action> s : this.frontier) {
                 if (fullyExplored(s) || !s.isLive() || !s.isStatus(Status.NONE)) continue;
