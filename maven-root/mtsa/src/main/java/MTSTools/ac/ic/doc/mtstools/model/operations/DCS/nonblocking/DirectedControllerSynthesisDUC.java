@@ -361,15 +361,33 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         
             result = new CompostateDUC<>(this, persistentList);
             compostates.put(permanentKey, result);
+
+            // === 追加：Marking 8 での finishUpdate ガードの先行チェック ===
+            // 状態生成時にあらかじめチェックすることで、ヒューリスティックがこの手を選ばないようにする
+            if (mState == 8) {
+                if (!checkHotswapEndCondition(result)) {
+                    result.setFinishUpdateBlocked(true);
+                }
+            }
+            // ======================================================
         
             heuristic.newState(result, parent);
             if (mState == 9) {
                 result.setStatus(Status.GOAL);
+                // result.setStatus(CompostateDUC.Status.GOAL);
                 result.setBestControllable(0, null);
             }
             if (checkErrorWithEnforce(result) || heuristic.fullyExplored(result)) {
                 setError(result);
             }
+            // checkErrorWithEnforce は「安全性違反(-1)」をチェックするため UNSAFE をセット
+        // if (checkErrorWithEnforce(result)) {
+        //     setUnsafe(result); // setError から名称変更推奨
+        // } else if (heuristic.fullyExplored(result)) {
+        //     // どこにも行けない（デッドロック）は TRAPPED
+        //     result.setStatus(CompostateDUC.Status.TRAPPED);
+        //     propagateError(singleton(result), null);
+        // }
         }
         return result;
     }
@@ -795,11 +813,35 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         boolean isSafeInNC = newControllerConnectionMap.containsKey(signature);
 
         if (!isSafeInNC && debugLogEnabled) {
-            // ユーザー様の不整合発見を検証するためのログ
-            log("  [finishUpdate Guard] BLOCKED: Signature '" + signature + "' is NOT found in New Controller's safe states.");
+            String debugSignature = generateMapSignature(state);
+            // 不整合発見を検証するためのログ
+            log("  [finishUpdate Guard] BLOCKED: MapSignature '(MapEnv) " + debugSignature + " (New Safety)' = Signature '(NewEnv) " + signature + " (New Safety)' is NOT found in New Controller's safe states.");
         }
 
         return isSafeInNC;
+    }
+
+    private String generateMapSignature(CompostateDUC<State, Action> compostate) {
+        List<State> vs = compostate.getStates();
+        StringBuilder sb = new StringBuilder();
+
+        // 1. MapEnvironment セグメント
+        for (int k = mappingStart; k <= mappingEnd; k++) {
+            if (k > mappingStart) sb.append(",");
+            Object mapEnvState = vs.get(k);
+            Integer mapEnvId = (mapEnvState instanceof Long) ? ((Long) mapEnvState).intValue() : (Integer) mapEnvState;
+            sb.append(mapEnvId);
+        }
+
+        sb.append("|");
+
+        // 2. New Safety セグメントの連結
+        for (int k = newSafeStart; k <= newSafeEnd; k++) {
+            if (k > newSafeStart) sb.append(",");
+            sb.append(vs.get(k));
+        }
+
+        return sb.toString();
     }
 
     private List<State> getChildStatesDUC(CompostateDUC<State, Action> state, HAction<State, Action> action) {
@@ -882,6 +924,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return childStates;
     }
 
+    // /*
     private void explore(CompostateDUC<State, Action> parent, HAction<State, Action> action,
             CompostateDUC<State, Action> child) {
         if (isError(child) || child.heuristicStronglySuggestsIsError) {
@@ -943,6 +986,36 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         dag.clear();
     }
+    // */
+
+    /*
+    private void explore(CompostateDUC<State, Action> parent, HAction<State, Action> action,
+                    CompostateDUC<State, Action> child) {
+    
+    if (child.status == CompostateDUC.Status.UNSAFE || child.heuristicStronglySuggestsIsError) {
+        if (child.status != CompostateDUC.Status.UNSAFE) setUnsafe(child);
+        propagateError(singleton(child), singleton(parent));
+
+    } else if (child.status == CompostateDUC.Status.TRAPPED) {
+        // TRAPPED の場合は即座に UNSAFE 伝播させず、parent の他の可能性を recompute させる
+        propagateError(singleton(child), singleton(parent));
+
+    } else if (isGoal(child)) {
+        parent.setHasGoalChild(action);
+        propagateGoal(singleton(child), singleton(parent));
+
+    } else {
+        // ループ検知ロジック (findNewErrors 内部で UNSAFE/TRAPPED を判定)
+        long sLoop = System.nanoTime();
+        if (closingALoop(parent, child)) {
+            gatherLoopStates(child);
+            findNewErrors(); // ここでループが UNSAFE か TRAPPED か決まる
+        }
+        DUCProfiler.timeLoopCheck += (System.nanoTime() - sLoop);
+    }
+    dag.clear();
+}
+    // */
 
     private void propagateGoal(Set<CompostateDUC<State, Action>> goals, Set<CompostateDUC<State, Action>> parents) {
         DUCProfiler.countPropGoalCalls++; // 呼び出し回数をカウント
@@ -1049,7 +1122,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Map<CompostateDUC<State, Action>, HAction<State, Action>> exitActions = new HashMap<>();
 
             for (CompostateDUC<State, Action> s : compostates.values()) {
-                if (s.isStatus(Status.NONE) && s.isLive()) {
+                if (s.isStatus(Status.NONE) /*s.status == CompostateDUC.Status.NONE*/ && s.isLive()) {
                     candidates.add(s);
                 }
             }
@@ -1220,8 +1293,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (isGoal(node))
             return;
 
+        // 既に失敗（UNSAFE/TRAPPED）が確定している状態を GOAL にはできない
+        // if (isGoal(node) || node.isFailed()) return;
+
         if(debugLogEnabled) System.out.println("  [Debug-Success] State " + node.getStates() + " is now marked as GOAL!");
         node.setStatus(Status.GOAL);
+
+        // node.setStatus(CompostateDUC.Status.GOAL);
+
         // setterを使用してアクションを登録（privateフィールドへの直接アクセスを回避）
         node.setHasGoalChild(action);
         winners.add(node);
@@ -1283,6 +1362,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      * キュー（Worklist）方式によるエラーの逆伝播処理。
      * 先祖の全スキャンを避け、ステータスが変化したノードの親のみを再評価します。
      */
+    // /*
     private void propagateError(Set<CompostateDUC<State, Action>> newErrors, Set<CompostateDUC<State, Action>> seedParents) {
         long start = System.nanoTime();
         statistics.incPropagateErrorsCalls();
@@ -1330,6 +1410,102 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         DUCProfiler.timePropagateErrorTotal += (System.nanoTime() - start);
     }
+    // */
+
+    /*
+    private void propagateError(Set<CompostateDUC<State, Action>> newErrors, Set<CompostateDUC<State, Action>> seedParents) {
+        statistics.incPropagateErrorsCalls();
+        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
+        if (newErrors != null) queue.addAll(newErrors);
+        if (seedParents != null) queue.addAll(seedParents);
+
+        while (!queue.isEmpty()) {
+            CompostateDUC<State, Action> s = queue.poll();
+            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : s.getParents()) {
+                CompostateDUC<State, Action> parent = pRel.getSecond();
+                if (parent.status != CompostateDUC.Status.NONE) continue;
+
+                CompostateDUC.Status nextStatus = calculateStatus(parent);
+                if (nextStatus != CompostateDUC.Status.NONE) {
+                    parent.setStatus(nextStatus);
+                    queue.add(parent);
+                }
+            }
+        }
+    }
+
+private CompostateDUC.Status calculateStatus(CompostateDUC<State, Action> s) {
+    // 環境（AND）側の判定変数
+    boolean anyUnsafeU = false;
+    boolean allFailedU = true;
+    boolean hasExploredU = false;
+
+    // コントローラ（OR）側の判定変数
+    boolean allFailedC = true;
+    boolean allUnsafeC = true;
+    boolean hasExploredC = false;
+
+    for (HAction<State, Action> a : s.getTransitions()) {
+        Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
+        
+        if (children == null || children.isEmpty()) {
+            // 未探索がある場合
+            if (!a.isControllable()) allFailedU = false;
+            else {
+                allFailedC = false;
+                allUnsafeC = false;
+            }
+            continue;
+        }
+
+        if (!a.isControllable()) {
+            // --- Uncontrollable (AND) 判定 ---
+            hasExploredU = true;
+            boolean actionLeadsToUnsafe = false;
+            boolean actionLeadsToFailure = false;
+
+            for (CompostateDUC<State, Action> c : children) {
+                if (c.status == CompostateDUC.Status.UNSAFE) actionLeadsToUnsafe = true;
+                if (isFailed(c)) actionLeadsToFailure = true;
+            }
+
+            // 環境が1つでも「死」を強制できるなら、この状態は UNSAFE
+            if (actionLeadsToUnsafe) anyUnsafeU = true;
+            // 公平性のための判定: 1つでも「生きている(NONE/GOAL)」枝があれば allFailedU は false
+            if (!actionLeadsToFailure) allFailedU = false;
+
+        } else {
+            // --- Controllable (OR) 判定 (reconfigure等の非決定性対応) ---
+            hasExploredC = true;
+            boolean actionIsUnsafe = false; // 1つでもUNSAFEな分岐があれば、その手は選べない(Unsafe)
+            boolean actionIsFailed = false; // 1つでも失敗(Trap/Unsafe)があれば、その手は必勝ではない(Failed)
+
+            for (CompostateDUC<State, Action> c : children) {
+                if (c.status == CompostateDUC.Status.UNSAFE) actionIsUnsafe = true;
+                if (isFailed(c)) actionIsFailed = true;
+            }
+
+            if (!actionIsUnsafe) allUnsafeC = false; // 安全な選択肢が1つでもあれば、状態はUNSAFEではない
+            if (!actionIsFailed) allFailedC = false; // 確実に勝利(GOAL/NONE)できる選択肢が1つでもあればOK
+        }
+    }
+
+    // 判定の適用順序
+    // 1. 環境が強制する安全性違反 (最優先)
+    if (anyUnsafeU) return CompostateDUC.Status.UNSAFE;
+
+    // 2. コントローラの選択肢がすべて「死」に繋がる場合
+    if (hasExploredC && allUnsafeC) return CompostateDUC.Status.UNSAFE;
+
+    // 3. 環境の公平性 (Qn のケース): すべての環境動作が Trap または Unsafe になった場合のみ Trap
+    if (hasExploredU && allFailedU) return CompostateDUC.Status.TRAPPED;
+
+    // 4. コントローラの選択肢がすべて「失敗(Trap含む)」に繋がる場合
+    if (hasExploredC && allFailedC) return CompostateDUC.Status.TRAPPED;
+
+    return CompostateDUC.Status.NONE;
+}
+    */
 
     /**
      * 補助メソッド: 指定された状態がエラーになるべきか判定する
@@ -1459,6 +1635,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         findNewErrors();
     }
 
+    // /*
     //ループ判定の緩和
     private void findNewErrors() {
         statistics.incFindNewErrorsCalls();
@@ -1470,22 +1647,186 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         for (CompostateDUC<State, Action> s : loop) {
-            List<String> unexploredCActions = new ArrayList<>();
+
+            // ▼▼▼ 仮説検証用：ループ内各状態における Controllable アクションの詳細出力 ▼▼▼
+            if (debugLogEnabled) {
+                log("    Analyzing State: " + s.getStates());
+            }
+            // ▲▲▲ 追加ここまで ▲▲▲
+
+            // List<String> unexploredCActions = new ArrayList<>();
             for (HAction<State, Action> a : s.getTransitions()) {
                 if (a.isControllable()) {
                     Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
+
+                    // ▼▼▼ 仮説検証用：アクションが「探索済み」の場合の遷移先ステータスを出力 ▼▼▼
+                    if (debugLogEnabled) {
+                        if (children != null && !children.isEmpty()) {
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("      -> Controllable [").append(a).append("]: Explored. Children: ");
+                            for (CompostateDUC<State, Action> child : children) {
+                                sb.append(child.getStates()).append(" (Status: ").append(child.getStatus()).append("), ");
+                            }
+                            log(sb.toString());
+                        } else {
+                            log("      -> Controllable [" + a + "]: UNEXPLORED (Escape Hatch Found!)");
+                        }
+                    }
+                    // ▲▲▲ 追加ここまで ▲▲▲
+
                     // まだ展開されていないControllableアクションを探す
                     if (children == null || children.isEmpty()) {
                         hasEscapeHatch = true;
-                        if (debugLogEnabled) {
-                            unexploredCActions.add(a.toString());
+                        // if (debugLogEnabled) {
+                        //     unexploredCActions.add(a.toString());
+                        // }
+                    }
+                    else{
+                        // 探索済みの場合、そのアクションの「すべての」遷移先がERRORでないかを確認
+                        // (Controllableなアクションは、環境の非決定性によってERRORへ落ちるリスクがない限り有効)
+                        boolean leadsToError = false;
+                        for (CompostateDUC<State, Action> child : children) {
+                            if (isError(child)) {
+                                leadsToError = true;
+                                break;
+                            }
+                        }
+                        if (!leadsToError) {
+                            hasEscapeHatch = true; // NONE または GOAL へ繋がる安全な脱出口
                         }
                     }
                 }
+                if (hasEscapeHatch) break;
             }
-            if (debugLogEnabled && !unexploredCActions.isEmpty()) {
-                log("    State " + s.getStates() + " -> hasUnexploredC: true " + unexploredCActions);
+            if (hasEscapeHatch) break;
+            // if (debugLogEnabled && !unexploredCActions.isEmpty()) {
+            //     log("    State " + s.getStates() + " -> hasUnexploredC: true " + unexploredCActions);
+            // }
+            
+            // デバッグログが無効な場合は、1つでも脱出口が見つかれば即座に走査を終了する
+            // if (hasEscapeHatch && !debugLogEnabled) {
+            //     break;
+            // }
+        }
+
+        // 未探索のControllableアクション（脱出口）が残っている場合は、エラーにせず探索を継続させる
+        if (hasEscapeHatch) {
+            if (debugLogEnabled) {
+                log("  [Livelock-Relaxation] Loop detected, but unexplored Controllable actions exist. Postponing ERROR marking to explore escape hatches.");
             }
+            return;
+        }
+
+        // ▼▼▼ 仮説検証用：ループ全体を ERROR に落とす直前の通知ログ ▼▼▼
+        if (debugLogEnabled) {
+            log("  [Loop-Mark-Error] NO unexplored Controllable actions found in this cycle. Marking the entire loop as ERROR.");
+        }
+        // ▲▲▲ 追加ここまで ▲▲▲
+
+        // 脱出口がない場合のみ、ループ内の全状態をエラーにする
+        for (CompostateDUC<State, Action> state : loop) {
+            setError(state);
+        }
+
+        // 初期状態がエラーでなければ伝播させる
+        if (!isError(initial)) {
+            propagateError(loop, null);
+        }
+    }
+    // */
+
+    /*
+    private void findNewErrors() {
+    boolean anyUnsafeInLoop = false;
+    for (CompostateDUC<State, Action> s : loop) {
+        if (s.status == CompostateDUC.Status.UNSAFE) { anyUnsafeInLoop = true; break; }
+    }
+
+    boolean hasEscapeHatch = false;
+    for (CompostateDUC<State, Action> s : loop) {
+        for (HAction<State, Action> a : s.getTransitions()) {
+            if (a.isControllable()) {
+                Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
+                if (children == null || children.isEmpty()) {
+                    hasEscapeHatch = true; // 未探索は希望あり
+                } else {
+                    // ★修正: 非決定的なControllableアクションが脱出口になるためには、
+                    // 「すべての」分岐先が失敗(isFailed)していないことが必要
+                    boolean actionIsBroken = false;
+                    for (CompostateDUC<State, Action> child : children) {
+                        if (isFailed(child)) {
+                            actionIsBroken = true;
+                            break;
+                        }
+                    }
+                    if (!actionIsBroken) hasEscapeHatch = true;
+                }
+            }
+            if (hasEscapeHatch) break;
+        }
+        if (hasEscapeHatch) break;
+    }
+
+    if (hasEscapeHatch) return;
+
+    CompostateDUC.Status loopStatus = anyUnsafeInLoop ? CompostateDUC.Status.UNSAFE : CompostateDUC.Status.TRAPPED;
+    for (CompostateDUC<State, Action> state : loop) {
+        state.setStatus(loopStatus);
+    }
+    propagateError(loop, null);
+}
+    */
+
+    /*
+    private void findNewErrors() {
+        statistics.incFindNewErrorsCalls();
+
+        boolean hasEscapeHatch = false;
+
+        if (debugLogEnabled) {
+            log("  [Loop-Analysis] Analyzing detected loop for escape hatches (Unexplored C-actions)...");
+        }
+
+        for (CompostateDUC<State, Action> s : loop) {
+
+            // ▼▼▼ 仮説検証用：ループ内各状態における Controllable アクションの詳細出力 ▼▼▼
+            if (debugLogEnabled) {
+                log("    Analyzing State: " + s.getStates());
+            }
+            // ▲▲▲ 追加ここまで ▲▲▲
+
+            // List<String> unexploredCActions = new ArrayList<>();
+            for (HAction<State, Action> a : s.getTransitions()) {
+                if (a.isControllable()) {
+                    Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
+
+                    // ▼▼▼ 仮説検証用：アクションが「探索済み」の場合の遷移先ステータスを出力 ▼▼▼
+                    if (debugLogEnabled) {
+                        if (children != null && !children.isEmpty()) {
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("      -> Controllable [").append(a).append("]: Explored. Children: ");
+                            for (CompostateDUC<State, Action> child : children) {
+                                sb.append(child.getStates()).append(" (Status: ").append(child.getStatus()).append("), ");
+                            }
+                            log(sb.toString());
+                        } else {
+                            log("      -> Controllable [" + a + "]: UNEXPLORED (Escape Hatch Found!)");
+                        }
+                    }
+                    // ▲▲▲ 追加ここまで ▲▲▲
+
+                    // まだ展開されていないControllableアクションを探す
+                    if (children == null || children.isEmpty()) {
+                        hasEscapeHatch = true;
+                        // if (debugLogEnabled) {
+                        //     unexploredCActions.add(a.toString());
+                        // }
+                    }
+                }
+            }
+            // if (debugLogEnabled && !unexploredCActions.isEmpty()) {
+            //     log("    State " + s.getStates() + " -> hasUnexploredC: true " + unexploredCActions);
+            // }
             
             // デバッグログが無効な場合は、1つでも脱出口が見つかれば即座に走査を終了する
             if (hasEscapeHatch && !debugLogEnabled) {
@@ -1501,6 +1842,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return;
         }
 
+        // ▼▼▼ 仮説検証用：ループ全体を ERROR に落とす直前の通知ログ ▼▼▼
+        if (debugLogEnabled) {
+            log("  [Loop-Mark-Error] NO unexplored Controllable actions found in this cycle. Marking the entire loop as ERROR.");
+        }
+        // ▲▲▲ 追加ここまで ▲▲▲
+
         // 脱出口がない場合のみ、ループ内の全状態をエラーにする
         for (CompostateDUC<State, Action> state : loop) {
             setError(state);
@@ -1511,6 +1858,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             propagateError(loop, null);
         }
     }
+     */
 
     /**
      * ゴールまでの距離を更新し、Director構築用の最善手(BestChild)を設定する。
@@ -1589,6 +1937,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         DUCProfiler.timeGoalDistUpdate += (System.nanoTime() - startTime);
     }
 
+    // /*
     private LTS<Long, Action> buildDirectorDUC() {
         // 1. 結果を格納する LTS の初期化
         // 状態 ID 0 を初期状態として設定（後に更新コントローラの初期 ID で上書き）
@@ -1721,6 +2070,113 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         statistics.setControllerUsedStates(result.getStates().size());
         return result;
     }
+    // */
+
+    /*
+    private LTS<Long, Action> buildDirectorDUC() {
+    LTSImpl<Long, Action> result = new LTSImpl<>(0L);
+
+    // 1. アクション（アルファベット）の登録
+    for (Action a : alphabet.getActions()) {
+        if (!a.toString().endsWith("_old")) {
+            result.addAction(a);
+        }
+    }
+    @SuppressWarnings("unchecked")
+    Set<Action> ncActions = (Set<Action>) newController.getActions();
+    result.addActions(ncActions);
+
+    long nextId = 0;
+    Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
+
+    // 2. 新コントローラ (NC) の完全移設
+    for (Long ncState : newController.getStates()) {
+        result.addState(ncState);
+        if (ncState >= nextId) nextId = ncState + 1;
+    }
+    for (Long ncState : newController.getStates()) {
+        for (Pair<String, Long> trans : newController.getTransitions(ncState)) {
+            @SuppressWarnings("unchecked")
+            Action action = (Action) trans.getFirst();
+            result.addTransition(ncState, action, trans.getSecond());
+        }
+    }
+
+    // 3. 更新コントローラのグラフ構築
+    Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
+    ids.put(initial, nextId++);
+    result.addState(ids.get(initial));
+    result.setInitialState(ids.get(initial));
+    queue.add(initial);
+
+    while (!queue.isEmpty()) {
+        CompostateDUC<State, Action> current = queue.remove();
+        Long currentId = ids.get(current);
+
+        for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : current.getExploredChildren()) {
+            HAction<State, Action> hAction = transition.getFirst();
+            CompostateDUC<State, Action> child = transition.getSecond();
+
+            // --- 採用判定ロジックの修正 ---
+            boolean toAdd = false;
+
+            if (!hAction.isControllable()) {
+                // 環境アクション(U): 公平性に基づき、TRAPPED（待機ループ）への遷移も残す。
+                // ただし、UNSAFE（破壊的エラー）への遷移は、論理的にあり得ないはずだがガードとして除外。
+                if (child.status != CompostateDUC.Status.UNSAFE) {
+                    toAdd = true;
+                }
+            } else {
+                // コントローラアクション(C):
+                // 1. beginUpdate は、その先で GOAL に到達できる場合のみ採用
+                if (hAction.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+                    toAdd = isGoal(child);
+                } 
+                // 2. 確定した勝利パス (actionToGoal) がある場合
+                else if (current.actionToGoal != null && current.actionToGoal.equals(hAction)) {
+                    toAdd = true;
+                } 
+                // 3. 距離計算（最短経路）またはヒューリスティックによる最善手
+                else {
+                    Pair<Integer, CompostateDUC<State, Action>> best = current.getBestControllable();
+                    if (best != null && best.getSecond() == child) {
+                        toAdd = true;
+                    }
+                }
+            }
+
+            if (toAdd) {
+                // NC への接続 (finishUpdate)
+                if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
+                    String signature = generateNCSignature(child);
+                    Long ncStateId = (signature != null) ? newControllerConnectionMap.get(signature) : null;
+
+                    if (ncStateId != null) {
+                        result.addTransition(currentId, hAction.getAction(), ncStateId);
+                    } else {
+                        throw new IllegalStateException("Missing NC mapping for reached state: " + child.getStates());
+                    }
+                } 
+                // 通常の遷移
+                else {
+                    if (!ids.containsKey(child)) {
+                        ids.put(child, nextId++);
+                        result.addState(ids.get(child));
+                        queue.add(child);
+                    }
+                    // _old 接尾辞を剥がして登録
+                    String actionName = hAction.toString().replace("_old", "");
+                    @SuppressWarnings("unchecked")
+                    Action finalAction = (Action) actionName;
+                    result.addTransition(currentId, finalAction, ids.get(child));
+                }
+            }
+        }
+    }
+    statistics.setControllerUsedStates(result.getStates().size());
+    return result;
+}
+    */
 
     /**
      * 到達した子状態のベクトルから、StateMapper が解釈可能なシグネチャを生成する
@@ -1757,6 +2213,34 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return sb.toString();
     }
 
+    /*
+    public boolean isGoal(CompostateDUC<State, Action> state) {
+        return state.status == CompostateDUC.Status.GOAL;
+    }
+
+    public boolean isError(CompostateDUC<State, Action> state) {
+        return state.status == CompostateDUC.Status.UNSAFE; // 安全性違反のみを指す
+    }
+
+    public boolean isTrapped(CompostateDUC<State, Action> state) {
+        return state.status == CompostateDUC.Status.TRAPPED; // 到達不能のみを指す
+    }
+
+    public boolean isFailed(CompostateDUC<State, Action> state) {
+        return state.status == CompostateDUC.Status.UNSAFE || state.status == CompostateDUC.Status.TRAPPED;
+    }
+
+    public boolean isFinished() {
+        return isGoal(initial) || isFailed(initial);
+    }
+
+    public void setUnsafe(CompostateDUC<State, Action> state) {
+    if (debugLogEnabled) log("[SAFETY VIOLATION] State marked as UNSAFE: " + state.getStates());
+    state.setStatus(CompostateDUC.Status.UNSAFE);
+    heuristic.notifyStateSetErrorOrGoal(state);
+}
+    // */
+    // /*
     public boolean isGoal(CompostateDUC<State, Action> state) {
         return state.isStatus(Status.GOAL);
     }
@@ -1778,6 +2262,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // ★修正点3: エラー発生時もヒューリスティックに通知する
         heuristic.notifyStateSetErrorOrGoal(state);
     }
+    // */
 
     // ★追加: アクションがブロックされている原因を探る診断メソッド
     private void debugCheckActionAvailability(CompostateDUC<State, Action> state, String actionName) {

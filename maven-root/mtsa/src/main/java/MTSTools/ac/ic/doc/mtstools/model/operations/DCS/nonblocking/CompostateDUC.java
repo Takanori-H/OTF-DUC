@@ -17,6 +17,16 @@ import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.
 
 public class CompostateDUC<State, Action> {
 
+    /*
+    // --- 修正箇所：Status列挙型の更新 ---
+    public enum Status {
+        NONE,    // 探索中・未確定
+        GOAL,    // ゴール到達確定
+        UNSAFE,  // 安全性違反（LTS状態-1への遷移）確定
+        TRAPPED  // 安全だが、自力でゴール（finishUpdate）に到達できない（無限ループ・デッドロック）
+    }
+    // */
+
     // (フィールド定義は変更なし)
     private final DirectedControllerSynthesisDUC<State, Action> dcs;
     private final List<State> states;
@@ -56,6 +66,9 @@ public class CompostateDUC<State, Action> {
     int uncontrollableUnexploredTransitions;
     HashMap<HAction<State, Action>, HEstimate<State, Action>> estimates;
     public final Integer uncontrollablesCount;
+
+    // finishUpdateがこの状態で発火可能かどうかのフラグ
+    private boolean finishUpdateBlocked = false;
 
     public CompostateDUC(DirectedControllerSynthesisDUC<State, Action> dcs, List<State> states) {
         this.dcs = dcs;
@@ -264,72 +277,6 @@ public class CompostateDUC<State, Action> {
         }
     }
     // */
-    /*
-    private void updateAllowedSetForComponent(int i, long markingState, boolean isFullUpdate) {
-        // 1. Trace = OFF の場合
-        if (!dcs.isTrace(i, markingState)) {
-            // OC (Index 1) は切り離し中なのでアクションを生成させない (Block All)
-            if (i == dcs.idxOC) return;
-
-            // Safetyなど他のコンポーネントは、監視停止中＝制約なし (Allow All)
-            for (Action action : dcs.ltss.get(i).getActions()) {
-                HAction<State, Action> hAction = dcs.alphabet.getHAction(action);
-                if (hAction != null) {
-                    dcs.allowed.add(i, hAction);
-                }
-            }
-            return; 
-        }
-
-        // 2. Active の場合
-        if (dcs.isActive(i, markingState)) {
-            for (Pair<Action,State> transition : dcs.ltss.get(i).getTransitions(states.get(i))) {
-                HAction<State, Action> action = dcs.alphabet.getHAction(transition.getFirst());
-                dcs.allowed.add(i, action);
-            }
-        } 
-        // 3. Inactive (Passive) の場合
-        else {
-            for (Action action : dcs.ltss.get(i).getActions()) {
-                HAction<State, Action> hAction = dcs.alphabet.getHAction(action);
-                if (hAction != null) {
-                    // ★修正: OC (Index 1) が Inactive の場合、
-                    // OC固有のアクション(_old)は Allow しない (Block)。
-                    // ただし、更新事象など「他と共有しているアクション」は Allow する必要があるかもしれないが、
-                    // OCのアクションは全て `_old` がついている (RenamedLTS) ため、
-                    // 単純に「InactiveなOCは何もAllowしない」とすると、
-                    // システムアクション(drill)に対するOCの反応(drill_old)もブロックされてしまう...？
-                    
-                    // いや、待ってください。
-                    // TransitionSetの仕組みでは：
-                    // 「OCが drill を知らない」 -> OCのBitは1 (Enable)
-                    // 「OCが drill_old を知っている」 -> OCのBitは0 (Disable)。addすれば1になる。
-                    
-                    // Envが `drill` を提案する。 -> OCは `drill` を知らないので自動OK。 -> `drill` はEnabledになる。
-                    // 以前の修正で `getChildStatesDUC` 内で `drill` -> `drill_old` 変換をしているので、
-                    // 探索上は `drill` が選ばれれば OC も動ける。
-                    
-                    // 問題は `drill_old` が候補に出てくること。
-                    // Envは `drill_old` を知らない -> 自動OK。
-                    // OCは `drill_old` を知っている -> Inactiveだからここで add してしまう -> OKになる。
-                    // 結果、`drill_old` がEnabledになる。
-                    
-                    // したがって、**「OCがInactiveのときは、_old付きのアクションを allowed に入れてはいけない」** が正解です。
-                    
-                    if (i == dcs.idxOC) {
-                         // OCのアクションは全て _old 付きである前提。
-                         // InactiveなOCは、自身のアルファベット（_oldアクション）をAllowしてはいけない。
-                         // なぜなら、それをAllowすると「誰も知らないアクション」として成立してしまうから。
-                         // 一方で、システムアクション(drill)に対しては「知らない」ので自動Allowされており、阻害しない。
-                         continue; // Skip adding (Block _old actions)
-                    }
-
-                    dcs.allowed.add(i, hAction);
-                }
-            }
-        }
-    }
-    */
 
     private boolean checkComponentAllows(int ltsIndex, String actionName) {
         Action matchedAction = null;
@@ -362,6 +309,25 @@ public class CompostateDUC<State, Action> {
     public void setDepth(int depth) { if (this.depth > depth) this.depth = depth; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { if (this.status != Status.ERROR || status == Status.ERROR) this.status = status; }
+    /**
+     * ステータスを更新します。
+     * 一度 UNSAFE になった状態は、他のいかなる状態（TRAPPEDなど）によっても上書きされないように制御します。
+     */
+    /*
+    public void setStatus(Status status) {
+        // 安全性の優先度：UNSAFE > TRAPPED > GOAL/NONE
+        if (this.status == Status.UNSAFE) {
+            return; // 既に最悪の状態なので変更不可
+        }
+        
+        // TRAPPEDはUNSAFEによってのみ上書き可能
+        if (this.status == Status.TRAPPED && status != Status.UNSAFE) {
+            return;
+        }
+
+        this.status = status;
+    }
+    // */
     public boolean isStatus(Status status) { return this.status == status; }
     public boolean hasGoalChild(){ return hasGoalChild; }
     public void setHasGoalChild(HAction<State, Action> actionToGoal) { this.actionToGoal = actionToGoal; this.hasGoalChild = true; }
@@ -434,57 +400,12 @@ public class CompostateDUC<State, Action> {
             updateRecommendation();
         }
     }
-    /*
-    public void initRecommendations() {
-        recommendit = recommendations.iterator();
-        updateRecommendation();
-    }
-    */
 
     /**
      * アクション候補を更新する。
      * 子状態のステータスを確認し、既に勝利(GOAL)が確定したControllableな枝があるなら、
      * 他のControllableアクションは探索せずにスキップする。
      */
-    /*
-    private void updateRecommendation() {
-        while (recommendit.hasNext()) {
-            recommendation = recommendit.next();
-            HAction<State, Action> action = recommendation.getAction();
-
-            // === 修正箇所：重複探索防止のためのフィルタリング ===
-            // 既に expandDUC によって探索（同期・展開）が行われたアクションであれば、
-            // リストの順序変更やリセットに関わらずスキップして次の未探索アクションを探す。
-            Set<CompostateDUC<State, Action>> alreadyExplored = exploredChildren.getImage(action);
-            if (alreadyExplored != null && !alreadyExplored.isEmpty()) {
-                continue;
-            }
-            // ===============================================
-
-            // ★修正：子状態の状態を直接確認する（ご指摘のデバッグポイント）
-            if (action.isControllable()) {
-                boolean alreadyWon = false;
-                // exploredChildren（既に展開済みの遷移先）を走査
-                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> explored : getExploredChildren()) {
-                    // 他のControllableなアクションで、その先が既にStatus.GOALになっているものがあるか？
-                    if (explored.getFirst().isControllable() && explored.getSecond().isStatus(Status.GOAL)) {
-                        alreadyWon = true;
-                        break;
-                    }
-                }
-                
-                if (alreadyWon) {
-                    // すでに1つ勝ち筋が見つかっているため、この(C)はスキップして(U)を探す
-                    continue; 
-                }
-            }
-
-            estimate = recommendation.getEstimate(); 
-            return; 
-        }
-        recommendation = null;
-    }
-        */
     private void updateRecommendation() {
         // 修正：インデックスを用いてリストを走査。
         // リセット（seq更新）が発生しても nextRecommendationIndex は維持されるため、
@@ -521,55 +442,6 @@ public class CompostateDUC<State, Action> {
         recommendation = null;
     }
 
-    /** アクション候補を更新し、OR条件が充足している場合はControllableをスキップする */
-    /*
-    private void updateRecommendation() {
-        // if を while に変更し、条件に合致するまでイテレータを進めるように修正
-        while (recommendit.hasNext()) {
-            recommendation = recommendit.next();
-
-            // ★デバッグ表示: アクション評価時のフラグ状態
-            System.out.println("  [Debug-Eval] State: " + this.states + " | Action: " + recommendation.getAction() + " | hasGoalChild: " + this.hasGoalChild);
-
-            // ★修正点：OR条件の枝刈り（Pruning）
-            // この状態で既にControllableな勝ち筋（hasGoalChild）が見つかっている場合、
-            // 他のControllableアクションを探索するのは冗長であるためスキップし、
-            // 未解決のUncontrollableアクション（AND枝）の検証を優先させる。
-            if (this.hasGoalChild && recommendation.getAction().isControllable()) {
-                // ★デバッグ表示: スキップの発生
-                System.out.println("  [Debug-Pruning] Skipping controllable action: " + recommendation.getAction() + " because hasGoalChild is true.");
-                continue;
-            }
-
-            estimate = recommendation.getEstimate(); 
-            return; // 有効な候補（スキップ対象でないもの）が見つかれば戻る
-        }
-        // 候補が尽きた場合
-        recommendation = null;
-    }
-    */
-
-    /*
-    private void updateRecommendation() {
-        if (recommendit.hasNext()) {
-            recommendation = recommendit.next();
-            estimate = recommendation.getEstimate(); 
-        } else {
-            recommendation = null;
-        }
-    }
-    */
-
-    /*
-    public void clearRecommendations() {
-        if (isEvaluated()) {
-            recommendations.clear();
-            recommendit = null;
-            recommendation = null;
-        }
-    }
-        */
-
     public void clearRecommendations() {
         if (isEvaluated()) {
             recommendations.clear();
@@ -595,4 +467,22 @@ public class CompostateDUC<State, Action> {
             this.dcs.log(message);
         }
     }
+
+    public void setFinishUpdateBlocked(boolean b) {
+        this.finishUpdateBlocked = b;
+    }
+
+    public boolean isFinishUpdateBlocked() {
+        return finishUpdateBlocked;
+    }
+
+    /**
+     * 現在の状態が「失敗（更新の完遂が不可能）」であるかどうかを判定します。
+     * 公平性の導入により、失敗は「物理的な破壊(UNSAFE)」か「待機ループ(TRAPPED)」のいずれかです。
+     */
+    /*
+    public boolean isFailed() {
+        return this.status == Status.UNSAFE || this.status == Status.TRAPPED;
+    }
+    */
 }

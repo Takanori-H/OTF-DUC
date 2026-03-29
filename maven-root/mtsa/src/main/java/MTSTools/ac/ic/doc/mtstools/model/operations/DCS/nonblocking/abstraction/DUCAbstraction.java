@@ -134,7 +134,12 @@ public class DUCAbstraction<State, Action> {
             compostate.setupRecommendations();
             for (HAction<State, Action> action : compostate.getTransitions()) {
                 HEstimate<State, Action> estimate = calculateEstimate(compostate, action);
-                compostate.addRecommendation(action, estimate);
+                // compostate.addRecommendation(action, estimate);
+                // === 修正：estimate が null の場合は候補リスト（Recommendations）に入れない ===
+                if (estimate != null) {
+                    compostate.addRecommendation(action, estimate);
+                }
+                // =======================================================================
             }
             // 最初はインデックス 0 から全件ソート
             sortRecommendations(compostate.recommendations, 0);
@@ -199,6 +204,14 @@ public class DUCAbstraction<State, Action> {
      * 個別のアクションに対するヒューリスティック評価値を計算する（共通ロジック）。
      */
     private HEstimate<State, Action> calculateEstimate(CompostateDUC<State, Action> compostate, HAction<State, Action> action) {
+
+        // === 追加：先行ブロックフラグの反映 ===
+        // 状態生成時に「不可」と判定された finishUpdate は、評価値を与えず null を返す
+        if (action.toString().equals(UpdateConstants.FINISH_UPDATE) && compostate.isFinishUpdateBlocked()) {
+            return null; 
+        }
+        // ===================================
+
         List<State> currentStates = compostate.getStates();
         
         // 現在の進捗状況 (Marking Depth) の取得
@@ -235,88 +248,7 @@ public class DUCAbstraction<State, Action> {
 
         return new HEstimate<>(1, new HDist(totalScore, 1));
     }
-    /*
-    public void eval(CompostateDUC<State, Action> compostate, List<Set<State>> knownMarked, List<Set<State>> goals) {
-        // 1. 計測開始（ナノ秒単位）
-        long start = System.nanoTime();
-        if (!compostate.isEvaluated()) {
-            compostate.setupRecommendations();
-            List<State> currentStates = compostate.getStates();
-            
-            // 1. 現在の進捗状況 (Marking Depth) の取得
-            long currentMarkingId = -1;
-            Object mStateObj = currentStates.get(markingLTSIndex);
-            if (mStateObj instanceof Long) {
-                currentMarkingId = (Long) mStateObj;
-            } else if (mStateObj instanceof Integer) {
-                currentMarkingId = ((Integer) mStateObj).longValue();
-            }
-            
-            int currentDepth = (currentMarkingId != -1) ? getMarkingDepth(currentMarkingId) : 0;
-
-            // 2. 各アクションのスコア計算
-            for (HAction<State, Action> action : compostate.getTransitions()) {
-                String actionName = action.toString();
-                int actionCost = getActionPriorityCost(actionName);
-                int predictedDepth = currentDepth;
-                
-                // 更新事象によって Marking Depth が進むと予想される場合、スコアを大幅に良くする
-                if (actionName.equals(UpdateConstants.BEGIN_UPDATE) && currentDepth == 0) {
-                    predictedDepth = 1;
-                } else if (actionName.equals(UpdateConstants.STOP_OLD_SPEC) || 
-                           actionName.equals(UpdateConstants.RECONFIGURE) || 
-                           actionName.equals(UpdateConstants.START_NEW_SPEC)) {
-                    if (currentDepth >= 1 && currentDepth < 4) {
-                        predictedDepth = currentDepth + 1;
-                    }
-                } else if (actionName.equals(UpdateConstants.FINISH_UPDATE) && currentDepth == 4) {
-                    predictedDepth = 5;
-                }
-
-                // スコア計算式: W_MARKING * (5 - 予測進捗) + 環境距離 + アクションコスト
-                // 更新事象は 3000台、環境アクションは 4000台のスコアになる
-                double markingScore = W_MARKING * (5 - predictedDepth);
-                int envDist = getEnvHeuristic(currentStates);
-                int totalScore = (int) markingScore + envDist + actionCost;
-                
-                HEstimate<State, Action> estimate = new HEstimate<>(1, new HDist(totalScore, 1));
-                compostate.addRecommendation(action, estimate);
-            }
-
-            // 3. ハイブリッド・ソート (進捗スコア > 役割優先)
-            if (compostate.recommendations != null && !compostate.recommendations.isEmpty()) {
-                Collections.sort(compostate.recommendations, new Comparator<CompostateDUC<State, Action>.RecommendationDUC>() {
-                    @Override
-                    public int compare(CompostateDUC<State, Action>.RecommendationDUC r1, 
-                                       CompostateDUC<State, Action>.RecommendationDUC r2) {
-
-                        // 第一優先: 進捗スコア (HEstimate)
-                        // ここで更新事象 (3000台) が環境アクション (4000台) よりも先に並ぶ
-                        int costCompare = r1.compareTo(r2);
-                        if (costCompare != 0) return costCompare;
-
-                        // 第二優先: スコアが同じ場合 (例: 共に環境アクション、または共に非更新のC)
-                        // 安全性確認を優先するため、Uncontrollable (false) を Controllable (true) より先にする
-                        boolean c1 = r1.getAction().isControllable();
-                        boolean c2 = r2.getAction().isControllable();
-                        
-                        if (c1 != c2) {
-                            return c1 ? 1 : -1; // c1がControllableなら後ろへ、Uncontrollableなら前へ
-                        }
-
-                        return 0;
-                    }
-                });
-            }
-            compostate.initRecommendations();
-        }
-        // 3. 計測終了と積算
-        // DirectedControllerSynthesisDUC.DUCProfiler のように、
-        // プロファイラが定義されている場所に合わせてアクセスしてください。
-        DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);
-    }
-        */
-
+    
     private int getActionPriorityCost(String actionName) {
         if (actionName.equals(UpdateConstants.FINISH_UPDATE)) return COST_FINISH_UPDATE;
         if (actionName.equals(UpdateConstants.STOP_OLD_SPEC)) return COST_STOP_OLD;

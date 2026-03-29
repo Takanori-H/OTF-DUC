@@ -126,12 +126,13 @@ public class DUCExplorationHeuristic<State, Action> {
             // dcs.log("  [Debug-Heuristic] Global seq updated to " + this.seq + ". Recomputing frontier...");
             Queue<CompostateDUC<State, Action>> newFrontier = new PriorityQueue<>(this.compostateRanker);
             for (CompostateDUC<State, Action> s : this.frontier) {
-                if (fullyExplored(s) || !s.isLive() || !s.isStatus(Status.NONE)) continue;
+                // Status.NONE 以外の状態（GOAL, UNSAFE, TRAPPED）はフロンティアから除外
+                if (fullyExplored(s) || !s.isLive()
+                    || !s.isStatus(Status.NONE)
+                    /*s.status != CompostateDUC.Status.NONE*/) continue;
                 if (s.seq < this.seq) {
                     // ★追加: どの状態がリセットされたか記録
                     // dcs.log("    Resetting state: " + s.getStates() + " (old seq: " + s.seq + ")");
-                    // s.clearRecommendations();
-                    // s.recommendations = null;
                     // ここで eval -> updateRecommendation が呼ばれ、最新の「子のStatus」がチェックされる
                     abstraction.eval(s, this.knownMarked, this.goals);
                     s.seq = this.seq;
@@ -143,13 +144,13 @@ public class DUCExplorationHeuristic<State, Action> {
     }
 
     private void removeNotLive() {
-        while (!frontier.isEmpty() && (!frontier.peek().isStatus(Status.NONE) || fullyExplored(frontier.peek()) || !frontier.peek().isLive())) {
+        while (!frontier.isEmpty() && (!frontier.peek().isStatus(Status.NONE) /*frontier.peek().status != CompostateDUC.Status.NONE*/ || fullyExplored(frontier.peek()) || !frontier.peek().isLive())) {
             frontier.remove();
         }
     }
     
     private void maybeAddToFrontier(CompostateDUC<State, Action> state) {
-        if (state.isStatus(Status.NONE) && !fullyExplored(state) && !state.inOpen) {
+        if (state.isStatus(Status.NONE) /*state.status == CompostateDUC.Status.NONE*/ && !fullyExplored(state) && !state.inOpen) {
             state.inOpen = true;
             state.live = true;
             this.frontier.add(state);
@@ -197,9 +198,14 @@ public class DUCExplorationHeuristic<State, Action> {
     }
 
     public void notifyStateSetErrorOrGoal(CompostateDUC<State, Action> state) {
+        // 1. この状態を「生存（探索対象）」から外す
         state.live = false;
+        // 2. この状態のアクション候補をクリアして、二度と expand されないようにする
         state.clearRecommendations();
-        if (state.isStatus(Status.GOAL)) {
+        // 3. ステータスに応じた処理
+        // Status 列挙型は CompostateDUC クラス内で定義されているため、完全修飾名で参照
+        if (state.isStatus(Status.GOAL) /*state.status == CompostateDUC.Status.GOAL*/) {
+            // 勝利確定時：時間軸（seq）を更新し、他の状態の再評価（recomputeEstimates）を促す
             this.seq++;
             for (int lts = 0; lts < dcs.ltssSize; ++lts) this.goals.get(lts).add(state.getStates().get(lts));
         }
