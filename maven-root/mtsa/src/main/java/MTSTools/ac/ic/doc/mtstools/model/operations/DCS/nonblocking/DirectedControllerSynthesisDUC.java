@@ -988,33 +988,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
     // */
 
-    /*
-    private void explore(CompostateDUC<State, Action> parent, HAction<State, Action> action,
-                    CompostateDUC<State, Action> child) {
-    
-    if (child.status == CompostateDUC.Status.UNSAFE || child.heuristicStronglySuggestsIsError) {
-        if (child.status != CompostateDUC.Status.UNSAFE) setUnsafe(child);
-        propagateError(singleton(child), singleton(parent));
-
-    } else if (child.status == CompostateDUC.Status.TRAPPED) {
-        // TRAPPED の場合は即座に UNSAFE 伝播させず、parent の他の可能性を recompute させる
-        propagateError(singleton(child), singleton(parent));
-
-    } else if (isGoal(child)) {
-        parent.setHasGoalChild(action);
-        propagateGoal(singleton(child), singleton(parent));
-
-    } else {
-        // ループ検知ロジック (findNewErrors 内部で UNSAFE/TRAPPED を判定)
-        long sLoop = System.nanoTime();
-        if (closingALoop(parent, child)) {
-            gatherLoopStates(child);
-            findNewErrors(); // ここでループが UNSAFE か TRAPPED か決まる
-        }
-        DUCProfiler.timeLoopCheck += (System.nanoTime() - sLoop);
-    }
-    dag.clear();
-}
     // */
     // private void propagateGoal(Set<CompostateDUC<State, Action>> goals, Set<CompostateDUC<State, Action>> parents) {
     //     DUCProfiler.countPropGoalCalls++; // 呼び出し回数をカウント
@@ -1296,229 +1269,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     //     DUCProfiler.timePropagateGoalTotal += (System.nanoTime() - startTotal);
     // }
 
-    //緩和しすぎた
-    // private void propagateGoal(Set<CompostateDUC<State, Action>> goals, Set<CompostateDUC<State, Action>> parents) {
-    //     DUCProfiler.countPropGoalCalls++;
-    //     long startTotal = System.nanoTime();
-    //     long sP1 = System.nanoTime();
-
-    //     Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>(parents);
-    //     Set<CompostateDUC<State, Action>> winners = new HashSet<>();
-
-    //     // --- Phase 1: 通常の勝利伝播 ---
-    //     while (!queue.isEmpty()) {
-    //         CompostateDUC<State, Action> current = queue.poll();
-    //         if (isGoal(current)) continue;
-
-    //         boolean allUncontrollableResolved = true;
-    //         boolean hasUncontrollable = false;
-
-    //         for (HAction<State, Action> action : current.getTransitions()) {
-    //             if (!action.isControllable()) {
-    //                 hasUncontrollable = true;
-    //                 Set<CompostateDUC<State, Action>> children = current.getExploredChildren().getImage(action);
-    //                 if (children == null || children.isEmpty()) {
-    //                     allUncontrollableResolved = false;
-    //                     break;
-    //                 }
-    //                 for (CompostateDUC<State, Action> child : children) {
-    //                     if (!isGoal(child)) {
-    //                         allUncontrollableResolved = false;
-    //                         break;
-    //                     }
-    //                 }
-    //             }
-    //             if (!allUncontrollableResolved) break;
-    //         }
-
-    //         boolean hasWinningC = false;
-    //         HAction<State, Action> winningC = null;
-    //         for (HAction<State, Action> action : current.getTransitions()) {
-    //             if (action.isControllable()) {
-    //                 Set<CompostateDUC<State, Action>> children = current.getExploredChildren().getImage(action);
-    //                 if (children != null && !children.isEmpty()) {
-    //                     boolean allGoals = true;
-    //                     for (CompostateDUC<State, Action> child : children) {
-    //                         if (!isGoal(child)) {
-    //                             allGoals = false;
-    //                             break;
-    //                         }
-    //                     }
-    //                     if (allGoals) {
-    //                         hasWinningC = true;
-    //                         winningC = action;
-    //                         break;
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         if (allUncontrollableResolved) {
-    //             if (hasWinningC) {
-    //                 applyGoalStatus(current, winningC, winners, queue);
-    //             } else if (hasUncontrollable) {
-    //                 HAction<State, Action> anyU = null;
-    //                 for (HAction<State, Action> a : current.getTransitions()) {
-    //                     if (!a.isControllable()) { anyU = a; break; }
-    //                 }
-    //                 applyGoalStatus(current, anyU, winners, queue);
-    //             }
-    //         }
-    //     }
-    //     DUCProfiler.timeGoalPhase1 += (System.nanoTime() - sP1);
-
-    //     // --- Phase 2: 不動点計算 (Fairness-Aware 緩和ロジック) ---
-    //     boolean changed;
-    //     do {
-    //         changed = false;
-    //         long sP2Init = System.nanoTime();
-
-    //         Set<CompostateDUC<State, Action>> candidates = new HashSet<>();
-    //         Map<CompostateDUC<State, Action>, HAction<State, Action>> exitActions = new HashMap<>();
-
-    //         for (CompostateDUC<State, Action> s : compostates.values()) {
-    //             if (s.isStatus(Status.NONE) && s.isLive()) {
-    //                 candidates.add(s);
-    //             }
-    //         }
-
-    //         DUCProfiler.totalCandidatesProcessed += candidates.size();
-    //         DUCProfiler.timeGoalPhase2Init += (System.nanoTime() - sP2Init);
-
-    //         if (candidates.isEmpty()) break;
-
-    //         long sP2Loop = System.nanoTime();
-    //         boolean innerChanged;
-    //         do {
-    //             innerChanged = false;
-    //             Iterator<CompostateDUC<State, Action>> it = candidates.iterator();
-    //             while (it.hasNext()) {
-    //                 CompostateDUC<State, Action> s = it.next();
-
-    //                 // 条件1: すべての Uncontrollable な遷移先が「確定Goal」または「この候補セット内」か（Uアクションが安全か）
-    //                 boolean uIsSafe = true;
-    //                 for (HAction<State, Action> action : s.getTransitions()) {
-    //                     if (!action.isControllable()) {
-    //                         Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
-    //                         if (children == null || children.isEmpty()) {
-    //                             uIsSafe = false; break;
-    //                         }
-    //                         for (CompostateDUC<State, Action> child : children) {
-    //                             if (!isGoal(child) && !candidates.contains(child)) {
-    //                                 uIsSafe = false; break;
-    //                             }
-    //                         }
-    //                     }
-    //                     if (!uIsSafe) break;
-    //                 }
-
-    //                 // 条件2: ループに留まるかGOALへ向かう「安全なアクション(CまたはU)」が最低1つは存在するか
-    //                 boolean hasSafeMove = false;
-    //                 HAction<State, Action> bestAction = null;
-    //                 HAction<State, Action> backupSafeC = null;
-    //                 HAction<State, Action> backupSafeU = null;
-
-    //                 for (HAction<State, Action> action : s.getTransitions()) {
-    //                     Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
-    //                     if (children != null && !children.isEmpty()) {
-    //                         boolean allSafe = true;
-    //                         boolean allGoals = true;
-    //                         for (CompostateDUC<State, Action> child : children) {
-    //                             if (!isGoal(child)) allGoals = false;
-    //                             if (!isGoal(child) && !candidates.contains(child)) allSafe = false;
-    //                         }
-
-    //                         if (allSafe) {
-    //                             hasSafeMove = true;
-    //                             if (action.isControllable()) backupSafeC = action;
-    //                             else backupSafeU = action;
-
-    //                             if (allGoals) {
-    //                                 if (action.isControllable()) {
-    //                                     bestAction = action;
-    //                                     break; // Cアクションで確定GOALに行けるのが最強
-    //                                 } else if (bestAction == null) {
-    //                                     bestAction = action; // Uアクションでも確定GOALに行ければ採用（Fairness）
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-
-    //                 // GOAL直行アクションがなくても、安全にループ内を巡回できるならそれを脱出口(待機行動)とする
-    //                 if (bestAction == null) {
-    //                     bestAction = (backupSafeC != null) ? backupSafeC : backupSafeU;
-    //                 }
-
-    //                 // Uアクションが危険、または安全な手が一切ない場合は候補から脱落
-    //                 if (!uIsSafe || !hasSafeMove) {
-    //                     it.remove();
-    //                     innerChanged = true;
-    //                 } else {
-    //                     exitActions.put(s, bestAction);
-    //                 }
-    //             }
-    //         } while (innerChanged);
-
-    //         // 生き残った候補は「環境の協力を待てば脱出できる安全なループ」として一括で勝利とする
-    //         for (CompostateDUC<State, Action> winner : candidates) {
-    //             applyGoalStatus(winner, exitActions.get(winner), winners, queue);
-    //             changed = true;
-    //         }
-
-    //         // Phase 2 で新たに Goal になった状態がある場合、親たちに Phase 1 の論理を再適用する
-    //         while (!queue.isEmpty()) {
-    //             CompostateDUC<State, Action> current = queue.poll();
-    //             if (isGoal(current)) continue;
-
-    //             boolean allUResolved = true;
-    //             boolean hasU = false;
-    //             for (HAction<State, Action> a : current.getTransitions()) {
-    //                 if (!a.isControllable()) {
-    //                     hasU = true;
-    //                     Set<CompostateDUC<State, Action>> children = current.getExploredChildren().getImage(a);
-    //                     if (children == null || children.isEmpty()) {
-    //                         allUResolved = false; break;
-    //                     }
-    //                     for (CompostateDUC<State, Action> c : children) {
-    //                         if (!isGoal(c)) {
-    //                             allUResolved = false; break;
-    //                         }
-    //                     }
-    //                 }
-    //                 if (!allUResolved) break;
-    //             }
-
-    //             HAction<State, Action> winningC = null;
-    //             for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> trans : current.getExploredChildren()) {
-    //                 if (trans.getFirst().isControllable() && isGoal(trans.getSecond())) {
-    //                     winningC = trans.getFirst();
-    //                     break;
-    //                 }
-    //             }
-
-    //             if (allUResolved) {
-    //                 if (winningC != null) {
-    //                     applyGoalStatus(current, winningC, winners, queue);
-    //                 } else if (hasU) {
-    //                     HAction<State, Action> anyU = null;
-    //                     for (HAction<State, Action> a : current.getTransitions()) {
-    //                         if (!a.isControllable()) { anyU = a; break; }
-    //                     }
-    //                     if (anyU != null) applyGoalStatus(current, anyU, winners, queue);
-    //                 }
-    //             }
-    //         }
-    //         DUCProfiler.timeGoalPhase2Loop += (System.nanoTime() - sP2Loop);
-
-    //     } while (changed);
-
-    //     if (!winners.isEmpty()) {
-    //         updateDistances(goals, winners, winners.size());
-    //     }
-    //     DUCProfiler.timePropagateGoalTotal += (System.nanoTime() - startTotal);
-    // }
-
+    /*
+    //全体にFairnessを適用
     private void propagateGoal(Set<CompostateDUC<State, Action>> goals, Set<CompostateDUC<State, Action>> parents) {
         DUCProfiler.countPropGoalCalls++;
         long startTotal = System.nanoTime();
@@ -1700,6 +1452,315 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     int bestDist = Integer.MAX_VALUE;
 
                     for (HAction<State, Action> action : s.getTransitions()) {
+                        Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
+                        if (children != null && !children.isEmpty()) {
+                            boolean validMove = true;
+                            int maxChildD = 0;
+                            for (CompostateDUC<State, Action> child : children) {
+                                if (isGoal(child)) {
+                                    maxChildD = Math.max(maxChildD, 0);
+                                } else if (candidates.contains(child)) {
+                                    maxChildD = Math.max(maxChildD, dist.get(child));
+                                } else {
+                                    validMove = false; break;
+                                }
+                            }
+                            if (validMove) {
+                                if (maxChildD < bestDist) {
+                                    bestDist = maxChildD;
+                                    bestAction = action;
+                                } else if (maxChildD == bestDist && bestAction != null && !bestAction.isControllable() && action.isControllable()) {
+                                    bestAction = action; // 同じ距離ならCアクションを優先
+                                }
+                            }
+                        }
+                    }
+                    exitActions.put(s, bestAction);
+                }
+
+                for (CompostateDUC<State, Action> winner : candidates) {
+                    applyGoalStatus(winner, exitActions.get(winner), winners, queue);
+                    changed = true;
+                }
+
+                // Phase 2 波及処理 (Phase 1と同じロジックを親に適用)
+                while (!queue.isEmpty()) {
+                    CompostateDUC<State, Action> current = queue.poll();
+                    if (isGoal(current)) continue;
+
+                    boolean allUResolved = true;
+                    boolean hasU = false;
+                    for (HAction<State, Action> a : current.getTransitions()) {
+                        if (!a.isControllable()) {
+                            hasU = true;
+                            Set<CompostateDUC<State, Action>> children = current.getExploredChildren().getImage(a);
+                            if (children == null || children.isEmpty()) {
+                                allUResolved = false; break;
+                            }
+                            for (CompostateDUC<State, Action> c : children) {
+                                if (!isGoal(c)) {
+                                    allUResolved = false; break;
+                                }
+                            }
+                        }
+                        if (!allUResolved) break;
+                    }
+
+                    HAction<State, Action> winningC = null;
+                    for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> trans : current.getExploredChildren()) {
+                        if (trans.getFirst().isControllable() && isGoal(trans.getSecond())) {
+                            winningC = trans.getFirst();
+                            break;
+                        }
+                    }
+
+                    if (allUResolved) {
+                        if (winningC != null) {
+                            applyGoalStatus(current, winningC, winners, queue);
+                        } else if (hasU) {
+                            HAction<State, Action> anyU = null;
+                            for (HAction<State, Action> a : current.getTransitions()) {
+                                if (!a.isControllable()) { anyU = a; break; }
+                            }
+                            if (anyU != null) applyGoalStatus(current, anyU, winners, queue);
+                        }
+                    }
+                }
+            }
+            DUCProfiler.timeGoalPhase2Loop += (System.nanoTime() - sP2Loop);
+
+        } while (changed);
+
+        if (!winners.isEmpty()) {
+            updateDistances(goals, winners, winners.size());
+        }
+        DUCProfiler.timePropagateGoalTotal += (System.nanoTime() - startTotal);
+    }
+    */
+
+    private void propagateGoal(Set<CompostateDUC<State, Action>> goals, Set<CompostateDUC<State, Action>> parents) {
+        DUCProfiler.countPropGoalCalls++;
+        long startTotal = System.nanoTime();
+        long sP1 = System.nanoTime();
+
+        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>(parents);
+        Set<CompostateDUC<State, Action>> winners = new HashSet<>();
+
+        // --- Phase 1: 通常の勝利伝播 (DAGの解決) ---
+        while (!queue.isEmpty()) {
+            CompostateDUC<State, Action> current = queue.poll();
+            if (isGoal(current)) continue;
+
+            boolean allUncontrollableResolved = true;
+            boolean hasUncontrollable = false;
+
+            for (HAction<State, Action> action : current.getTransitions()) {
+                if (!action.isControllable()) {
+                    hasUncontrollable = true;
+                    Set<CompostateDUC<State, Action>> children = current.getExploredChildren().getImage(action);
+                    if (children == null || children.isEmpty()) {
+                        allUncontrollableResolved = false;
+                        break;
+                    }
+                    for (CompostateDUC<State, Action> child : children) {
+                        if (!isGoal(child)) {
+                            allUncontrollableResolved = false;
+                            break;
+                        }
+                    }
+                }
+                if (!allUncontrollableResolved) break;
+            }
+
+            boolean hasWinningC = false;
+            HAction<State, Action> winningC = null;
+            for (HAction<State, Action> action : current.getTransitions()) {
+                if (action.isControllable()) {
+                    Set<CompostateDUC<State, Action>> children = current.getExploredChildren().getImage(action);
+                    if (children != null && !children.isEmpty()) {
+                        boolean allGoals = true;
+                        for (CompostateDUC<State, Action> child : children) {
+                            if (!isGoal(child)) {
+                                allGoals = false;
+                                break;
+                            }
+                        }
+                        if (allGoals) {
+                            hasWinningC = true;
+                            winningC = action;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (allUncontrollableResolved) {
+                if (hasWinningC) {
+                    applyGoalStatus(current, winningC, winners, queue);
+                } else if (hasUncontrollable) {
+                    HAction<State, Action> anyU = null;
+                    for (HAction<State, Action> a : current.getTransitions()) {
+                        if (!a.isControllable()) { anyU = a; break; }
+                    }
+                    applyGoalStatus(current, anyU, winners, queue);
+                }
+            }
+        }
+        DUCProfiler.timeGoalPhase1 += (System.nanoTime() - sP1);
+
+        // --- Phase 2: 不動点計算 (Hybrid Fairly Winning SCC) ---
+        boolean changed;
+        do {
+            changed = false;
+            long sP2Init = System.nanoTime();
+
+            Set<CompostateDUC<State, Action>> candidates = new HashSet<>();
+            for (CompostateDUC<State, Action> s : compostates.values()) {
+                if (s.isStatus(Status.NONE) && s.isLive()) {
+                    candidates.add(s);
+                }
+            }
+
+            DUCProfiler.totalCandidatesProcessed += candidates.size();
+            DUCProfiler.timeGoalPhase2Init += (System.nanoTime() - sP2Init);
+
+            if (candidates.isEmpty()) break;
+
+            long sP2Loop = System.nanoTime();
+            boolean innerChanged;
+            Map<CompostateDUC<State, Action>, Integer> dist = new HashMap<>();
+
+            do {
+                innerChanged = false;
+
+                // 1. U-Safety Filter: 環境の動きでCandidate外に追い出されないか
+                Iterator<CompostateDUC<State, Action>> it = candidates.iterator();
+                while (it.hasNext()) {
+                    CompostateDUC<State, Action> s = it.next();
+                    boolean uIsSafe = true;
+                    for (HAction<State, Action> action : s.getTransitions()) {
+                        if (!action.isControllable()) {
+                            Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
+                            if (children == null || children.isEmpty()) {
+                                uIsSafe = false; break;
+                            }
+                            for (CompostateDUC<State, Action> child : children) {
+                                if (!isGoal(child) && !candidates.contains(child)) {
+                                    uIsSafe = false; break;
+                                }
+                            }
+                        }
+                        if (!uIsSafe) break;
+                    }
+                    if (!uIsSafe) {
+                        it.remove();
+                        innerChanged = true;
+                    }
+                }
+
+                if (candidates.isEmpty()) break;
+
+                // 2. Reachability Filter: SCCから最終的にGOALへ到達できるか
+                dist.clear();
+                boolean distChanged;
+                do {
+                    distChanged = false;
+                    for (CompostateDUC<State, Action> s : candidates) {
+                        int currentD = dist.getOrDefault(s, Integer.MAX_VALUE);
+                        int minD = Integer.MAX_VALUE;
+
+                        // ★追加: 現在の Marking を動的に取得
+                        int currentMarking = 0;
+                        Object stObj = s.getStates();
+                        if (stObj instanceof int[]) {
+                            currentMarking = ((int[]) stObj)[0];
+                        } else if (stObj instanceof byte[]) {
+                            currentMarking = ((byte[]) stObj)[0];
+                        } else {
+                            String str = stObj.toString().replace("[", "").replace("]", "").trim();
+                            String[] parts = str.split(",");
+                            if(parts.length > 0) {
+                                try { currentMarking = Integer.parseInt(parts[0].trim()); } catch(Exception e) {}
+                            }
+                        }
+
+                        for (HAction<State, Action> action : s.getTransitions()) {
+                            // ★ハイブリッド・ロジック:
+                            // Marking > 0 (更新中) の場合、Fairnessを無効化し、Uncontrollableアクションによる
+                            // ループ脱出（Livelockの免罪）を禁止する。確実な Controllable な脱出口のみを許容する。
+                            if (currentMarking > 0 && !action.isControllable()) {
+                                continue;
+                            }
+
+                            Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
+                            if (children != null && !children.isEmpty()) {
+                                boolean validMove = true;
+                                int maxChildD = 0;
+                                for (CompostateDUC<State, Action> child : children) {
+                                    if (isGoal(child)) {
+                                        maxChildD = Math.max(maxChildD, 0);
+                                    } else if (candidates.contains(child)) {
+                                        int cd = dist.getOrDefault(child, Integer.MAX_VALUE);
+                                        if (cd == Integer.MAX_VALUE) {
+                                            validMove = false; break;
+                                        }
+                                        maxChildD = Math.max(maxChildD, cd);
+                                    } else {
+                                        validMove = false; break;
+                                    }
+                                }
+                                if (validMove && maxChildD != Integer.MAX_VALUE) {
+                                    minD = Math.min(minD, maxChildD + 1);
+                                }
+                            }
+                        }
+                        if (minD < currentD) {
+                            dist.put(s, minD);
+                            distChanged = true;
+                        }
+                    }
+                } while (distChanged);
+
+                // GOALへ到達不可能な閉じたループ（距離が無限大）を候補から削除
+                it = candidates.iterator();
+                while (it.hasNext()) {
+                    CompostateDUC<State, Action> s = it.next();
+                    if (!dist.containsKey(s)) {
+                        it.remove();
+                        innerChanged = true;
+                    }
+                }
+
+            } while (innerChanged);
+
+            // 残ったCandidate群は「安全」かつ「必ずGOALへ行ける」ことが証明された
+            if (!candidates.isEmpty()) {
+                Map<CompostateDUC<State, Action>, HAction<State, Action>> exitActions = new HashMap<>();
+                for (CompostateDUC<State, Action> s : candidates) {
+                    HAction<State, Action> bestAction = null;
+                    int bestDist = Integer.MAX_VALUE;
+
+                    // ★追加: 出口アクション選定時も Marking をチェック
+                    int currentMarking = 0;
+                    Object stObj = s.getStates();
+                    if (stObj instanceof int[]) {
+                        currentMarking = ((int[]) stObj)[0];
+                    } else if (stObj instanceof byte[]) {
+                        currentMarking = ((byte[]) stObj)[0];
+                    } else {
+                        String str = stObj.toString().replace("[", "").replace("]", "").trim();
+                        String[] parts = str.split(",");
+                        if(parts.length > 0) {
+                            try { currentMarking = Integer.parseInt(parts[0].trim()); } catch(Exception e) {}
+                        }
+                    }
+
+                    for (HAction<State, Action> action : s.getTransitions()) {
+                        // ★ここでも Fairness 無効化ルールを適用
+                        if (currentMarking > 0 && !action.isControllable()) {
+                            continue;
+                        }
+
                         Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
                         if (children != null && !children.isEmpty()) {
                             boolean validMove = true;

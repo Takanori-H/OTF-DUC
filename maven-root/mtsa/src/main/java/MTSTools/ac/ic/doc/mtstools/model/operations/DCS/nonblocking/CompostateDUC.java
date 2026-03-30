@@ -17,16 +17,6 @@ import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.
 
 public class CompostateDUC<State, Action> {
 
-    /*
-    // --- 修正箇所：Status列挙型の更新 ---
-    public enum Status {
-        NONE,    // 探索中・未確定
-        GOAL,    // ゴール到達確定
-        UNSAFE,  // 安全性違反（LTS状態-1への遷移）確定
-        TRAPPED  // 安全だが、自力でゴール（finishUpdate）に到達できない（無限ループ・デッドロック）
-    }
-    // */
-
     // (フィールド定義は変更なし)
     private final DirectedControllerSynthesisDUC<State, Action> dcs;
     private final List<State> states;
@@ -309,25 +299,6 @@ public class CompostateDUC<State, Action> {
     public void setDepth(int depth) { if (this.depth > depth) this.depth = depth; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { if (this.status != Status.ERROR || status == Status.ERROR) this.status = status; }
-    /**
-     * ステータスを更新します。
-     * 一度 UNSAFE になった状態は、他のいかなる状態（TRAPPEDなど）によっても上書きされないように制御します。
-     */
-    /*
-    public void setStatus(Status status) {
-        // 安全性の優先度：UNSAFE > TRAPPED > GOAL/NONE
-        if (this.status == Status.UNSAFE) {
-            return; // 既に最悪の状態なので変更不可
-        }
-        
-        // TRAPPEDはUNSAFEによってのみ上書き可能
-        if (this.status == Status.TRAPPED && status != Status.UNSAFE) {
-            return;
-        }
-
-        this.status = status;
-    }
-    // */
     public boolean isStatus(Status status) { return this.status == status; }
     public boolean hasGoalChild(){ return hasGoalChild; }
     public void setHasGoalChild(HAction<State, Action> actionToGoal) { this.actionToGoal = actionToGoal; this.hasGoalChild = true; }
@@ -475,14 +446,4 @@ public class CompostateDUC<State, Action> {
     public boolean isFinishUpdateBlocked() {
         return finishUpdateBlocked;
     }
-
-    /**
-     * 現在の状態が「失敗（更新の完遂が不可能）」であるかどうかを判定します。
-     * 公平性の導入により、失敗は「物理的な破壊(UNSAFE)」か「待機ループ(TRAPPED)」のいずれかです。
-     */
-    /*
-    public boolean isFailed() {
-        return this.status == Status.UNSAFE || this.status == Status.TRAPPED;
-    }
-    */
 }
