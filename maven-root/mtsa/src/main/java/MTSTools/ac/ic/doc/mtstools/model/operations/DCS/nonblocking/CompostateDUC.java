@@ -287,9 +287,10 @@ public class CompostateDUC<State, Action> {
             }
         }
         if (matchedAction == null) return true;
+        if (!dcs.isActive(ltsIndex, getMarkingState())) return true;
         State curr = states.get(ltsIndex);
         Set<State> targets = dcs.ltss.get(ltsIndex).getTransitions(curr).getImage(matchedAction);
-        if (targets != null && !targets.isEmpty()) return true; 
+        if (targets != null && !targets.isEmpty()) return true;
         return false; 
     }
 
@@ -475,14 +476,4 @@ public class CompostateDUC<State, Action> {
     public boolean isFinishUpdateBlocked() {
         return finishUpdateBlocked;
     }
-
-    /**
-     * 現在の状態が「失敗（更新の完遂が不可能）」であるかどうかを判定します。
-     * 公平性の導入により、失敗は「物理的な破壊(UNSAFE)」か「待機ループ(TRAPPED)」のいずれかです。
-     */
-    /*
-    public boolean isFailed() {
-        return this.status == Status.UNSAFE || this.status == Status.TRAPPED;
-    }
-    */
 }

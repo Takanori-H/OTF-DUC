@@ -98,16 +98,16 @@ public class DUCExplorationHeuristic<State, Action> {
     }
 
     public CompostateDUC<State,Action> getNextState() {
-        long startRec = System.nanoTime();
+        // long startRec = System.nanoTime();
         // ★修正した点：探索候補を取り出す前に、情報の鮮度をチェックして更新する
         recomputeEstimates();
-        DUCProfiler.timeRecompute += (System.nanoTime() - startRec);
+        // DUCProfiler.timeRecompute += (System.nanoTime() - startRec);
 
-        long startQueue = System.nanoTime();
+        // long startQueue = System.nanoTime();
         removeNotLive();
         CompostateDUC<State,Action> state = frontier.remove();
         state.inOpen = false;
-        DUCProfiler.timeFrontier += (System.nanoTime() - startQueue);
+        // DUCProfiler.timeFrontier += (System.nanoTime() - startQueue);
         
         return state;
     }

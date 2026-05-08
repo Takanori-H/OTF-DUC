@@ -2180,37 +2180,57 @@ public class HPWindow extends JFrame implements Runnable {
 
     private void doComposition() {
 
+        //評価実験用
+        long doCompositionStart = System.currentTimeMillis();
+        System.gc();
+        ltsa.updatingControllers.EvaluationProfiler.resetPeakMemory();
+        // ★追加: 処理開始直後のクリーンな状態のメモリ（ベースライン）を記録
+        long baselineMemory = ltsa.updatingControllers.EvaluationProfiler.getCurrentMemoryUsage();
+
         EnvConfiguration.getInstance().setOpenFileName(openFile);
 
         ltsOutput.clearOutput();
 
-        long start = System.currentTimeMillis();
+        //評価実験用
+        long compileStart = System.currentTimeMillis();
 
         // 1. コンパイル（FSP記述の解析とモデル構造の生成）
         // 変更があれば再コンパイルし、結果をフィールド変数 'current' に格納
         compileIfChange();
 
-        ltsOutput.outln("Compile time : " + (System.currentTimeMillis()-start) + "ms");
-
+        //評価実験用
+        long compileTime = System.currentTimeMillis() - compileStart;
+        long synthesisTime = 0;
+        long drawTime = 0;
 
         if (current != null) {
-            long tmp = System.currentTimeMillis();
 
             try {
+                //評価実験用
+                long synthesisStart = System.currentTimeMillis();
+
                 // 2. 合成処理の実行（Dispatcherへ委譲）
                 // ここで実際の計算（Updating Controllerの合成含む）が走ります
                 TransitionSystemDispatcher.applyComposition(current, ltsOutput);
+
+                synthesisTime = System.currentTimeMillis() - synthesisStart;
                 
             } catch (LTSCompositionException e) {
+                //評価実験用
+                long failedPeakMemory = ltsa.updatingControllers.EvaluationProfiler.getPeakMemoryUsage();
+                ltsOutput.outln("合成失敗時のピークメモリ : " + failedPeakMemory + " B");
                 return;
             }
 
-            ltsOutput.outln("Composition time : " + (System.currentTimeMillis()-tmp) + "ms");
-            tmp = System.currentTimeMillis();
+            //評価実験用
+            long drawStart = System.currentTimeMillis();
 
             // 3. 結果の判定とGUIへの反映
             boolean isControllable = current.composition != null;
             if (!isControllable) {
+                //評価実験用
+                long uncotrollablePeakMemory = ltsa.updatingControllers.EvaluationProfiler.getPeakMemoryUsage();
+                ltsOutput.outln("uncontrollable失敗時のピークメモリ : " + uncotrollablePeakMemory + " B");
                 return;
                 //throw new LTSException("Composition not controllable.");
                 
@@ -2223,10 +2243,30 @@ public class HPWindow extends JFrame implements Runnable {
                 current_states[i] = 0;
             layouts.setCurrentState(current_states);
 
-            ltsOutput.outln("Draw time : " + (System.currentTimeMillis()-tmp) + "ms");
+            drawTime = System.currentTimeMillis() - drawStart;
         }
 
-        ltsOutput.outln("Total time : " + (System.currentTimeMillis()-start) + "ms");
+        //評価実験用
+        long doCompositionTime = System.currentTimeMillis() - doCompositionStart;
+        long overallPeakMemory = ltsa.updatingControllers.EvaluationProfiler.getPeakMemoryUsage();
+        long netPeakMemory = overallPeakMemory - baselineMemory; // ★差分（純増分）を計算
+
+        ltsOutput.outln("================ EVALUATION ==================");
+        ltsOutput.outln("[共通] 合成ボタンを押してから合成完了までの時間 : " + doCompositionTime + " ms");
+        //||UPDATE_CONTROLLER_OTF = UpdCont_OTFだとUpdCont_OTFを合成する時間もcompileTimeに含まれる
+        ltsOutput.outln("[共通] 構文解析と合成に必要な環境モデルや要求の準備の時間 : " + compileTime + " ms");
+        ltsOutput.outln("[共通] コントローラ合成時間 : " + synthesisTime + " ms");
+        ltsOutput.outln("[共通] コントローラ描画時間 : " + drawTime + " ms");
+        ltsOutput.outln("[共通] コントローラ合成のベースラインメモリ ( B): " + baselineMemory + " B");
+        ltsOutput.outln("[共通] コントローラ合成のベースラインメモリ (KB): " + (baselineMemory / 1024) + " KB");
+        ltsOutput.outln("[共通] コントローラ合成のベースラインメモリ (MB): " + (baselineMemory / 1024 / 1024) + " MB");
+        ltsOutput.outln("[共通] コントローラ合成全体のピークメモリ ( B): " + overallPeakMemory + " B");
+        ltsOutput.outln("[共通] コントローラ合成全体のピークメモリ (KB): " + (overallPeakMemory / 1024) + " KB");
+        ltsOutput.outln("[共通] コントローラ合成全体のピークメモリ (MB): " + (overallPeakMemory / 1024 / 1024) + " MB");
+        ltsOutput.outln("[共通] コントローラ合成により増えたメモリ ( B): " + netPeakMemory + " B");
+        ltsOutput.outln("[共通] コントローラ合成により増えたメモリ (KB): " + (netPeakMemory / 1024) + " KB");
+        ltsOutput.outln("[共通] コントローラ合成により増えたメモリ (MB): " + (netPeakMemory / 1024 / 1024) + " MB");
+        ltsOutput.outln("==============================================");
     }
 
 

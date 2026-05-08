@@ -127,7 +127,7 @@ public class DUCAbstraction<State, Action> {
      * 2. スコアが同じ場合は、安全性の検証のために Uncontrollable を優先する。
      */
     public void eval(CompostateDUC<State, Action> compostate, List<Set<State>> knownMarked, List<Set<State>> goals) {
-        long start = System.nanoTime();
+        // long start = System.nanoTime();
         
         // ケース1：初回評価（リストの構築と初期ソート）
         if (!compostate.isEvaluated()) {
@@ -169,7 +169,7 @@ public class DUCAbstraction<State, Action> {
             // else{compostate.log("    [Debug-Abstraction] Knowledge Update: All branches already explored for state " + compostate.getStates());}
         }
         
-        DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);
+        // DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);
     }
 
     /**

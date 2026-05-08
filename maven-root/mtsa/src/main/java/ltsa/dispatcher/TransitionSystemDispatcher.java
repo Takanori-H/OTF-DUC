@@ -217,7 +217,15 @@ public class TransitionSystemDispatcher {
         // 3. Dynamic Update特有の後処理
         // 合成に成功した場合、古い遷移（Old Transitions）を削除する処理などがここで行われます
         if (Symbol.UPDATING_CONTROLLER == toCompose.getCompositionType() && toCompose.composition != null) {
+            //評価実験用
+            long removeOldTransitionsStart = System.currentTimeMillis();
+
             UpdatingControllersUtils.removeOldTransitions(toCompose);
+
+            long removeOldTransitionsTime = System.currentTimeMillis() - removeOldTransitionsStart;
+            ltsOutput.outln("================ EVALUATION ==================");
+            ltsOutput.outln("[多分，従来のDUCのみ] removeOldTransitions実行時間 : " + removeOldTransitionsTime + " ms");
+            ltsOutput.outln("==============================================");
         }
 
     }
@@ -252,9 +260,7 @@ public class TransitionSystemDispatcher {
             output.outln("MTSA tool is trying to solve an updatingController problem but the CompositeState given "
                     + "is not appropiated");
         }
-        // if(isOTF)
-        // {
-        // }
+        
         UpdatingControllerSynthesizer.generateController((UpdatingControllerCompositeState) toCompose, output);
     }
 

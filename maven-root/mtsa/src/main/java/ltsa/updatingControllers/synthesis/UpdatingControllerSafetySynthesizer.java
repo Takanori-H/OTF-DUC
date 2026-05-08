@@ -12,6 +12,7 @@ import ltsa.ac.ic.doc.mtstools.util.fsp.AutomataToMTSConverter;
 import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
 import ltsa.lts.CompactState;
 import ltsa.lts.CompositeState;
+import ltsa.lts.LTSOutput;
 import ltsa.ui.StandardOutput;
 import ltsa.updatingControllers.UpdateConstants;
 
@@ -25,25 +26,25 @@ import java.util.logging.Logger;
 public class UpdatingControllerSafetySynthesizer {
 
 
-    public static MTS<Long, String> synthesizeSafety(MTS<Long, String> metaEnvironment, Set<Fluent> goalFluents, List<Formula> safetyFormulas, Set<String> controllableActions) {
+    public static MTS<Long, String> synthesizeSafety(MTS<Long, String> metaEnvironment, Set<Fluent> goalFluents, List<Formula> safetyFormulas, Set<String> controllableActions, LTSOutput output) {
 
         // /*
         // ▼▼▼ 追加: 追跡しているFluentの名前を一覧表示 ▼▼▼
-        System.out.println("=========================================");
-        System.out.println(" DEBUG: Tracking Fluents for New Safety");
-        System.out.println("=========================================");
-        if (goalFluents.isEmpty()) {
-            System.out.println(" (No fluents are being tracked)");
-        } else {
-            for (Fluent fl : goalFluents) {
-                System.out.println(" Fluent Name: " + fl.getName());
-                // 必要であれば初期値やアクションも表示可能です
-                System.out.println("   Initial Value: " + fl.getInitialValue());
-                System.out.println("   Initiating Actions: " + fl.getInitiatingActions());
-                System.out.println("   Terminating Actions: " + fl.getTerminatingActions());
-            }
-        }
-        System.out.println("=========================================");
+        // System.out.println("=========================================");
+        // System.out.println(" DEBUG: Tracking Fluents for New Safety");
+        // System.out.println("=========================================");
+        // if (goalFluents.isEmpty()) {
+        //     System.out.println(" (No fluents are being tracked)");
+        // } else {
+        //     for (Fluent fl : goalFluents) {
+        //         System.out.println(" Fluent Name: " + fl.getName());
+        //         // 必要であれば初期値やアクションも表示可能です
+        //         System.out.println("   Initial Value: " + fl.getInitialValue());
+        //         System.out.println("   Initiating Actions: " + fl.getInitiatingActions());
+        //         System.out.println("   Terminating Actions: " + fl.getTerminatingActions());
+        //     }
+        // }
+        // System.out.println("=========================================");
         // ▲▲▲ 追加ここまで ▲▲▲
         // */
 
@@ -52,6 +53,14 @@ public class UpdatingControllerSafetySynthesizer {
         FluentStateValuation<Long> fluentStateValuation = buildValuations(metaEnvironment, goalFluents);
 
         MTS<Long, String> safetyEnv = valuateSafety(safetyFormulas, metaEnvironment, fluentStateValuation);
+
+        // ▼▼▼ 評価実験用: [3] 枝刈り(Pruning)直後の状態数・遷移数 ▼▼▼
+        long prunedCountStart = System.currentTimeMillis();
+        int prunedStates = safetyEnv.getStates().size();
+        int prunedTrans = countTransitions(safetyEnv); // ※このクラス内にも countTransitions メソッドをコピペしてください
+        long prunedCountTime = System.currentTimeMillis() - prunedCountStart;
+        output.outln("[3. Pruned] Safety Env (Before DontDoTwice) States: " + prunedStates + ", Transitions: " + prunedTrans + ", CountTime: " + prunedCountTime);
+        // ▲▲▲ 追加ここまで ▲▲▲
 
 		return getDontDoTwiceGoals(safetyEnv);
 
@@ -241,5 +250,17 @@ public class UpdatingControllerSafetySynthesizer {
         }
         return MTSToAutomataConverter.getInstance().convert(model,"dontDo"+dontDoTwiceAction.toUpperCase(), true);
     }
+
+    // ▼▼▼ 評価実験用: MTSの遷移数をカウントするヘルパーメソッド ▼▼▼
+    private static int countTransitions(MTS<Long, String> mts) {
+        int count = 0;
+        for (Long state : mts.getStates()) {
+            // REQUIRED と MAYBE の両方の遷移をカウントする（通常はREQUIREDのみですが念のため両方）
+            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.REQUIRED).size();
+            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.MAYBE).size();
+        }
+        return count;
+    }
+    // ▲▲▲ 追加ここまで ▲▲▲
 
 }

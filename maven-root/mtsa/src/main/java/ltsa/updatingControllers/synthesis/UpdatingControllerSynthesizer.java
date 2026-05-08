@@ -51,6 +51,11 @@ public class UpdatingControllerSynthesizer {
      */
 	public static void generateController(UpdatingControllerCompositeState uccs, LTSOutput output) {
 
+        //評価実験用
+        long generateControllerStart = System.currentTimeMillis();
+        long DUCTime = 0;
+        long UpdatingEnvironmentGenerateTime = 0;
+
 		// set environment
 		MTS<Long, String> oldC = uccs.getOldController();
 
@@ -59,61 +64,131 @@ public class UpdatingControllerSynthesizer {
             // ★確認用ログ出力
             // --- OTF-DUC (提案手法) の実行 ---
             output.outln("=========================================");
-            output.outln(" OTF Mode Verification");
+            output.outln("Mode: On-the-fly DUC");
             output.outln("=========================================");
 
-            output.outln("Mode: On-The-Fly Updating Controller Synthesis");
-
-            long tStart = System.currentTimeMillis();
+            //評価実験用
+            long DUCStart = System.currentTimeMillis();
 
             // OTF-DUCの実行メインロジック呼び出し
             generateDUC(uccs, output);
 
-            long tEnd = System.currentTimeMillis();
-            long tDelta = tEnd - tStart;
-            output.outln("DCU built in: " + tDelta +"ms");
+            //評価実験用
+            DUCTime = System.currentTimeMillis() - DUCStart;
         }
         else
         {
             // --- 従来手法 (DUCS) の実行 ---
             // 環境モデル全体(UpdatingEnvironment)を構築してから合成を行う
+            output.outln("=========================================");
+            output.outln("Mode: Traditional DUC");
+            output.outln("=========================================");
+
+            //評価実験用
+            long UpdatingEnvironmentGenerateStart = System.currentTimeMillis();
+
             MTS<Long, String> mapping = uccs.getMapping();
 
+            //old controllerとmapping environmentからゲームを分析するための空間を作る
             UpdatingEnvironmentGenerator updEnvGenerator = new UpdatingEnvironmentGenerator(oldC, mapping);
 		    updEnvGenerator.generateEnvironment();
 
-            long tStart = System.currentTimeMillis();
+            UpdatingEnvironmentGenerateTime = System.currentTimeMillis() - UpdatingEnvironmentGenerateStart;
+
+            //評価実験用
+            long DUCStart = System.currentTimeMillis();
 
             solveControlProblem(uccs, updEnvGenerator.getUpdEnv(), output);
 
-            long tEnd = System.currentTimeMillis();
-            long tDelta = tEnd - tStart;
-            output.outln("DCU built in: " + tDelta +"ms");
+            //評価実験用
+            DUCTime = System.currentTimeMillis() - DUCStart;
         }
+
+        //評価実験用
+        long generateControllerTime = System.currentTimeMillis() - generateControllerStart;
+        output.outln("");
+        output.outln("================ EVALUATION UpdatingControllerSynthesizer ==================");
+        output.outln("[Trasitional DUC / OTF-DUC] UpdatingControllerSynthesizer.generateControllerの全体実行時間 : " + generateControllerTime + " ms");
+        output.outln("[Traditional DUC] solveControlProblem / [OTF-DUC] generateDUC 実行時間 : " + DUCTime + " ms");
+        output.outln("[Traditional DUC] Old ControllerとMapping Environmentの並列合成による状態空間E_u構築時間 : " + UpdatingEnvironmentGenerateTime + " ms");
+        output.outln("============================================================================");
+        output.outln("");
 
 	}
 
 	private static void solveControlProblem(
             UpdatingControllerCompositeState uccs, UpdatingEnvironment updEnv, LTSOutput output) {
 
+        //UpdatingEnvironmentからMTSへ変換
         MTS<Long, String> E_u = ControllerUtils.UpdateEnvironment2MTS(updEnv);
+
+        // ▼▼▼ 評価実験用: [1] Updating Environment 生成直後 ▼▼▼
+        long euCountStart = System.currentTimeMillis();
+        int euStates = E_u.getStates().size();
+        int euTrans = countTransitions(E_u);
+        long euCountTime = System.currentTimeMillis() - euCountStart;
+        // ▲▲▲ 追加ここまで ▲▲▲
+
+        //評価実験用
+        long extractFluentStart = System.currentTimeMillis();
+
+        //GoalからFluentを抽出
         Pair<List<Formula>,Set<Fluent>> safetyFormulasAndFluents = getSafetyFormulas(uccs.getUpdateSafetyGoals(), output); // plain safety(G_u)
         List<Formula> safetyFormulas = safetyFormulasAndFluents.getFirst();
         Set<Fluent> goalFluents = safetyFormulasAndFluents.getSecond();
 
         fillTerminatingActions(E_u.getActions(), goalFluents); // set the action events fluents terminating with any action
 
+        //評価実験用
+        long extractFluentTime = System.currentTimeMillis() - extractFluentStart;
+        long buildMetaEnvStart = System.currentTimeMillis();
+
+        //Fluentをオートマトンに変換し，ベース環境と並列合成
         MTS<Long, String> metaEnvironment = ControllerUtils.removeTopStates(E_u, goalFluents);
+
+        //評価実験用
+        long buildMetaEnvTime = System.currentTimeMillis() - buildMetaEnvStart;
+
+        // ▼▼▼ 評価実験用: [2] Meta Environment 生成直後 (★最大ピーク★) ▼▼▼
+        long metaCountStart = System.currentTimeMillis();
+        int metaStates = metaEnvironment.getStates().size();
+        int metaTrans = countTransitions(metaEnvironment);
+        long metaCountTime = System.currentTimeMillis() - metaCountStart;
+        // ▲▲▲ 追加ここまで ▲▲▲
 
 		output.outln("Environment states:"+ metaEnvironment.getStates().size());
         output.outln("Solving safety goals for the controller synthesis");
 
-        MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions());
+        //評価実験用
+        output.outln("");
+        output.outln("============== EVALUATION Traditional DUC 最大状態数と遷移数 =================");
+        output.outln("[1. E_u] (Old Controller || Mapping Environment) States: " + euStates + ", Transitions: " + euTrans + ", CountTime: " + euCountTime);
+        output.outln("[2. Meta] Meta Environment (PEAK)   States: " + metaStates + ", Transitions: " + metaTrans + ", CountTime: " + metaCountTime);
+
+        //評価実験用
+        long buildSafetyEnvStart = System.currentTimeMillis();
+
+        //論理式（Formula）の評価による状態空間の前処理（Safety違反状態の無効化）
+        MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions(), output);
+
+        //評価実験用
+        long buildSafetyEnvTime = System.currentTimeMillis() - buildSafetyEnvStart;
+
+        // ▼▼▼ 評価実験用: [4] 最終 Safety Environment 生成直後 ▼▼▼
+        long safeCountStart = System.currentTimeMillis();
+        int safeStates = safetyEnv.getStates().size();
+        int safeTrans = countTransitions(safetyEnv);
+        long safeCountTime = System.currentTimeMillis() - safeCountStart;
+        output.outln("[4. Final] Safety Environment       States: " + safeStates + ", Transitions: " + safeTrans + ", CountTime: " + safeCountTime);
+        output.outln("===========================================================================");
+        output.outln("");
+        // ▲▲▲ 追加ここまで ▲▲▲
 
         output.outln("Environment states after safety: "+ safetyEnv.getStates().size());
 
         uccs.setUpdateEnvironment(safetyEnv);
 
+        //MTSからCompactStateへ型変換
         CompactState compactSafetyEnv = MTSToAutomataConverter.getInstance().convert(safetyEnv, "E_u||G(safety)", false, true);
 //		CompactState compactMetaEnv = MTSToAutomataConverter.getInstance().convert(metaEnvironment, "meta E_u", false);
 //		CompactState compactEnv = MTSToAutomataConverter.getInstance().convert(E_u, "E_u", false);
@@ -125,7 +200,13 @@ public class UpdatingControllerSynthesizer {
 
         uccs.setMachines(machines);
 
+        //評価実験用
+        long synthesizeGRStart = System.currentTimeMillis();
+
         UpdatingControllerGRSynthesizer.synthesizeGR(compactSafetyEnv, uccs, safetyEnv, output);
+
+        //評価実験用
+        long synthesizeGRTime = System.currentTimeMillis() - synthesizeGRStart;
 
 //        if (uccs.getComposition() == null){
 //            output.outln("Running in debug mode");
@@ -137,6 +218,14 @@ public class UpdatingControllerSynthesizer {
 
         UpdatingControllersUtils.ACTION_FLUENTS_FOR_UPDATE.clear();
 
+        output.outln("");
+        output.outln("================ EVALUATION solveControlProblem ==================");
+        output.outln("[Traditional DUC] Old SafetyとNew SafetyからFluent抽出する時間 : " + extractFluentTime + " ms");
+        output.outln("[Traditional DUC] Fluentとベース環境(OldCon || MapEnv)を並列合成した状態空間metaEnv構築時間 : " + buildMetaEnvTime + " ms");
+        output.outln("[Traditional DUC] metaEnvからエラーを枝刈りしてsafetyEnvを構築する時間 : " + buildSafetyEnvTime + " ms");
+        output.outln("[Traditional DUC] safetyEnvをGR1で解く時間 : " + synthesizeGRTime + " ms");
+        output.outln("==================================================================");
+        output.outln("");
 	}
 
     /**
@@ -210,8 +299,10 @@ public class UpdatingControllerSynthesizer {
      */
     private static void generateDUC(UpdatingControllerCompositeState uccs, LTSOutput output)
     {
-        long tStart = System.currentTimeMillis();
         output.outln("Starting On-The-Fly Controller Synthesis (Box List & Mapping Table Strategy)...");
+
+        //評価実験用
+        long boxListStart = System.currentTimeMillis();
 
         // ---------------------------------------------------------
         // 1. Build Box List (DCS探索用のLTSリスト構築)
@@ -231,6 +322,9 @@ public class UpdatingControllerSynthesizer {
         int transReqStartIndex, transReqEndIndex;
         // ★追加: Synthesis Machines (Monitor+Fluents) のインデックス
         int synthesisStartIndex, synthesisEndIndex;
+
+        //評価実験用
+        long createMarkingLTSStart = System.currentTimeMillis();
 
         // --- A. Marking LTS (Goal & Process Management) ---
         // システム全体のアクション集合を収集して、Marking LTSのアルファベットとする
@@ -267,6 +361,9 @@ public class UpdatingControllerSynthesizer {
         for(long i = 0; i <= 8; i++) markedMarkingLTS.unmark(i);
         markedMarkingLTS.mark(9L);
 
+        //評価実験章
+        long createMarkingLTSTime = System.currentTimeMillis() - createMarkingLTSStart;
+
         boxList.add(markedMarkingLTS); // Index 0
         output.outln(" - Added OTF Marking LTS (Index 0)");
 
@@ -295,12 +392,14 @@ public class UpdatingControllerSynthesizer {
             for(CompactState cs : uccs.getMappingComponents())
             {
 
-                output.outln("MapEnv (index" + i + "): " + cs.name);
+                // output.outln("MapEnv (index" + i + "): " + cs.name);
                 boxList.add(new LTSAdapter<>(converter.convert(cs), TransitionType.REQUIRED));
                 i++;
             }
         }
         mappingEndIndex = boxList.size() - 1;
+
+        output.outln("Added Mapping Environment Components (Index " + mappingStartIndex + " to " + mappingEndIndex + ") to BoxList:");
 
         // --- E. Old Safety ---
         oldSafeStartIndex = boxList.size();
@@ -313,6 +412,8 @@ public class UpdatingControllerSynthesizer {
         }
         oldSafeEndIndex = boxList.size() - 1;
 
+        output.outln("Added Old Safety Properties (Index " + oldSafeStartIndex + " to " + oldSafeEndIndex + ") to BoxList:");
+
         // --- F. New Safety ---
         // StateMapper用には、元の定義(LTSAdapter)を別途リスト化して保持しておく必要がある
         newSafeStartIndex = boxList.size();
@@ -323,7 +424,7 @@ public class UpdatingControllerSynthesizer {
         Map<CompactState, LTS<Long, String>> compactToLtsMap = new HashMap<>();
         
         //デバッグ用
-        output.outln("Adding New Safety Properties to BoxList:"); // ★見出し追加
+        // output.outln("Adding New Safety Properties to BoxList:"); // ★見出し追加
 
         if (uccs.getNewSafetyLTSs() != null)
         {
@@ -340,11 +441,13 @@ public class UpdatingControllerSynthesizer {
                 compactToLtsMap.put(cs, originalForBox);
 
                 // ★追加: 追加したインデックスと名前を表示
-                int currentIndex = boxList.size() - 1;
-                output.outln("  [Index " + currentIndex + "] " + cs.name);
+                // int currentIndex = boxList.size() - 1;
+                // output.outln("  [Index " + currentIndex + "] " + cs.name);
             }
         }
         newSafeEndIndex = boxList.size() - 1;
+
+        output.outln("Added New Safety Properties (Index " + newSafeStartIndex + " to " + newSafeEndIndex + ") to BoxList:");
 
         // --- G. Transition Requirements ---
         transReqStartIndex = boxList.size();
@@ -357,11 +460,13 @@ public class UpdatingControllerSynthesizer {
         }
         transReqEndIndex = boxList.size() - 1;
 
-        // --- H. Synthesis Machines (Monitors + Fluents) ---
+        output.outln("Added Transition Requirements (Index " + transReqStartIndex + " to " + transReqEndIndex + ") to BoxList:");
+
+        // --- H. Synthesis Machines (Fluents) ---
         // ★追加: Transition Requirements の後に追加する
 
         //デバッグ用
-        output.outln("Adding Synthesis Machines (Monitors & Fluents) to BoxList:"); // ★見出し追加
+        // output.outln("Adding Synthesis Machines (Fluents) to BoxList:"); // ★見出し追加
 
         synthesisStartIndex = boxList.size();
         if (uccs.getSynthesisMachines() != null)
@@ -375,15 +480,20 @@ public class UpdatingControllerSynthesizer {
                 compactToLtsMap.put(cs, lts);
 
                 // ★追加: 追加したインデックスと名前を表示
-                int currentIndex = boxList.size() - 1;
-                output.outln("  [Index " + currentIndex + "] " + cs.name);
+                // int currentIndex = boxList.size() - 1;
+                // output.outln("  [Index " + currentIndex + "] " + cs.name);
             }
         }
         synthesisEndIndex = boxList.size() - 1;
 
-        output.outln(" - Synthesis Machines added at indices: " + synthesisStartIndex + " to " + synthesisEndIndex);
+        output.outln("Added New Safety Fluents (Index " + synthesisStartIndex + " to " + synthesisEndIndex + ") to BoxList:");
+
+        // output.outln(" - Synthesis Machines added at indices: " + synthesisStartIndex + " to " + synthesisEndIndex);
 
         output.outln("Box List Created. Total Components: " + boxList.size());
+
+        //評価実験用
+        long stateMappingStart = System.currentTimeMillis();
 
         // ---------------------------------------------------------
         // 2. Build State Mapping Table (NC接続先の事前計算)
@@ -453,15 +563,19 @@ public class UpdatingControllerSynthesizer {
         // output.outln("========== DEBUG: StateMapper Verification END ==========\n");
         // // ▲▲▲▲▲▲▲▲▲▲▲▲ END RESULT LOGGING ▲▲▲▲▲▲▲▲▲▲▲▲
 
-        // ▼▼▼ ここにデバッグ出力を追加 ▼▼▼
-        output.outln("\n========== DEBUG: NC Connection Map Signatures ==========");
-        for (String sig : newControllerConnectionMap.keySet()) {
-            output.outln("NC Map Key: " + sig);
-        }
-        output.outln("=========================================================\n");
-        // ▲▲▲ 追加ここまで ▲▲▲
+        // // ▼▼▼ ここにデバッグ出力を追加 ▼▼▼
+        // output.outln("\n========== DEBUG: NC Connection Map Signatures ==========");
+        // for (String sig : newControllerConnectionMap.keySet()) {
+        //     output.outln("NC Map Key: " + sig);
+        // }
+        // output.outln("=========================================================\n");
+        // // ▲▲▲ 追加ここまで ▲▲▲
 
         output.outln(" - State Mapper generated " + newControllerConnectionMap.size() + " mapping entries.");
+
+        long stateMappingTime = System.currentTimeMillis() - stateMappingStart;
+
+        long translateFluentMapStart = System.currentTimeMillis();
 
         // ---------------------------------------------------------
         // 3. Convert CompactState Maps to LTS Maps
@@ -519,34 +633,37 @@ public class UpdatingControllerSynthesizer {
         }
         output.outln("Map Conversion Completed.");
 
-        // ▼▼▼▼▼▼▼▼▼▼▼▼ デバッグ表示 (Integer Key 確認用) ▼▼▼▼▼▼▼▼▼▼▼▼
-        output.outln("\n========== DEBUG: Index-based Safety Map Verification ==========");
-        for (Map.Entry<Integer, List<Integer>> entry : safetyComponentIndicesMap.entrySet()) {
-            int safetyIdx = entry.getKey();
-            List<Integer> compIndices = entry.getValue();
-            
-            // boxListからLTSを取り出して確認（デバッグ用）
-            // ※実際にはLTSAdapterなので名前は取れないかもしれないが、クラス名などで確認
-            output.outln("Safety Property [Index " + safetyIdx + "]:");
-            
-            for (int i = 0; i < compIndices.size(); i++) {
-                int idx = compIndices.get(i);
-                String type = (i == 0) ? "Monitor" : "Fluent ";
-                output.outln("     [" + i + "] " + type + " => boxList Index: " + idx);
-            }
-            
-            // Lookup Map の確認
-            Map<List<Integer>, Integer> lookup = safetyStateLookupMap.get(safetyIdx);
-            output.outln("     -> Lookup Table Size: " + (lookup != null ? lookup.size() : "null"));
-        }
-        output.outln("========== END VERIFICATION ==========\n");
-        // ▲▲▲▲▲▲▲▲▲▲▲▲ 追加終了 ▲▲▲▲▲▲▲▲▲▲▲▲
+        long translateFluentMapTime = System.currentTimeMillis() - translateFluentMapStart;
 
-        long tEnd = System.currentTimeMillis();
-        long tDelta = tEnd - tStart;
-        output.outln("OTF-DUC前処理: " + tDelta +"ms");
+        // // ▼▼▼▼▼▼▼▼▼▼▼▼ デバッグ表示 (Integer Key 確認用) ▼▼▼▼▼▼▼▼▼▼▼▼
+        // output.outln("\n========== DEBUG: Index-based Safety Map Verification ==========");
+        // for (Map.Entry<Integer, List<Integer>> entry : safetyComponentIndicesMap.entrySet()) {
+        //     int safetyIdx = entry.getKey();
+        //     List<Integer> compIndices = entry.getValue();
+            
+        //     // boxListからLTSを取り出して確認（デバッグ用）
+        //     // ※実際にはLTSAdapterなので名前は取れないかもしれないが、クラス名などで確認
+        //     output.outln("Safety Property [Index " + safetyIdx + "]:");
+            
+        //     for (int i = 0; i < compIndices.size(); i++) {
+        //         int idx = compIndices.get(i);
+        //         String type = (i == 0) ? "Monitor" : "Fluent ";
+        //         output.outln("     [" + i + "] " + type + " => boxList Index: " + idx);
+        //     }
+            
+        //     // Lookup Map の確認
+        //     Map<List<Integer>, Integer> lookup = safetyStateLookupMap.get(safetyIdx);
+        //     output.outln("     -> Lookup Table Size: " + (lookup != null ? lookup.size() : "null"));
+        // }
+        // output.outln("========== END VERIFICATION ==========\n");
+        // // ▲▲▲▲▲▲▲▲▲▲▲▲ 追加終了 ▲▲▲▲▲▲▲▲▲▲▲▲
+
+        //評価実験用
+        long boxListTime = System.currentTimeMillis() - boxListStart;
 
         output.outln("Initializing DCS...");
+
+        long dcsStart = System.currentTimeMillis();
 
         DirectedControllerSynthesisDUC<Long, String> ducSynthesis = new DirectedControllerSynthesisDUC<>();
 
@@ -566,6 +683,8 @@ public class UpdatingControllerSynthesizer {
             output
         );
 
+        long dcsTmp = System.currentTimeMillis() - dcsStart;
+
         if (result != null) {
             output.outln("DUC Generated Successfully! States: " + result.getStates().size());
             CompactState res = MTSToAutomataConverter.getInstance().convert(new MTSAdapter<Long, String>(result), uccs.getName(), false);
@@ -574,6 +693,17 @@ public class UpdatingControllerSynthesizer {
         } else {
             output.outln("Failed to generate DUC (Goal not reachable).");
         }
+
+        long dcsTime = System.currentTimeMillis() - dcsStart;
+
+        output.outln("================ EVALUATION generateDUC (OTF-DUC) ==================");
+        output.outln("[OTF-DUC] boxList準備時間 (DCSの前準備) : " + boxListTime + " ms");
+        output.outln("[OTF-DUC] MarkingLTS生成時間 : " + createMarkingLTSTime + " ms");
+        output.outln("[OTF-DUC] New Controllerの接続先の事前計算 : " + stateMappingTime + " ms");
+        output.outln("[OTF-DUC] New SafetyとFluentの対応表の変換作業時間 : " + translateFluentMapTime + " ms");
+        output.outln("[OTF-DUC] DCSでUpdate Controllerを合成する時間 (型変換含む) : " + dcsTime + " ms");
+        output.outln("[OTF-DUC] DCS実行時間 : " + dcsTmp + " ms");
+        output.outln("====================================================================");
     }
 
     /**
@@ -815,4 +945,16 @@ public class UpdatingControllerSynthesizer {
             }
         }
     }
+
+    // ▼▼▼ 評価実験用: MTSの遷移数をカウントするヘルパーメソッド ▼▼▼
+    private static int countTransitions(MTS<Long, String> mts) {
+        int count = 0;
+        for (Long state : mts.getStates()) {
+            // REQUIRED と MAYBE の両方の遷移をカウントする（通常はREQUIREDのみですが念のため両方）
+            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.REQUIRED).size();
+            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.MAYBE).size();
+        }
+        return count;
+    }
+    // ▲▲▲ 追加ここまで ▲▲▲
 }

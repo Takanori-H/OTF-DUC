@@ -2368,25 +2368,24 @@ public class LTSCompiler {
             {
                 ucDefinition.setMapping(this.controllerSubUpdateController());
             }
-            // ▼▼▼ 追加: Old Environment (リスト形式) ▼▼▼
+            // ▼▼▼ 修正: Old Environment (パラメータ対応のリスト解析メソッドを使用) ▼▼▼
             else if (current.kind == Symbol.OLD_ENVIRONMENT) {
                 this.expectBecomes();
-                // componentsNotEmpty() は { A, B } 形式のリストを解析して List<Symbol> を返す既存メソッドです
-                ucDefinition.setOldEnvironment(this.componentsNotEmpty());
+                ucDefinition.setOldEnvironment(this.componentsWithParamsNotEmpty());
             }
-            // ▼▼▼ 追加: New Environment (リスト形式) ▼▼▼
+            // ▼▼▼ 修正: New Environment (パラメータ対応のリスト解析メソッドを使用) ▼▼▼
             else if(current.kind == Symbol.NEW_ENVIRONMENT)
             {
                 this.expectBecomes();
-                ucDefinition.setNewEnvironment(this.componentsNotEmpty());
+                ucDefinition.setNewEnvironment(this.componentsWithParamsNotEmpty());
             }
-            // ▼▼▼ 追加: Map Relation (リスト形式) ▼▼▼
+            // ▼▼▼ 修正: Map Relation (パラメータ対応のリスト解析メソッドを使用) ▼▼▼
             else if(current.kind == Symbol.MAP_RELATION)
             {
                 this.expectBecomes();
-                ucDefinition.setMapRelation(this.componentsNotEmpty());
+                ucDefinition.setMapRelation(this.componentsWithParamsNotEmpty());
             }
-            // ▲▲▲ 追加ここまで ▲▲▲
+            // ▲▲▲ 修正ここまで ▲▲▲
             else if(current.kind == Symbol.OLD_GOAL)
             {
                 this.expectBecomes();
@@ -2441,6 +2440,80 @@ public class LTSCompiler {
         // ループ終了時は RCURLY であるはず
         current_is(Symbol.RCURLY, "} expected");
     }
+
+    /**
+     * パラメータ ( ) や [ ] を含むプロセス名のリスト ({A(1), B(2)} など) または {forall[i:Arms]} のような動的展開リストを解析するメソッド。
+     * 前回追加した parseProcessNameWithParams() を内部で使用します。
+     */
+    private List<Symbol> componentsWithParamsNotEmpty() {
+        List<Symbol> definitions = new ArrayList<Symbol>();
+        current_is(Symbol.BECOMES, "= expected");
+        expectLeftCurly();
+        next_symbol();
+
+        // ▼▼▼ 修正: LTSAネイティブの FORALL 構文解析を完全流用 ▼▼▼
+        if (current.kind == Symbol.FORALL) {
+            next_symbol(); // 'forall' を消費
+
+            // 1. LTSAの既存メソッドでRangeをパース (例: [i:Arms] や [i:1..N][j:1..K] など)
+            ActionLabels ranges = forallRanges();
+
+            // 2. ベースとなるプロセス名をパース (例: PRODUCTION_CELL_OLD(i))
+            Symbol baseProcessSym = parseProcessNameWithParams();
+            String baseProcessStr = baseProcessSym.toString();
+
+            // 3. ActionLabels を使って変数を列挙し、展開する
+            Hashtable<String, Value> locals = new Hashtable<>();
+            ranges.initContext(locals, null);
+
+            while (ranges.hasMoreNames()) {
+                ranges.nextName(); // locals に { i=1 } などが格納される
+
+                // locals内のすべての変数名について、文字列を置換する
+                String replaced = baseProcessStr;
+                for (String varName : locals.keySet()) {
+                    String valStr = locals.get(varName).toString();
+                    // 単語境界 (\b) を利用して安全に置換 (例: i を 1 に)
+                    replaced = replaced.replaceAll("\\b" + varName + "\\b", valStr);
+                }
+                definitions.add(new Symbol(Symbol.UPPERIDENT, replaced));
+            }
+            ranges.clearContext();
+
+            current_is(Symbol.RCURLY, "} expected");
+            next_symbol(); // '}' を消費
+
+            return definitions;
+        }
+        // ▲▲▲ 修正ここまで ▲▲▲
+
+        // --- 従来の単一またはカンマ区切りリストのパース処理 ---
+        boolean finish = false;
+
+        // 最初の要素を読み込む
+        // parseProcessNameWithParams() はメソッド終了時に次のトークン(カンマや '}')へ current を進めています
+        definitions.add(parseProcessNameWithParams());
+        
+        if (current.kind != Symbol.COMMA) {
+            finish = true;
+        } else {
+            next_symbol(); // カンマを消費
+        }
+
+        while (current.kind == Symbol.UPPERIDENT && !finish) {
+            definitions.add(parseProcessNameWithParams());
+            if (current.kind != Symbol.COMMA) {
+                finish = true;
+                break;
+            }
+            next_symbol(); // カンマを消費
+        }
+        
+        current_is(Symbol.RCURLY, "} expected");
+        next_symbol(); // '}' を消費
+
+        return definitions;
+    }
     
     private void parseRelation(){
         // デバッグ: 開始時のトークンを表示
@@ -2451,9 +2524,10 @@ public class LTSCompiler {
         // デバッグ: 消費後のトークン（名前のはず）を表示
         // output.outln("DEBUG: After next_symbol(). Current token: " + current);
 
-        if (current.kind != Symbol.UPPERIDENT) {
-            error("Relation name expected");
-        }
+        // if (current.kind != Symbol.UPPERIDENT) {
+        //     error("Relation name expected");
+        // }
+        current_is(Symbol.UPPERIDENT, "Relation name expected");
         Symbol name = current;
 
         /*
@@ -2466,15 +2540,34 @@ public class LTSCompiler {
         // 注意: Parseボタンで既存の定義をクリアしたい場合は、
         // relations.clear() を呼び出し元で行う必要があります
         if (relations.containsKey(name.toString())) {
-            output.outln("DEBUG: Duplicate found for " + name + ". Overwriting for re-parse.");
+            // output.outln("DEBUG: Duplicate found for " + name + ". Overwriting for re-parse.");
             relations.remove(name.toString());
         }
 
         RelationDefinition relDef = new RelationDefinition(name);
 
+        next_symbol(); // 名前を消費。次のトークン ('(' または '=') へ
+
+        // パラメータ (I) の読み取り
+        if (current.toString().equals("(")) {
+            next_symbol(); // '(' を消費
+            
+            if (current.kind != Symbol.UPPERIDENT && current.kind != Symbol.IDENTIFIER) {
+                error("Parameter name expected in relation definition");
+            }
+            relDef.parameterName = current;
+            next_symbol(); // パラメータ名を消費
+            
+            if (!current.toString().equals(")")) {
+                error(") expected after relation parameter");
+            }
+            next_symbol(); // ')' を消費し、次のトークン ('=') へ進む
+        }
+
         // 名前を消費して'=' を確認
         // output.outln("DEBUG: Calling expectBecomes()...");
-        expectBecomes();
+        // expectBecomes();
+        current_is(Symbol.BECOMES, "= expected in relation definition");
         // output.outln("DEBUG: expectBecomes passed.");
         // '='を消費して'{' を確認
         expectLeftCurly();
@@ -2489,15 +2582,18 @@ public class LTSCompiler {
             }
         }
 
-        if (current.kind == Symbol.RCURLY) {
-            // ここで relations.put を行う
-            relations.put(name.toString(), relDef);
-            // output.outln("DEBUG: Parsed [" + name + "] successfully.");
-            next_symbol(); // '}' を消費
-            // output.outln("DEBUG: Parsed [" + name + "] with " + relDef.rules.size() + " rules.");
-        } else {
-            error("} expected at the end of relation");
-        }
+        // if (current.kind == Symbol.RCURLY) {
+        //     // ここで relations.put を行う
+        //     relations.put(name.toString(), relDef);
+        //     // output.outln("DEBUG: Parsed [" + name + "] successfully.");
+        //     next_symbol(); // '}' を消費
+        //     // output.outln("DEBUG: Parsed [" + name + "] with " + relDef.rules.size() + " rules.");
+        // } else {
+        //     error("} expected at the end of relation");
+        // }
+        current_is(Symbol.RCURLY, "} expected at the end of relation");
+        relations.put(name.toString(), relDef);
+        next_symbol(); // '}' を消費
 
         /*
         // ループ終了時は '}' のはず
@@ -2513,7 +2609,7 @@ public class LTSCompiler {
         */
 
         // ▼▼▼ デバッグ用追加 ▼▼▼
-        output.outln("DEBUG: Parsed relation definition [" + name + "] with " + relDef.rules.size() + " rules.");
+        // output.outln("DEBUG: Parsed relation definition [" + name + "] with " + relDef.rules.size() + " rules.");
         // ▲▲▲ 追加ここまで ▲▲▲
         
         // 最後にピリオドがあればスキップ
@@ -2577,11 +2673,17 @@ public class LTSCompiler {
             error("@ expected in relation (State@Process)");
         }
 
-        if (current.kind != Symbol.UPPERIDENT) error("Process name expected after @");
-        rule.oldProcessName = current;
+        // if (current.kind != Symbol.UPPERIDENT) error("Process name expected after @");
+        // rule.oldProcessName = current;
+        // ★変更: パラメータを含むプロセス名を読み込むヘルパーメソッドを使用
+        rule.oldProcessName = parseProcessNameWithParams();
 
         // ProcessNameを消費して '=' に進む
-        next_symbol(); 
+        // next_symbol();
+
+        // ▼▼▼ デバッグ追加: 左辺プロセス名直後のトークン確認 ▼▼▼
+        // output.outln("DEBUG [LHS]: After oldProcessName (" + rule.oldProcessName + "), current token is: '" + current + "' (kind: " + current.kind + ")");
+        // ▲▲▲ デバッグ追加ここまで ▲▲▲
 
         // 3. = (遷移の開始)
         // 修正: expectBecomes() は使わず、文字列表現も含めた堅牢なチェックを行う
@@ -2651,11 +2753,65 @@ public class LTSCompiler {
         }
 
         // 5. 右辺の残り: ProcessName
-        if (current.kind != Symbol.UPPERIDENT) error("Process name expected after @");
-        rule.newProcessName = current;
+        // if (current.kind != Symbol.UPPERIDENT) error("Process name expected after @");
+        // rule.newProcessName = current;
+        // ★変更: パラメータを含むプロセス名を読み込むヘルパーメソッドを使用
+        rule.newProcessName = parseProcessNameWithParams();
         
-        next_symbol();
+        // next_symbol();
+
+        // ▼▼▼ デバッグ追加: 右辺プロセス名直後のトークン確認 ▼▼▼
+        // output.outln("DEBUG [RHS]: After newProcessName (" + rule.newProcessName + "), current token is: '" + current + "' (kind: " + current.kind + ")");
+        // ▲▲▲ デバッグ追加ここまで ▲▲▲
+
         relDef.addRule(rule);
+    }
+
+    /**
+     * プロセス名に続くパラメータ ( ) や [ ] を読み込み、結合したSymbolを返す
+     */
+    private Symbol parseProcessNameWithParams() {
+        if (current.kind != Symbol.UPPERIDENT) {
+            error("Process name expected after @");
+        }
+        
+        Symbol baseName = current;
+        StringBuilder sb = new StringBuilder(baseName.toString());
+        next_symbol();
+
+        // パラメータ ( ) や [ ] が続く限り読み込む
+        while (current.toString().equals("(") || current.kind == Symbol.LSQUARE) {
+            if (current.toString().equals("(")) {
+                sb.append("(");
+                next_symbol();
+                while (!current.toString().equals(")") && current.kind != Symbol.EOFSYM) {
+                    sb.append(current.toString());
+                    next_symbol();
+                }
+                if (current.toString().equals(")")) {
+                    sb.append(")");
+                    next_symbol();
+                } else {
+                    error(") expected");
+                }
+            } else if (current.kind == Symbol.LSQUARE) {
+                sb.append("[");
+                next_symbol();
+                while (!current.toString().equals("]") && current.kind != Symbol.EOFSYM) {
+                    sb.append(current.toString());
+                    next_symbol();
+                }
+                if (current.toString().equals("]")) {
+                    sb.append("]");
+                    next_symbol();
+                } else {
+                    error("] expected");
+                }
+            }
+        }
+        
+        // 結合した文字列を持つ新しいSymbolを返す
+        return new Symbol(Symbol.UPPERIDENT, sb.toString());
     }
 
     /**
@@ -2697,56 +2853,84 @@ public class LTSCompiler {
         // もし既に消費されていて Identifier (Map名) になっている場合は何もしない
 
         // 2. Map名
-        if (current.kind != Symbol.UPPERIDENT) {
-            error("Map Environment identifier expected");
-        }
+        // if (current.kind != Symbol.UPPERIDENT) {
+        //     error("Map Environment identifier expected");
+        // }
+        current_is(Symbol.UPPERIDENT, "Map Environment identifier expected");
         Symbol mapName = current;
         MapDefinition mapDef = new MapDefinition(mapName);
 
         // Name -> '=' へ移動
-        next_symbol();
+        // next_symbol();
 
-        // 3. '=' のチェック
-        if (current.kind == Symbol.BECOMES || current.toString().equals("=")) {
-            // OK
-        } else {
-            error("= expected");
-        }
+        // // 3. '=' のチェック
+        // if (current.kind == Symbol.BECOMES || current.toString().equals("=")) {
+        //     // OK
+        // } else {
+        //     error("= expected");
+        // }
+        expectBecomes();
 
-        // '=' -> '{' へ移動
-        next_symbol();
+        // // '=' -> '{' へ移動
+        // next_symbol();
 
-        // 4. '{' のチェック
-        if (current.kind != Symbol.LCURLY) {
-             error("{ expected");
-        }
+        // // 4. '{' のチェック
+        // if (current.kind != Symbol.LCURLY) {
+        //      error("{ expected");
+        // }
+        expectLeftCurly();
         next_symbol(); // '{' を消費して中身へ
 
         // 5. Old Process Name
-        if (current.kind != Symbol.UPPERIDENT) error("Old process identifier expected. Found: " + current);
-        mapDef.oldProcess = current;
-        next_symbol();
+        // if (current.kind != Symbol.UPPERIDENT) error("Old process identifier expected. Found: " + current);
+        // mapDef.oldProcess = current;
+        // next_symbol();
+        // ★修正: パラメータを含むプロセス名を読み込むヘルパーメソッドを使用
+        mapDef.oldProcess = parseProcessNameWithParams();
 
-        if (current.kind != Symbol.COMMA) error(", expected");
+        // // ▼▼▼ デバッグ追加: カンマチェック直前のトークン確認 ▼▼▼
+        // output.outln("DEBUG [parseMap]: After oldProcess (" + mapDef.oldProcess + "), current token is: '" + current + "' (kind: " + current.kind + ")");
+        // // ▲▲▲ デバッグ追加ここまで ▲▲▲
+
+        // if (current.kind != Symbol.COMMA) error(", expected");
+        current_is(Symbol.COMMA, ", expected after old process");
         next_symbol();
 
         // 6. New Process Name
-        if (current.kind != Symbol.UPPERIDENT) error("New process identifier expected");
-        mapDef.newProcess = current;
-        next_symbol();
+        // if (current.kind != Symbol.UPPERIDENT) error("New process identifier expected");
+        // mapDef.newProcess = current;
+        // next_symbol();
+        // ★修正: パラメータを含むプロセス名を読み込むヘルパーメソッドを使用
+        mapDef.newProcess = parseProcessNameWithParams();
 
-        if (current.kind != Symbol.COMMA) error(", expected");
+        // if (current.kind != Symbol.COMMA) error(", expected");
+        current_is(Symbol.COMMA, ", expected after new process");
         next_symbol();
 
         // 7. Relation Name
-        if (current.kind != Symbol.UPPERIDENT) error("Relation identifier expected");
-        mapDef.relationName = current;
-        next_symbol();
+        // if (current.kind != Symbol.UPPERIDENT) error("Relation identifier expected");
+        // mapDef.relationName = current;
+        // next_symbol();
+        // ▼▼▼ 変更: リレーション名もパラメータ付きで読み込む ▼▼▼
+        Symbol relSymbol = parseProcessNameWithParams();
+        String relNameStr = relSymbol.toString();
+        
+        // ベース名と引数に分離する (例: R_PRODUCTION_CELL(1) -> R_PRODUCTION_CELL と 1)
+        if (relNameStr.contains("(")) {
+            String baseName = relNameStr.substring(0, relNameStr.indexOf('(')).trim();
+            String argStr = relNameStr.substring(relNameStr.indexOf('(') + 1, relNameStr.lastIndexOf(')')).trim();
+            mapDef.relationName = new Symbol(Symbol.UPPERIDENT, baseName);
+            mapDef.relationArg = argStr;
+        } else {
+            mapDef.relationName = relSymbol;
+        }
+        // ▲▲▲ 変更ここまで ▲▲▲
 
         // 8. 終了処理
-        if (current.kind != Symbol.RCURLY) {
-            error("} expected");
-        }
+        // if (current.kind != Symbol.RCURLY) {
+        //     error("} expected");
+        // }
+        current_is(Symbol.RCURLY, "} expected at the end of map");
         next_symbol(); // '}' を消費。ここで次のトークン（'.' や次の 'map'）になる
 
         // Debug: } 消費前のトークン

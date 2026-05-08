@@ -8,6 +8,9 @@ public class RelationDefinition {
     public Symbol name;
     public Vector<RelationRule> rules = new Vector<>();
 
+    // ★追加: パラメータ名を保持するフィールド
+    public Symbol parameterName;
+
     public RelationDefinition(Symbol name) {
         this.name = name;
     }

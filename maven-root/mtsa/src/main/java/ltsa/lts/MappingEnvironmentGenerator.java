@@ -52,7 +52,9 @@ public class MappingEnvironmentGenerator {
         int extraStatesCount = 0;
 
         for (RelationDefinition.RelationRule rule : relDef.rules) {
-            Vector<FlattenedRule> expanded = expandRule(rule);
+            // Vector<FlattenedRule> expanded = expandRule(rule);
+            // ★変更: mapDefとrelDefも引数として渡し、変数展開に使えるようにする
+            Vector<FlattenedRule> expanded = expandRule(rule, mapDef, relDef);
             flatRules.addAll(expanded);
             for (FlattenedRule fr : expanded) {
                 // 必要なステップ数: preActions + reconfigure(1) + postActions
@@ -106,15 +108,15 @@ public class MappingEnvironmentGenerator {
         }
 
         // ▼▼▼ 制約5に基づく推測の確認用デバッグ出力を追加 ▼▼▼
-        output.outln("========== DEBUG: STATE ID VERIFICATION ==========");
-        for (FlattenedRule fr : flatRules) {
-            Integer startNode = oldM.getStateId(fr.oldLabel);
-            Integer endNode = newM.getStateId(fr.newLabel);
-            output.outln("Rule: " + fr.oldLabel + " -> " + fr.newLabel);
-            output.outln("  - oldM.getStateId(" + fr.oldLabel + ") = " + startNode);
-            output.outln("  - newM.getStateId(" + fr.newLabel + ") = " + endNode);
-        }
-        output.outln("==================================================");
+        // output.outln("========== DEBUG: STATE ID VERIFICATION ==========");
+        // for (FlattenedRule fr : flatRules) {
+        //     Integer startNode = oldM.getStateId(fr.oldLabel);
+        //     Integer endNode = newM.getStateId(fr.newLabel);
+        //     output.outln("Rule: " + fr.oldLabel + " -> " + fr.newLabel);
+        //     output.outln("  - oldM.getStateId(" + fr.oldLabel + ") = " + startNode);
+        //     output.outln("  - newM.getStateId(" + fr.newLabel + ") = " + endNode);
+        // }
+        // output.outln("==================================================");
         // ▲▲▲ デバッグ出力ここまで ▲▲▲
 
         // 5. ルールに基づく遷移の追加（シーケンス処理）
@@ -205,7 +207,8 @@ public class MappingEnvironmentGenerator {
     }
 
     // ルールを展開してフラットにする (forall対応)
-    private Vector<FlattenedRule> expandRule(RelationDefinition.RelationRule rule) {
+    // ★変更: mapDefとrelDefを引数に受け取るように変更
+    private Vector<FlattenedRule> expandRule(RelationDefinition.RelationRule rule, MapDefinition mapDef, RelationDefinition relDef) {
         Vector<FlattenedRule> result = new Vector<>();
 
         if (rule.range != null) {
@@ -213,6 +216,21 @@ public class MappingEnvironmentGenerator {
             // イテレータを使って変数をバインドしながら展開する
             Hashtable<String, Value> locals = new Hashtable<>();
             Hashtable<String, Value> globals = new Hashtable<>();
+
+            // ▼▼▼ 追加: リレーションの引数をローカル変数にバインドする ▼▼▼
+            if (relDef.parameterName != null && mapDef.relationArg != null) {
+                String arg = mapDef.relationArg;
+                try {
+                    locals.put(relDef.parameterName.toString(), new Value(Integer.parseInt(arg)));
+                } catch (NumberFormatException e) {
+                    Hashtable<?, ?> constants = Expression.constants;
+                    if (constants != null && constants.containsKey(arg)) {
+                        locals.put(relDef.parameterName.toString(), (Value) constants.get(arg));
+                    }
+                }
+            }
+            // ▲▲▲ 追加ここまで ▲▲▲
+
             rule.range.initContext(locals, globals);
 
             while (rule.range.hasMoreNames()) {
@@ -242,6 +260,21 @@ public class MappingEnvironmentGenerator {
             // 単一ルール
             Hashtable<String, Value> locals = new Hashtable<>();
             Hashtable<String, Value> globals = new Hashtable<>();
+
+            // ▼▼▼ 追加: forallが無い単一ルールの場合でもバインドする ▼▼▼
+            if (relDef.parameterName != null && mapDef.relationArg != null) {
+                String arg = mapDef.relationArg;
+                try {
+                    locals.put(relDef.parameterName.toString(), new Value(Integer.parseInt(arg)));
+                } catch (NumberFormatException e) {
+                    Hashtable<?, ?> constants = Expression.constants;
+                    if (constants != null && constants.containsKey(arg)) {
+                        locals.put(relDef.parameterName.toString(), (Value) constants.get(arg));
+                    }
+                }
+            }
+            // ▲▲▲ 追加ここまで ▲▲▲
+            
             Vector<String> oldLabels = rule.oldStateSelector.getActions(locals, globals);
             Vector<String> newLabels = rule.newStateSelector.getActions(locals, globals);
             Vector<String> pre = expandActionList(rule.preReconfigureActions, locals, globals);

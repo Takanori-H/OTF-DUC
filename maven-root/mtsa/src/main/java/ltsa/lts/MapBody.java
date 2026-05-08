@@ -50,22 +50,87 @@ public class MapBody extends CompositeBody {
             return;
         }
 
-        // 定義済みプロセス(ProcessSpec)を探す
-        ProcessSpec p = c.processes.get(name);
+        // ▼▼▼ 修正: ベース名とパラメータの分離 ▼▼▼
+        String baseName = name;
+        Vector<Value> actuals = new Vector<>();
+        if (name.contains("(")) {
+            baseName = name.substring(0, name.indexOf('(')).trim();
+            String paramStr = name.substring(name.indexOf('(') + 1, name.lastIndexOf(')'));
+            String[] params = paramStr.split(",");
+            for (String p : params) {
+                p = p.trim();
+                try {
+                    // 数値パラメータとして解析
+                    actuals.add(new Value(Integer.parseInt(p)));
+                } catch (NumberFormatException ex) {
+                    // 数値でない場合は定数テーブルからの解決を試みる
+                    Hashtable<?, ?> constants = Expression.constants;
+                    if (constants != null && constants.containsKey(p)) {
+                        actuals.add((Value) constants.get(p));
+                    } else {
+                        c.output.outln("Warning: Cannot parse parameter '" + p + "'. Using fallback 0.");
+                        actuals.add(new Value(0));
+                    }
+                }
+            }
+        }
+        // ▲▲▲ 修正ここまで ▲▲▲
+
+        // // 定義済みプロセス(ProcessSpec)を探す
+        // ProcessSpec p = c.processes.get(name);
+        // if (p != null) {
+        //     try {
+        //         c.output.outln("INFO: Auto-compiling dependency for Map: " + name);
+        //         StateMachine sm = new StateMachine(p, new Vector<>()); 
+        //         CompactState cs = sm.makeCompactState();
+        //         cs.name = name; // 名前を確定
+        //         c.compiledProcesses.put(name, cs);
+        //     } catch (Exception e) {
+        //         Diagnostics.fatal("Error compiling dependency '" + name + "': " + e);
+        //     }
+        // } else {
+        //     // ProcessSpecにも見つからない場合
+        //     // Generator側で詳細なエラーを出すか、ここで警告を出す
+        //     c.output.outln("Warning: Process '" + baseName + "' not found in definition.");
+        // }
+        // 定義済みプロセス(ProcessSpec)を "ベース名" で探す
+        ProcessSpec p = c.processes.get(baseName);
         if (p != null) {
             try {
                 c.output.outln("INFO: Auto-compiling dependency for Map: " + name);
-                StateMachine sm = new StateMachine(p, new Vector<>()); 
+                // 抽出したパラメータ(actuals)を渡してコンパイル
+                StateMachine sm = new StateMachine(p, actuals); 
                 CompactState cs = sm.makeCompactState();
-                cs.name = name; // 名前を確定
+                cs.name = name; // キャッシュ用の名前はパラメータ付きの元の名前を確定
                 c.compiledProcesses.put(name, cs);
             } catch (Exception e) {
                 Diagnostics.fatal("Error compiling dependency '" + name + "': " + e);
             }
         } else {
+            // ▼▼▼ デバッグ追加: プロセステーブルの中身と検索キーの確認 ▼▼▼
+            c.output.outln("DEBUG: --- ensureCompiled Error Analysis ---");
+            c.output.outln("DEBUG: Target name: [" + name + "]");
+            c.output.outln("DEBUG: Extracted baseName: [" + baseName + "] (length: " + baseName.length() + ")");
+            c.output.outln("DEBUG: c.processes is null? " + (c.processes == null));
+            if (c.processes != null) {
+                c.output.outln("DEBUG: c.processes size: " + c.processes.size());
+                boolean found = false;
+                for (String key : c.processes.keySet()) {
+                    if (key.contains("PRODUCTION")) {
+                        c.output.outln("DEBUG: Found matching key in table: [" + key + "] (length: " + key.length() + ")");
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    c.output.outln("DEBUG: No keys containing 'PRODUCTION' were found in the table.");
+                }
+            }
+            c.output.outln("DEBUG: -------------------------------------");
+            // ▲▲▲ デバッグ追加ここまで ▲▲▲
+
             // ProcessSpecにも見つからない場合
             // Generator側で詳細なエラーを出すか、ここで警告を出す
-            c.output.outln("Warning: Process '" + name + "' not found in definition.");
+            c.output.outln("Warning: Process '" + baseName + "' not found in definition.");
         }
     }
 }

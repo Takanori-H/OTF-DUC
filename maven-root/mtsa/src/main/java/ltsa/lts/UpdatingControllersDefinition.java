@@ -66,14 +66,19 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
     @Override
     protected CompositeState compose(Vector<Value> actuals) {
-        long start = System.currentTimeMillis();
+        //評価実験用：UpdatingControllerDefinition.compose計測開始
+        long UCDefStart = System.currentTimeMillis();
 
         // ---------------------------------------------------------
         // 1. Old Controller のコンパイル (Monolithic)
         // ---------------------------------------------------------
+        //評価実験用:Old Controllerの計測開始
+        long oldCStart = System.currentTimeMillis();
+
         CompositeState oldC = composeLTS(this.getOldController().toString());
-        output.outln("UpdatingControllersDefinition Generate OldController time : "
-                + (System.currentTimeMillis() - start) + "ms");
+
+        //評価実験用：Old Controllerの計測終了
+        long oldCTime = System.currentTimeMillis() - oldCStart;
 
         // ---------------------------------------------------------
         // 2. Goal 定義の準備
@@ -83,12 +88,14 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
         // 全体のControllable Action (OTF探索用)
         Set<String> controllableSet = this.generateUpdatingControllableActions(oldGoalDef, newGoalDef);
-        // Symbol controllableSetSymbol =
-        // LTSCompiler.saveControllableSet(controllableSet, this.getName().getName());
 
         // ---------------------------------------------------------
         // 3. Mapping Environment の生成
         // ---------------------------------------------------------
+        
+        //評価実験：Mapping Environment Component計測開始
+        long mapEComponentStart = System.currentTimeMillis();
+
         // LTSCompilerのstaticメソッドから参照を取得
         Hashtable<String, RelationDefinition> relations = LTSCompiler.getRelations();
         Hashtable<String, ProcessSpec> processes = LTSCompiler.getProcesses();
@@ -137,7 +144,18 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 MapDefinition mapDef = new MapDefinition(new Symbol(Symbol.UPPERIDENT, mapEnvName));
                 mapDef.oldProcess = oldSym;
                 mapDef.newProcess = newSym;
-                mapDef.relationName = relSym;
+                // mapDef.relationName = relSym;
+                // ▼▼▼ 修正: リレーション名と引数を分離して MapDefinition に登録する ▼▼▼
+                String relNameStr = relSym.toString();
+                if (relNameStr.contains("(")) {
+                    String baseName = relNameStr.substring(0, relNameStr.indexOf('(')).trim();
+                    String argStr = relNameStr.substring(relNameStr.indexOf('(') + 1, relNameStr.lastIndexOf(')')).trim();
+                    mapDef.relationName = new Symbol(Symbol.UPPERIDENT, baseName);
+                    mapDef.relationArg = argStr;
+                } else {
+                    mapDef.relationName = relSym;
+                }
+                // ▲▲▲ 修正ここまで ▲▲▲
 
                 // relations を渡す
                 CompactState mapComp = generator.generate(mapDef, compiledProcesses, relations, this.output);
@@ -153,34 +171,34 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     Map<Integer, Integer> currentMap = new HashMap<>(generator.getStateMapping());
                     mappingMapEnvToNewEnv.add(currentMap);
 
-                    // ▼▼▼▼▼▼▼▼▼ デバッグ出力：対応付けの確認 ▼▼▼▼▼▼▼▼▼
-                    output.outln("--------------------------------------------------");
-                    output.outln("DEBUG: Verifying Mapping for " + mapEnvName);
+                    // // ▼▼▼▼▼▼▼▼▼ デバッグ出力：対応付けの確認 ▼▼▼▼▼▼▼▼▼
+                    // output.outln("--------------------------------------------------");
+                    // output.outln("DEBUG: Verifying Mapping for " + mapEnvName);
 
-                    // 1. State Mapping の表示 (Generatorから取得)
-                    output.outln(" [State Mapping (MapEnvID -> NewEnvID)]");
-                    if (currentMap.isEmpty()) {
-                        output.outln(" (No mapping recorded. Check Generator implementation)");
-                    } else {
-                        List<Integer> sortedKeys = new ArrayList<>(currentMap.keySet());
-                        Collections.sort(sortedKeys);
-                        for (Integer mapStateId : sortedKeys) {
-                            output.outln(" MapState " + mapStateId + " -> NewEnvState " + currentMap.get(mapStateId));
-                        }
-                    }
+                    // // 1. State Mapping の表示 (Generatorから取得)
+                    // output.outln(" [State Mapping (MapEnvID -> NewEnvID)]");
+                    // if (currentMap.isEmpty()) {
+                    //     output.outln(" (No mapping recorded. Check Generator implementation)");
+                    // } else {
+                    //     List<Integer> sortedKeys = new ArrayList<>(currentMap.keySet());
+                    //     Collections.sort(sortedKeys);
+                    //     for (Integer mapStateId : sortedKeys) {
+                    //         output.outln(" MapState " + mapStateId + " -> NewEnvState " + currentMap.get(mapStateId));
+                    //     }
+                    // }
 
-                    // 2. Mapping Environment の構造表示
-                    output.outln(" [Structure: " + mapEnvName + "]");
-                    printLTSStructure(mapComp, output);
+                    // // 2. Mapping Environment の構造表示
+                    // output.outln(" [Structure: " + mapEnvName + "]");
+                    // printLTSStructure(mapComp, output);
 
-                    // 3. New Environment の構造表示 (比較用)
-                    if (compiledProcesses.containsKey(newName)) {
-                        CompactState newEnvComp = compiledProcesses.get(newName);
-                        output.outln(" [Structure: " + newName + " (Reference)]");
-                        printLTSStructure(newEnvComp, output);
-                    }
-                    output.outln("--------------------------------------------------");
-                    // ▲▲▲▲▲▲▲▲▲ デバッグ出力ここまで ▲▲▲▲▲▲▲▲▲
+                    // // 3. New Environment の構造表示 (比較用)
+                    // if (compiledProcesses.containsKey(newName)) {
+                    //     CompactState newEnvComp = compiledProcesses.get(newName);
+                    //     output.outln(" [Structure: " + newName + " (Reference)]");
+                    //     printLTSStructure(newEnvComp, output);
+                    // }
+                    // output.outln("--------------------------------------------------");
+                    // // ▲▲▲▲▲▲▲▲▲ デバッグ出力ここまで ▲▲▲▲▲▲▲▲▲
                 } else {
                     Diagnostics.fatal("Failed to generate mapping component '" + mapEnvName + "'.");
                 }
@@ -190,9 +208,22 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             Diagnostics.fatal("Mapping environment not defined.");
         }
 
-        output.outln("UpdatingControllersDefinition Generate MappingEnvironment time : "
-                + (System.currentTimeMillis() - start) + "ms");
-        long tmp = System.currentTimeMillis();
+        //評価実験用：Mapping Environment Component計測終了
+        long mapEComponentTime = System.currentTimeMillis() - mapEComponentStart;
+
+        long newCTime = 0;
+        long mapETime = 0;
+        long oldSafetyToTesterTime = 0;
+        long newSafetyToTesterTime = 0;
+        long transitionRequirementToTesterTime = 0;
+        long safetyToTesterTime = 0;
+        long newSafetyToFluentTime = 0;
+        long goalTime = 0;
+        long grGoalTime = 0;
+        long safetyGoalTime = 0;
+
+        int mapStateCount = 0;
+        int mapTransCount = 0;
 
         // ---------------------------------------------------------
         // 4. モード別処理 (OTF / Traditional)
@@ -205,11 +236,14 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // OTF固有の設定
             controllableSet.add(UpdateConstants.BEGIN_UPDATE);
             controllableSet.add(UpdateConstants.FINISH_UPDATE);
-            long newCgenerate = System.currentTimeMillis();
 
             // =========================================================
             // New Controller の内部合成
             // =========================================================
+
+            //評価実験用:New Controllerの計測開始
+            long newCStart = System.currentTimeMillis();
+
             // (1) New Environment Components の取得
             Vector<CompactState> newEnvComponents = new Vector<>();
             if (newEnvironmentList != null) {
@@ -266,30 +300,34 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             }
 
             output.outln(" - New Controller synthesized successfully. States: " + newC.composition.maxStates);
-            output.outln("UpdatingControllersDefinition NewC generate time : "
-                    + (System.currentTimeMillis() - newCgenerate) + "ms");
+            
+            //評価実験用:New Controllerの計測終了
+            newCTime = System.currentTimeMillis() - newCStart;
 
-            // ▼▼▼ デバッグ出力：状態数と遷移数のカウント ▼▼▼
-            int stateCount = newC.composition.maxStates;
-            int transitionCount = 0;
+            // // ▼▼▼ デバッグ出力：状態数と遷移数のカウント ▼▼▼
+            // int stateCount = newC.composition.maxStates;
+            // int transitionCount = 0;
 
-            // 全状態の遷移リストを走査してカウント
-            for (int i = 0; i < stateCount; i++) {
-                ltsa.lts.EventState current = newC.composition.states[i];
-                while (current != null) {
-                    transitionCount++;
-                    current = current.list;
-                }
-            }
+            // // 全状態の遷移リストを走査してカウント
+            // for (int i = 0; i < stateCount; i++) {
+            //     ltsa.lts.EventState current = newC.composition.states[i];
+            //     while (current != null) {
+            //         transitionCount++;
+            //         current = current.list;
+            //     }
+            // }
 
-            output.outln("---------------------------------------------------------");
-            output.outln("DEBUG: New Controller Synthesis Result");
-            output.outln(" - Name: " + newC.composition.name);
-            output.outln(" - States: " + stateCount);
-            output.outln(" - Transitions: " + transitionCount);
-            output.outln(" - Alphabet Size: " + newC.composition.alphabet.length);
-            output.outln("---------------------------------------------------------");
-            // ▲▲▲ 追加ここまで ▲▲▲
+            // output.outln("---------------------------------------------------------");
+            // output.outln("DEBUG: New Controller Synthesis Result");
+            // output.outln(" - Name: " + newC.composition.name);
+            // output.outln(" - States: " + stateCount);
+            // output.outln(" - Transitions: " + transitionCount);
+            // output.outln(" - Alphabet Size: " + newC.composition.alphabet.length);
+            // output.outln("---------------------------------------------------------");
+            // // ▲▲▲ 追加ここまで ▲▲▲
+
+            //評価実験用：Safety計測開始
+            long safetyToTesterStart = System.currentTimeMillis();
 
             // Safety Goals の取得
             Vector<CompactState> oldSafetyLTSs = new Vector<>();
@@ -297,26 +335,39 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             if (oldSafeCol != null)
                 oldSafetyLTSs.addAll(oldSafeCol);
 
+            oldSafetyToTesterTime = System.currentTimeMillis() - safetyToTesterStart;
+            long newSafetyToMonitorStart = System.currentTimeMillis();
+
             // New Safety Goals の保持 (Vector変換)
             Vector<CompactState> newSafetyLTSs = new Vector<>();
             if (newSafeCol != null)
                 newSafetyLTSs.addAll(newSafeCol);
 
+            newSafetyToTesterTime = System.currentTimeMillis() - newSafetyToMonitorStart;
+            long transitionRequirementToTesterStart = System.currentTimeMillis();
+
             // ★変更: ここで Transition Goals を CompactState に変換する
             // 元の getTransitionGoals() (List<Symbol>) を渡して変換
             Vector<CompactState> transitionLTSs = UpdatingControllersUtils
                     .compileTransitionRequirements(this.getTransitionGoals(), output);
+            
+            transitionRequirementToTesterTime = System.currentTimeMillis() - transitionRequirementToTesterStart;
+            safetyToTesterTime = System.currentTimeMillis() - safetyToTesterStart;
 
             // ★追加: ログ出力して確認
-            if (transitionLTSs != null) {
-                for (CompactState cs : transitionLTSs) {
-                    UpdatingControllersUtils.logCompactState(cs, output);
-                }
-            }
+            // if (transitionLTSs != null) {
+            //     for (CompactState cs : transitionLTSs) {
+            //         UpdatingControllersUtils.logCompactState(cs, output);
+            //     }
+            // }
 
             // =========================================================
             // Updating Controller 用の Monitor & Action Fluent 生成
             // =========================================================
+
+            //評価実験用：New Safety to Fluent測定開始
+            long newSafetyToFluentStart = System.currentTimeMillis();
+
             // 全体でユニークなアクションFluentを保持するキャッシュ (ActionName -> CompactState)
             Map<String, CompactState> globalFluentCache = new HashMap<>();
 
@@ -390,7 +441,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     if (originalSafe == null) {
                         Diagnostics.fatal("Compiled LTS not found for safety property: " + name);
                     }
-                    
+
                     Set<Fluent> propertyFluents = new HashSet<>();
 
                     AssertDefinition def = AssertDefinition.getDefinition(name);
@@ -458,93 +509,142 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
                     // デバッグ用
                     // /*
-                    output.outln("--------------------------");
-                    output.outln(originalSafe.name + " Mapped");
-                    for(Fluent fluent : sortedFluents){
-                        output.outln(fluent.getName());
-                    }
+                    // output.outln("--------------------------");
+                    // output.outln(originalSafe.name + " Mapped");
+                    // for(Fluent fluent : sortedFluents){
+                    //     output.outln(fluent.getName());
+                    // }
                     //  */
 
                     // =========================================================
                     // Debug: State Mapping Visualization
                     // =========================================================
-                    // ▼▼▼ デバッグ出力処理の追加箇所（Monitor廃止版） ▼▼▼
-                    if (output != null) {
-                        StringBuilder headerBuilder = new StringBuilder();
-                        headerBuilder.append("    Mapping Table [");
-                        boolean firstFluent = true;
-                        for (Fluent f : sortedFluents) {
-                            if (!firstFluent) {
-                                headerBuilder.append(", ");
-                            }
-                            headerBuilder.append(f.getName());
-                            firstFluent = false;
-                        }
-                        headerBuilder.append("] -> [").append(originalSafe.name).append("]");
-                        output.outln(headerBuilder.toString());
+                    // // ▼▼▼ デバッグ出力処理の追加箇所（Monitor廃止版） ▼▼▼
+                    // if (output != null) {
+                    //     StringBuilder headerBuilder = new StringBuilder();
+                    //     headerBuilder.append("    Mapping Table [");
+                    //     boolean firstFluent = true;
+                    //     for (Fluent f : sortedFluents) {
+                    //         if (!firstFluent) {
+                    //             headerBuilder.append(", ");
+                    //         }
+                    //         headerBuilder.append(f.getName());
+                    //         firstFluent = false;
+                    //     }
+                    //     headerBuilder.append("] -> [").append(originalSafe.name).append("]");
+                    //     output.outln(headerBuilder.toString());
 
-                        // 状態の組み合わせ（List<Integer>）を辞書順にソート
-                        List<Map.Entry<List<Integer>, Integer>> sortedEntries = new ArrayList<>(stateMap.entrySet());
-                        Collections.sort(sortedEntries, new Comparator<Map.Entry<List<Integer>, Integer>>() {
-                            public int compare(Map.Entry<List<Integer>, Integer> e1, Map.Entry<List<Integer>, Integer> e2) {
-                                List<Integer> k1 = e1.getKey();
-                                List<Integer> k2 = e2.getKey();
-                                int size = Math.min(k1.size(), k2.size());
-                                for (int i = 0; i < size; i++) {
-                                    int cmp = k1.get(i).compareTo(k2.get(i));
-                                    if (cmp != 0) return cmp;
-                                }
-                                return Integer.compare(k1.size(), k2.size());
-                            }
-                        });
+                    //     // 状態の組み合わせ（List<Integer>）を辞書順にソート
+                    //     List<Map.Entry<List<Integer>, Integer>> sortedEntries = new ArrayList<>(stateMap.entrySet());
+                    //     Collections.sort(sortedEntries, new Comparator<Map.Entry<List<Integer>, Integer>>() {
+                    //         public int compare(Map.Entry<List<Integer>, Integer> e1, Map.Entry<List<Integer>, Integer> e2) {
+                    //             List<Integer> k1 = e1.getKey();
+                    //             List<Integer> k2 = e2.getKey();
+                    //             int size = Math.min(k1.size(), k2.size());
+                    //             for (int i = 0; i < size; i++) {
+                    //                 int cmp = k1.get(i).compareTo(k2.get(i));
+                    //                 if (cmp != 0) return cmp;
+                    //             }
+                    //             return Integer.compare(k1.size(), k2.size());
+                    //         }
+                    //     });
 
-                        // ソートしたマッピングの出力
-                        for (Map.Entry<List<Integer>, Integer> entry : sortedEntries) {
-                            String targetStateStr = (entry.getValue() == ltsa.lts.Declaration.ERROR) ? "ERROR (-1)" : String.valueOf(entry.getValue());
-                            output.outln("      " + entry.getKey().toString() + " -> " + targetStateStr);
-                        }
-                        output.outln("--------------------------------------------------");
-                    }
-                    // ▲▲▲ デバッグ出力処理の追加箇所ここまで ▲▲▲
+                    //     // ソートしたマッピングの出力
+                    //     for (Map.Entry<List<Integer>, Integer> entry : sortedEntries) {
+                    //         String targetStateStr = (entry.getValue() == ltsa.lts.Declaration.ERROR) ? "ERROR (-1)" : String.valueOf(entry.getValue());
+                    //         output.outln("      " + entry.getKey().toString() + " -> " + targetStateStr);
+                    //     }
+                    //     output.outln("--------------------------------------------------");
+                    // }
+                    // // ▲▲▲ デバッグ出力処理の追加箇所ここまで ▲▲▲
                 }
             }
+
+            //評価実験用：New Safety to Fluent測定終了
+            newSafetyToFluentTime = System.currentTimeMillis() - newSafetyToFluentStart;
 
             ucce = new UpdatingControllerCompositeState(oldC, newC, mappingComponents, newEnvComponents, mappingMapEnvToNewEnv,
                                                         oldSafetyLTSs, newSafetyLTSs,
                                                         // transitionGoals,
                                                         transitionLTSs, synthesisMachines, safetyComponentsMap, safetyStateMapping,
                                                         controllableSet,true, name.getName());
+            
+
         }
         else
         {
             // Traditional Mode
             output.outln("Mode: Traditional Updating Controller Synthesis");
+
+            //評価実験用
+            long goalStart = System.currentTimeMillis();
+
             ControllerGoal<String> grGoal = UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
                     controllableSet);
+
+            grGoalTime = System.currentTimeMillis() - goalStart;
+            long safetyGoalStart = System.currentTimeMillis();
+
             ControllerGoalDefinition safetyGoal = UpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
                     newGoalDef, controllableSet, output);
+            
+            safetyGoalTime = System.currentTimeMillis() - safetyGoalStart;
+            long mapEStart = System.currentTimeMillis();
+
             CompositeState mappingComposite = new CompositeState(mappingComponents);
 
             mappingComposite.name = "MAPPING_ENV";
             // 合成を実行
             mappingComposite.compose(output);
 
-            // ▼▼▼ 制約5に基づく構造の一致確認用デバッグ表示 ▼▼▼
-        output.outln("========== DEBUG: VERIFYING LTS ISOMORPHISM ==========");
-        for (CompactState cs : mappingComponents) {
-            if (cs.name.equals("MAP_PRODUCTION_CELL") || cs.name.equals("PRODUCTION_CELL_MAP")) {
-                output.outln("--- Component: " + cs.name + " ---");
-                printLTSStructure(cs, output);
-            }
-        }
-        output.outln("======================================================");
-        // ▲▲▲ デバッグ表示ここまで ▲▲▲
+            mapETime = System.currentTimeMillis() - mapEStart;
+
+            // ▼▼▼ 評価実験用: 従来DUCの Mapping Environment ピーク状態数・遷移数 ▼▼▼
+            // if (mappingComposite.composition != null) {
+            //     mapStateCount = mappingComposite.composition.maxStates;
+            //     for (int i = 0; i < mapStateCount; i++) {
+            //         ltsa.lts.EventState current = mappingComposite.composition.states[i];
+            //         while (current != null) {
+            //             mapTransCount++;
+            //             current = current.list;
+            //         }
+            //     }
+            // }
+
+        //     // ▼▼▼ 制約5に基づく構造の一致確認用デバッグ表示 ▼▼▼
+        // output.outln("========== DEBUG: VERIFYING LTS ISOMORPHISM ==========");
+        // for (CompactState cs : mappingComponents) {
+        //     if (cs.name.equals("MAP_PRODUCTION_CELL") || cs.name.equals("PRODUCTION_CELL_MAP")) {
+        //         output.outln("--- Component: " + cs.name + " ---");
+        //         printLTSStructure(cs, output);
+        //     }
+        // }
+        // output.outln("======================================================");
+        // // ▲▲▲ デバッグ表示ここまで ▲▲▲
 
             ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal, name.getName());
         }
 
-        output.outln("UpdatingControllersDefinition mode time : " + (System.currentTimeMillis() - tmp) + "ms");
-        output.outln("UpdatingControllersDefinition total time : " + (System.currentTimeMillis() - start) + "ms");
+        //評価実験用：UpdatingControllersDefinition.compose測定終了
+        long UCDefTime = System.currentTimeMillis() - UCDefStart;
+        output.outln("");
+        output.outln("================ EVALUATION UpdatingControllersDefinition ==================");
+        output.outln("[共通] UpdatingControllersDefinition.composeの全体の実行時間 : " + UCDefTime + " ms");
+        output.outln("[共通] Old Controller 合成時間 : " + oldCTime + " ms");
+        output.outln("[共通] Mapping Environment Component をoldEnvとnewEnvとRelationから合成する時間 : " + mapEComponentTime + " ms");
+        output.outln("[OTF-DUC] New Controller 合成時間 : " + newCTime + " ms");
+        output.outln("[OTF-DUC] Old Safetyをテスターモデルに変換する時間 : " + oldSafetyToTesterTime + " ms");
+        output.outln("[OTF-DUC] New Safetyをテスターモデルに変換する時間 : " + newSafetyToTesterTime + " ms");
+        output.outln("[OTF-DUC] Transition Requirementをテスターモデルに変換する時間 : " + transitionRequirementToTesterTime + " ms");
+        output.outln("[OTF-DUC] Safetyをテスターモデルに変換する全体時間 : " + safetyToTesterTime + " ms");
+        output.outln("[OTF-DUC] New SafetyからFluentを抽出する時間 : " + newSafetyToFluentTime + " ms");
+        output.outln("[Traditional DUC] grGoal生成時間 : " + grGoalTime + " ms");
+        output.outln("[Traditional DUC] safetyGoal生成時間 : " + safetyGoalTime + " ms");
+        output.outln("[Traditional DUC] Mapping Environment Componentの並列合成時間 : " + mapETime + " ms");
+        //output.outln("[Traditional DUC] Mapping Environment - States: " + mapStateCount + ", Transitions: " + mapTransCount);
+        output.outln("============================================================================");
+        output.outln("");
+
         return ucce;
     }
 
@@ -772,11 +872,36 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         Hashtable<String, CompactState> compiled = LTSCompiler.getCompiled();
         if (compiled.containsKey(name))
             return;
-        ProcessSpec p = (processes != null) ? processes.get(name) : null;
+
+        // ▼▼▼ 修正: ベース名とパラメータの分離 ▼▼▼
+        String baseName = name;
+        Vector<Value> actuals = new Vector<>();
+        if (name.contains("(")) {
+            baseName = name.substring(0, name.indexOf('(')).trim();
+            String paramStr = name.substring(name.indexOf('(') + 1, name.lastIndexOf(')'));
+            String[] params = paramStr.split(",");
+            for (String p : params) {
+                p = p.trim();
+                try {
+                    actuals.add(new Value(Integer.parseInt(p)));
+                } catch (NumberFormatException ex) {
+                    Hashtable<?, ?> constants = Expression.constants;
+                    if (constants != null && constants.containsKey(p)) {
+                        actuals.add((Value) constants.get(p));
+                    } else {
+                        output.outln("Warning: Cannot parse parameter '" + p + "'. Using fallback 0.");
+                        actuals.add(new Value(0));
+                    }
+                }
+            }
+        }
+        // ▲▲▲ 修正ここまで ▲▲▲
+
+        ProcessSpec p = (processes != null) ? processes.get(baseName) : null;
         if (p != null) {
             try {
                 output.outln("INFO: Auto-compiling dependency: " + name);
-                StateMachine sm = new StateMachine(p, new Vector<>());
+                StateMachine sm = new StateMachine(p, actuals);
                 CompactState cs = sm.makeCompactState();
                 cs.name = name;
                 compiled.put(name, cs);
@@ -784,7 +909,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 Diagnostics.fatal("Error compiling dependency '" + name + "': " + e);
             }
         } else {
-            Diagnostics.fatal("Environment process '" + name + "' not found.");
+            Diagnostics.fatal("Environment process '" + baseName + "' not found.");
         }
     }
 
