@@ -48,6 +48,7 @@ import ltsa.lts.distribution.DistributionDefinition;
 import ltsa.lts.distribution.DistributionTransformationException;
 import ltsa.lts.util.MTSUtils;
 import ltsa.ui.MTSAnimator;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.synthesis.UpdatingControllerSynthesizer;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
@@ -212,22 +213,32 @@ public class TransitionSystemDispatcher {
             throw new LTSCompositionException("Error composing");
         }
 
-        // switch old actions to actions without old after having the winning
-        // game
-        // 3. Dynamic Update特有の後処理
-        // 合成に成功した場合、古い遷移（Old Transitions）を削除する処理などがここで行われます
-        if (Symbol.UPDATING_CONTROLLER == toCompose.getCompositionType() && toCompose.composition != null) {
+        // 3. Dynamic Update 特有の後処理。
+        // 従来 DUC では合成内部で使った ".old" action を出力用の action 名へ戻す。
+        // OTF-DUC の "_old" action は buildDirectorDUC 側で除去済みなので、この後処理は行わない。
+        if (Symbol.UPDATING_CONTROLLER == toCompose.getCompositionType()
+                && toCompose.composition != null
+                && shouldRemoveOldTransitions(toCompose)) {
             //評価実験用
             long removeOldTransitionsStart = System.currentTimeMillis();
 
             UpdatingControllersUtils.removeOldTransitions(toCompose);
 
             long removeOldTransitionsTime = System.currentTimeMillis() - removeOldTransitionsStart;
-            ltsOutput.outln("================ EVALUATION ==================");
-            ltsOutput.outln("[多分，従来のDUCのみ] removeOldTransitions実行時間 : " + removeOldTransitionsTime + " ms");
-            ltsOutput.outln("==============================================");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "TransitionSystemDispatcher",
+                    "removeOldTransitions 実行時間",
+                    removeOldTransitionsTime);
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional removeOldTransitions 後");
         }
 
+    }
+
+    private static boolean shouldRemoveOldTransitions(CompositeState toCompose) {
+        if (toCompose instanceof UpdatingControllerCompositeState) {
+            return !((UpdatingControllerCompositeState) toCompose).isOTF();
+        }
+        return true;
     }
 
     private static void compose(CompositeState toCompose, LTSOutput ltsOutput) {

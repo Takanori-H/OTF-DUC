@@ -9,7 +9,6 @@ import java.util.Queue;
 import java.util.Set;
 
 import MTSTools.ac.ic.doc.commons.relations.Pair;
-import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC.DUCProfiler;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.DUCAbstraction;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HAction;
 
@@ -98,16 +97,16 @@ public class DUCExplorationHeuristic<State, Action> {
     }
 
     public CompostateDUC<State,Action> getNextState() {
-        // long startRec = System.nanoTime();
-        // ★修正した点：探索候補を取り出す前に、情報の鮮度をチェックして更新する
+        long startRec = System.nanoTime();
+        // 探索候補を取り出す前に、情報の鮮度をチェックして更新する。
         recomputeEstimates();
-        // DUCProfiler.timeRecompute += (System.nanoTime() - startRec);
+        dcs.addHeuristicRecomputeNanos(System.nanoTime() - startRec);
 
-        // long startQueue = System.nanoTime();
+        long startQueue = System.nanoTime();
         removeNotLive();
         CompostateDUC<State,Action> state = frontier.remove();
         state.inOpen = false;
-        // DUCProfiler.timeFrontier += (System.nanoTime() - startQueue);
+        dcs.addHeuristicFrontierNanos(System.nanoTime() - startQueue);
         
         return state;
     }
@@ -122,7 +121,7 @@ public class DUCExplorationHeuristic<State, Action> {
             }
         }
         if (updateNeeded) {
-            // ★追加: リセットが走ったことを記録
+            int recomputedStates = 0;
             // dcs.log("  [Debug-Heuristic] Global seq updated to " + this.seq + ". Recomputing frontier...");
             Queue<CompostateDUC<State, Action>> newFrontier = new PriorityQueue<>(this.compostateRanker);
             for (CompostateDUC<State, Action> s : this.frontier) {
@@ -131,14 +130,19 @@ public class DUCExplorationHeuristic<State, Action> {
                     || !s.isStatus(Status.NONE)
                     /*s.status != CompostateDUC.Status.NONE*/) continue;
                 if (s.seq < this.seq) {
-                    // ★追加: どの状態がリセットされたか記録
                     // dcs.log("    Resetting state: " + s.getStates() + " (old seq: " + s.seq + ")");
-                    // ここで eval -> updateRecommendation が呼ばれ、最新の「子のStatus」がチェックされる
+                    // ここで eval -> updateRecommendation が呼ばれ、最新の子ステータスを反映する。
+                    long evalStart = System.nanoTime();
                     abstraction.eval(s, this.knownMarked, this.goals);
+                    dcs.addHeuristicEvaluationNanos(System.nanoTime() - evalStart);
+                    dcs.incrementHeuristicEvaluationCalls();
+                    recomputedStates++;
                     s.seq = this.seq;
                 }
                 newFrontier.add(s);
             }
+            dcs.incrementHeuristicRecomputeRuns();
+            dcs.addHeuristicRecomputedStates(recomputedStates);
             this.frontier = newFrontier;
         }
     }
@@ -186,8 +190,11 @@ public class DUCExplorationHeuristic<State, Action> {
                 this.knownMarked.get(lts).add(state.getStates().get(lts));
         }
 
-        // DUCAbstraction.eval を呼び出し、アグレッシブなアクション優先順位を決定
+        // DUCAbstraction.eval を呼び出し、アクション優先順位を決定する。
+        long evalStart = System.nanoTime();
         abstraction.eval(state, this.knownMarked, this.goals);
+        dcs.addHeuristicEvaluationNanos(System.nanoTime() - evalStart);
+        dcs.incrementHeuristicEvaluationCalls();
     }
 
     public void notifyExpandingState(CompostateDUC<State, Action> parent, HAction<State, Action> action, CompostateDUC<State, Action> state) {

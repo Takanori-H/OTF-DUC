@@ -169,7 +169,6 @@ public class DUCAbstraction<State, Action> {
             // else{compostate.log("    [Debug-Abstraction] Knowledge Update: All branches already explored for state " + compostate.getStates());}
         }
         
-        // DirectedControllerSynthesisDUC.DUCProfiler.timeEval += (System.nanoTime() - start);
     }
 
     /**

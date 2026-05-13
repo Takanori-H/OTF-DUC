@@ -2,6 +2,7 @@ package ltsa.lts;
 
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.controller.model.ControllerGoal;
+import MTSTools.ac.ic.doc.mtstools.model.MTS;
 import ltsa.control.ControllerGoalDefinition;
 import ltsa.control.util.GoalDefToControllerGoal;
 import ltsa.lts.ltl.AssertDefinition;
@@ -9,6 +10,7 @@ import ltsa.lts.ltl.FormulaFactory;
 import ltsa.lts.ltl.FormulaSyntax;
 import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
 
@@ -68,32 +70,57 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     protected CompositeState compose(Vector<Value> actuals) {
         //評価実験用：UpdatingControllerDefinition.compose計測開始
         long UCDefStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "UpdatingControllersDefinition", "compose の全体実行時間");
 
         // ---------------------------------------------------------
         // 1. Old Controller のコンパイル (Monolithic)
         // ---------------------------------------------------------
         //評価実験用:Old Controllerの計測開始
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "UpdatingControllersDefinition", "Old Controller 合成時間");
         long oldCStart = System.currentTimeMillis();
 
         CompositeState oldC = composeLTS(this.getOldController().toString());
 
         //評価実験用：Old Controllerの計測終了
         long oldCTime = System.currentTimeMillis() - oldCStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "UpdatingControllersDefinition", "Old Controller 合成時間");
+        if (oldC.composition != null) {
+            long oldCCountStart = System.currentTimeMillis();
+            int oldControllerStates = oldC.composition.maxStates;
+            int oldControllerTransitions = oldC.composition.ntransitions();
+            long oldCCountTime = System.currentTimeMillis() - oldCCountStart;
+            UpdatingControllerEvaluationRecorder.recordOldControllerStateSpace(
+                    oldControllerStates,
+                    oldControllerTransitions,
+                    oldCCountTime);
+        }
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Old Controller 合成後");
 
         // ---------------------------------------------------------
         // 2. Goal 定義の準備
         // ---------------------------------------------------------
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間");
+        long goalDefStart = System.currentTimeMillis();
         ControllerGoalDefinition oldGoalDef = ControllerGoalDefinition.getDefinition(this.getOldGoal());
         ControllerGoalDefinition newGoalDef = ControllerGoalDefinition.getDefinition(this.getNewGoal());
 
         // 全体のControllable Action (OTF探索用)
         Set<String> controllableSet = this.generateUpdatingControllableActions(oldGoalDef, newGoalDef);
+        long goalDefTime = System.currentTimeMillis() - goalDefStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間");
 
         // ---------------------------------------------------------
         // 3. Mapping Environment の生成
         // ---------------------------------------------------------
         
         //評価実験：Mapping Environment Component計測開始
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "UpdatingControllersDefinition", "Mapping Environment Component 合成時間");
         long mapEComponentStart = System.currentTimeMillis();
 
         // LTSCompilerのstaticメソッドから参照を取得
@@ -210,6 +237,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
         //評価実験用：Mapping Environment Component計測終了
         long mapEComponentTime = System.currentTimeMillis() - mapEComponentStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "UpdatingControllersDefinition", "Mapping Environment Component 合成時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Mapping Environment Component 生成後");
 
         long newCTime = 0;
         long mapETime = 0;
@@ -242,6 +272,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // =========================================================
 
             //評価実験用:New Controllerの計測開始
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "New Controller 合成時間");
             long newCStart = System.currentTimeMillis();
 
             // (1) New Environment Components の取得
@@ -300,9 +332,22 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             }
 
             output.outln(" - New Controller synthesized successfully. States: " + newC.composition.maxStates);
+            long newCCountStart = System.currentTimeMillis();
+            int newControllerStates = newC.composition.maxStates;
+            int newControllerTransitions = newC.composition.ntransitions();
+            long newCCountTime = System.currentTimeMillis() - newCCountStart;
+            UpdatingControllerEvaluationRecorder.recordStateSpace(
+                    "入力規模 / 事前合成",
+                    "New Controller",
+                    newControllerStates,
+                    newControllerTransitions,
+                    newCCountTime);
             
             //評価実験用:New Controllerの計測終了
             newCTime = System.currentTimeMillis() - newCStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "New Controller 合成時間");
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("New Controller 合成後");
 
             // // ▼▼▼ デバッグ出力：状態数と遷移数のカウント ▼▼▼
             // int stateCount = newC.composition.maxStates;
@@ -327,6 +372,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // // ▲▲▲ 追加ここまで ▲▲▲
 
             //評価実験用：Safety計測開始
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "Safety の tester 変換全体時間");
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "Old Safety の tester 変換時間");
             long safetyToTesterStart = System.currentTimeMillis();
 
             // Safety Goals の取得
@@ -336,6 +385,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 oldSafetyLTSs.addAll(oldSafeCol);
 
             oldSafetyToTesterTime = System.currentTimeMillis() - safetyToTesterStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "Old Safety の tester 変換時間");
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "New Safety の tester 変換時間");
             long newSafetyToMonitorStart = System.currentTimeMillis();
 
             // New Safety Goals の保持 (Vector変換)
@@ -344,6 +397,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 newSafetyLTSs.addAll(newSafeCol);
 
             newSafetyToTesterTime = System.currentTimeMillis() - newSafetyToMonitorStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "New Safety の tester 変換時間");
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "Transition Requirement の tester 変換時間");
             long transitionRequirementToTesterStart = System.currentTimeMillis();
 
             // ★変更: ここで Transition Goals を CompactState に変換する
@@ -352,7 +409,11 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     .compileTransitionRequirements(this.getTransitionGoals(), output);
             
             transitionRequirementToTesterTime = System.currentTimeMillis() - transitionRequirementToTesterStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "Transition Requirement の tester 変換時間");
             safetyToTesterTime = System.currentTimeMillis() - safetyToTesterStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "Safety の tester 変換全体時間");
 
             // ★追加: ログ出力して確認
             // if (transitionLTSs != null) {
@@ -366,6 +427,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // =========================================================
 
             //評価実験用：New Safety to Fluent測定開始
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間");
             long newSafetyToFluentStart = System.currentTimeMillis();
 
             // 全体でユニークなアクションFluentを保持するキャッシュ (ActionName -> CompactState)
@@ -562,6 +625,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
             //評価実験用：New Safety to Fluent測定終了
             newSafetyToFluentTime = System.currentTimeMillis() - newSafetyToFluentStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間");
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("New Safety Fluent 抽出後");
 
             ucce = new UpdatingControllerCompositeState(oldC, newC, mappingComponents, newEnvComponents, mappingMapEnvToNewEnv,
                                                         oldSafetyLTSs, newSafetyLTSs,
@@ -577,18 +643,28 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             output.outln("Mode: Traditional Updating Controller Synthesis");
 
             //評価実験用
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間");
             long goalStart = System.currentTimeMillis();
 
             ControllerGoal<String> grGoal = UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
                     controllableSet);
 
             grGoalTime = System.currentTimeMillis() - goalStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間");
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間");
             long safetyGoalStart = System.currentTimeMillis();
 
             ControllerGoalDefinition safetyGoal = UpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
                     newGoalDef, controllableSet, output);
             
             safetyGoalTime = System.currentTimeMillis() - safetyGoalStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間");
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間");
             long mapEStart = System.currentTimeMillis();
 
             CompositeState mappingComposite = new CompositeState(mappingComponents);
@@ -598,6 +674,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             mappingComposite.compose(output);
 
             mapETime = System.currentTimeMillis() - mapEStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間");
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional Mapping Environment 並列合成後");
 
             // ▼▼▼ 評価実験用: 従来DUCの Mapping Environment ピーク状態数・遷移数 ▼▼▼
             // if (mappingComposite.composition != null) {
@@ -627,25 +706,142 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
         //評価実験用：UpdatingControllersDefinition.compose測定終了
         long UCDefTime = System.currentTimeMillis() - UCDefStart;
-        output.outln("");
-        output.outln("================ EVALUATION UpdatingControllersDefinition ==================");
-        output.outln("[共通] UpdatingControllersDefinition.composeの全体の実行時間 : " + UCDefTime + " ms");
-        output.outln("[共通] Old Controller 合成時間 : " + oldCTime + " ms");
-        output.outln("[共通] Mapping Environment Component をoldEnvとnewEnvとRelationから合成する時間 : " + mapEComponentTime + " ms");
-        output.outln("[OTF-DUC] New Controller 合成時間 : " + newCTime + " ms");
-        output.outln("[OTF-DUC] Old Safetyをテスターモデルに変換する時間 : " + oldSafetyToTesterTime + " ms");
-        output.outln("[OTF-DUC] New Safetyをテスターモデルに変換する時間 : " + newSafetyToTesterTime + " ms");
-        output.outln("[OTF-DUC] Transition Requirementをテスターモデルに変換する時間 : " + transitionRequirementToTesterTime + " ms");
-        output.outln("[OTF-DUC] Safetyをテスターモデルに変換する全体時間 : " + safetyToTesterTime + " ms");
-        output.outln("[OTF-DUC] New SafetyからFluentを抽出する時間 : " + newSafetyToFluentTime + " ms");
-        output.outln("[Traditional DUC] grGoal生成時間 : " + grGoalTime + " ms");
-        output.outln("[Traditional DUC] safetyGoal生成時間 : " + safetyGoalTime + " ms");
-        output.outln("[Traditional DUC] Mapping Environment Componentの並列合成時間 : " + mapETime + " ms");
-        //output.outln("[Traditional DUC] Mapping Environment - States: " + mapStateCount + ", Transitions: " + mapTransCount);
-        output.outln("============================================================================");
-        output.outln("");
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "UpdatingControllersDefinition", "compose の全体実行時間");
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "UpdatingControllersDefinition", "入力規模集計時間");
+        long inputScaleStart = System.currentTimeMillis();
+        recordInputScale(oldGoalDef, newGoalDef, controllableSet, mappingComponents, ucce, oldC);
+        long inputScaleTime = System.currentTimeMillis() - inputScaleStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "UpdatingControllersDefinition", "入力規模集計時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("UpdatingControllersDefinition compose 後");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "compose の全体実行時間", UCDefTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Old Controller 合成時間", oldCTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間", goalDefTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Mapping Environment Component 合成時間", mapEComponentTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "New Controller 合成時間", newCTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Old Safety の tester 変換時間", oldSafetyToTesterTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "New Safety の tester 変換時間", newSafetyToTesterTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Transition Requirement の tester 変換時間", transitionRequirementToTesterTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Safety の tester 変換全体時間", safetyToTesterTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間", newSafetyToFluentTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間", grGoalTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間", safetyGoalTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間", mapETime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "入力規模集計時間", inputScaleTime);
 
         return ucce;
+    }
+
+    private void recordInputScale(
+            ControllerGoalDefinition oldGoalDef,
+            ControllerGoalDefinition newGoalDef,
+            Set<String> controllableSet,
+            Vector<CompactState> mappingComponents,
+            UpdatingControllerCompositeState ucce,
+            CompositeState oldC) {
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "old env component 数", safeSize(oldEnvironmentList), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "new env component 数", safeSize(newEnvironmentList), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "map relation 数", safeSize(mapRelationList), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "mapping component 数", safeSize(mappingComponents), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "old safety 数", safeSize(oldGoalDef.getSafetyDefinitions()), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "new safety 数", safeSize(newGoalDef.getSafetyDefinitions()), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "transition requirement 数", safeSize(transitionGoals), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "controllable action 数", safeSize(controllableSet), "個");
+
+        MTS<Long, String> oldControllerMTS = null;
+        if (ucce != null) {
+            long oldMtsCountStart = System.currentTimeMillis();
+            oldControllerMTS = ucce.getOldController();
+            if (oldControllerMTS != null
+                    && !UpdatingControllerEvaluationRecorder.hasOldControllerStateSpace()) {
+                UpdatingControllerEvaluationRecorder.recordOldControllerStateSpace(
+                        oldControllerMTS.getStates().size(),
+                        countTransitions(oldControllerMTS),
+                        System.currentTimeMillis() - oldMtsCountStart);
+            }
+        }
+
+        Set<String> knownActions = new HashSet<>();
+        if (oldC != null && oldC.composition != null) {
+            addAlphabet(knownActions, oldC.composition);
+        }
+        if (oldControllerMTS != null && oldControllerMTS.getActions() != null) {
+            knownActions.addAll(oldControllerMTS.getActions());
+        }
+        if (ucce != null) {
+            addAlphabet(knownActions, ucce.machines);
+            if (ucce.getOldSafetyLTSs() != null) addAlphabet(knownActions, ucce.getOldSafetyLTSs());
+            if (ucce.getNewSafetyLTSs() != null) addAlphabet(knownActions, ucce.getNewSafetyLTSs());
+            if (ucce.getTransitionRequirements() != null) addAlphabet(knownActions, ucce.getTransitionRequirements());
+            if (ucce.getSynthesisMachines() != null) addAlphabet(knownActions, ucce.getSynthesisMachines());
+        }
+        addAlphabet(knownActions, mappingComponents);
+        knownActions.remove("tau");
+
+        int uncontrollableCount = Math.max(0, knownActions.size() - safeSize(controllableSet));
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "既知 action 数", knownActions.size(), "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "推定 uncontrollable action 数", uncontrollableCount, "個");
+    }
+
+    private static int countTransitions(MTS<Long, String> mts) {
+        if (mts == null || mts.getStates() == null) {
+            return 0;
+        }
+        int transitions = 0;
+        for (Long state : mts.getStates()) {
+            transitions += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
+        }
+        return transitions;
+    }
+
+    private static int safeSize(Collection<?> values) {
+        return values == null ? 0 : values.size();
+    }
+
+    private static void addAlphabet(Set<String> actions, Collection<CompactState> machines) {
+        if (actions == null || machines == null) {
+            return;
+        }
+        for (CompactState machine : machines) {
+            if (machine == null || machine.alphabet == null) {
+                continue;
+            }
+            actions.addAll(Arrays.asList(machine.alphabet));
+        }
+    }
+
+    private static void addAlphabet(Set<String> actions, CompactState machine) {
+        if (actions == null || machine == null || machine.alphabet == null) {
+            return;
+        }
+        actions.addAll(Arrays.asList(machine.alphabet));
     }
 
     private CompositeState composeLTS(String target) {

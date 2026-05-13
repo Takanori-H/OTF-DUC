@@ -1,6 +1,6 @@
 package MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking;
 
-/** This enum contains the possible status for a state. */
+/** 探索状態に付与する判定結果を表す。 */
 enum Status {
     ERROR(-1, "ERROR"),
     NONE(0, "NONE"),

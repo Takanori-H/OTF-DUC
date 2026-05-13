@@ -3,7 +3,6 @@ package MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,17 +16,6 @@ import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.
 
 public class CompostateDUC<State, Action> {
 
-    /*
-    // --- 修正箇所：Status列挙型の更新 ---
-    public enum Status {
-        NONE,    // 探索中・未確定
-        GOAL,    // ゴール到達確定
-        UNSAFE,  // 安全性違反（LTS状態-1への遷移）確定
-        TRAPPED  // 安全だが、自力でゴール（finishUpdate）に到達できない（無限ループ・デッドロック）
-    }
-    // */
-
-    // (フィールド定義は変更なし)
     private final DirectedControllerSynthesisDUC<State, Action> dcs;
     private final List<State> states;
     public Status status;
@@ -51,9 +39,7 @@ public class CompostateDUC<State, Action> {
     private HEstimate<State, Action> estimate;
     public List<RecommendationDUC> recommendations;
 
-    // --- 変更箇所：フィールドの追加と削除 ---
     private int nextRecommendationIndex = 0; // 探索済みの境界線
-    // private Iterator<RecommendationDUC> recommendit;
 
     RecommendationDUC recommendation;
     public boolean live;
@@ -77,10 +63,7 @@ public class CompostateDUC<State, Action> {
         this.distance = DirectedControllerSynthesisDUC.INF;
         this.depth = DirectedControllerSynthesisDUC.INF;
 
-        // ★修正: 生成順序(seq)をDCSから取得して設定 (DFS的探索のため)
-        // DirectedControllerSynthesisDUC側に seq カウンタが必要だが、
-        // ここでは簡易的に System.nanoTime() や、もしdcsにカウンタがあればそれを使う。
-        // ヒューリスティック側で管理している場合はそちらに任せるが、初期値は入れておく。
+        // 生成順序はヒューリスティック側で管理する。ここでは初期値だけを入れる。
         this.seq = 0;
 
         this.exploredChildren = new BinaryRelationImpl<>();
@@ -118,7 +101,12 @@ public class CompostateDUC<State, Action> {
         long markingState = getMarkingState();
 
         // ---------------------------------------------------------
-        // Case A: State 0 (Observation Phase) - 特殊同期ロジック
+        // 場合 A: markingState 0（更新前 / 旧コントローラフェーズ）
+        //
+        // 旧コントローラの action は "<action>_old" として公開し、OTF 探索上は
+        // uncontrollable として扱う。これにより、1 回の on-the-fly 探索で
+        // 旧コントローラ全状態からの更新パスを調べられる。
+        // beginUpdate などの hotswap action は元の名前のまま扱う。
         // ---------------------------------------------------------
         if (markingState == 0) {
             Set<String> candidates = new HashSet<>();
@@ -155,17 +143,19 @@ public class CompostateDUC<State, Action> {
                     if (hAction != null) validTransitions.add(hAction);
                 }
             }
-            
-            // Facilitators (前回の状態) を更新して終了
             dcs.facilitators = states;
             return validTransitions;
         }
 
         // ---------------------------------------------------------
-        // Case B: State 1+ (Update Phase) - 標準DCSロジック (差分バグ修正版)
+        // 場合 B: markingState 1+（更新中フェーズ）
+        //
+        // 旧コントローラは trace から外れ、mapping/new-safety コンポーネントは
+        // 更新フェーズに応じて有効化される。以降は通常の同期 action 集合を
+        // 差分更新で構築する。
         // ---------------------------------------------------------
         
-        // ★修正1: Marking状態が変わったかどうかを判定
+        // Marking 状態が変わったかどうかを判定する。
         boolean markingChanged = false;
         if (dcs.facilitators != null) {
             Object oldMarking = dcs.facilitators.get(0);
@@ -175,7 +165,7 @@ public class CompostateDUC<State, Action> {
             }
         }
 
-        // ★修正2: Markingが変わった、または初回の場合は「全更新」
+        // Marking が変わった場合、または初回の場合は「全更新」とする。
         // そうでなければ「差分更新」
         boolean fullUpdate = (dcs.facilitators == null) || markingChanged;
 
@@ -218,7 +208,7 @@ public class CompostateDUC<State, Action> {
                     }
 
                     // 2. 新しい状態の遷移を追加
-                    updateAllowedSetForComponent(i, markingState, false); // false = not remove phase (already removed)
+                    updateAllowedSetForComponent(i, markingState, false); // false: 削除処理は既に済んでいる。
                 }
             }
         }
@@ -234,20 +224,13 @@ public class CompostateDUC<State, Action> {
      * @param markingState 現在のMarking
      * @param isFullUpdate 呼び出し元が全更新モードか (使用していないが拡張性のため)
      */
-    // /*
     private void updateAllowedSetForComponent(int i, long markingState, boolean isFullUpdate) {
-        // 1. Trace = OFF の場合 (Update中のOC)
-        // -> 何も追加しない (Block All)
-        // if (!dcs.isTrace(i, markingState)) {
-        //     return; 
-        // }
-
-        // 1. Trace = OFF の場合
+        // 1. Trace = OFF の場合。
         if (!dcs.isTrace(i, markingState)) {
-            // ★修正: OC (Index 1) は切り離し中なのでアクションを生成させない (Block All)
+            // OC (Index 1) は切り離し中なので action を生成させない。
             if (i == dcs.idxOC) return;
 
-            // ★修正: Safetyなど他のコンポーネントは、監視停止中＝制約なし (Allow All)
+            // Safety など他のコンポーネントは監視停止中なので制約なしとして扱う。
             for (Action action : dcs.ltss.get(i).getActions()) {
                 HAction<State, Action> hAction = dcs.alphabet.getHAction(action);
                 if (hAction != null) {
@@ -257,16 +240,14 @@ public class CompostateDUC<State, Action> {
             return; 
         }
 
-        // 2. Active の場合
-        // -> 自身の遷移定義に従って allow
+        // 2. Active の場合は、自身の遷移定義に従って許可する。
         if (dcs.isActive(i, markingState)) {
             for (Pair<Action,State> transition : dcs.ltss.get(i).getTransitions(states.get(i))) {
                 HAction<State, Action> action = dcs.alphabet.getHAction(transition.getFirst());
                 dcs.allowed.add(i, action);
             }
         } 
-        // 3. Inactive (Passive) の場合
-        // -> 全アクションを allow (Monitor)
+        // 3. Inactive の場合は、モニタとして全 action を許可する。
         else {
             for (Action action : dcs.ltss.get(i).getActions()) {
                 HAction<State, Action> hAction = dcs.alphabet.getHAction(action);
@@ -276,7 +257,6 @@ public class CompostateDUC<State, Action> {
             }
         }
     }
-    // */
 
     private boolean checkComponentAllows(int ltsIndex, String actionName) {
         Action matchedAction = null;
@@ -301,7 +281,7 @@ public class CompostateDUC<State, Action> {
         return -1;
     }
 
-    // (以下、Getter/Setter等 変更なし)
+    // Getter / Setter など。
     public HEstimate<State, Action> getEstimate() { return estimate; }
     public List<State> getStates() { return states; }
     public int getDistance() { return distance; }
@@ -310,25 +290,6 @@ public class CompostateDUC<State, Action> {
     public void setDepth(int depth) { if (this.depth > depth) this.depth = depth; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { if (this.status != Status.ERROR || status == Status.ERROR) this.status = status; }
-    /**
-     * ステータスを更新します。
-     * 一度 UNSAFE になった状態は、他のいかなる状態（TRAPPEDなど）によっても上書きされないように制御します。
-     */
-    /*
-    public void setStatus(Status status) {
-        // 安全性の優先度：UNSAFE > TRAPPED > GOAL/NONE
-        if (this.status == Status.UNSAFE) {
-            return; // 既に最悪の状態なので変更不可
-        }
-        
-        // TRAPPEDはUNSAFEによってのみ上書き可能
-        if (this.status == Status.TRAPPED && status != Status.UNSAFE) {
-            return;
-        }
-
-        this.status = status;
-    }
-    // */
     public boolean isStatus(Status status) { return this.status == status; }
     public boolean hasGoalChild(){ return hasGoalChild; }
     public void setHasGoalChild(HAction<State, Action> actionToGoal) { this.actionToGoal = actionToGoal; this.hasGoalChild = true; }
@@ -396,7 +357,7 @@ public class CompostateDUC<State, Action> {
     public RecommendationDUC peekRecommendation() { return recommendation; }
 
     public void initRecommendations() {
-        // 修正：イテレータの初期化を廃止し、初回のみ updateRecommendation を呼ぶ
+        // 初回のみ updateRecommendation を呼び、現在候補を初期化する。
         if (recommendation == null && nextRecommendationIndex == 0) {
             updateRecommendation();
         }
@@ -408,7 +369,7 @@ public class CompostateDUC<State, Action> {
      * 他のControllableアクションは探索せずにスキップする。
      */
     private void updateRecommendation() {
-        // 修正：インデックスを用いてリストを走査。
+        // インデックスを用いて候補リストを走査する。
         // リセット（seq更新）が発生しても nextRecommendationIndex は維持されるため、
         // 構造的に重複探索を防止する。
         while (nextRecommendationIndex < recommendations.size()) {
@@ -419,7 +380,7 @@ public class CompostateDUC<State, Action> {
             recommendation = recommendations.get(nextRecommendationIndex++);
             HAction<State, Action> action = recommendation.getAction();
 
-            // ★追加: 構造的管理の確認ログ
+            // 構造的な候補管理を確認するためのデバッグログ。
             // dcs.log("    [Debug-Structural] State " + this.states + ": Yielding action at index [" + currentIndex + "/" + recommendations.size() + "]: " + action);
 
             // OR条件の枝刈り（Pruning）ロジックは維持
@@ -446,7 +407,7 @@ public class CompostateDUC<State, Action> {
     public void clearRecommendations() {
         if (isEvaluated()) {
             recommendations.clear();
-            // 修正：イテレータの代わりにインデックスをリセットし、現在の候補をnullにする
+            // イテレータの代わりにインデックスをリセットし、現在の候補を null にする。
             nextRecommendationIndex = 0; 
             recommendation = null;
         }

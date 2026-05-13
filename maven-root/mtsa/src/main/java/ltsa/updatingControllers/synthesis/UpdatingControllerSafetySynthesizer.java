@@ -15,6 +15,7 @@ import ltsa.lts.CompositeState;
 import ltsa.lts.LTSOutput;
 import ltsa.ui.StandardOutput;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 
 import java.util.*;
 import java.util.logging.Level;
@@ -48,21 +49,77 @@ public class UpdatingControllerSafetySynthesizer {
         // ▲▲▲ 追加ここまで ▲▲▲
         // */
 
+        long makeOldActionsStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "beginUpdate 前の旧 action を uncontrollable 化する時間");
         makeOldActionsUncontrollable(controllableActions, metaEnvironment);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "beginUpdate 前の旧 action を uncontrollable 化する時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "beginUpdate 前の旧 action を uncontrollable 化する時間",
+                System.currentTimeMillis() - makeOldActionsStart);
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional 旧 action uncontrollable 化後");
 
+        long valuationStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Fluent valuation 構築時間");
         FluentStateValuation<Long> fluentStateValuation = buildValuations(metaEnvironment, goalFluents);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Fluent valuation 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Fluent valuation 構築時間",
+                System.currentTimeMillis() - valuationStart);
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional Fluent valuation 構築後");
 
+        long valuateSafetyStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety formula 評価と違反状態 pruning 時間");
         MTS<Long, String> safetyEnv = valuateSafety(safetyFormulas, metaEnvironment, fluentStateValuation);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety formula 評価と違反状態 pruning 時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety formula 評価と違反状態 pruning 時間",
+                System.currentTimeMillis() - valuateSafetyStart);
 
         // ▼▼▼ 評価実験用: [3] 枝刈り(Pruning)直後の状態数・遷移数 ▼▼▼
         long prunedCountStart = System.currentTimeMillis();
         int prunedStates = safetyEnv.getStates().size();
         int prunedTrans = countTransitions(safetyEnv); // ※このクラス内にも countTransitions メソッドをコピペしてください
         long prunedCountTime = System.currentTimeMillis() - prunedCountStart;
-        output.outln("[3. Pruned] Safety Env (Before DontDoTwice) States: " + prunedStates + ", Transitions: " + prunedTrans + ", CountTime: " + prunedCountTime);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "Traditional DUC 最大状態数と遷移数",
+                "[3. Pruned] Safety Env (Before DontDoTwice)",
+                prunedStates,
+                prunedTrans,
+                prunedCountTime,
+                "Meta から safety formula に違反する状態を除去した環境。DontDoTwice 制約はまだ未適用。");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional Safety pruning 後");
         // ▲▲▲ 追加ここまで ▲▲▲
 
-		return getDontDoTwiceGoals(safetyEnv);
+        long dontDoTwiceStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "DontDoTwice goal 合成時間");
+        MTS<Long, String> result = getDontDoTwiceGoals(safetyEnv);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "DontDoTwice goal 合成時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "DontDoTwice goal 合成時間",
+                System.currentTimeMillis() - dontDoTwiceStart);
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional DontDoTwice 合成後");
+
+		return result;
 
     }
 
@@ -125,9 +182,31 @@ public class UpdatingControllerSafetySynthesizer {
     private static MTS<Long, String> valuateSafety(List<Formula> safetyFormulas , MTS<Long, String> metaEnvironment, FluentStateValuation<Long> fluentStateValuation) {
 
         HashSet<Long> toBuild = new HashSet<Long>();
+        long formulaEvalStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety formula を全状態で評価する時間");
         formulaToStateSet(toBuild, metaEnvironment.getStates(), safetyFormulas,	fluentStateValuation);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety formula を全状態で評価する時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety formula を全状態で評価する時間",
+                System.currentTimeMillis() - formulaEvalStart);
 
+        long applySafetyStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety 違反状態を除去した MTS 構築時間");
         MTS<Long, String> safetyEnv = applySafetyInEnvironment(metaEnvironment, toBuild);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety 違反状態を除去した MTS 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC safetyEnv 構築時間内訳",
+                "Safety 違反状態を除去した MTS 構築時間",
+                System.currentTimeMillis() - applySafetyStart);
         return safetyEnv;
     }
 

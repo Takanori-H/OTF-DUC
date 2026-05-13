@@ -31,6 +31,9 @@ import ltsa.lts.ltl.FormulaFactory;
 import ltsa.lts.util.MTSUtils;
 import ltsa.ui.enactment.EnactorOptionsWindows;
 import ltsa.ui.update.UpdateGraphSimulation;
+import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -2022,28 +2025,74 @@ public class HPWindow extends JFrame implements Runnable {
         resetInput();
         CompositeState cs = null;
         LTSCompiler comp = new LTSCompiler(ltsInputString, ltsOutput, currentDirectory);
+        long compileOnlyStart = -1;
+        long continueCompilationStart = -1;
+        boolean compileOnlyRecorded = false;
+        boolean continueCompilationRecorded = false;
         try {
-            long tmp = System.currentTimeMillis();
+            compileOnlyStart = System.currentTimeMillis();
             comp.compile();
-            ltsOutput.outln("comp.compile time : " + (System.currentTimeMillis()-tmp) + "ms");
+            long compileOnlyTime = System.currentTimeMillis() - compileOnlyStart;
+            ltsOutput.outln("comp.compile time : " + compileOnlyTime + "ms");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "共通 / HPWindow",
+                    "構文解析時間",
+                    compileOnlyTime);
+            compileOnlyRecorded = true;
             if (!parse(comp.getComposites(), comp.getProcesses(), comp.getExplorers())) {
                 return null;
             }
 
-            tmp = System.currentTimeMillis();
+            continueCompilationStart = System.currentTimeMillis();
             cs = comp.continueCompilation((String) targetChoice.getSelectedItem());
-            ltsOutput.outln("comp.continueCompilation time : " + (System.currentTimeMillis()-tmp) + "ms");
+            long continueCompilationTime = System.currentTimeMillis() - continueCompilationStart;
+            ltsOutput.outln("comp.continueCompilation time : " + continueCompilationTime + "ms");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "共通 / HPWindow",
+                    "合成問題準備時間",
+                    continueCompilationTime);
+            continueCompilationRecorded = true;
 
         } catch (LTSCompositionException x) {
+            recordPartialCompilationTimes(
+                    compileOnlyStart,
+                    continueCompilationStart,
+                    compileOnlyRecorded,
+                    continueCompilationRecorded);
             ltsOutput.outln("Construction of " + targetChoice.getSelectedItem() + " aborted.");
             cs = null;
             return cs;
         } catch (LTSException x) {
+            recordPartialCompilationTimes(
+                    compileOnlyStart,
+                    continueCompilationStart,
+                    compileOnlyRecorded,
+                    continueCompilationRecorded);
             cs = null;
             displayError(x, ltsInputString.getMarker());
             return cs;
         }
         return cs;
+    }
+
+    private void recordPartialCompilationTimes(
+            long compileOnlyStart,
+            long continueCompilationStart,
+            boolean compileOnlyRecorded,
+            boolean continueCompilationRecorded) {
+        long now = System.currentTimeMillis();
+        if (compileOnlyStart >= 0 && !compileOnlyRecorded) {
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "共通 / HPWindow",
+                    "構文解析時間",
+                    now - compileOnlyStart);
+        }
+        if (continueCompilationStart >= 0 && !continueCompilationRecorded) {
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "共通 / HPWindow",
+                    "合成問題準備時間",
+                    now - continueCompilationStart);
+        }
     }
 
     private void doparse(Hashtable cs, Hashtable ps, Hashtable ex) {
@@ -2183,9 +2232,11 @@ public class HPWindow extends JFrame implements Runnable {
         //評価実験用
         long doCompositionStart = System.currentTimeMillis();
         System.gc();
+        UpdatingControllerEvaluationRecorder.reset();
         ltsa.updatingControllers.EvaluationProfiler.resetPeakMemory();
         // ★追加: 処理開始直後のクリーンな状態のメモリ（ベースライン）を記録
         long baselineMemory = ltsa.updatingControllers.EvaluationProfiler.getCurrentMemoryUsage();
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("合成開始時");
 
         EnvConfiguration.getInstance().setOpenFileName(openFile);
 
@@ -2193,21 +2244,50 @@ public class HPWindow extends JFrame implements Runnable {
 
         //評価実験用
         long compileStart = System.currentTimeMillis();
-
-        // 1. コンパイル（FSP記述の解析とモデル構造の生成）
-        // 変更があれば再コンパイルし、結果をフィールド変数 'current' に格納
-        compileIfChange();
-
-        //評価実験用
-        long compileTime = System.currentTimeMillis() - compileStart;
+        long compileTime = 0;
         long synthesisTime = 0;
         long drawTime = 0;
 
+        // 1. コンパイル（FSP記述の解析とモデル構造の生成）
+        // 変更があれば再コンパイルし、結果をフィールド変数 'current' に格納
+        try {
+            compileIfChange();
+            compileTime = System.currentTimeMillis() - compileStart;
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("構文解析・合成問題準備後");
+        } catch (OutOfMemoryError e) {
+            compileTime = System.currentTimeMillis() - compileStart;
+            UpdatingControllerEvaluationRecorder.recordFailure(
+                    ResultStatus.OUT_OF_MEMORY,
+                    e.getMessage());
+            UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+            recordCommonEvaluationAndPrint(
+                    doCompositionStart,
+                    compileTime,
+                    synthesisTime,
+                    drawTime,
+                    baselineMemory);
+            return;
+        } catch (RuntimeException e) {
+            compileTime = System.currentTimeMillis() - compileStart;
+            UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
+                    ResultStatus.EXCEPTION,
+                    e.getMessage());
+            UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+            recordCommonEvaluationAndPrint(
+                    doCompositionStart,
+                    compileTime,
+                    synthesisTime,
+                    drawTime,
+                    baselineMemory);
+            return;
+        }
+
+
         if (current != null) {
 
+            long synthesisStart = System.currentTimeMillis();
             try {
                 //評価実験用
-                long synthesisStart = System.currentTimeMillis();
 
                 // 2. 合成処理の実行（Dispatcherへ委譲）
                 // ここで実際の計算（Updating Controllerの合成含む）が走ります
@@ -2215,10 +2295,44 @@ public class HPWindow extends JFrame implements Runnable {
 
                 synthesisTime = System.currentTimeMillis() - synthesisStart;
                 
+            } catch (OutOfMemoryError e) {
+                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                UpdatingControllerEvaluationRecorder.recordFailure(
+                        ResultStatus.OUT_OF_MEMORY,
+                        e.getMessage());
+                UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+                recordCommonEvaluationAndPrint(
+                        doCompositionStart,
+                        compileTime,
+                        synthesisTime,
+                        drawTime,
+                        baselineMemory);
+                return;
             } catch (LTSCompositionException e) {
-                //評価実験用
-                long failedPeakMemory = ltsa.updatingControllers.EvaluationProfiler.getPeakMemoryUsage();
-                ltsOutput.outln("合成失敗時のピークメモリ : " + failedPeakMemory + " B");
+                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
+                        ResultStatus.EXCEPTION,
+                        e.getMessage());
+                UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+                recordCommonEvaluationAndPrint(
+                        doCompositionStart,
+                        compileTime,
+                        synthesisTime,
+                        drawTime,
+                        baselineMemory);
+                return;
+            } catch (RuntimeException e) {
+                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
+                        ResultStatus.EXCEPTION,
+                        e.getMessage());
+                UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+                recordCommonEvaluationAndPrint(
+                        doCompositionStart,
+                        compileTime,
+                        synthesisTime,
+                        drawTime,
+                        baselineMemory);
                 return;
             }
 
@@ -2226,11 +2340,19 @@ public class HPWindow extends JFrame implements Runnable {
             long drawStart = System.currentTimeMillis();
 
             // 3. 結果の判定とGUIへの反映
+            try {
             boolean isControllable = current.composition != null;
             if (!isControllable) {
-                //評価実験用
-                long uncotrollablePeakMemory = ltsa.updatingControllers.EvaluationProfiler.getPeakMemoryUsage();
-                ltsOutput.outln("uncontrollable失敗時のピークメモリ : " + uncotrollablePeakMemory + " B");
+                UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
+                        ResultStatus.NOT_CONTROLLABLE,
+                        "Composition not controllable.");
+                UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+                recordCommonEvaluationAndPrint(
+                        doCompositionStart,
+                        compileTime,
+                        synthesisTime,
+                        drawTime,
+                        baselineMemory);
                 return;
                 //throw new LTSException("Composition not controllable.");
                 
@@ -2244,29 +2366,151 @@ public class HPWindow extends JFrame implements Runnable {
             layouts.setCurrentState(current_states);
 
             drawTime = System.currentTimeMillis() - drawStart;
+            } catch (OutOfMemoryError e) {
+                drawTime = System.currentTimeMillis() - drawStart;
+                UpdatingControllerEvaluationRecorder.recordFailure(
+                        ResultStatus.OUT_OF_MEMORY,
+                        e.getMessage());
+                UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+                recordCommonEvaluationAndPrint(
+                        doCompositionStart,
+                        compileTime,
+                        synthesisTime,
+                        drawTime,
+                        baselineMemory);
+                return;
+            } catch (RuntimeException e) {
+                drawTime = System.currentTimeMillis() - drawStart;
+                UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
+                        ResultStatus.EXCEPTION,
+                        e.getMessage());
+                UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
+                recordCommonEvaluationAndPrint(
+                        doCompositionStart,
+                        compileTime,
+                        synthesisTime,
+                        drawTime,
+                        baselineMemory);
+                return;
+            }
         }
 
-        //評価実験用
+        if (current != null && current.composition != null) {
+            UpdatingControllerEvaluationRecorder.markSuccess();
+        } else {
+            UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
+                    ResultStatus.UNKNOWN_FAILURE,
+                    "Composition was not generated.");
+        }
+        recordCommonEvaluationAndPrint(
+                doCompositionStart,
+                compileTime,
+                synthesisTime,
+                drawTime,
+                baselineMemory);
+    }
+
+    private void recordCommonEvaluationAndPrint(
+            long doCompositionStart,
+            long compileTime,
+            long synthesisTime,
+            long drawTime,
+            long baselineMemory) {
+
         long doCompositionTime = System.currentTimeMillis() - doCompositionStart;
         long overallPeakMemory = ltsa.updatingControllers.EvaluationProfiler.getPeakMemoryUsage();
-        long netPeakMemory = overallPeakMemory - baselineMemory; // ★差分（純増分）を計算
+        long netPeakMemory = overallPeakMemory - baselineMemory;
+        long problemPreparationTime = UpdatingControllerEvaluationRecorder.getRecordedTimeMillis(
+                "共通 / HPWindow",
+                "合成問題準備時間");
+        long updateControllerGenerationTime = synthesisTime;
+        long controllerSynthesisRelatedTime = problemPreparationTime + updateControllerGenerationTime;
 
-        ltsOutput.outln("================ EVALUATION ==================");
-        ltsOutput.outln("[共通] 合成ボタンを押してから合成完了までの時間 : " + doCompositionTime + " ms");
-        //||UPDATE_CONTROLLER_OTF = UpdCont_OTFだとUpdCont_OTFを合成する時間もcompileTimeに含まれる
-        ltsOutput.outln("[共通] 構文解析と合成に必要な環境モデルや要求の準備の時間 : " + compileTime + " ms");
-        ltsOutput.outln("[共通] コントローラ合成時間 : " + synthesisTime + " ms");
-        ltsOutput.outln("[共通] コントローラ描画時間 : " + drawTime + " ms");
-        ltsOutput.outln("[共通] コントローラ合成のベースラインメモリ ( B): " + baselineMemory + " B");
-        ltsOutput.outln("[共通] コントローラ合成のベースラインメモリ (KB): " + (baselineMemory / 1024) + " KB");
-        ltsOutput.outln("[共通] コントローラ合成のベースラインメモリ (MB): " + (baselineMemory / 1024 / 1024) + " MB");
-        ltsOutput.outln("[共通] コントローラ合成全体のピークメモリ ( B): " + overallPeakMemory + " B");
-        ltsOutput.outln("[共通] コントローラ合成全体のピークメモリ (KB): " + (overallPeakMemory / 1024) + " KB");
-        ltsOutput.outln("[共通] コントローラ合成全体のピークメモリ (MB): " + (overallPeakMemory / 1024 / 1024) + " MB");
-        ltsOutput.outln("[共通] コントローラ合成により増えたメモリ ( B): " + netPeakMemory + " B");
-        ltsOutput.outln("[共通] コントローラ合成により増えたメモリ (KB): " + (netPeakMemory / 1024) + " KB");
-        ltsOutput.outln("[共通] コントローラ合成により増えたメモリ (MB): " + (netPeakMemory / 1024 / 1024) + " MB");
-        ltsOutput.outln("==============================================");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow",
+                "合成ボタンを押してから合成完了までの時間",
+                doCompositionTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow",
+                "compileIfChange 全体時間（参考）",
+                compileTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow",
+                "update controller 生成時間",
+                updateControllerGenerationTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow",
+                "コントローラ合成時間",
+                controllerSynthesisRelatedTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow",
+                "コントローラ描画時間",
+                drawTime);
+        UpdatingControllerEvaluationRecorder.recordMemory(
+                "共通 / HPWindow",
+                "コントローラ合成のベースラインメモリ",
+                baselineMemory);
+        UpdatingControllerEvaluationRecorder.recordMemory(
+                "共通 / HPWindow",
+                "コントローラ合成全体のピークメモリ",
+                overallPeakMemory);
+        UpdatingControllerEvaluationRecorder.recordMemory(
+                "共通 / HPWindow",
+                "コントローラ合成により増えたメモリ",
+                netPeakMemory);
+
+        if (current != null && current.composition != null) {
+            long outputCountStart = System.currentTimeMillis();
+            long outputStates = current.composition.maxStates;
+            long outputTransitions = current.composition.ntransitions();
+            long outputCountTime = System.currentTimeMillis() - outputCountStart;
+            UpdatingControllerEvaluationRecorder.recordOutputController(
+                    outputStates,
+                    outputTransitions,
+                    outputCountTime);
+
+            long beginUpdateCountStart = System.currentTimeMillis();
+            long beginUpdateStates = countStatesWithOutgoingAction(
+                    current.composition,
+                    UpdateConstants.BEGIN_UPDATE);
+            long beginUpdateCountTime = System.currentTimeMillis() - beginUpdateCountStart;
+            if (beginUpdateStates > 0 || UpdatingControllerEvaluationRecorder.hasOldControllerStateSpace()) {
+                UpdatingControllerEvaluationRecorder.recordBeginUpdateCoverage(
+                        beginUpdateStates,
+                        beginUpdateCountTime);
+            }
+        }
+
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("合成終了時");
+
+        UpdatingControllerEvaluationRecorder.printSummary(ltsOutput);
+    }
+
+    private long countStatesWithOutgoingAction(CompactState machine, String actionName) {
+        int actionIndex = findActionIndex(machine, actionName);
+        if (actionIndex < 0 || machine.states == null) {
+            return 0;
+        }
+
+        long count = 0;
+        for (int i = 0; i < machine.states.length; i++) {
+            if (EventState.hasEvent(machine.states[i], actionIndex)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int findActionIndex(CompactState machine, String actionName) {
+        if (machine == null || machine.alphabet == null || actionName == null) {
+            return -1;
+        }
+        for (int i = 0; i < machine.alphabet.length; i++) {
+            if (actionName.equals(machine.alphabet[i])) {
+                return i;
+            }
+        }
+        return -1;
     }
 
 

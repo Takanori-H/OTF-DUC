@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import MTSTools.ac.ic.doc.commons.collections.BidirectionalMap;
 import MTSTools.ac.ic.doc.commons.relations.BinaryRelation;
@@ -23,6 +24,7 @@ import MTSTools.ac.ic.doc.mtstools.model.impl.MarkedLTSImpl;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.DirectedControllerSynthesis;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HAction;
 import ltsa.lts.LTSOutput;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdateConstants;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.gr1.Statistics;
 
@@ -66,20 +68,91 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     final public Statistics statistics = new Statistics();
 
-    private boolean debugLogEnabled = false;
+    private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
     private PrintWriter logWriter;
-    private static final String LOG_FILE_PATH = "duc_debug.txt";
+    private static final String LOG_FILE_PATH = System.getProperty("otfduc.debug.file", "duc_debug.txt");
 
     private List<Map<Integer, Integer>> mappingMapEnvToNewEnv;
     private Map<String, Long> newControllerConnectionMap;
     private LTS<Long, String> newController;
 
-    // ★追加: Safety Maps (Rev. 8.0)
+    // 合成済み安全モニタと元の環境コンポーネントを対応づけるための表。
     private Map<Integer, List<Integer>> safetyComponentIndicesMap;
     private Map<Integer, Map<List<Integer>, Integer>> safetyStateLookupMap;
     protected LTSOutput output;
 
-    // --- コンポーネントインデックス範囲 ---
+    private long errorMarkCount = 0;
+    private long loopErrorCount = 0;
+    private long fairControllableExitRejectedCount = 0;
+    private String lastErrorSummary = "none";
+    private String lastLoopErrorSummary = "none";
+    private String lastFairControllableExitRejectedSummary = "none";
+    private long generatedChildCount = 0;
+    private long existingCompostateHitCount = 0;
+    private long newCompostateCount = 0;
+    private long safetyViolationChildCount = 0;
+    private long finishUpdateGuardBlockedCount = 0;
+    private long detectedLoopCount = 0;
+    private long preUpdateLoopExceptionCount = 0;
+    private long fairPromotedLoopCount = 0;
+    private long directorCandidateTransitions = 0;
+    private long directorOutputTransitions = 0;
+    private long prunedControllableTransitions = 0;
+    private long finishUpdateTransitions = 0;
+    private long ncConnectionSuccessCount = 0;
+    private long ncConnectionMissCount = 0;
+
+    private int totalLtsExpansions = 0;
+    private long synthesizeDUCTime = 0;
+    private long searchTime = 0;
+    private long countTime = 0;
+    private long buildDirectorDUCTime = 0;
+    private long transferNCTime = 0;
+    private long stitchingNCTime = 0;
+    private int otfPeakStates = 0;
+    private int otfPeakTrans = 0;
+
+    private long heuristicSelectionNanos = 0;
+    private long heuristicRecomputeNanos = 0;
+    private long heuristicFrontierNanos = 0;
+    private long heuristicEvaluationNanos = 0;
+    private long stateExpansionNanos = 0;
+    private long successorGenerationNanos = 0;
+    private long componentSyncNanos = 0;
+    private long cartesianProductNanos = 0;
+    private long safetySyncNanos = 0;
+    private long stateCanonicalizationNanos = 0;
+    private long stateLookupNanos = 0;
+    private long newStateRegistrationNanos = 0;
+    private long enforceSafetyCheckNanos = 0;
+    private long finishUpdateGuardNanos = 0;
+    private long childRegistrationNanos = 0;
+    private long exploreNanos = 0;
+    private long loopDetectionNanos = 0;
+    private long fairnessAnalysisNanos = 0;
+    private long fairPromotionNanos = 0;
+    private long propagateGoalNanos = 0;
+    private long propagateErrorNanos = 0;
+    private long propagateGoalPhase1Nanos = 0;
+    private long propagateGoalPhase2Nanos = 0;
+    private long propagateGoalDistanceUpdateNanos = 0;
+    private long outputPruningDecisionNanos = 0;
+    private long directorTraversalNanos = 0;
+
+    private long heuristicSelectionCalls = 0;
+    private long heuristicRecomputeRuns = 0;
+    private long heuristicRecomputedStates = 0;
+    private long heuristicEvaluationCalls = 0;
+    private long stateLookupCalls = 0;
+    private long finishUpdateGuardChecks = 0;
+    private long loopDetectionCalls = 0;
+    private long fairnessAnalysisCalls = 0;
+    private long propagateGoalCalls = 0;
+    private long propagateErrorCalls = 0;
+    private long outputPruningDecisionCalls = 0;
+    private long totalFairnessCandidatesProcessed = 0;
+
+    // OTF-DUC の直積モデルにおけるコンポーネントのインデックス範囲。
     public int idxMarking = 0;
     public int idxOC = 1;
     public int mappingStart = -1;
@@ -91,8 +164,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     public int transReqStart = -1;
     public int transReqEnd = -1;
 
-    // ★追加: Component Indices
-    public int synthesisStart = -1; // Monitors + Fluents
+    public int synthesisStart = -1; // モニタと fluent
     public int synthesisEnd = -1;
 
     public DirectedControllerSynthesisDUC() {
@@ -124,7 +196,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Map<Integer, Map<List<Integer>, Integer>> safetyStateLookupMap,
             LTSOutput output) {
         
-        //評価実験用
         long synthesizeDUCStart = System.currentTimeMillis();
 
         this.mappingStart = mappingStart;
@@ -178,10 +249,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 //   まずは外側で「選択にかかる総時間」を測ります。
                 // long startHeuristic = System.currentTimeMillis();
 
+                long heuristicSelectionStart = System.nanoTime();
                 Pair<CompostateDUC<State, Action>, HAction<State, Action>> next = heuristic.getNextAction();
-
-                // 便宜上、一旦 timeRecompute に加算（後で詳細化可能）
-                // DUCProfiler.timeRecompute += (System.currentTimeMillis() - startHeuristic);
+                heuristicSelectionNanos += System.nanoTime() - heuristicSelectionStart;
+                heuristicSelectionCalls++;
 
                 statistics.endHeuristicTime();
 
@@ -190,60 +261,52 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 CompostateDUC<State, Action> state = next.getFirst();
                 HAction<State, Action> action = next.getSecond();
 
-                // ★追加ログ1：ヒューリスティックが何を提案したか
                 // log(String.format("[Heuristic-Next] State: %s, Action: %s (%s)", state.getStates(), action, action.isControllable() ? "C" : "U"));
 
-                // ★修正点: 探索の効率化ロジック (AND/OR Pruning)
-                // 既にその状態で Controllable な勝ち筋 (hasGoalChild) が見つかっている場合、
-                // 他の Controllable アクションを探索するのは時間の無駄であるためスキップする。
+                // Controllable の勝ち筋が一つ見つかっていれば、他の controllable 分岐は
+                // AND/OR ゲームの勝敗を改善しない。一方で uncontrollable 分岐は環境が
+                // 選ぶ可能性があるため、引き続き探索する。
                 if (state.hasGoalChild() && action.isControllable()) {
-                    // ヒューリスティックにこのアクションは不要であることを通知（もし通知メソッドがあれば）
-                    // 無い場合は、このまま continue して次の候補へ移る。
-                    // デバッグログ : なぜスキップしたかを明記
                     // log("  [Pruning] Skipping redundant controllable action '" + action + "' for state " + state.getStates());
-                    // 重要：ヒューリスティックに探索終了を「通知だけ」して、expandDUCは実行しない
-                    // これにより、ヒューリスティックは次のアクション（Uなど）を提案できるようになる
-
-                    // ★追加ログ2：枝刈りが発生した瞬間を記録
-                    // log(String.format("  [Pruning-Action] SKIPPING controllable '%s' because state already has a winning path.", action));
                     heuristic.expansionDone(state, action, null);
                     continue;
-                }
-                // Uncontrollable アクションなら、AND条件（すべてのUでの勝利）を満たすために探索を続行
-                else{
-                    // ★追加ログ3：勝利パスがあるのにUを探索しようとしている場合
-                    // log(String.format("  [Verification-Action] MUST expand environment '%s' even with winning path.", action));
                 }
 
                 // --- 2. 状態展開（Expansion）の計測 ---
                 // long startExp = System.currentTimeMillis();
 
-                DUCProfiler.totalLtsExpansions++; // 展開回数をカウント
+                totalLtsExpansions++; // 展開回数をカウント
+                long expansionStart = System.nanoTime();
                 expandDUC(state, action);
+                stateExpansionNanos += System.nanoTime() - expansionStart;
 
-                // DUCProfiler.timeExpansion += (System.currentTimeMillis() - startExp);
             }
 
             statistics.end();
 
             //評価実験用
-            DUCProfiler.searchTime = System.currentTimeMillis() - searchStart;
+            searchTime = System.currentTimeMillis() - searchStart;
             long countStart = System.currentTimeMillis();
-            DUCProfiler.otfPeakStates = compostates.size();
-            DUCProfiler.otfPeakTrans = countOTFTransitions();
-            DUCProfiler.countTime = System.currentTimeMillis() - countStart;
+            otfPeakStates = compostates.size();
+            otfPeakTrans = countOTFTransitions();
+            countTime = System.currentTimeMillis() - countStart;
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF DCS 探索終了後");
 
             if (isGoal(initial)) {
                 log("Goal Reached! Building Director...");
 
                 long buildDirectorDUCStart = System.currentTimeMillis();
                 LTS<Long, Action> result = buildDirectorDUC();
-                DUCProfiler.buildDirectorDUCTime = System.currentTimeMillis() - buildDirectorDUCStart;
+                buildDirectorDUCTime = System.currentTimeMillis() - buildDirectorDUCStart;
+                UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF buildDirectorDUC 後");
 
                 return result;
                 // return buildDirectorDUC();
             } else {
                 log("Goal NOT Reached. Synthesis Failed.");
+                if (debugLogEnabled) {
+                    emitFailureDiagnostics();
+                }
             }
             return null;
 
@@ -252,9 +315,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 log("=== Synthesis Finished ===");
                 logWriter.close();
             }
-            DUCProfiler.synthesizeDUCTime = System.currentTimeMillis() - synthesizeDUCStart;
+            synthesizeDUCTime = System.currentTimeMillis() - synthesizeDUCStart;
             // 合成完了後
-            DUCProfiler.printSummary(this.output);
+            recordOtfDcsTimingEvaluation();
+            recordOtfDetailedEvaluation();
         }
     }
 
@@ -265,12 +329,103 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
+    void addHeuristicRecomputeNanos(long nanos) {
+        heuristicRecomputeNanos += nanos;
+    }
+
+    void addHeuristicFrontierNanos(long nanos) {
+        heuristicFrontierNanos += nanos;
+    }
+
+    void addHeuristicEvaluationNanos(long nanos) {
+        heuristicEvaluationNanos += nanos;
+    }
+
+    void incrementHeuristicEvaluationCalls() {
+        heuristicEvaluationCalls++;
+    }
+
+    void incrementHeuristicRecomputeRuns() {
+        heuristicRecomputeRuns++;
+    }
+
+    void addHeuristicRecomputedStates(long states) {
+        heuristicRecomputedStates += states;
+    }
+
     private void setupSynthesisDUC(List<LTS<State, Action>> ltss, Set<Action> controllable) {
         this.ltss = ltss;
         this.ltssSize = ltss.size();
         this.controllable = controllable;
         statistics.clear();
         statistics.start();
+        errorMarkCount = 0;
+        loopErrorCount = 0;
+        fairControllableExitRejectedCount = 0;
+        totalLtsExpansions = 0;
+        synthesizeDUCTime = 0;
+        searchTime = 0;
+        countTime = 0;
+        buildDirectorDUCTime = 0;
+        transferNCTime = 0;
+        stitchingNCTime = 0;
+        otfPeakStates = 0;
+        otfPeakTrans = 0;
+        heuristicSelectionNanos = 0;
+        heuristicRecomputeNanos = 0;
+        heuristicFrontierNanos = 0;
+        heuristicEvaluationNanos = 0;
+        stateExpansionNanos = 0;
+        successorGenerationNanos = 0;
+        componentSyncNanos = 0;
+        cartesianProductNanos = 0;
+        safetySyncNanos = 0;
+        stateCanonicalizationNanos = 0;
+        stateLookupNanos = 0;
+        newStateRegistrationNanos = 0;
+        enforceSafetyCheckNanos = 0;
+        finishUpdateGuardNanos = 0;
+        childRegistrationNanos = 0;
+        exploreNanos = 0;
+        loopDetectionNanos = 0;
+        fairnessAnalysisNanos = 0;
+        fairPromotionNanos = 0;
+        propagateGoalNanos = 0;
+        propagateErrorNanos = 0;
+        propagateGoalPhase1Nanos = 0;
+        propagateGoalPhase2Nanos = 0;
+        propagateGoalDistanceUpdateNanos = 0;
+        outputPruningDecisionNanos = 0;
+        directorTraversalNanos = 0;
+        heuristicSelectionCalls = 0;
+        heuristicRecomputeRuns = 0;
+        heuristicRecomputedStates = 0;
+        heuristicEvaluationCalls = 0;
+        stateLookupCalls = 0;
+        finishUpdateGuardChecks = 0;
+        loopDetectionCalls = 0;
+        fairnessAnalysisCalls = 0;
+        propagateGoalCalls = 0;
+        propagateErrorCalls = 0;
+        outputPruningDecisionCalls = 0;
+        totalFairnessCandidatesProcessed = 0;
+        lastErrorSummary = "none";
+        lastLoopErrorSummary = "none";
+        lastFairControllableExitRejectedSummary = "none";
+        generatedChildCount = 0;
+        existingCompostateHitCount = 0;
+        newCompostateCount = 0;
+        safetyViolationChildCount = 0;
+        finishUpdateGuardBlockedCount = 0;
+        detectedLoopCount = 0;
+        preUpdateLoopExceptionCount = 0;
+        fairPromotedLoopCount = 0;
+        directorCandidateTransitions = 0;
+        directorOutputTransitions = 0;
+        prunedControllableTransitions = 0;
+        finishUpdateTransitions = 0;
+        ncConnectionSuccessCount = 0;
+        ncConnectionMissCount = 0;
         compostates = new HashMap<>();
         setupLookupOptimizations();
         transitions = new ArrayDeque<>(ltss.size());
@@ -327,13 +482,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         initial.setExpanded();
     }
 
-    // ★ 復活させたメソッド
     private CompostateDUC<State, Action> buildInitialState() {
         List<State> states = new ArrayList<>(ltss.size());
         for (LTS<State, Action> lts : ltss)
             states.add(lts.getInitialState());
         CompostateDUC<State, Action> initial = buildCompostate(states, null);
-        initial.setDepth(0); // ★追加: 初期状態の深さを0に設定
+        initial.setDepth(0); // 初期状態の深さを 0 に固定する。
         return initial;
         // return buildCompostate(states, null);
     }
@@ -343,6 +497,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // 現在の更新フェーズにおいて追跡（Trace）対象外となっているコンポーネントは、
         // 将来の挙動に影響を与えないため、状態IDを固定値 -2L に統一する。
         // これにより、インターリービングの順序違いなどで生じる等価な状態がハッシュキーレベルで一致するようになる。
+
+        long canonicalizationStart = System.nanoTime();
 
         // [最適化] getMarkingStateFromList 内の instanceof 呼び出しを削減するための型キャスト
         long mState = getMarkingStateFromList(states);
@@ -364,16 +520,22 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // [最適化] Map検索用のプリミティブ配列バッファを構築
             lookupBuffer[i] = val;
         }
+        stateCanonicalizationNanos += System.nanoTime() - canonicalizationStart;
 
         // 2. Map検索
         // [最適化] 検索のたびに new StateKey(...) せず、既存の reusableKey の中身を書き換えて再利用。
         // Mapにヒットする場合、ここでのヒープメモリ確保は一切発生しない。
+        long lookupStart = System.nanoTime();
         reusableKey.wrap(lookupBuffer);
         CompostateDUC<State, Action> result = compostates.get(reusableKey);
+        stateLookupNanos += System.nanoTime() - lookupStart;
+        stateLookupCalls++;
 
         if (result == null) {
+            long registrationStart = System.nanoTime();
             // 新しい状態が見つかったときのみ、永続化のためのオブジェクトを生成
             statistics.incExpandedStates();
+            newCompostateCount++;
         
             // 3. 新しい状態の場合のみ、永続的なオブジェクトを生成
             List<State> persistentList = new ArrayList<>(states);
@@ -382,12 +544,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             result = new CompostateDUC<>(this, persistentList);
             compostates.put(permanentKey, result);
 
-            // === 追加：Marking 8 での finishUpdate ガードの先行チェック ===
+            // Marking 8 では finishUpdate ガードを先に評価する。
             // 状態生成時にあらかじめチェックすることで、ヒューリスティックがこの手を選ばないようにする
             if (mState == 8) {
+                long guardStart = System.nanoTime();
+                finishUpdateGuardChecks++;
                 if (!checkHotswapEndCondition(result)) {
                     result.setFinishUpdateBlocked(true);
                 }
+                finishUpdateGuardNanos += System.nanoTime() - guardStart;
             }
             // ======================================================
         
@@ -397,9 +562,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 // result.setStatus(CompostateDUC.Status.GOAL);
                 result.setBestControllable(0, null);
             }
-            if (checkErrorWithEnforce(result) || heuristic.fullyExplored(result)) {
+            long safetyCheckStart = System.nanoTime();
+            boolean enforceError = checkErrorWithEnforce(result);
+            enforceSafetyCheckNanos += System.nanoTime() - safetyCheckStart;
+            if (enforceError || heuristic.fullyExplored(result)) {
                 setError(result);
             }
+            newStateRegistrationNanos += System.nanoTime() - registrationStart;
+        } else {
+            existingCompostateHitCount++;
         }
         return result;
     }
@@ -508,7 +679,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     public boolean isTrace(int ltsIndex, long markingState) {
 
         // 1. Old Controller (OC)
-        // ★修正：beginUpdate が発火した瞬間（State 1以上）にトレースを OFF にする。
+        // beginUpdate 発火後（State 1 以上）は旧コントローラを trace から外す。
         if (ltsIndex == idxOC) {
             return (markingState == 0);
         }
@@ -571,10 +742,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     // =====================================================================
-    // ★修正版: expandDUC (非決定的遷移に完全対応し、複数の子状態を展開する)
+    // expandDUC: 非決定的遷移を考慮し、複数の子状態をまとめて展開する。
     // =====================================================================
     void expandDUC(CompostateDUC<State, Action> state, HAction<State, Action> action) {
-        // ★追加: 重複展開のチェック
+        // 同じ状態・アクションの重複展開を検知する。
         Set<CompostateDUC<State, Action>> alreadyExplored = state.getExploredChildren().getImage(action);
         if (alreadyExplored != null && !alreadyExplored.isEmpty()) {
             log("!!! [ALARM] Redundant Expansion detected!");
@@ -587,16 +758,23 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 1. ブロック条件のチェック
         boolean blocked = false;
-        if (action.toString().equals(UpdateConstants.FINISH_UPDATE) && !checkHotswapEndCondition(state)) {
-            blocked = true;
+        if (action.toString().equals(UpdateConstants.FINISH_UPDATE)) {
+            long guardStart = System.nanoTime();
+            finishUpdateGuardChecks++;
+            boolean hotswapEndAllowed = checkHotswapEndCondition(state);
+            finishUpdateGuardNanos += System.nanoTime() - guardStart;
+            if (!hotswapEndAllowed) {
+                blocked = true;
+                finishUpdateGuardBlockedCount++;
+            }
         }
 
         // 2. 次の状態（生のリストの直積リスト）の取得
         List<List<State>> allNextStates = null;
         if (!blocked) {
-            // long s1 = System.currentTimeMillis();
+            long successorStart = System.nanoTime();
             allNextStates = getChildStatesDUC_Nondet(state, action);
-            // DUCProfiler.timeSync += (System.currentTimeMillis() - s1);
+            successorGenerationNanos += System.nanoTime() - successorStart;
         }
 
         if (allNextStates == null || allNextStates.isEmpty()) {
@@ -613,7 +791,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             //         state.getStatus(), state.isLive(), state.inOpen, state.isControlled(), state.getDepth(),
             //         state.hasGoalChild()));
             //log("  Marking State: " + getMarkingState(state));
-            // ★変更: Available Transitions の表示フォーマットを変更 (C/U付与)
+            // 利用可能な遷移に C/U を付けてログへ出力する。
             StringBuilder transSb = new StringBuilder();
             transSb.append("[");
             Iterator<HAction<State, Action>> it = state.getTransitions().iterator();
@@ -646,30 +824,34 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return;
         }
 
-        // 3. 非決定的分岐（全ての次状態）を一つずつ生成して、"すべて"探索ツリーに繋ぐ
+        // 3. 非決定的分岐（全ての次状態）を一つずつ生成し、全て探索ツリーに接続する。
         List<CompostateDUC<State, Action>> children = new ArrayList<>();
+        generatedChildCount += allNextStates.size();
         for (List<State> nextStates : allNextStates) {
-            // long s2 = System.currentTimeMillis();
             CompostateDUC<State, Action> child = buildCompostate(nextStates, state);
-            // DUCProfiler.timeLookup += (System.currentTimeMillis() - s2);
 
-            if (isError(child) && debugLogEnabled) {
-                log(String.format("  [Safety-Violation] Action '%s' leads to ERROR state -> %s", action, child.getStates()));
+            if (isError(child)) {
+                safetyViolationChildCount++;
+                if (debugLogEnabled) {
+                    log(String.format("  [Safety-Violation] Action '%s' leads to ERROR state -> %s", action, child.getStates()));
+                }
             }
 
             // ツリー構造への登録だけを先に行う
+            long childRegistrationStart = System.nanoTime();
             state.addChild(action, child);
             child.addParent(action, state);
             children.add(child);
+            childRegistrationNanos += System.nanoTime() - childRegistrationStart;
         }
 
-        // ★修正箇所: 全ての分岐を登録し終わってから、一気に explore を評価する
+        // 全ての分岐を登録し終わってから explore を評価する。
         for (CompostateDUC<State, Action> child : children) {
-            // long s3 = System.nanoTime();
             heuristic.notifyExpandingState(state, action, child);
+            long exploreStart = System.nanoTime();
             explore(state, action, child);
+            exploreNanos += System.nanoTime() - exploreStart;
             child.setExpanded();
-            // DUCProfiler.timeNewStateInit += (System.nanoTime() - s3);
         }
 
         // 4. heuristic.expansionDone への完了通知
@@ -683,7 +865,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
         if (allGoals) {
-            heuristic.notifyExpansionDidntFindAnything(state, action, sampleChild); // ★バグ防止のため通知変更
+            heuristic.notifyExpansionDidntFindAnything(state, action, sampleChild); // 全分岐が GOAL の場合も代表子を通知する。
             heuristic.expansionDone(state, action, null);
         } else {
             heuristic.expansionDone(state, action, sampleChild);
@@ -691,7 +873,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     // =====================================================================
-    // ★新規追加: getChildStatesDUC_Nondet (直積を計算し全ての遷移先を網羅)
+    // getChildStatesDUC_Nondet: 直積を計算し、全ての遷移先を列挙する。
     // =====================================================================
     private List<List<State>> getChildStatesDUC_Nondet(CompostateDUC<State, Action> state, HAction<State, Action> action) {
         List<State> parentStates = state.getStates();
@@ -704,6 +886,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // 各LTSコンポーネントが取り得る「次状態の集合」をリストに保持
         List<Set<State>> possibleStatesPerLTS = new ArrayList<>(ltssSize);
 
+        long componentSyncStart = System.nanoTime();
         for (int i = 0; i < ltssSize; ++i) {
             if (!isTrace(i, markingState)) {
                 Set<State> s = new HashSet<>();
@@ -729,7 +912,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 if (!found) s.add(curr);
                 possibleStatesPerLTS.add(s);
             }
-            // Standard Case
+            // 通常の同期ケース。
             else {
                 Set<State> image = lts.getTransitions(curr).getImage(rawAction);
                 if (image == null || image.isEmpty()) {
@@ -737,7 +920,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     if (isActive(i, markingState) && lts.getActions().contains(rawAction)) {
                         return null; // Active component だけが veto できる
                     }
-                    // Trace-only / inactive は無視して自己ループ
+                    // trace 専用または inactive のコンポーネントは自己ループとして扱う。
                     Set<State> s = new HashSet<>();
                     s.add(curr);
                     possibleStatesPerLTS.add(s);
@@ -746,23 +929,28 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
         }
+        componentSyncNanos += System.nanoTime() - componentSyncStart;
 
         // 全LTSの次状態候補から直積（Cartesian Product）を生成
         List<List<State>> cartesianProduct = new ArrayList<>();
+        long cartesianStart = System.nanoTime();
         generateCartesianProduct(possibleStatesPerLTS, 0, new ArrayList<State>(), cartesianProduct);
+        cartesianProductNanos += System.nanoTime() - cartesianStart;
 
         // startNewSpec の場合の Safety の同期(上書き)
         if (actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+            long safetySyncStart = System.nanoTime();
             for (List<State> childVector : cartesianProduct) {
                 applySafetySync(childVector);
             }
+            safetySyncNanos += System.nanoTime() - safetySyncStart;
         }
 
         return cartesianProduct;
     }
 
     // =====================================================================
-    // ★ヘルパーメソッド (直積計算とSafety同期)
+    // 直積計算と Safety 同期のためのヘルパーメソッド。
     // =====================================================================
     private void generateCartesianProduct(List<Set<State>> sets, int index, List<State> current, List<List<State>> result) {
         if (index == sets.size()) {
@@ -856,40 +1044,32 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return sb.toString();
     }
 
-    // /*
     private void explore(CompostateDUC<State, Action> parent, HAction<State, Action> action,
             CompostateDUC<State, Action> child) {
         if (isError(child) || child.heuristicStronglySuggestsIsError) {
             if (!isError(child))
                 setError(child);
 
-            // --- 計測：伝播 (Error) ---
-            // long sProp = System.nanoTime();
-
             propagateError(singleton(child), singleton(parent));
-
-            // DUCProfiler.timePropagation += (System.nanoTime() - sProp);
         } else if (isGoal(child)) {
             parent.setHasGoalChild(action);
 
-            // --- 計測：伝播 (Goal) ---
-            // long sProp = System.nanoTime();
-
             propagateGoal(singleton(child), singleton(parent));
-
-            // DUCProfiler.timePropagation += (System.nanoTime() - sProp);
         }
         else {
-            // --- 計測：ループ検知 ---
-            // long sLoop = System.nanoTime();
+            long loopStart = System.nanoTime();
+            loopDetectionCalls++;
             boolean isLoop = closingALoop(parent, child);
             if (isLoop) {
                 gatherLoopStates(child);
             }
-            // DUCProfiler.timeLoopCheck += (System.nanoTime() - sLoop);
+            loopDetectionNanos += System.nanoTime() - loopStart;
 
             if (isLoop) {
-                // ループ処理ロジック
+                detectedLoopCount++;
+                // 更新前のループは、旧コントローラを環境化して探索しているために現れる。
+                // これは更新進行の失敗ではなく、旧コントローラ上の別状態からも
+                // beginUpdate への経路を確認する必要があることを意味する。
                 boolean isPreUpdateLoop = true;
                 for (CompostateDUC<State, Action> s : loop) {
                     if (getMarkingState(s) != 0) {
@@ -899,18 +1079,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
 
                 if (isPreUpdateLoop) {
-                    // --- 計測：Phase 2 強制起動 (伝播扱い) ---
-                    // long sProp = System.nanoTime();
+                    preUpdateLoopExceptionCount++;
+                    // 旧コントローラ上のループは ERROR にせず、勝ち状態の固定点計算を進める。
                     propagateGoal(new HashSet<>(), singleton(parent));
-                    // DUCProfiler.timePropagation += (System.nanoTime() - sProp);
                 } else {
-                    // --- 計測：不動点計算 (Heavy!) ---
-                    // long sFP = System.nanoTime();
+                    // 更新中のループは fairness の方針に従って判定する。
+                    long fairnessStart = System.nanoTime();
+                    fairnessAnalysisCalls++;
                     if (probablyWinningStates.size() > 0)
                         findNewGoals();
                     else
                         findNewErrors();
-                    // DUCProfiler.timeFixedPoint += (System.nanoTime() - sFP);
+                    fairnessAnalysisNanos += System.nanoTime() - fairnessStart;
                 }
             } else {
                 heuristic.notifyExpansionDidntFindAnything(parent, action, child);
@@ -918,12 +1098,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         dag.clear();
     }
-    // */
 
     private void propagateGoal(Set<CompostateDUC<State, Action>> goals, Set<CompostateDUC<State, Action>> parents) {
-        // DUCProfiler.countPropGoalCalls++;
-        // long startTotal = System.nanoTime();
-        // long sP1 = System.nanoTime();
+        propagateGoalCalls++;
+        long startTotal = System.nanoTime();
+        long phase1Start = System.nanoTime();
 
         Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>(parents);
         Set<CompostateDUC<State, Action>> winners = new HashSet<>();
@@ -988,10 +1167,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
         }
-        // DUCProfiler.timeGoalPhase1 += (System.nanoTime() - sP1);
+        propagateGoalPhase1Nanos += System.nanoTime() - phase1Start;
 
-        // /*
-        // --- Phase 2: 不動点計算 (Strict Fairly Winning SCC) ---
+        // Phase 2: fairness のもとで勝ちとなる SCC を固定点計算する。
+        //
+        // 候補 SCC は、すべての uncontrollable 遷移が SCC 内または既に証明済みの
+        // GOAL に向かい、かつ finishUpdate へ fair に到達できる場合だけ採用する。
+        // ただし、uncontrollable 遷移で SCC 内に留まり続けられる場合、通常の
+        // controllable 脱出口だけでは fairness の根拠にしない。更新プロトコルの
+        // action は canUseActionForFairReachability で別扱いする。
+        long phase2Start = System.nanoTime();
         boolean changed;
         do {
             changed = false;
@@ -1003,9 +1188,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     candidates.add(s);
                 }
             }
-
-            // DUCProfiler.totalCandidatesProcessed += candidates.size();
-            // DUCProfiler.timeGoalPhase2Init += (System.nanoTime() - sP2Init);
+            totalFairnessCandidatesProcessed += candidates.size();
 
             if (candidates.isEmpty()) break;
 
@@ -1013,11 +1196,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             boolean innerChanged;
             Map<CompostateDUC<State, Action>, Integer> dist = new HashMap<>();
 
-            // ★重要：U-Safetyの崩壊と距離計算を収束するまで繰り返すループ
+            // U-safety と fair 到達性の両方が安定するまで候補集合を絞り込む。
             do {
                 innerChanged = false;
 
-                // 1. U-Safety Filter: 環境の動きでCandidate外に追い出されないか
+                // 1. U-safety フィルタ: 環境が候補集合の外へ出られるのは、
+                // 既に証明済みの GOAL に向かう場合だけでなければならない。
                 Iterator<CompostateDUC<State, Action>> it = candidates.iterator();
                 while (it.hasNext()) {
                     CompostateDUC<State, Action> s = it.next();
@@ -1044,13 +1228,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                 if (candidates.isEmpty()) break;
 
-                // 2. Reachability Filter (Queue-based BFS)
+                // 2. fair 到達性フィルタ。
                 dist.clear();
                 Deque<CompostateDUC<State, Action>> distQueue = new ArrayDeque<>();
 
-                // 1) 最初に、直接GOALに繋がっている安全な手を1巡だけ探す
+                // 証明済み GOAL へ 1 手で到達できる状態を距離計算の始点にする。
                 for (CompostateDUC<State, Action> s : candidates) {
                     for (HAction<State, Action> action : s.getTransitions()) {
+                        if (!canUseActionForFairReachability(s, action, candidates)) {
+                            continue;
+                        }
                         Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
                         if (children != null && !children.isEmpty()) {
                             boolean allGoals = true;
@@ -1068,7 +1255,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     }
                 }
 
-                // 2) キューを使って、距離が確定したノードから親へ向かって波及させる
+                // 候補集合の内側で fair 距離を逆向きに伝播する。
                 while (!distQueue.isEmpty()) {
                     CompostateDUC<State, Action> current = distQueue.poll();
                     
@@ -1076,6 +1263,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         CompostateDUC<State, Action> parent = pRel.getSecond();
                         if (candidates.contains(parent)) {
                             HAction<State, Action> actionFromParent = pRel.getFirst();
+                            if (!canUseActionForFairReachability(parent, actionFromParent, candidates)) {
+                                continue;
+                            }
                             
                             boolean validMove = true;
                             int maxChildD = 0;
@@ -1095,7 +1285,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                                 int oldDist = dist.getOrDefault(parent, Integer.MAX_VALUE);
                                 if (newDist < oldDist) {
                                     dist.put(parent, newDist);
-                                    // ★距離が更新された親だけを再評価対象にする
                                     if (!distQueue.contains(parent)) {
                                         distQueue.add(parent);
                                     }
@@ -1105,7 +1294,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     }
                 }
 
-                // ★重要：GOALへ到達不可能な閉じたループ（距離が無限大）を候補から削除
+                // finishUpdate への fair 経路を持たない閉じた成分を候補から外す。
                 it = candidates.iterator();
                 while (it.hasNext()) {
                     CompostateDUC<State, Action> s = it.next();
@@ -1115,9 +1304,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     }
                 }
 
-            } while (innerChanged); // ★U-SafetyまたはReachabilityで削除があった場合、再検証する
+            } while (innerChanged);
 
-            // 残ったCandidate群は「安全」かつ「必ずGOALへ行ける」ことが証明された
+            // 残った候補は U-safe であり、GOAL への fair 経路を持つ。
             if (!candidates.isEmpty()) {
                 Map<CompostateDUC<State, Action>, HAction<State, Action>> exitActions = new HashMap<>();
                 for (CompostateDUC<State, Action> s : candidates) {
@@ -1125,6 +1314,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     int bestDist = Integer.MAX_VALUE;
 
                     for (HAction<State, Action> action : s.getTransitions()) {
+                        if (!canUseActionForFairReachability(s, action, candidates)) {
+                            continue;
+                        }
                         Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
                         if (children != null && !children.isEmpty()) {
                             boolean validMove = true;
@@ -1133,7 +1325,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                                 if (isGoal(child)) {
                                     maxChildD = Math.max(maxChildD, 0);
                                 } else if (candidates.contains(child)) {
-                                    // ★注意: dist.get(child) は必ず存在することが保証されている
                                     maxChildD = Math.max(maxChildD, dist.get(child));
                                 } else {
                                     validMove = false; break;
@@ -1144,7 +1335,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                                     bestDist = maxChildD;
                                     bestAction = action;
                                 } else if (maxChildD == bestDist && bestAction != null && !bestAction.isControllable() && action.isControllable()) {
-                                    bestAction = action; // 同じ距離ならCアクションを優先
+                                    bestAction = action;
                                 }
                             }
                         }
@@ -1157,7 +1348,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     changed = true;
                 }
 
-                // Phase 2 波及処理 (Phase 1と同じロジックを親に適用)
+                // 新しく証明された SCC から通常の GOAL 伝播を再開する。
                 while (!queue.isEmpty()) {
                     CompostateDUC<State, Action> current = queue.poll();
                     if (isGoal(current)) continue;
@@ -1201,15 +1392,80 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     }
                 }
             }
-            // DUCProfiler.timeGoalPhase2Loop += (System.nanoTime() - sP2Loop);
-
         } while (changed);
-        //  */
-
+        propagateGoalPhase2Nanos += System.nanoTime() - phase2Start;
         if (!winners.isEmpty()) {
             updateDistances(goals, winners, winners.size());
         }
-        // DUCProfiler.timePropagateGoalTotal += (System.nanoTime() - startTotal);
+        propagateGoalNanos += System.nanoTime() - startTotal;
+    }
+
+    private boolean canUseActionForFairReachability(
+            CompostateDUC<State, Action> state,
+            HAction<State, Action> action,
+            Set<CompostateDUC<State, Action>> candidates) {
+
+        if (!action.isControllable()) {
+            return true;
+        }
+
+        // 更新前状態は、更新中に仮定する fairness の対象外である。
+        // 旧コントローラ上の action が uncontrollable loop を作っていても、
+        // beginUpdate は旧コントローラ状態空間からの有効な進行辺として残す。
+        if (getMarkingState(state) == 0 && action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+            return true;
+        }
+
+        // 更新プロトコル action は update controller 内部の進行ステップである。
+        // 環境 action が同じ SCC に戻れる場合でも fair 脱出口として扱う。
+        // これを許さないと、環境の interleaving だけで通常の更新手順まで
+        // 勝てない扱いになってしまう。
+        if (isUpdateProtocolAction(action)) {
+            return true;
+        }
+
+        // 環境 fairness は controllable 脱出口の発火を強制できない。
+        // uncontrollable 遷移で fair SCC 内に留まり続けられる場合、
+        // 同じ状態の通常 controllable 脱出口は finishUpdate への進行根拠にしない。
+        boolean rejected = hasUncontrollableSuccessorIn(state, candidates);
+        if (rejected) {
+            fairControllableExitRejectedCount++;
+            lastFairControllableExitRejectedSummary =
+                    "action=" + action + ", " + summarizeStateForDiagnostics(state)
+                    + ", candidatesByMarking=" + summarizeMarkingHistogram(candidates);
+        }
+        return !rejected;
+    }
+
+    private boolean isUpdateProtocolAction(HAction<State, Action> action) {
+        String actionName = action.toString();
+        return actionName.equals(UpdateConstants.STOP_OLD_SPEC)
+            || actionName.equals(UpdateConstants.RECONFIGURE)
+            || actionName.equals(UpdateConstants.START_NEW_SPEC)
+            || actionName.equals(UpdateConstants.FINISH_UPDATE);
+    }
+
+    private boolean hasUncontrollableSuccessorIn(
+            CompostateDUC<State, Action> state,
+            Set<CompostateDUC<State, Action>> candidates) {
+
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (action.isControllable()) {
+                continue;
+            }
+
+            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+            if (children == null || children.isEmpty()) {
+                continue;
+            }
+
+            for (CompostateDUC<State, Action> child : children) {
+                if (candidates.contains(child)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -1276,17 +1532,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     /**
-     * エラー（到達不能または安全性違反）の逆伝播処理
-     * Uncontrollableな遷移先がエラーなら親もエラー、
-     * Controllableな遷移先が全てエラーなら親もエラー、という論理で伝播します。
-     */
-    /**
      * キュー（Worklist）方式によるエラーの逆伝播処理。
+     * uncontrollable な遷移先が 1 つでも ERROR なら親も ERROR とし、
+     * controllable な遷移先が全て ERROR の場合も親を ERROR として伝播する。
      * 先祖の全スキャンを避け、ステータスが変化したノードの親のみを再評価します。
      */
-    // /*
     private void propagateError(Set<CompostateDUC<State, Action>> newErrors, Set<CompostateDUC<State, Action>> seedParents) {
-        // long start = System.nanoTime();
+        propagateErrorCalls++;
+        long start = System.nanoTime();
         statistics.incPropagateErrorsCalls();
 
         // 1. 処理対象を管理するキュー (重複を許さない集合も併用)
@@ -1330,16 +1583,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
         }
-        // DUCProfiler.timePropagateErrorTotal += (System.nanoTime() - start);
+        propagateErrorNanos += System.nanoTime() - start;
     }
-    // */
 
     /**
      * 補助メソッド: 指定された状態がエラーになるべきか判定する
      */
-    // /*
-    //reconfigureの非決定性を処理するための実装
-    //uncontrollableアクションだけになっても待機しない
+    // reconfigure の非決定性を処理し、uncontrollable action だけが残っても待機しない。
     private boolean checkIfShouldBecomeError(CompostateDUC<State, Action> state) {
         // A. 環境によって強制的にエラー（安全性違反やデッドロック）へ連れて行かれるか
         if (forcedToError(state)) return true;
@@ -1374,7 +1624,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (hasPotentialWinningMove) break; // Cアクションでの勝ち筋が見つかればそれ以上探す必要なし
         }
 
-        // ★追加: Fairnessの仮説検証ログ
         if (!hasPotentialWinningMove && hasSafeUncontrollable && debugLogEnabled) {
             log("  [Fairness-Hypothesis-Check] State " + state.getStates() + " has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist.");
         }
@@ -1388,14 +1637,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // Controllable な手も、安全な Uncontrollable な手も残っていない場合はエラー
         return !hasPotentialWinningMove && !hasSafeUncontrollable;
     }
-    // */
 
     /**
-     * 環境(Uncontrollable)によってエラーに落とされるか、
-     * あるいはコントローラ(Controllable)が回避不能かを判定する
+     * 環境がエラーを強制できる場合、または完全探索後に安全な手が残っていない場合に true を返す。
      */
-    // /*
-    //reconfigureの非決定性を処理するための実装　まだ動作確認してない
     private boolean forcedToError(CompostateDUC<State, Action> state) {
         boolean fullyExplored = heuristic.fullyExplored(state);
         boolean existsSafeMove = false;
@@ -1404,12 +1649,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
             
             if (!action.isControllable()) {
-                // Uアクション: 1つでもERRORがあれば、環境に殺されるので即アウト
+                // uncontrollable action は環境が選べるため、1 つでも ERROR 後続があれば失敗を強制され得る。
                 if (children != null) {
                     for (CompostateDUC<State, Action> child : children) {
                         if (isError(child)) {
 
-                            // ★検証用ログ
                             if (debugLogEnabled) log("  [Forced-Error] Uncontrollable action '" + action + "' leads to ERROR. Environment can force failure.");
 
                             return true;
@@ -1418,7 +1662,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
                 existsSafeMove = true;
             } else {
-                // Cアクション: すべての分岐がERRORでない場合のみ「安全な逃げ道」とみなす
+                // controllable action は、非決定的な後続が全て ERROR を避ける場合だけ安全に選べる。
                 if (children != null && !children.isEmpty()) {
                     boolean allSafe = true;
                     for (CompostateDUC<State, Action> child : children) {
@@ -1437,17 +1681,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return false;
         }
 
-        // ★検証用ログ
         if (fullyExplored && debugLogEnabled) {
             log("  [Forced-Error] State " + state.getStates() + " has NO safe moves left (fully explored). Marking as ERROR.");
         }
 
         return fullyExplored;
     }
-    // */
 
     private void gatherLoopStates(CompostateDUC<State, Action> child) {
-        probablyWinningStates.clear(); // ここではError候補として使う
+        probablyWinningStates.clear();
         loop = new HashSet<>();
         auxiliarListStates.clear();
         auxiliarListStates.add(child);
@@ -1462,30 +1704,33 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         auxiliarListStates.clear();
 
-        // ループに含まれる状態を全て「勝利候補(＝この文脈では処理対象)」に入れる
+        // ループ内の全状態を fair winning 固定点計算の候補にする。
         probablyWinningStates.addAll(loop);
     }
 
     /**
-     * OTF-DUCはReachability問題なので、ループはLiveness違反（ゴール到達不可）とみなす。
-     * したがって、ループが見つかったら `findNewGoals` ではなく `findNewErrors` で処理すべきだが、
-     * 既存ロジックとの整合性のため、ループ状態を全てErrorにする処理を実装する。
+     * OTF-DUC は到達性問題だが、更新中の進行は環境 fairness のもとで判定する。
+     * beginUpdate 後のループは、固定点計算で finishUpdate への fair 経路を
+     * 証明できる場合だけ勝ちとし、それ以外は ERROR 候補として解析する。
      */
     private void findNewGoals() {
-        // Reachability to Marking 9 において、Marking 9を含まないループはゴールになり得ない。
-        // ここに到達するということはループがあるが、それはLivelock（更新が進まない）を意味する。
-        // したがって、これをエラーとして処理する。
+        statistics.incFindNewGoalsCalls();
+
+        if (tryPromoteFairLoopToGoal()) {
+            return;
+        }
+
         findNewErrors();
     }
 
-    // /*
-    //ループ判定の緩和
     private void findNewErrors() {
         statistics.incFindNewErrorsCalls();
 
         boolean hasEscapeHatch = false;
 
-        boolean hasUncontrollableWait = false; // ★検証用フラグ：安全なUncontrollableアクションが存在するか
+        boolean hasUncontrollableWait = false;
+        boolean hasUnexploredUncontrollable = false;
+        boolean hasOpenUncontrollableExit = false;
 
         if (debugLogEnabled) {
             log("  [Loop-Analysis] Analyzing detected loop for escape hatches (Unexplored C-actions)...");
@@ -1493,21 +1738,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         for (CompostateDUC<State, Action> s : loop) {
 
-            // ▼▼▼ 仮説検証用：ループ内各状態における Controllable アクションの詳細出力 ▼▼▼
             if (debugLogEnabled) {
                 log("    Analyzing State: " + s.getStates());
             }
-            // ▲▲▲ 追加ここまで ▲▲▲
 
-            // List<String> unexploredCActions = new ArrayList<>();
             for (HAction<State, Action> a : s.getTransitions()) {
 
                 Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
 
                 if (a.isControllable()) {
-                    // Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
-
-                    // ▼▼▼ 仮説検証用：アクションが「探索済み」の場合の遷移先ステータスを出力 ▼▼▼
                     if (debugLogEnabled) {
                         if (children != null && !children.isEmpty()) {
                             StringBuilder sb = new StringBuilder();
@@ -1520,18 +1759,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                             log("      -> Controllable [" + a + "]: UNEXPLORED (Escape Hatch Found!)");
                         }
                     }
-                    // ▲▲▲ 追加ここまで ▲▲▲
 
-                    // まだ展開されていないControllableアクションを探す
                     if (children == null || children.isEmpty()) {
                         hasEscapeHatch = true;
-                        // if (debugLogEnabled) {
-                        //     unexploredCActions.add(a.toString());
-                        // }
                     }
                     else{
-                        // 探索済みの場合、そのアクションの「すべての」遷移先がERRORでないかを確認
-                        // (Controllableなアクションは、環境の非決定性によってERRORへ落ちるリスクがない限り有効)
+                        // controllable action は、探索済みの非決定分岐がすべて
+                        // ERROR を避ける場合に限り、まだ有効な脱出口候補である。
                         boolean leadsToError = false;
                         for (CompostateDUC<State, Action> child : children) {
                             if (isError(child)) {
@@ -1540,14 +1774,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                             }
                         }
                         if (!leadsToError) {
-                            hasEscapeHatch = true; // NONE または GOAL へ繋がる安全な脱出口
+                            hasEscapeHatch = true;
                         }
                     }
                 }
                 else{
-                    // ★検証用ロジック：Uncontrollableアクションの状況を確認
                     if (children == null || children.isEmpty()) {
                         hasUncontrollableWait = true;
+                        hasUnexploredUncontrollable = true;
                         if (debugLogEnabled) {
                             log("      -> Uncontrollable [" + a + "]: UNEXPLORED (Potential Wait Found!)");
                         }
@@ -1561,6 +1795,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
                         if (allSafe) {
                             hasUncontrollableWait = true;
+                            for (CompostateDUC<State, Action> child : children) {
+                                if (child.isStatus(Status.NONE) && !loop.contains(child)) {
+                                    hasOpenUncontrollableExit = true;
+                                    break;
+                                }
+                            }
                             if (debugLogEnabled) {
                                 log("      -> Uncontrollable [" + a + "]: Explored and Safe (Potential Wait Found!)");
                             }
@@ -1571,45 +1811,338 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
                     }
                 }
-                if (hasEscapeHatch) break;
             }
-            if (hasEscapeHatch) break;
-            // if (debugLogEnabled && !unexploredCActions.isEmpty()) {
-            //     log("    State " + s.getStates() + " -> hasUnexploredC: true " + unexploredCActions);
-            // }
         }
 
-        // 未探索のControllableアクション（脱出口）が残っている場合は、エラーにせず探索を継続させる
-        if (hasEscapeHatch) {
+        // 未探索の uncontrollable 挙動がある場合、ループを勝ち/負けと
+        // 判定するにはまだ情報が足りない。
+        if (hasUnexploredUncontrollable) {
             if (debugLogEnabled) {
-                log("  [Livelock-Relaxation] Loop detected, but unexplored Controllable actions exist. Postponing ERROR marking to explore escape hatches.");
+                log("  [Fairness-Wait] Loop has an unexplored Uncontrollable action. Postponing ERROR marking.");
             }
             return;
         }
 
-        // ★検証用ログ出力：仮説が正しいかどうかの確認
-        if (hasUncontrollableWait && debugLogEnabled) {
-            log("  [Fairness-Hypothesis-Check] Loop has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist!");
-            log("  [Fairness-Hypothesis-Check] If we assume environment fairness, we shouldn't mark this as ERROR. But current logic will.");
+        // uncontrollable 遷移でループ外の NONE 状態へ出られるなら、
+        // まだ閉じた負けループとは扱わない。
+        if (hasOpenUncontrollableExit) {
+            if (debugLogEnabled) {
+                log("  [Fairness-Wait] Loop has a safe Uncontrollable exit to a NONE state. Postponing ERROR marking.");
+            }
+            return;
         }
 
-        // ▼▼▼ 仮説検証用：ループ全体を ERROR に落とす直前の通知ログ ▼▼▼
+        // 閉じた安全な uncontrollable ループは、fair 固定点計算で
+        // finishUpdate への経路を証明できる場合だけ受理する。
+        if (hasUncontrollableWait) {
+            if (tryPromoteFairLoopToGoal()) {
+                if (debugLogEnabled) {
+                    log("  [Fairness-Goal] Safe Uncontrollable loop was accepted by fair goal propagation.");
+                }
+                return;
+            }
+        }
+
+        // controllable 脱出口だけを持つループは、さらに探索する余地を残す。
+        // ただし安全な uncontrollable ループも残っている場合、通常 controllable
+        // 脱出口だけでは fairness の根拠にしない。
+        if (hasEscapeHatch && !hasUncontrollableWait) {
+            if (debugLogEnabled) {
+                log("  [Livelock-Relaxation] Loop detected, but Controllable escape hatches exist and no Uncontrollable loop remains. Postponing ERROR marking.");
+            }
+            return;
+        }
+
+        if (hasUncontrollableWait && debugLogEnabled) {
+            log("  [Fairness-Hypothesis-Check] Loop has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist!");
+            log("  [Fairness-Hypothesis-Check] Fair propagation could not prove a path to finishUpdate. Marking as ERROR.");
+        }
+
         if (debugLogEnabled) {
             log("  [Loop-Mark-Error] NO unexplored Controllable actions found in this cycle. Marking the entire loop as ERROR.");
         }
-        // ▲▲▲ 追加ここまで ▲▲▲
 
-        // 脱出口がない場合のみ、ループ内の全状態をエラーにする
+        loopErrorCount++;
+        lastLoopErrorSummary = buildLoopErrorSummary(
+                hasEscapeHatch,
+                hasUncontrollableWait,
+                hasUnexploredUncontrollable,
+                hasOpenUncontrollableExit);
+
         for (CompostateDUC<State, Action> state : loop) {
             setError(state);
         }
 
-        // 初期状態がエラーでなければ伝播させる
         if (!isError(initial)) {
             propagateError(loop, null);
         }
     }
-    // */
+
+    private boolean tryPromoteFairLoopToGoal() {
+        if (loop == null || loop.isEmpty()) {
+            return false;
+        }
+
+        long promotionStart = System.nanoTime();
+        Set<CompostateDUC<State, Action>> loopSnapshot = new HashSet<>(loop);
+        propagateGoal(new HashSet<>(), loopSnapshot);
+
+        for (CompostateDUC<State, Action> state : loopSnapshot) {
+            if (isGoal(state)) {
+                fairPromotedLoopCount++;
+                fairPromotionNanos += System.nanoTime() - promotionStart;
+                return true;
+            }
+        }
+        fairPromotionNanos += System.nanoTime() - promotionStart;
+        return false;
+    }
+
+    private String buildLoopErrorSummary(
+            boolean hasEscapeHatch,
+            boolean hasUncontrollableWait,
+            boolean hasUnexploredUncontrollable,
+            boolean hasOpenUncontrollableExit) {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("loopSize=").append(loop == null ? 0 : loop.size());
+        sb.append(", hasControllableEscape=").append(hasEscapeHatch);
+        sb.append(", hasSafeUncontrollable=").append(hasUncontrollableWait);
+        sb.append(", hasUnexploredUncontrollable=").append(hasUnexploredUncontrollable);
+        sb.append(", hasOpenUncontrollableExit=").append(hasOpenUncontrollableExit);
+        sb.append(", markings=").append(summarizeMarkingHistogram(loop));
+
+        if (loop != null && !loop.isEmpty()) {
+            sb.append(", sampleStates=[");
+            int shown = 0;
+            for (CompostateDUC<State, Action> state : loop) {
+                if (shown >= 5) {
+                    sb.append("...");
+                    break;
+                }
+                if (shown > 0) sb.append("; ");
+                sb.append(summarizeStateForDiagnostics(state));
+                sb.append(", actions=").append(summarizeActionsForDiagnostics(state, 6));
+                shown++;
+            }
+            sb.append("]");
+        }
+        return sb.toString();
+    }
+
+    private void emitFailureDiagnostics() {
+        if (!debugLogEnabled || output == null) {
+            return;
+        }
+
+        output.outln("================ OTF-DUC FAILURE DIAGNOSTICS ================");
+        output.outln("Initial: " + summarizeStateForDiagnostics(initial));
+        output.outln("Compostates: " + (compostates == null ? 0 : compostates.size())
+                + ", exploredTransitions: " + countOTFTransitions());
+        output.outln("StatusByMarking: " + summarizeStatusByMarking());
+        output.outln("OpenNoneStates: " + countOpenNoneStates());
+        output.outln("ErrorMarks: " + errorMarkCount + ", LoopErrors: " + loopErrorCount);
+        output.outln("LastError: " + lastErrorSummary);
+        output.outln("LastLoopError: " + lastLoopErrorSummary);
+        output.outln("RejectedOrdinaryControllableFairExits: " + fairControllableExitRejectedCount);
+        if (fairControllableExitRejectedCount > 0) {
+            output.outln("LastRejectedOrdinaryControllableFairExit: " + lastFairControllableExitRejectedSummary);
+        }
+        output.outln("Debug trace file: " + LOG_FILE_PATH);
+        output.outln("=============================================================");
+    }
+
+    private String summarizeStatusByMarking() {
+        Map<String, Integer> counts = new HashMap<>();
+        if (compostates != null) {
+            for (CompostateDUC<State, Action> state : compostates.values()) {
+                String key = "m" + getMarkingState(state) + ":" + state.getStatus();
+                counts.put(key, counts.getOrDefault(key, 0) + 1);
+            }
+        }
+        return counts.toString();
+    }
+
+    private int countOpenNoneStates() {
+        int count = 0;
+        if (compostates != null && heuristic != null) {
+            for (CompostateDUC<State, Action> state : compostates.values()) {
+                if (state.isStatus(Status.NONE) && state.isLive() && !heuristic.fullyExplored(state)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private String summarizeMarkingHistogram(Set<CompostateDUC<State, Action>> states) {
+        Map<Long, Integer> counts = new HashMap<>();
+        if (states != null) {
+            for (CompostateDUC<State, Action> state : states) {
+                Long marking = getMarkingState(state);
+                counts.put(marking, counts.getOrDefault(marking, 0) + 1);
+            }
+        }
+        return counts.toString();
+    }
+
+    private String summarizeStateForDiagnostics(CompostateDUC<State, Action> state) {
+        if (state == null) {
+            return "null";
+        }
+
+        boolean fullyExplored = heuristic != null && heuristic.fullyExplored(state);
+        return "m=" + getMarkingState(state)
+                + ", status=" + state.getStatus()
+                + ", live=" + state.isLive()
+                + ", expanded=" + state.wasExpanded()
+                + ", fullyExplored=" + fullyExplored
+                + ", vector=" + state.getStates();
+    }
+
+    private String summarizeActionsForDiagnostics(CompostateDUC<State, Action> state, int maxActions) {
+        StringBuilder sb = new StringBuilder("[");
+        int shown = 0;
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (shown >= maxActions) {
+                sb.append("...");
+                break;
+            }
+            if (shown > 0) sb.append(", ");
+            sb.append(action).append(action.isControllable() ? "(C)" : "(U)");
+            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+            if (children == null || children.isEmpty()) {
+                sb.append("->UNEXP");
+            } else {
+                int goals = 0;
+                int errors = 0;
+                int none = 0;
+                for (CompostateDUC<State, Action> child : children) {
+                    if (isGoal(child)) {
+                        goals++;
+                    } else if (isError(child)) {
+                        errors++;
+                    } else {
+                        none++;
+                    }
+                }
+                sb.append("->G").append(goals).append("/E").append(errors).append("/N").append(none);
+            }
+            shown++;
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private void recordOtfDetailedEvaluation() {
+        recordOtfMarkingAndStatusBreakdown();
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 展開統計", "生成した child 数", generatedChildCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 展開統計", "新規 compostate 生成数", newCompostateCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 展開統計", "既存 compostate hit 数", existingCompostateHitCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 展開統計", "ERROR child 到達数", safetyViolationChildCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 展開統計", "finishUpdate guard block 回数", finishUpdateGuardBlockedCount, "回");
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC fairness / loop 統計", "検出した loop 数", detectedLoopCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC fairness / loop 統計", "更新前 m0 loop 例外扱い数", preUpdateLoopExceptionCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC fairness / loop 統計", "fairness により GOAL 昇格した loop 数", fairPromotedLoopCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC fairness / loop 統計", "ERROR と判定した loop 数", loopErrorCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC fairness / loop 統計", "ordinary controllable fair exit 拒否回数", fairControllableExitRejectedCount, "回");
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力 pruning 統計", "pruning 前の候補遷移数", directorCandidateTransitions, "本");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力 pruning 統計", "pruning 後の出力遷移数", directorOutputTransitions, "本");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力 pruning 統計", "削除した controllable 遷移数", prunedControllableTransitions, "本");
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC NC 接続統計", "finishUpdate 遷移数", finishUpdateTransitions, "本");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC NC 接続統計", "NC 接続成功数", ncConnectionSuccessCount, "本");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC NC 接続統計", "NC mapping miss 数", ncConnectionMissCount, "本");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC lookup table 統計", "new controller connection map entries", safeSize(newControllerConnectionMap), "件");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC lookup table 統計", "safety lookup table entries", countSafetyLookupEntries(), "件");
+    }
+
+    private void recordOtfMarkingAndStatusBreakdown() {
+        long countStart = System.currentTimeMillis();
+        Map<Long, long[]> byMarking = new TreeMap<>();
+        Map<String, Long> statusCounts = new TreeMap<>();
+
+        if (compostates != null) {
+            for (CompostateDUC<State, Action> state : compostates.values()) {
+                long marking = getMarkingState(state);
+                long[] counts = byMarking.computeIfAbsent(marking, k -> new long[2]);
+                counts[0]++;
+                counts[1] += countExploredTransitions(state);
+
+                String statusKey = "m" + marking + ":" + state.getStatus();
+                statusCounts.put(statusKey, statusCounts.getOrDefault(statusKey, 0L) + 1L);
+            }
+        }
+
+        long countTime = System.currentTimeMillis() - countStart;
+        boolean first = true;
+        for (Map.Entry<Long, long[]> entry : byMarking.entrySet()) {
+            long[] counts = entry.getValue();
+            if (entry.getKey() == 0L) {
+                UpdatingControllerEvaluationRecorder.recordBeginUpdateReferenceStates(counts[0]);
+            }
+            UpdatingControllerEvaluationRecorder.recordStateSpace(
+                    "OTF-DUC markingState 別探索規模",
+                    "markingState=" + entry.getKey(),
+                    counts[0],
+                    counts[1],
+                    first ? countTime : 0);
+            first = false;
+        }
+
+        for (Map.Entry<String, Long> entry : statusCounts.entrySet()) {
+            UpdatingControllerEvaluationRecorder.recordCount(
+                    "OTF-DUC 状態 status 内訳",
+                    entry.getKey(),
+                    entry.getValue(),
+                    "状態");
+        }
+    }
+
+    private long countExploredTransitions(CompostateDUC<State, Action> state) {
+        long count = 0;
+        for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> ignored : state.getExploredChildren()) {
+            count++;
+        }
+        return count;
+    }
+
+    private int countSafetyLookupEntries() {
+        int count = 0;
+        if (safetyStateLookupMap != null) {
+            for (Map<List<Integer>, Integer> map : safetyStateLookupMap.values()) {
+                if (map != null) {
+                    count += map.size();
+                }
+            }
+        }
+        return count;
+    }
+
+    private int safeSize(Map<?, ?> map) {
+        return map == null ? 0 : map.size();
+    }
 
     /**
      * ゴールまでの距離を更新し、Director構築用の最善手(BestChild)を設定する。
@@ -1618,7 +2151,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private void updateDistances(Set<CompostateDUC<State, Action>> seeds,
         Set<CompostateDUC<State, Action>> goalsToUpdate, int amountToUpdate) {
     
-        // long startTime = System.nanoTime();
+        long startTime = System.nanoTime();
     
         // 1. ArrayDequeを使用して、ループごとのHashSet生成（new HashSet）を排除
         Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
@@ -1631,7 +2164,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             
                 for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> childPair : s.getExploredChildren()) {
                     CompostateDUC<State, Action> child = childPair.getSecond();
-                    if (isGoal(child)) {
+                    if (isGoal(child) && !goalsToUpdate.contains(child)) {
                         int childDist = child.getBestControllable().getFirst();
                         int newDist = (childDist == -1) ? 0 : childDist + 1;
 
@@ -1684,22 +2217,19 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
 
-        // 以前の13msの正体をDUCProfilerに記録
-        // DUCProfiler.timeGoalDistUpdate += (System.nanoTime() - startTime);
+        propagateGoalDistanceUpdateNanos += System.nanoTime() - startTime;
     }
 
-    // /*
     private LTS<Long, Action> buildDirectorDUC() {
         // 1. 結果を格納する LTS の初期化
         // 状態 ID 0 を初期状態として設定（後に更新コントローラの初期 ID で上書き）
         LTSImpl<Long, Action> result = new LTSImpl<>(0L);
 
-        // ★修正: 探索アルゴリズム全体の alphabet.getActions() を一括登録するのをやめる。
-        // これにより、遷移図に登場しない "_old" アクションがアルファベット拡張として出力されるのを防ぐ。
+        // 探索用 alphabet を丸ごと登録すると、遷移図に出ない "_old" action まで
+        // アルファベット拡張として出力されるため、出力対象 action だけを登録する。
         // result.addActions(alphabet.getActions());
 
-        // 1. 全アクションの中から "_old" を含まないものだけを抽出して登録
-        // これにより、遷移図に現れる可能性のある全アクションを網羅しつつ、不要な表示を消す
+        // 1. 全 action の中から "_old" を含まないものだけを登録する。
         for (Action a : alphabet.getActions()) {
             if (!a.toString().endsWith("_old")) {
                 result.addAction(a);
@@ -1733,7 +2263,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
 
-        DUCProfiler.transferNCTime = System.currentTimeMillis() - transferNCStart;
+        transferNCTime = System.currentTimeMillis() - transferNCStart;
 
         // ---------------------------------------------------------
         // ステップ 2: 更新コントローラのグラフ構築と動的リンク
@@ -1745,6 +2275,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         result.setInitialState(ids.get(initial));
         queue.add(initial);
 
+        long directorTraversalStart = System.nanoTime();
         while (!queue.isEmpty()) {
             CompostateDUC<State, Action> current = queue.remove();
             Long currentId = ids.get(current);
@@ -1752,25 +2283,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : current.getExploredChildren()) {
                 HAction<State, Action> hAction = transition.getFirst();
                 CompostateDUC<State, Action> child = transition.getSecond();
+                directorCandidateTransitions++;
 
-                // 採用判定 (Anytime Hotswap 含む)
-                boolean toAdd = !hAction.isControllable();
-                if (hAction.isControllable()) {
-                    if (hAction.toString().equals(UpdateConstants.BEGIN_UPDATE) && isGoal(child)) {
-                        toAdd = true;
-                    } else if (current.actionToGoal != null && current.actionToGoal.equals(hAction)) {
-                        toAdd = true;
-                    } else {
-                        Pair<Integer, CompostateDUC<State, Action>> best = current.getBestControllable();
-                        if (best != null && best.getSecond() == child) {
-                            toAdd = true;
-                        }
-                    }
-                }
+                long pruningStart = System.nanoTime();
+                boolean toAdd = shouldAddDirectorTransition(current, hAction, child);
+                outputPruningDecisionNanos += System.nanoTime() - pruningStart;
+                outputPruningDecisionCalls++;
 
                 if (toAdd) {
+                    directorOutputTransitions++;
                     // finishUpdate の場合は NC への接続を試みる
                     if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
+                        finishUpdateTransitions++;
 
                         //評価実験用
                         long stitchingNCStart = System.currentTimeMillis();
@@ -1802,10 +2326,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         Long ncStateId = (signature != null) ? newControllerConnectionMap.get(signature) : null;
 
                         if (ncStateId != null) {
+                            ncConnectionSuccessCount++;
                             // NC マップで見つかった ID へ直接リンクを張る
                             if(debugLogEnabled) log("  [Stitch] Connecting " + current.getStates() + " --(finishUpdate)--> NC State " + ncStateId);
                             result.addTransition(currentId, hAction.getAction(), ncStateId);
                         } else {
+                            ncConnectionMissCount++;
                             // 制約5に基づき、エラー時は詳細なベクトルを出力
                             System.err.println("!!! [Stitch-Error] No NC state mapping found for signature: " + signature);
                             System.err.println("    Target child vector: " + child.getStates());
@@ -1813,7 +2339,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
 
                         //評価実験用
-                        DUCProfiler.stitchingNCTime += (System.currentTimeMillis() - stitchingNCStart);
+                        stitchingNCTime += (System.currentTimeMillis() - stitchingNCStart);
                     } else {
                         // 通常の遷移
                         if (!ids.containsKey(child)) {
@@ -1826,17 +2352,127 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         Action finalAction = (Action) actionName;
                         result.addTransition(currentId, finalAction, ids.get(child));
                     }
+                } else if (hAction.isControllable()) {
+                    prunedControllableTransitions++;
                 }
             }
         }
+        directorTraversalNanos += System.nanoTime() - directorTraversalStart;
         statistics.setControllerUsedStates(result.getStates().size());
         return result;
     }
-    // */
 
     /**
-     * 到達した子状態のベクトルから、StateMapper が解釈可能なシグネチャを生成する
+     * OTF-DUC の 2 フェーズ構造に従って出力 controller の遷移を選ぶ。
+     *
+     * - uncontrollable 遷移は合法性のため常に残す。
+     * - 更新前の beginUpdate は、勝ち更新パスを持つ旧コントローラ状態から残す。
+     * - 更新中の通常 controllable 遷移は、controllable livelock を出力しないように
+     *   選択済みの進行 action だけに pruning する。
+     * - 旧コントローラ部分と移設済み新コントローラ部分は、事前合成済み controller
+     *   として扱い、不当に pruning しない。
      */
+    private boolean shouldAddDirectorTransition(
+            CompostateDUC<State, Action> current,
+            HAction<State, Action> hAction,
+            CompostateDUC<State, Action> child) {
+
+        if (!hAction.isControllable()) {
+            logDirectorPruningDecision(current, hAction, child, true,
+                    "uncontrollable action is always preserved");
+            return true;
+        }
+
+        // anytime hotswap 要件: 勝ち更新パスを持つ旧コントローラ状態からは
+        // beginUpdate を出力に残す。
+        if (hAction.toString().equals(UpdateConstants.BEGIN_UPDATE) && isGoal(child)) {
+            logDirectorPruningDecision(current, hAction, child, true,
+                    "beginUpdate from a winning pre-update state");
+            return true;
+        }
+
+        HAction<State, Action> selected = getSelectedControllableAction(current);
+        boolean toAdd = selected != null && selected.equals(hAction);
+        if (toAdd) {
+            logDirectorPruningDecision(current, hAction, child, true,
+                    "selected controllable action");
+        } else {
+            String selectedName = selected == null ? "none" : selected.toString();
+            logDirectorPruningDecision(current, hAction, child, false,
+                    "not selected; selected controllable=" + selectedName
+                            + ", actionToGoal=" + describeAction(current.actionToGoal)
+                            + ", bestControllable=" + describeBestControllable(current));
+        }
+        return toAdd;
+    }
+
+    private void logDirectorPruningDecision(
+            CompostateDUC<State, Action> current,
+            HAction<State, Action> hAction,
+            CompostateDUC<State, Action> child,
+            boolean kept,
+            String reason) {
+        if (!debugLogEnabled) {
+            return;
+        }
+        log("  [Director-Pruning] " + (kept ? "KEEP " : "PRUNE ")
+                + hAction
+                + " from " + summarizeStateForDiagnostics(current)
+                + " to " + summarizeStateForDiagnostics(child)
+                + " :: " + reason);
+    }
+
+    private String describeAction(HAction<State, Action> action) {
+        if (action == null) {
+            return "none";
+        }
+        return action.toString() + (action.isControllable() ? "(C)" : "(U)");
+    }
+
+    private String describeBestControllable(CompostateDUC<State, Action> state) {
+        Pair<Integer, CompostateDUC<State, Action>> best = state.getBestControllable();
+        if (best == null || best.getFirst() == null || best.getFirst() < 0) {
+            return "none";
+        }
+        CompostateDUC<State, Action> bestChild = best.getSecond();
+        if (bestChild == null) {
+            return "distance=" + best.getFirst() + ", child=none";
+        }
+        return "distance=" + best.getFirst()
+                + ", child=" + summarizeStateForDiagnostics(bestChild);
+    }
+
+    private HAction<State, Action> getSelectedControllableAction(CompostateDUC<State, Action> current) {
+        Pair<Integer, CompostateDUC<State, Action>> best = current.getBestControllable();
+
+        if (best != null && best.getFirst() != null && best.getFirst() >= 0) {
+            CompostateDUC<State, Action> bestChild = best.getSecond();
+
+            // bestChild が null の場合、最短の証明済み経路は uncontrollable 経由で
+            // 進むことを意味する。ただし、探索時に controllable の勝ち筋
+            // (actionToGoal) も記録されている場合がある。ここで即 return すると、
+            // beginUpdate 後の stopOldSpec など、更新プロトコルを進めるための
+            // controllable action まで pruning してしまうため、下の actionToGoal
+            // fallback に進ませる。
+            if (bestChild == null) {
+                // fall through
+            } else {
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : current.getExploredChildren()) {
+                    HAction<State, Action> action = transition.getFirst();
+                    if (action.isControllable() && transition.getSecond() == bestChild) {
+                        return action;
+                    }
+                }
+            }
+        }
+
+        if (current.actionToGoal != null && current.actionToGoal.isControllable()) {
+            return current.actionToGoal;
+        }
+
+        return null;
+    }
+
     /**
      * 指定された状態から、新コントローラ照合用のシグネチャを生成する
      * 翻訳不能な環境状態が含まれる場合は null を返す
@@ -1869,7 +2505,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return sb.toString();
     }
 
-    // /*
     public boolean isGoal(CompostateDUC<State, Action> state) {
         return state.isStatus(Status.GOAL);
     }
@@ -1883,43 +2518,42 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public void setError(CompostateDUC<State, Action> state) {
-        // ★追加: エラー判定された状態をログ出力
+        if (!isError(state)) {
+            errorMarkCount++;
+        }
+        lastErrorSummary = summarizeStateForDiagnostics(state);
+
         log("[ERROR DETECTED] State marked as ERROR: " + state.getStates());
-        // ステータス更新
         state.setStatus(Status.ERROR);
 
-        // ★修正点3: エラー発生時もヒューリスティックに通知する
         heuristic.notifyStateSetErrorOrGoal(state);
     }
-    // */
 
-    // ★追加: アクションがブロックされている原因を探る診断メソッド
+    /**
+     * 直積を構成する各コンポーネントで、指定 action がなぜ有効/無効かを調べる
+     * デバッグ用ヘルパ。
+     */
     private void debugCheckActionAvailability(CompostateDUC<State, Action> state, String actionName) {
         log("  [DEBUG] Diagnosing action: " + actionName);
         long markingState = getMarkingState(state);
 
         for (int i = 0; i < ltssSize; ++i) {
-            // ★修正: Trace対象外のコンポーネントもスキップせずに診断する
-            // if (!isTrace(i, markingState)) continue;
-
             LTS<State, Action> lts = ltss.get(i);
             State curr = state.getStates().get(i);
 
-            // ★追加: 正規化された状態 (-2L) のチェック
-            // トレース対象外のコンポーネントは実機LTSに状態が存在しないため、
-            // getTransitions を呼ぶと NPE や例外の原因となる。
+            // trace 対象外のコンポーネントは正規化されており、元の LTS 上に
+            // 対応する具象状態を持たない。
             if (curr instanceof Long && (Long) curr == -2L) {
                 log(String.format("    LTS %d : IGNORED (Normalized State -2L, Trace=OFF) (State=%s)", i, curr));
                 continue;
             }
             
             boolean enforce = isEnforce(i, markingState);
-            boolean trace = isTrace(i, markingState); // ★追加: Trace状態を取得
+            boolean trace = isTrace(i, markingState);
 
             boolean hasTransition = false;
             boolean hasActionInAlphabet = false;
 
-            // 1. アルファベットに含まれているか確認 (String比較)
             for (Action a : lts.getActions()) {
                 if (a.toString().equals(actionName)) {
                     hasActionInAlphabet = true;
@@ -1927,7 +2561,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
 
-            // 2. 現在の状態から遷移できるか確認 (String比較)
             BinaryRelation<Action, State> origTrans = lts.getTransitions(curr);
             if (origTrans != null) {
                 for (Pair<Action, State> trans : origTrans) {
@@ -1941,17 +2574,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             String status = "";
             if (hasTransition) {
                 if (!trace) {
-                    // ★追加: 遷移はあるが、Trace=OFFなので採用されない（これが意図した動作かは文脈によるが、今回のバグの原因ではない）
                     status = "IGNORED (Trace=OFF) (Transition exists but Trace=OFF)";
                 } else {
                     status = "OK (Transition found)";
                 }
             } else if (hasActionInAlphabet) {
                 if (!trace) {
-                    // ★追加: Trace=OFF かつ Alphabetに含まれる -> updateAllowedSetForComponent でブロックされる原因
                     status = "!!! BLOCKED (Trace=OFF) !!! (In Alphabet, but Trace=FALSE blocks everything)";
                 } else if (enforce) {
-                    // アルファベットにあるのに遷移がなく、かつEnforceなら「ブロック」の原因
                     status = "!!! BLOCKED !!! (In Alphabet, Enforce=TRUE, but no transition)";
                 } else {
                     status = "ALLOWED (In Alphabet, Enforce=FALSE, so no transition is OK)";
@@ -1964,121 +2594,112 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
-    /**
- * OTF-DUCのパフォーマンス計測用プロファイラ
- */
-public static class DUCProfiler {
-    // public static long timeExpansion = 0;   // 状態展開（LTS同期）
-    // public static long timeEval = 0;        // evalメソッド（ヒューリスティック計算+ソート）
-    // public static long timeRecompute = 0;   // recomputeEstimates（フロンティアの再評価）
-    // public static long timeFrontier = 0;    // PriorityQueueの操作
+    private void recordOtfDcsTimingEvaluation() {
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "DCS (OTF-DUC)", "synthesizeDUC 実行時間", synthesizeDUCTime);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "DCS (OTF-DUC)",
+                "DCS で探索した状態数と遷移数の最大値",
+                otfPeakStates,
+                otfPeakTrans,
+                countTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "DCS (OTF-DUC)", "DCS で探索した時間", searchTime);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "DCS (OTF-DUC)",
+                "expandDUC 呼び出し回数",
+                totalLtsExpansions,
+                "回");
 
-    // // --- LTS Expansion の内訳 ---
-    // public static long timeSync = 0;        // boxListのLTSを走査して次の状態ベクトルを作る時間
-    // public static long timeLookup = 0;      // 既存の状態かMapで検索し、新しければ生成する時間
-    // public static long timeNewStateInit = 0; // heuristic.newState() (eval含む) の時間
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 探索時間内訳", "ヒューリスティックによる次アクション選択時間", heuristicSelectionNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC 探索時間内訳", "ヒューリスティック選択の平均時間", heuristicSelectionNanos, heuristicSelectionCalls);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 探索時間内訳", "フロンティア再評価時間", heuristicRecomputeNanos);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 探索時間内訳", "フロンティア再評価回数", heuristicRecomputeRuns, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 探索時間内訳", "再評価した状態数", heuristicRecomputedStates, "状態");
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 探索時間内訳", "フロンティア操作時間", heuristicFrontierNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 探索時間内訳", "ヒューリスティック評価(eval)時間", heuristicEvaluationNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC 探索時間内訳", "ヒューリスティック評価(eval)平均時間", heuristicEvaluationNanos, heuristicEvaluationCalls);
 
-    // // --- explore 内部の内訳 ---
-    // public static long timePropagation = 0; // propagateGoal / propagateError
-    // public static long timeLoopCheck = 0;   // closingALoop / gatherLoopStates
-    // public static long timeFixedPoint = 0;  // findNewGoals / findNewErrors
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "expandDUC 全体時間", stateExpansionNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "次状態候補生成時間", successorGenerationNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "各 LTS の同期候補収集時間", componentSyncNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "非決定分岐の直積生成時間", cartesianProductNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "New Safety 同期 lookup 時間", safetySyncNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "状態正規化時間", stateCanonicalizationNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "既存状態 lookup / 新規登録判定時間", stateLookupNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC 展開時間内訳", "状態 lookup 平均時間", stateLookupNanos, stateLookupCalls);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "新規状態初期化時間", newStateRegistrationNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "Safety / requirement 違反判定時間", enforceSafetyCheckNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "finishUpdate guard 判定時間", finishUpdateGuardNanos);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 展開時間内訳", "finishUpdate guard 判定回数", finishUpdateGuardChecks, "回");
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "子状態と探索木の接続時間", childRegistrationNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 展開時間内訳", "explore 全体時間", exploreNanos);
 
-    // // メソッドごとの合計
-    // public static long timePropagateGoalTotal = 0;
-    // public static long timePropagateErrorTotal = 0;
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC loop / fairness 時間内訳", "loop 検出時間", loopDetectionNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC loop / fairness 時間内訳", "loop 検出平均時間", loopDetectionNanos, loopDetectionCalls);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC loop / fairness 時間内訳", "fairness / loop 判定時間", fairnessAnalysisNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC loop / fairness 時間内訳", "fairness / loop 判定平均時間", fairnessAnalysisNanos, fairnessAnalysisCalls);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC loop / fairness 時間内訳", "fair loop GOAL 昇格試行時間", fairPromotionNanos);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC loop / fairness 時間内訳", "fairness 固定点で処理した候補状態数", totalFairnessCandidatesProcessed, "状態");
 
-    // // propagateGoal 内部の内訳
-    // public static long timeGoalPhase1 = 0;      // 通常の波及 (Queue)
-    // public static long timeGoalPhase2Init = 0;  // Phase 2 の準備 (全状態スキャン)
-    // public static long timeGoalPhase2Loop = 0;  // Phase 2 の不動点計算ループ
-    // public static long timeGoalDistUpdate = 0;
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 伝播時間内訳", "GOAL 伝播時間", propagateGoalNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC 伝播時間内訳", "GOAL 伝播平均時間", propagateGoalNanos, propagateGoalCalls);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 伝播時間内訳", "GOAL 伝播 Phase1 時間", propagateGoalPhase1Nanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 伝播時間内訳", "GOAL 伝播 fairness Phase2 時間", propagateGoalPhase2Nanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 伝播時間内訳", "GOAL 距離更新時間", propagateGoalDistanceUpdateNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 伝播時間内訳", "ERROR 伝播時間", propagateErrorNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC 伝播時間内訳", "ERROR 伝播平均時間", propagateErrorNanos, propagateErrorCalls);
 
-    // // --- 実行回数と密度のカウンタ ---
-    // public static int countPropGoalCalls = 0;   // propagateGoal が呼ばれた回数
-    // public static int totalCandidatesProcessed = 0; // Phase 2 で処理した累積状態数
-    public static int totalLtsExpansions = 0;   // 実際に expandDUC された回数
-
-    public static long synthesizeDUCTime = 0;
-    public static long searchTime = 0;
-    public static long countTime = 0;
-    public static long buildDirectorDUCTime = 0;
-    public static long transferNCTime = 0;
-    public static long stitchingNCTime = 0;
-
-    public static int otfPeakStates = 0;
-    public static int otfPeakTrans = 0;
-
-    /**
-     * 計測結果をLTSAコンソールに表示
-     */
-    public static void printSummary(LTSOutput output) {
-        output.outln("");
-        output.outln("================== EVALUATION DCS (OTF-DUC) ==================");
-        output.outln("[OTF-DUC] OTF-DUCの探索とコントローラ生成の実行時間 (synthesizeDUCの実行時間) : " + synthesizeDUCTime + " ms");
-        output.outln("[OTF Peak] DCSで探索した状態数と遷移数の最大値とカウント時間, States: " + otfPeakStates + ", Transitions: " + otfPeakTrans + " ms, CountTime: " + countTime + " ms");
-        output.outln("[OTF-DUC] DCSで探索した時間: " + searchTime + " ms");
-        output.outln("[OTF-DUC] アクションを展開しようとした回数 (expandDUC呼び出し回数，safety違反等で拒否られることもある): " + totalLtsExpansions + " 回");
-        // output.outln("[OTF-DUC] boxListのLTSを走査して次の状態ベクトルを作る時間: " + timeSync + " ms");
-        // output.outln("[OTF-DUC] 計算された次状態が既知か未知かを判定し，未知ならメモリに実体化する時間: " + timeLookup + " ms");
-        output.outln("[OTF-DUC] 探索結果からコントローラを生成する時間 (buildDirectorDUC実行時間): " + buildDirectorDUCTime + " ms");
-        output.outln("[OTF-DUC] コントローラ生成時のNC移設時間: " + transferNCTime + " ms");
-        output.outln("[OTF-DUC] コントローラ生成時のNC接続時間: " + stitchingNCTime + " ms");
-        output.outln("[OTF-DUC] コントローラ生成時のNC移設時間+NC接続時間: " + (transferNCTime + stitchingNCTime) + " ms");
-        output.outln("==============================================================");
-        output.outln("");
-        // output.outln("---- OTF-DUC Propagation Detailed (ms) ----");
-        // output.outln("1. propagateError Total   : " + String.format("%.2f", timePropagateErrorTotal / 1_000_000.0));
-        // output.outln("2. propagateGoal Total    : " + String.format("%.2f", timePropagateGoalTotal / 1_000_000.0));
-        // output.outln("   -> Phase 1 (Queue)     : " + String.format("%.2f", timeGoalPhase1 / 1_000_000.0));
-        // output.outln("   -> Phase 2 Init (Scan) : " + String.format("%.2f", timeGoalPhase2Init / 1_000_000.0));
-        // output.outln("   -> Phase 2 Loop        : " + String.format("%.2f", timeGoalPhase2Loop / 1_000_000.0));
-        // output.outln("   -> UpdateDistances        : " + String.format("%.2f", timeGoalDistUpdate / 1_000_000.0));
-        // output.outln("-------------------------------------------");
-
-        // output.outln("---- OTF-DUC explore Breakdown (ms) ----");
-        // output.outln("1. Goal/Error Prop  : " + String.format("%.2f", timePropagation / 1_000_000.0));
-        // output.outln("2. Loop Check       : " + String.format("%.2f", timeLoopCheck / 1_000_000.0));
-        // output.outln("3. Fixed-Point Calc : " + String.format("%.2f", timeFixedPoint / 1_000_000.0));
-        // output.outln("----------------------------------------");
-
-        // output.outln("---- OTF-DUC Performance Breakdown (ms) ----");
-        // output.outln("1. Sync Calculation : " + String.format("%.2f", timeSync / 1_000_000.0));
-        // output.outln("2. State Lookup/Map  : " + String.format("%.2f", timeLookup / 1_000_000.0));
-        // output.outln("3. NewState Init     : " + String.format("%.2f", timeNewStateInit / 1_000_000.0));
-        // output.outln("--------------------------------------------");
-        // output.outln("Total LTS Expansion  : " + String.format("%.2f", timeExpansion / 1_000_000.0));
-
-        // output.outln("---- OTF-DUC Performance Summary (ms) ----");
-        // output.outln("LTS Expansion      : " + String.format("%.2f", timeExpansion / 1_000_000.0));
-        // output.outln("Heuristic Eval     : " + String.format("%.2f", timeEval / 1_000_000.0));
-        // output.outln("Recompute Estimates: " + String.format("%.2f", timeRecompute / 1_000_000.0));
-        // output.outln("Frontier Ops       : " + String.format("%.2f", timeFrontier / 1_000_000.0));
-        // output.outln("------------------------------------------");
-
-        // output.outln("---- OTF-DUC Workload Stats ----");
-        // output.outln("Total Expansions    : " + totalLtsExpansions);
-        // output.outln("PropagateGoal Calls : " + countPropGoalCalls);
-        // output.outln("Total Candidates P2 : " + totalCandidatesProcessed);
-        // if (countPropGoalCalls > 0) {
-        //     output.outln("Avg Candidates/Call : " + (totalCandidatesProcessed / (double)countPropGoalCalls));
-        // }
-        // output.outln("--------------------------------");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "DCS (OTF-DUC)", "buildDirectorDUC 実行時間", buildDirectorDUCTime);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 出力構築時間内訳", "出力遷移 pruning 判定時間", outputPruningDecisionNanos);
+        UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
+                "OTF-DUC 出力構築時間内訳", "出力遷移 pruning 判定平均時間", outputPruningDecisionNanos, outputPruningDecisionCalls);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 出力構築時間内訳", "director グラフ走査・遷移構築時間", directorTraversalNanos);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "DCS (OTF-DUC)", "NC 移設時間", transferNCTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "DCS (OTF-DUC)", "NC 接続時間", stitchingNCTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "DCS (OTF-DUC)", "NC 移設時間 + NC 接続時間", transferNCTime + stitchingNCTime);
     }
-
-    /**
-     * 全てのカウンタをリセット
-     */
-    // public static void reset() {
-    //     timeExpansion = 0;
-    //     timeEval = 0;
-    //     timeRecompute = 0;
-    //     timeFrontier = 0;
-
-    //     timeSync = 0;        // 19個のLTSを走査して次の状態ベクトルを作る時間
-    //     timeLookup = 0;      // 既存の状態かMapで検索し、新しければ生成する時間
-    //     timeNewStateInit = 0; 
-    // }
-}
 
     /**
      * [最適化] 高速Map検索のためのキー。
@@ -2117,7 +2738,7 @@ public static class DUCProfiler {
         }
     }
 
-    // ▼▼▼ 評価実験用: OTF-DUCが実際に展開した遷移数をカウントするメソッド ▼▼▼
+    // 評価実験用: OTF-DUC が実際に展開した遷移数を数える。
     private int countOTFTransitions() {
         int count = 0;
         for (CompostateDUC<State, Action> state : compostates.values()) {
@@ -2132,5 +2753,4 @@ public static class DUCProfiler {
         }
         return count;
     }
-    // ▲▲▲ 追加ここまで ▲▲▲
 }

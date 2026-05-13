@@ -27,6 +27,8 @@ import ltsa.lts.Symbol;
 import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.lts.ltl.AssertDefinition;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC;
 import ltsa.lts.EventState;
@@ -55,12 +57,16 @@ public class UpdatingControllerSynthesizer {
         long generateControllerStart = System.currentTimeMillis();
         long DUCTime = 0;
         long UpdatingEnvironmentGenerateTime = 0;
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "UpdatingControllerSynthesizer",
+                "generateController の全体実行時間");
 
 		// set environment
 		MTS<Long, String> oldC = uccs.getOldController();
 
         if(uccs.isOTF())
         {
+            UpdatingControllerEvaluationRecorder.setMode("OTF-DUC");
             // ★確認用ログ出力
             // --- OTF-DUC (提案手法) の実行 ---
             output.outln("=========================================");
@@ -69,15 +75,22 @@ public class UpdatingControllerSynthesizer {
 
             //評価実験用
             long DUCStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
 
             // OTF-DUCの実行メインロジック呼び出し
             generateDUC(uccs, output);
 
             //評価実験用
             DUCTime = System.currentTimeMillis() - DUCStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
         }
         else
         {
+            UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
             // --- 従来手法 (DUCS) の実行 ---
             // 環境モデル全体(UpdatingEnvironment)を構築してから合成を行う
             output.outln("=========================================");
@@ -86,6 +99,9 @@ public class UpdatingControllerSynthesizer {
 
             //評価実験用
             long UpdatingEnvironmentGenerateStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional DUC E_u 構築時間");
 
             MTS<Long, String> mapping = uccs.getMapping();
 
@@ -94,33 +110,65 @@ public class UpdatingControllerSynthesizer {
 		    updEnvGenerator.generateEnvironment();
 
             UpdatingEnvironmentGenerateTime = System.currentTimeMillis() - UpdatingEnvironmentGenerateStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional DUC E_u 構築時間");
 
             //評価実験用
             long DUCStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
 
             solveControlProblem(uccs, updEnvGenerator.getUpdEnv(), output);
 
             //評価実験用
             DUCTime = System.currentTimeMillis() - DUCStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
         }
 
         //評価実験用
         long generateControllerTime = System.currentTimeMillis() - generateControllerStart;
-        output.outln("");
-        output.outln("================ EVALUATION UpdatingControllerSynthesizer ==================");
-        output.outln("[Trasitional DUC / OTF-DUC] UpdatingControllerSynthesizer.generateControllerの全体実行時間 : " + generateControllerTime + " ms");
-        output.outln("[Traditional DUC] solveControlProblem / [OTF-DUC] generateDUC 実行時間 : " + DUCTime + " ms");
-        output.outln("[Traditional DUC] Old ControllerとMapping Environmentの並列合成による状態空間E_u構築時間 : " + UpdatingEnvironmentGenerateTime + " ms");
-        output.outln("============================================================================");
-        output.outln("");
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "UpdatingControllerSynthesizer",
+                "generateController の全体実行時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllerSynthesizer",
+                "generateController の全体実行時間",
+                generateControllerTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllerSynthesizer",
+                "Traditional solveControlProblem / OTF generateDUC 実行時間",
+                DUCTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllerSynthesizer",
+                "Traditional DUC E_u 構築時間",
+                UpdatingEnvironmentGenerateTime);
 
 	}
 
-	private static void solveControlProblem(
+    private static void solveControlProblem(
             UpdatingControllerCompositeState uccs, UpdatingEnvironment updEnv, LTSOutput output) {
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "solveControlProblem 全体時間");
 
         //UpdatingEnvironmentからMTSへ変換
+        long convertEuStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "UpdatingEnvironment から E_u MTS への変換時間");
         MTS<Long, String> E_u = ControllerUtils.UpdateEnvironment2MTS(updEnv);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "UpdatingEnvironment から E_u MTS への変換時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "solveControlProblem (Traditional DUC)",
+                "UpdatingEnvironment から E_u MTS への変換時間",
+                System.currentTimeMillis() - convertEuStart);
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional E_u MTS 変換後");
 
         // ▼▼▼ 評価実験用: [1] Updating Environment 生成直後 ▼▼▼
         long euCountStart = System.currentTimeMillis();
@@ -131,6 +179,9 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long extractFluentStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "Old Safety と New Safety から Fluent を抽出する時間");
 
         //GoalからFluentを抽出
         Pair<List<Formula>,Set<Fluent>> safetyFormulasAndFluents = getSafetyFormulas(uccs.getUpdateSafetyGoals(), output); // plain safety(G_u)
@@ -141,13 +192,23 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long extractFluentTime = System.currentTimeMillis() - extractFluentStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "Old Safety と New Safety から Fluent を抽出する時間");
         long buildMetaEnvStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "Fluent とベース環境を並列合成した metaEnv 構築時間");
 
         //Fluentをオートマトンに変換し，ベース環境と並列合成
         MTS<Long, String> metaEnvironment = ControllerUtils.removeTopStates(E_u, goalFluents);
 
         //評価実験用
         long buildMetaEnvTime = System.currentTimeMillis() - buildMetaEnvStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "Fluent とベース環境を並列合成した metaEnv 構築時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional metaEnv 構築後");
 
         // ▼▼▼ 評価実験用: [2] Meta Environment 生成直後 (★最大ピーク★) ▼▼▼
         long metaCountStart = System.currentTimeMillis();
@@ -159,29 +220,49 @@ public class UpdatingControllerSynthesizer {
 		output.outln("Environment states:"+ metaEnvironment.getStates().size());
         output.outln("Solving safety goals for the controller synthesis");
 
-        //評価実験用
-        output.outln("");
-        output.outln("============== EVALUATION Traditional DUC 最大状態数と遷移数 =================");
-        output.outln("[1. E_u] (Old Controller || Mapping Environment) States: " + euStates + ", Transitions: " + euTrans + ", CountTime: " + euCountTime);
-        output.outln("[2. Meta] Meta Environment (PEAK)   States: " + metaStates + ", Transitions: " + metaTrans + ", CountTime: " + metaCountTime);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "Traditional DUC 最大状態数と遷移数",
+                "[1. E_u] (Old Controller || Mapping Environment)",
+                euStates,
+                euTrans,
+                euCountTime,
+                "旧コントローラと Mapping Environment を並列合成した、従来 DUC の基本更新環境。");
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "Traditional DUC 最大状態数と遷移数",
+                "[2. Meta] Meta Environment (PEAK)",
+                metaStates,
+                metaTrans,
+                metaCountTime,
+                "E_u に safety 用 Fluent を組み込んだ環境。状態空間が最大になりやすい段階。");
 
         //評価実験用
         long buildSafetyEnvStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
 
         //論理式（Formula）の評価による状態空間の前処理（Safety違反状態の無効化）
         MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions(), output);
 
         //評価実験用
         long buildSafetyEnvTime = System.currentTimeMillis() - buildSafetyEnvStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional safetyEnv 構築後");
 
         // ▼▼▼ 評価実験用: [4] 最終 Safety Environment 生成直後 ▼▼▼
         long safeCountStart = System.currentTimeMillis();
         int safeStates = safetyEnv.getStates().size();
         int safeTrans = countTransitions(safetyEnv);
         long safeCountTime = System.currentTimeMillis() - safeCountStart;
-        output.outln("[4. Final] Safety Environment       States: " + safeStates + ", Transitions: " + safeTrans + ", CountTime: " + safeCountTime);
-        output.outln("===========================================================================");
-        output.outln("");
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "Traditional DUC 最大状態数と遷移数",
+                "[4. Final] Safety Environment",
+                safeStates,
+                safeTrans,
+                safeCountTime,
+                "Pruned に DontDoTwice 制約を合成した、GR1 合成に渡す最終 safety 環境。");
         // ▲▲▲ 追加ここまで ▲▲▲
 
         output.outln("Environment states after safety: "+ safetyEnv.getStates().size());
@@ -189,7 +270,19 @@ public class UpdatingControllerSynthesizer {
         uccs.setUpdateEnvironment(safetyEnv);
 
         //MTSからCompactStateへ型変換
+        long compactSafetyEnvStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "safetyEnv から CompactState への変換時間");
         CompactState compactSafetyEnv = MTSToAutomataConverter.getInstance().convert(safetyEnv, "E_u||G(safety)", false, true);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "safetyEnv から CompactState への変換時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "solveControlProblem (Traditional DUC)",
+                "safetyEnv から CompactState への変換時間",
+                System.currentTimeMillis() - compactSafetyEnvStart);
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional safetyEnv CompactState 変換後");
 //		CompactState compactMetaEnv = MTSToAutomataConverter.getInstance().convert(metaEnvironment, "meta E_u", false);
 //		CompactState compactEnv = MTSToAutomataConverter.getInstance().convert(E_u, "E_u", false);
 
@@ -202,11 +295,18 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long synthesizeGRStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "safetyEnv を GR1 で解く時間");
 
         UpdatingControllerGRSynthesizer.synthesizeGR(compactSafetyEnv, uccs, safetyEnv, output);
 
         //評価実験用
         long synthesizeGRTime = System.currentTimeMillis() - synthesizeGRStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "safetyEnv を GR1 で解く時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional GR1 合成後");
 
 //        if (uccs.getComposition() == null){
 //            output.outln("Running in debug mode");
@@ -218,14 +318,25 @@ public class UpdatingControllerSynthesizer {
 
         UpdatingControllersUtils.ACTION_FLUENTS_FOR_UPDATE.clear();
 
-        output.outln("");
-        output.outln("================ EVALUATION solveControlProblem ==================");
-        output.outln("[Traditional DUC] Old SafetyとNew SafetyからFluent抽出する時間 : " + extractFluentTime + " ms");
-        output.outln("[Traditional DUC] Fluentとベース環境(OldCon || MapEnv)を並列合成した状態空間metaEnv構築時間 : " + buildMetaEnvTime + " ms");
-        output.outln("[Traditional DUC] metaEnvからエラーを枝刈りしてsafetyEnvを構築する時間 : " + buildSafetyEnvTime + " ms");
-        output.outln("[Traditional DUC] safetyEnvをGR1で解く時間 : " + synthesizeGRTime + " ms");
-        output.outln("==================================================================");
-        output.outln("");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "solveControlProblem (Traditional DUC)",
+                "Old Safety と New Safety から Fluent を抽出する時間",
+                extractFluentTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "solveControlProblem (Traditional DUC)",
+                "Fluent とベース環境を並列合成した metaEnv 構築時間",
+                buildMetaEnvTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "solveControlProblem (Traditional DUC)",
+                "metaEnv からエラーを枝刈りして safetyEnv を構築する時間",
+                buildSafetyEnvTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "solveControlProblem (Traditional DUC)",
+                "safetyEnv を GR1 で解く時間",
+                synthesizeGRTime);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "solveControlProblem 全体時間");
 	}
 
     /**
@@ -300,9 +411,15 @@ public class UpdatingControllerSynthesizer {
     private static void generateDUC(UpdatingControllerCompositeState uccs, LTSOutput output)
     {
         output.outln("Starting On-The-Fly Controller Synthesis (Box List & Mapping Table Strategy)...");
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "generateDUC 全体時間");
 
         //評価実験用
         long boxListStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "boxList 準備時間");
 
         // ---------------------------------------------------------
         // 1. Build Box List (DCS探索用のLTSリスト構築)
@@ -325,6 +442,9 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long createMarkingLTSStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "MarkingLTS 生成時間");
 
         // --- A. Marking LTS (Goal & Process Management) ---
         // システム全体のアクション集合を収集して、Marking LTSのアルファベットとする
@@ -363,6 +483,10 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験章
         long createMarkingLTSTime = System.currentTimeMillis() - createMarkingLTSStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "MarkingLTS 生成時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF MarkingLTS 生成後");
 
         boxList.add(markedMarkingLTS); // Index 0
         output.outln(" - Added OTF Marking LTS (Index 0)");
@@ -494,6 +618,9 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long stateMappingStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "New Controller の接続先の事前計算");
 
         // ---------------------------------------------------------
         // 2. Build State Mapping Table (NC接続先の事前計算)
@@ -574,8 +701,15 @@ public class UpdatingControllerSynthesizer {
         output.outln(" - State Mapper generated " + newControllerConnectionMap.size() + " mapping entries.");
 
         long stateMappingTime = System.currentTimeMillis() - stateMappingStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "New Controller の接続先の事前計算");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF New Controller 接続先事前計算後");
 
         long translateFluentMapStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "New Safety と Fluent の対応表の変換作業時間");
 
         // ---------------------------------------------------------
         // 3. Convert CompactState Maps to LTS Maps
@@ -634,6 +768,10 @@ public class UpdatingControllerSynthesizer {
         output.outln("Map Conversion Completed.");
 
         long translateFluentMapTime = System.currentTimeMillis() - translateFluentMapStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "New Safety と Fluent の対応表の変換作業時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF New Safety/Fluent 対応表変換後");
 
         // // ▼▼▼▼▼▼▼▼▼▼▼▼ デバッグ表示 (Integer Key 確認用) ▼▼▼▼▼▼▼▼▼▼▼▼
         // output.outln("\n========== DEBUG: Index-based Safety Map Verification ==========");
@@ -660,10 +798,20 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long boxListTime = System.currentTimeMillis() - boxListStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "boxList 準備時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF boxList 準備後");
 
         output.outln("Initializing DCS...");
 
         long dcsStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "DCS で Update Controller を合成する時間");
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "DCS 実行時間");
 
         DirectedControllerSynthesisDUC<Long, String> ducSynthesis = new DirectedControllerSynthesisDUC<>();
 
@@ -684,26 +832,44 @@ public class UpdatingControllerSynthesizer {
         );
 
         long dcsTmp = System.currentTimeMillis() - dcsStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "DCS 実行時間");
+        UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF DCS 実行後");
 
         if (result != null) {
             output.outln("DUC Generated Successfully! States: " + result.getStates().size());
             CompactState res = MTSToAutomataConverter.getInstance().convert(new MTSAdapter<Long, String>(result), uccs.getName(), false);
             res.reachable();
             uccs.setComposition(res);
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF Update Controller 出力構築後");
         } else {
+            UpdatingControllerEvaluationRecorder.recordFailure(
+                    ResultStatus.GOAL_NOT_REACHABLE,
+                    "Failed to generate DUC (Goal not reachable).");
             output.outln("Failed to generate DUC (Goal not reachable).");
         }
 
         long dcsTime = System.currentTimeMillis() - dcsStart;
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "DCS で Update Controller を合成する時間");
 
-        output.outln("================ EVALUATION generateDUC (OTF-DUC) ==================");
-        output.outln("[OTF-DUC] boxList準備時間 (DCSの前準備) : " + boxListTime + " ms");
-        output.outln("[OTF-DUC] MarkingLTS生成時間 : " + createMarkingLTSTime + " ms");
-        output.outln("[OTF-DUC] New Controllerの接続先の事前計算 : " + stateMappingTime + " ms");
-        output.outln("[OTF-DUC] New SafetyとFluentの対応表の変換作業時間 : " + translateFluentMapTime + " ms");
-        output.outln("[OTF-DUC] DCSでUpdate Controllerを合成する時間 (型変換含む) : " + dcsTime + " ms");
-        output.outln("[OTF-DUC] DCS実行時間 : " + dcsTmp + " ms");
-        output.outln("====================================================================");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "generateDUC (OTF-DUC)", "boxList 準備時間", boxListTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "generateDUC (OTF-DUC)", "MarkingLTS 生成時間", createMarkingLTSTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "generateDUC (OTF-DUC)", "New Controller の接続先の事前計算", stateMappingTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "generateDUC (OTF-DUC)", "New Safety と Fluent の対応表の変換作業時間", translateFluentMapTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "generateDUC (OTF-DUC)", "DCS で Update Controller を合成する時間", dcsTime);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "generateDUC (OTF-DUC)", "DCS 実行時間", dcsTmp);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "generateDUC 全体時間");
     }
 
     /**

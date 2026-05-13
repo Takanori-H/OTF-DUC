@@ -23,6 +23,7 @@ import MTSTools.ac.ic.doc.mtstools.utils.GenericMTSToLongStringMTSConverter;
 import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
 import ltsa.lts.CompactState;
 import ltsa.lts.LTSOutput;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 
 import java.util.HashSet;
@@ -37,6 +38,9 @@ public class UpdatingControllerGRSynthesizer {
 
     public static void synthesizeGR(CompactState compactSafetyEnv, UpdatingControllerCompositeState uccs, MTS<Long, String> safetyEnv, LTSOutput output) {
 
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "synthesizeGR 全体時間");
         output.outln("Synthezising GR");
         if (compactSafetyEnv.isNonDeterministic()){
             output.outln("Environment after safety is non-deterministic");
@@ -47,6 +51,9 @@ public class UpdatingControllerGRSynthesizer {
             output.outln("Solving a deterministic controller synthesis");
             synthesizeGRDeterministic(uccs, output, safetyEnv);
         }
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "synthesizeGR 全体時間");
 
     }
 
@@ -59,41 +66,128 @@ public class UpdatingControllerGRSynthesizer {
 
         FluentUtils fluentUtils = FluentUtils.getInstance();
 
+        long subsetStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "非決定環境の subset construction 時間");
         subsetConstructionBuilder = new SubsetConstructionBuilder<Long, String>(safetyEnv);
-
         perfectInfoGame = subsetConstructionBuilder.build();
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "非決定環境の subset construction 時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "非決定環境の subset construction 時間",
+                System.currentTimeMillis() - subsetStart);
 
         FluentStateValuation<Set<Long>> valuation = fluentUtils.buildValuation(perfectInfoGame, uccs.getUpdateGRGoal().getFluents());
+        long goalBuildStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "GR goal 構築時間");
         Assumptions<Set<Long>> assumptions = formulasToAssumptions(perfectInfoGame.getStates(), uccs.getUpdateGRGoal().getAssumptions(), valuation);
         Guarantees<Set<Long>> guarantees = formulasToGuarantees(perfectInfoGame.getStates(), uccs.getUpdateGRGoal().getGuarantees(), valuation);
         Set<Set<Long>> faults = new HashSet<Set<Long>>();
 
         grGoal = new GRGoal<Set<Long>>(guarantees, assumptions, faults, uccs.getUpdateGRGoal().isPermissive());
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "GR goal 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "GR goal 構築時間",
+                System.currentTimeMillis() - goalBuildStart);
         Set<Set<Long>> initialStates = new HashSet<Set<Long>>();
         Set<Long> initialState = new HashSet<Long>();
         initialState.add(safetyEnv.getInitialState());
         initialStates.add(initialState);
 
+        long gameBuildStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Knowledge GR game 構築時間");
         game = new KnowledgeGRGame<Long, String>(initialStates, safetyEnv, perfectInfoGame, uccs.getUpdateGRGoal().getControllableActions(), grGoal);
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Knowledge GR game 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "Knowledge GR game 構築時間",
+                System.currentTimeMillis() - gameBuildStart);
 
+        long rankSystemStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Rank system 構築時間");
         GRRankSystem<Set<Long>> system = new GRRankSystem<Set<Long>>(game.getStates(), grGoal.getGuarantees(), grGoal.getAssumptions(), grGoal.getFailures());
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Rank system 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "Rank system 構築時間",
+                System.currentTimeMillis() - rankSystemStart);
 
         KnowledgeGRGameSolver<Long, String> solver = new KnowledgeGRGameSolver<Long, String>(game, system);
+        long solveStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Winning region 計算時間");
         solver.solveGame();
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Winning region 計算時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "Winning region 計算時間",
+                System.currentTimeMillis() - solveStart);
 
         if (solver.isWinning(perfectInfoGame.getInitialState())) {
+            long strategyBuildStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy 構築時間");
             Strategy<Set<Long>, Integer> strategy = solver.buildStrategy();
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy 構築時間");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy 構築時間",
+                    System.currentTimeMillis() - strategyBuildStart);
 
             Set<Pair<StrategyState<Set<Long>, Integer>, StrategyState<Set<Long>, Integer>>> worseRank = solver.getWorseRank();
+            long strategyToMtsStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy から controller MTS を構築する時間");
             MTS<StrategyState<Set<Long>, Integer>, String> result = GameStrategyToMTSBuilder.getInstance().buildMTSFrom(perfectInfoGame, strategy, worseRank);
 
             result.removeUnreachableStates();
             LTSAdapter<StrategyState<Set<Long>, Integer>, String> ltsAdapter = new LTSAdapter<StrategyState<Set<Long>,Integer>, String>(result, MTS.TransitionType.POSSIBLE);
             MTS<StrategyState<Set<Long>, Integer>, String> synthesised  = new MTSAdapter<StrategyState<Set<Long>,Integer>, String>(ltsAdapter);
             MTS<Long, String> plainController = new GenericMTSToLongStringMTSConverter<StrategyState<Set<Long>, Integer>, String>().transform(synthesised);
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy から controller MTS を構築する時間");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy から controller MTS を構築する時間",
+                    System.currentTimeMillis() - strategyToMtsStart);
 
             output.outln("Controller [" + plainController.getStates().size() + "] generated successfully.");
+            long compactConvertStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Controller を CompactState に変換する時間");
             CompactState compactState = MTSToAutomataConverter.getInstance().convert(plainController, uccs.getName(), false, true);
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Controller を CompactState に変換する時間");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "Traditional DUC GR1 時間内訳",
+                    "Controller を CompactState に変換する時間",
+                    System.currentTimeMillis() - compactConvertStart);
             uccs.setComposition(compactState);
         } else {
             output.outln("There is no controller for model " + uccs.name + " for the given setting.");
@@ -156,27 +250,104 @@ public class UpdatingControllerGRSynthesizer {
     private static void synthesizeGRDeterministic(UpdatingControllerCompositeState uccs, LTSOutput output, MTS<Long, String> safetyEnv) {
         GRGame<Long> game;
 
+        long gameBuildStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "GR game 構築時間");
         game = new GRGameBuilder<Long, String>().buildGRGameFrom(safetyEnv,uccs.getUpdateGRGoal());
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "GR game 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "GR game 構築時間",
+                System.currentTimeMillis() - gameBuildStart);
+        long rankSystemStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Rank system 構築時間");
         GRRankSystem<Long> system = new GRRankSystem<Long>(game.getStates(),game.getGoal().getGuarantees(),
                 game.getGoal().getAssumptions(), game.getGoal().getFailures());
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Rank system 構築時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "Rank system 構築時間",
+                System.currentTimeMillis() - rankSystemStart);
         PerfectInfoGRGameSolver<Long> solver = new PerfectInfoGRGameSolver<Long>(game, system);
+        long solveStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Winning region 計算時間");
         solver.solveGame();
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC GR1 時間内訳",
+                "Winning region 計算時間");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Traditional DUC GR1 時間内訳",
+                "Winning region 計算時間",
+                System.currentTimeMillis() - solveStart);
 
         if (solver.isWinning(safetyEnv.getInitialState())) {
+            long strategyBuildStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy 構築時間");
             Strategy<Long, Integer> strategy = solver.buildStrategy();
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy 構築時間");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy 構築時間",
+                    System.currentTimeMillis() - strategyBuildStart);
             GRGameSolver<Long> grSolver = (GRGameSolver<Long>) solver;
             Set<Pair<StrategyState<Long, Integer>, StrategyState<Long, Integer>>> worseRank = grSolver.getWorseRank();
+            long strategyToMtsStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy から controller MTS を構築する時間");
             MTS<StrategyState<Long, Integer>, String> result = GameStrategyToMTSBuilder.getInstance().buildMTSFrom(safetyEnv, strategy, worseRank, uccs.getUpdateGRGoal().getLazyness());
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy から controller MTS を構築する時間");
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "Traditional DUC GR1 時間内訳",
+                    "Strategy から controller MTS を構築する時間",
+                    System.currentTimeMillis() - strategyToMtsStart);
 
             if (result == null) {
                 output.outln("There is no controller for model " + uccs.name + " for the given setting.");
                 uccs.setComposition(null);
             } else {
+                long plainTransformStart = System.currentTimeMillis();
+                UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                        "Traditional DUC GR1 時間内訳",
+                        "StrategyState controller を Long/String MTS に変換する時間");
                 GenericMTSToLongStringMTSConverter<StrategyState<Long, Integer>, String> transformer = new GenericMTSToLongStringMTSConverter<StrategyState<Long, Integer>, String>();
                 MTS<Long, String> plainController = transformer.transform(result);
+                UpdatingControllerEvaluationRecorder.endFailureTimer(
+                        "Traditional DUC GR1 時間内訳",
+                        "StrategyState controller を Long/String MTS に変換する時間");
+                UpdatingControllerEvaluationRecorder.recordTime(
+                        "Traditional DUC GR1 時間内訳",
+                        "StrategyState controller を Long/String MTS に変換する時間",
+                        System.currentTimeMillis() - plainTransformStart);
 
                 output.outln("Controller [" + plainController.getStates().size() + "] generated successfully.");
+                long compactConvertStart = System.currentTimeMillis();
+                UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                        "Traditional DUC GR1 時間内訳",
+                        "Controller を CompactState に変換する時間");
                 CompactState convert = MTSToAutomataConverter.getInstance().convert(plainController, uccs.getName(), true);
+                UpdatingControllerEvaluationRecorder.endFailureTimer(
+                        "Traditional DUC GR1 時間内訳",
+                        "Controller を CompactState に変換する時間");
+                UpdatingControllerEvaluationRecorder.recordTime(
+                        "Traditional DUC GR1 時間内訳",
+                        "Controller を CompactState に変換する時間",
+                        System.currentTimeMillis() - compactConvertStart);
                 uccs.setComposition(convert);
             }
         } else {
