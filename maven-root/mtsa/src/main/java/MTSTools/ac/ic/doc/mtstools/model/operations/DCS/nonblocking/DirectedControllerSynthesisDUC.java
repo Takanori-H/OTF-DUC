@@ -6,10 +6,12 @@ import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -101,6 +103,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long finishUpdateTransitions = 0;
     private long ncConnectionSuccessCount = 0;
     private long ncConnectionMissCount = 0;
+    private long preUpdateOutputMergedStates = 0;
+    private long preUpdateOutputMergeRemovedStates = 0;
 
     private int totalLtsExpansions = 0;
     private long synthesizeDUCTime = 0;
@@ -263,10 +267,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                 // log(String.format("[Heuristic-Next] State: %s, Action: %s (%s)", state.getStates(), action, action.isControllable() ? "C" : "U"));
 
-                // Controllable の勝ち筋が一つ見つかっていれば、他の controllable 分岐は
-                // AND/OR ゲームの勝敗を改善しない。一方で uncontrollable 分岐は環境が
-                // 選ぶ可能性があるため、引き続き探索する。
-                if (state.hasGoalChild() && action.isControllable()) {
+                // 状態自体が GOAL と確定した後は、追加の controllable 分岐は
+                // 出力 controller に採用しない。一方で、GOAL 子を 1 つ見ただけの
+                // 暫定段階では、非決定分岐や他の controllable 候補の探索を止めない。
+                if (isGoal(state) && action.isControllable()) {
                     // log("  [Pruning] Skipping redundant controllable action '" + action + "' for state " + state.getStates());
                     heuristic.expansionDone(state, action, null);
                     continue;
@@ -426,6 +430,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         finishUpdateTransitions = 0;
         ncConnectionSuccessCount = 0;
         ncConnectionMissCount = 0;
+        preUpdateOutputMergedStates = 0;
+        preUpdateOutputMergeRemovedStates = 0;
         compostates = new HashMap<>();
         setupLookupOptimizations();
         transitions = new ArrayDeque<>(ltss.size());
@@ -1479,7 +1485,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if(debugLogEnabled) System.out.println("  [Debug-Success] State " + node.getStates() + " is now marked as GOAL!");
         node.setStatus(Status.GOAL);
 
-        // setterを使用してアクションを登録（privateフィールドへの直接アクセスを回避）
+        // GOAL 証明済みの action と、GOAL 子を見た暫定情報を分けて保持する。
+        node.setDirectorActionToGoal(action);
         node.setHasGoalChild(action);
         winners.add(node);
         heuristic.notifyStateSetErrorOrGoal(node);
@@ -1487,7 +1494,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // 親をキューに追加し、勝利が伝播するようにする
         for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> parentRel : node.getParents()) {
             CompostateDUC<State, Action> parentNode = parentRel.getSecond();
-            // 親に対しても「子の一つがGoalになった」ことを記録
+            // 親に対しては「子の一つが GOAL になった」暫定情報だけを記録する。
+            // 親自身の director action は、親が GOAL と証明された時点で設定する。
             parentNode.setHasGoalChild(parentRel.getFirst());
             if (!isGoal(parentNode)) {
                 queue.add(parentNode);
@@ -2065,6 +2073,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC 出力 pruning 統計", "pruning 後の出力遷移数", directorOutputTransitions, "本");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力 pruning 統計", "削除した controllable 遷移数", prunedControllableTransitions, "本");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力 pruning 統計", "出力時マージ対象の旧コントローラ状態数", preUpdateOutputMergedStates, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力 pruning 統計", "出力時マージで削減した旧コントローラ状態数", preUpdateOutputMergeRemovedStates, "状態");
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC NC 接続統計", "finishUpdate 遷移数", finishUpdateTransitions, "本");
@@ -2242,7 +2254,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 状態 ID 管理：NC の状態 ID と衝突しないようにカウンターを管理
         long nextId = 0;
-        Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
 
         //評価実験用
         long transferNCStart = System.currentTimeMillis();
@@ -2266,19 +2277,19 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         transferNCTime = System.currentTimeMillis() - transferNCStart;
 
         // ---------------------------------------------------------
-        // ステップ 2: 更新コントローラのグラフ構築と動的リンク
+        // ステップ 2: pruning 後の更新コントローラグラフを一度収集する
         // ---------------------------------------------------------
+        Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges = new LinkedHashMap<>();
+        List<CompostateDUC<State, Action>> reachableOrder = new ArrayList<>();
+        Set<CompostateDUC<State, Action>> reached = new HashSet<>();
         Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
-        ids.put(initial, nextId++);
-        result.addState(ids.get(initial));
-        // 初期状態を更新コントローラの開始点に設定
-        result.setInitialState(ids.get(initial));
+        reached.add(initial);
+        reachableOrder.add(initial);
         queue.add(initial);
 
         long directorTraversalStart = System.nanoTime();
         while (!queue.isEmpty()) {
             CompostateDUC<State, Action> current = queue.remove();
-            Long currentId = ids.get(current);
 
             for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : current.getExploredChildren()) {
                 HAction<State, Action> hAction = transition.getFirst();
@@ -2291,7 +2302,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 outputPruningDecisionCalls++;
 
                 if (toAdd) {
-                    directorOutputTransitions++;
                     // finishUpdate の場合は NC への接続を試みる
                     if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
                         finishUpdateTransitions++;
@@ -2327,9 +2337,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                         if (ncStateId != null) {
                             ncConnectionSuccessCount++;
-                            // NC マップで見つかった ID へ直接リンクを張る
                             if(debugLogEnabled) log("  [Stitch] Connecting " + current.getStates() + " --(finishUpdate)--> NC State " + ncStateId);
-                            result.addTransition(currentId, hAction.getAction(), ncStateId);
+                            directorEdges.computeIfAbsent(current, k -> new ArrayList<>())
+                                    .add(new DirectorEdge(toOutputAction(hAction), child, ncStateId));
                         } else {
                             ncConnectionMissCount++;
                             // 制約5に基づき、エラー時は詳細なベクトルを出力
@@ -2342,24 +2352,214 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         stitchingNCTime += (System.currentTimeMillis() - stitchingNCStart);
                     } else {
                         // 通常の遷移
-                        if (!ids.containsKey(child)) {
-                            ids.put(child, nextId++);
-                            result.addState(ids.get(child));
+                        directorEdges.computeIfAbsent(current, k -> new ArrayList<>())
+                                .add(new DirectorEdge(toOutputAction(hAction), child, null));
+                        if (reached.add(child)) {
+                            reachableOrder.add(child);
                             queue.add(child);
                         }
-                        String actionName = hAction.toString().replace("_old", "");
-                        @SuppressWarnings("unchecked")
-                        Action finalAction = (Action) actionName;
-                        result.addTransition(currentId, finalAction, ids.get(child));
                     }
                 } else if (hAction.isControllable()) {
                     prunedControllableTransitions++;
                 }
             }
         }
+
+        // ---------------------------------------------------------
+        // ステップ 3: 出力時のみ、旧コントローラ上の同値状態をマージする
+        // ---------------------------------------------------------
+        Map<CompostateDUC<State, Action>, Integer> preUpdateClasses =
+                computePreUpdateOutputMergeClasses(reachableOrder, directorEdges);
+
+        Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
+        Map<Integer, Long> preUpdateClassIds = new HashMap<>();
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (isPreUpdateOutputState(state)) {
+                Integer classId = preUpdateClasses.get(state);
+                Long id = preUpdateClassIds.get(classId);
+                if (id == null) {
+                    id = nextId++;
+                    preUpdateClassIds.put(classId, id);
+                    result.addState(id);
+                }
+                ids.put(state, id);
+            } else {
+                Long id = nextId++;
+                ids.put(state, id);
+                result.addState(id);
+            }
+        }
+        result.setInitialState(ids.get(initial));
+
+        for (CompostateDUC<State, Action> source : reachableOrder) {
+            Long sourceId = ids.get(source);
+            List<DirectorEdge> edges = directorEdges.get(source);
+            if (edges == null) {
+                continue;
+            }
+            for (DirectorEdge edge : edges) {
+                Long targetId = edge.isNewControllerConnection()
+                        ? edge.ncTargetId
+                        : ids.get(edge.child);
+                if (targetId == null) {
+                    throw new IllegalStateException("Missing output state id for director edge target.");
+                }
+                if (result.addTransition(sourceId, edge.outputAction, targetId)) {
+                    directorOutputTransitions++;
+                }
+            }
+        }
+
         directorTraversalNanos += System.nanoTime() - directorTraversalStart;
         statistics.setControllerUsedStates(result.getStates().size());
         return result;
+    }
+
+    private boolean isPreUpdateOutputState(CompostateDUC<State, Action> state) {
+        return getMarkingState(state) == 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Action toOutputAction(HAction<State, Action> hAction) {
+        return (Action) hAction.toString().replace("_old", "");
+    }
+
+    /**
+     * 探索では new safety fluent の履歴を保持するが、出力上で同じ旧コントローラ
+     * 状態かつ同じ遷移構造を持つ m=0 状態は同一状態としてまとめる。
+     *
+     * 初期分割は旧コントローラ成分で行い、beginUpdate と旧コントローラ遷移を含む
+     * 出力遷移の行き先が同じ同値クラスになるまで partition refinement する。
+     */
+    private Map<CompostateDUC<State, Action>, Integer> computePreUpdateOutputMergeClasses(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges) {
+
+        List<CompostateDUC<State, Action>> preUpdateStates = new ArrayList<>();
+        Map<State, Integer> oldControllerClassIds = new HashMap<>();
+        Map<CompostateDUC<State, Action>, Integer> classOf = new HashMap<>();
+        int nextClassId = 0;
+
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                continue;
+            }
+            preUpdateStates.add(state);
+            State oldControllerState = state.getStates().get(idxOC);
+            Integer classId = oldControllerClassIds.get(oldControllerState);
+            if (classId == null) {
+                classId = nextClassId++;
+                oldControllerClassIds.put(oldControllerState, classId);
+            }
+            classOf.put(state, classId);
+        }
+
+        if (preUpdateStates.isEmpty()) {
+            preUpdateOutputMergedStates = 0;
+            preUpdateOutputMergeRemovedStates = 0;
+            return classOf;
+        }
+
+        Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds = new HashMap<>();
+        int nextNonPreUpdateId = 0;
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                nonPreUpdateIds.put(state, nextNonPreUpdateId++);
+            }
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            Map<Integer, List<CompostateDUC<State, Action>>> statesByClass = new LinkedHashMap<>();
+            for (CompostateDUC<State, Action> state : preUpdateStates) {
+                statesByClass.computeIfAbsent(classOf.get(state), k -> new ArrayList<>()).add(state);
+            }
+
+            Map<CompostateDUC<State, Action>, Integer> refinedClassOf = new HashMap<>();
+            int refinedClassId = 0;
+
+            for (List<CompostateDUC<State, Action>> candidates : statesByClass.values()) {
+                Map<List<String>, Integer> signatureToClass = new LinkedHashMap<>();
+                for (CompostateDUC<State, Action> state : candidates) {
+                    List<String> signature = buildPreUpdateOutputSignature(
+                            state, directorEdges, classOf, nonPreUpdateIds);
+                    Integer classId = signatureToClass.get(signature);
+                    if (classId == null) {
+                        classId = refinedClassId++;
+                        signatureToClass.put(signature, classId);
+                    }
+                    refinedClassOf.put(state, classId);
+                }
+                if (signatureToClass.size() > 1) {
+                    changed = true;
+                }
+            }
+
+            classOf = refinedClassOf;
+            nextClassId = refinedClassId;
+        } while (changed);
+
+        preUpdateOutputMergedStates = preUpdateStates.size();
+        preUpdateOutputMergeRemovedStates = preUpdateStates.size() - nextClassId;
+        if (debugLogEnabled && preUpdateOutputMergeRemovedStates > 0) {
+            log("  [Director-Merge] merged pre-update output states: raw="
+                    + preUpdateOutputMergedStates
+                    + ", classes=" + nextClassId
+                    + ", removed=" + preUpdateOutputMergeRemovedStates);
+        }
+        return classOf;
+    }
+
+    private List<String> buildPreUpdateOutputSignature(
+            CompostateDUC<State, Action> state,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> preUpdateClasses,
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds) {
+
+        List<String> signature = new ArrayList<>();
+        List<DirectorEdge> edges = directorEdges.get(state);
+        if (edges != null) {
+            for (DirectorEdge edge : edges) {
+                signature.add(edge.outputAction.toString() + "->" + outputMergeTargetToken(
+                        edge, preUpdateClasses, nonPreUpdateIds));
+            }
+        }
+        Collections.sort(signature);
+        return signature;
+    }
+
+    private String outputMergeTargetToken(
+            DirectorEdge edge,
+            Map<CompostateDUC<State, Action>, Integer> preUpdateClasses,
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds) {
+
+        if (edge.isNewControllerConnection()) {
+            return "NC:" + edge.ncTargetId;
+        }
+        if (isPreUpdateOutputState(edge.child)) {
+            return "PRE:" + preUpdateClasses.get(edge.child);
+        }
+        return "UPD:" + nonPreUpdateIds.get(edge.child);
+    }
+
+    private class DirectorEdge {
+        private final Action outputAction;
+        private final CompostateDUC<State, Action> child;
+        private final Long ncTargetId;
+
+        private DirectorEdge(
+                Action outputAction,
+                CompostateDUC<State, Action> child,
+                Long ncTargetId) {
+            this.outputAction = outputAction;
+            this.child = child;
+            this.ncTargetId = ncTargetId;
+        }
+
+        private boolean isNewControllerConnection() {
+            return ncTargetId != null;
+        }
     }
 
     /**
@@ -2385,7 +2585,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // anytime hotswap 要件: 勝ち更新パスを持つ旧コントローラ状態からは
         // beginUpdate を出力に残す。
-        if (hAction.toString().equals(UpdateConstants.BEGIN_UPDATE) && isGoal(child)) {
+        if (getMarkingState(current) == 0
+                && hAction.toString().equals(UpdateConstants.BEGIN_UPDATE)
+                && isGoal(child)) {
             logDirectorPruningDecision(current, hAction, child, true,
                     "beginUpdate from a winning pre-update state");
             return true;
@@ -2400,6 +2602,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             String selectedName = selected == null ? "none" : selected.toString();
             logDirectorPruningDecision(current, hAction, child, false,
                     "not selected; selected controllable=" + selectedName
+                            + ", directorAction=" + describeAction(current.getDirectorActionToGoal())
                             + ", actionToGoal=" + describeAction(current.actionToGoal)
                             + ", bestControllable=" + describeBestControllable(current));
         }
@@ -2443,17 +2646,19 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private HAction<State, Action> getSelectedControllableAction(CompostateDUC<State, Action> current) {
+        HAction<State, Action> directorAction = current.getDirectorActionToGoal();
+        if (directorAction != null && directorAction.isControllable()) {
+            return directorAction;
+        }
+
         Pair<Integer, CompostateDUC<State, Action>> best = current.getBestControllable();
 
         if (best != null && best.getFirst() != null && best.getFirst() >= 0) {
             CompostateDUC<State, Action> bestChild = best.getSecond();
 
             // bestChild が null の場合、最短の証明済み経路は uncontrollable 経由で
-            // 進むことを意味する。ただし、探索時に controllable の勝ち筋
-            // (actionToGoal) も記録されている場合がある。ここで即 return すると、
-            // beginUpdate 後の stopOldSpec など、更新プロトコルを進めるための
-            // controllable action まで pruning してしまうため、下の actionToGoal
-            // fallback に進ませる。
+            // 進むことを意味する。directorAction が controllable でなければ、
+            // 出力として追加すべき controllable はない。
             if (bestChild == null) {
                 // fall through
             } else {
@@ -2464,10 +2669,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     }
                 }
             }
-        }
-
-        if (current.actionToGoal != null && current.actionToGoal.isControllable()) {
-            return current.actionToGoal;
         }
 
         return null;

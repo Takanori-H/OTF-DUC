@@ -35,6 +35,7 @@ public class CompostateDUC<State, Action> {
     private HAction<State, Action> potentiallyGoodTransition;
     private boolean hasGoalChild = false;
     public HAction<State,Action> actionToGoal;
+    private HAction<State,Action> directorActionToGoal;
     private boolean wasExpanded = false;
     private HEstimate<State, Action> estimate;
     public List<RecommendationDUC> recommendations;
@@ -292,7 +293,18 @@ public class CompostateDUC<State, Action> {
     public void setStatus(Status status) { if (this.status != Status.ERROR || status == Status.ERROR) this.status = status; }
     public boolean isStatus(Status status) { return this.status == status; }
     public boolean hasGoalChild(){ return hasGoalChild; }
+
+    /**
+     * GOAL 子を見つけたことを記録する暫定情報。
+     * この情報だけでは、この状態自体の winning action とは限らない。
+     */
     public void setHasGoalChild(HAction<State, Action> actionToGoal) { this.actionToGoal = actionToGoal; this.hasGoalChild = true; }
+
+    /**
+     * 状態が GOAL と証明されたときに、director 出力で採用できる action を記録する。
+     */
+    public void setDirectorActionToGoal(HAction<State, Action> actionToGoal) { this.directorActionToGoal = actionToGoal; }
+    public HAction<State, Action> getDirectorActionToGoal() { return directorActionToGoal; }
     public Set<HAction<State, Action>> getTransitions() { return transitions; }
     public void addChild(HAction<State, Action> action, CompostateDUC<State, Action> child) {
         if(action.isControllable()){
@@ -383,19 +395,12 @@ public class CompostateDUC<State, Action> {
             // 構造的な候補管理を確認するためのデバッグログ。
             // dcs.log("    [Debug-Structural] State " + this.states + ": Yielding action at index [" + currentIndex + "/" + recommendations.size() + "]: " + action);
 
-            // OR条件の枝刈り（Pruning）ロジックは維持
-            if (action.isControllable()) {
-                boolean alreadyWon = false;
-                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> explored : getExploredChildren()) {
-                    if (explored.getFirst().isControllable() && explored.getSecond().isStatus(Status.GOAL)) {
-                        alreadyWon = true;
-                        break;
-                    }
-                }
-                if (alreadyWon){
-                    // dcs.log("    [Debug-Structural]   -> Skipped (Already won)");
-                    continue;
-                }
+            // 状態自体が GOAL と確定した後は、追加の controllable 候補は出力戦略に不要。
+            // ただし、GOAL 子を 1 つ見ただけの暫定段階では、非決定分岐や他の候補の
+            // 探索を止めてはいけない。
+            if (action.isControllable() && isStatus(Status.GOAL)) {
+                // dcs.log("    [Debug-Structural]   -> Skipped (State already won)");
+                continue;
             }
 
             estimate = recommendation.getEstimate();
