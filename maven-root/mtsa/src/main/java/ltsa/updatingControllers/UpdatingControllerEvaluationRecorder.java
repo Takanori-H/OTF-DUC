@@ -204,23 +204,69 @@ public final class UpdatingControllerEvaluationRecorder {
 
     public static synchronized void recordBeginUpdateCoverage(long beginUpdateStates, long countTimeMillis) {
         stateSpaceCountOverheadMillis += Math.max(0, countTimeMillis);
-        long denominator = beginUpdateReferenceStates >= 0 ? beginUpdateReferenceStates : oldControllerStates;
+        long denominator = oldControllerStates >= 0 ? oldControllerStates : beginUpdateReferenceStates;
         if (denominator >= 0 && beginUpdateStates <= denominator) {
-            add("要件確認", "beginUpdate coverage: " + beginUpdateStates + " / " + denominator
-                    + " reference states, CountTime: " + countTimeMillis + " ms");
+            add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
+                    + " / 旧コントローラ状態数 " + denominator
+                    + " 状態, CountTime: " + countTimeMillis + " ms");
         } else if (denominator >= 0) {
-            add("要件確認", "beginUpdate outgoing states: " + beginUpdateStates
-                    + ", reference states: " + denominator
+            add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
+                    + " 状態, 旧コントローラ状態数 : " + denominator
                     + ", CountTime: " + countTimeMillis + " ms");
         } else {
-            add("要件確認", "beginUpdate outgoing states: " + beginUpdateStates
+            add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
                     + ", CountTime: " + countTimeMillis + " ms");
         }
         recordDataMetric("begin_update_outgoing_states", "要件確認", "beginUpdate outgoing states", Long.toString(beginUpdateStates), "states");
         if (denominator >= 0) {
             recordDataMetric("begin_update_reference_states", "要件確認", "beginUpdate reference states", Long.toString(denominator), "states");
+            recordDataMetric("old_controller_states_for_begin_update", "要件確認", "旧コントローラ状態数", Long.toString(denominator), "states");
         }
         recordDataMetric("begin_update_coverage_count_time", "要件確認", "beginUpdate coverage CountTime", Long.toString(countTimeMillis), "ms");
+    }
+
+    public static synchronized void recordOtfPreUpdateStateOverhead(
+            long oldControllerStateCount,
+            long preUpdateRawStateCount,
+            long preUpdateOutputStateCount) {
+
+        long effectiveOldControllerStates = oldControllerStates >= 0
+                ? oldControllerStates
+                : oldControllerStateCount;
+        if (oldControllerStates < 0 && oldControllerStateCount >= 0) {
+            oldControllerStates = oldControllerStateCount;
+        }
+
+        long overhead = effectiveOldControllerStates >= 0 && preUpdateOutputStateCount >= 0
+                ? Math.max(0, preUpdateOutputStateCount - effectiveOldControllerStates)
+                : -1;
+
+        if (effectiveOldControllerStates >= 0) {
+            add("要件確認", "旧コントローラ状態数 : " + effectiveOldControllerStates + " 状態");
+            recordDataMetric("old_controller_states_for_begin_update", "要件確認",
+                    "旧コントローラ状態数", Long.toString(effectiveOldControllerStates), "states");
+        }
+
+        add("要件確認", "探索上の旧コントローラ相当状態数（出力時マージ前） : "
+                + preUpdateRawStateCount + " 状態");
+        add("要件確認", "出力上の旧コントローラ相当状態数（マージ後） : "
+                + preUpdateOutputStateCount + " 状態");
+        if (overhead >= 0) {
+            add("要件確認", "OTF-DUCにより増えた旧コントローラ相当状態数 : "
+                    + overhead + " 状態");
+        }
+
+        recordDataMetric("otf_pre_update_raw_states", "要件確認",
+                "探索上の旧コントローラ相当状態数（出力時マージ前）",
+                Long.toString(preUpdateRawStateCount), "states");
+        recordDataMetric("otf_pre_update_output_states", "要件確認",
+                "出力上の旧コントローラ相当状態数（マージ後）",
+                Long.toString(preUpdateOutputStateCount), "states");
+        if (overhead >= 0) {
+            recordDataMetric("otf_pre_update_state_overhead", "要件確認",
+                    "OTF-DUCにより増えた旧コントローラ相当状態数",
+                    Long.toString(overhead), "states");
+        }
     }
 
     public static synchronized boolean hasOldControllerStateSpace() {
@@ -969,7 +1015,19 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummaryDataMetric(output, "update controller 遷移数", "output_update_controller_transitions", "");
         printSummaryDataMetric(output, "出力状態数・遷移数 CountTime", "output_update_controller_count_time", "");
         printSummaryDataMetric(output, "beginUpdate が出ている状態数", "begin_update_outgoing_states", "");
-        printSummaryDataMetric(output, "beginUpdate の参照状態数", "begin_update_reference_states", "");
+        printSummaryDataMetric(output, "旧コントローラ状態数", "old_controller_states_for_begin_update",
+                "beginUpdate が出るべき基準状態数。");
+        if ("OTF-DUC".equals(mode)) {
+            printSummaryDataMetric(output, "探索上の旧コントローラ相当状態数（マージ前）",
+                    "otf_pre_update_raw_states",
+                    "OTF-DUC の探索で markingState=0 として現れた状態数。new safety fluent などで旧コントローラ状態が分割される。");
+            printSummaryDataMetric(output, "出力上の旧コントローラ相当状態数（マージ後）",
+                    "otf_pre_update_output_states",
+                    "出力時マージ後に update controller 側へ残る旧コントローラ相当状態数。");
+            printSummaryDataMetric(output, "OTF-DUCにより増えた旧コントローラ相当状態数",
+                    "otf_pre_update_state_overhead",
+                    "出力上の旧コントローラ相当状態数（マージ後） - 旧コントローラ状態数。マージできなかった分を OTF-DUC の状態数オーバーヘッドとして数える。");
+        }
         printSummaryDataMetric(output, "beginUpdate coverage CountTime", "begin_update_coverage_count_time", "");
     }
 

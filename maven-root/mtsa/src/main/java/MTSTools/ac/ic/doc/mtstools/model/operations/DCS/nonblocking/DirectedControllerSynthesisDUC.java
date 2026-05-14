@@ -71,6 +71,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     final public Statistics statistics = new Statistics();
 
     private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
+    private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
     private PrintWriter logWriter;
     private static final String LOG_FILE_PATH = System.getProperty("otfduc.debug.file", "duc_debug.txt");
 
@@ -104,6 +105,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long ncConnectionSuccessCount = 0;
     private long ncConnectionMissCount = 0;
     private long preUpdateOutputMergedStates = 0;
+    private long preUpdateOutputClassStates = 0;
     private long preUpdateOutputMergeRemovedStates = 0;
 
     private int totalLtsExpansions = 0;
@@ -228,9 +230,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             try {
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
                 log("=== Starting OTF-DUC Synthesis ===");
-                log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d]",
+                log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s]",
                         mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
-                        transReqEnd));
+                        transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled));
             } catch (IOException e) {
                 System.err.println("Failed to open debug log file: " + e.getMessage());
                 e.printStackTrace();
@@ -431,6 +433,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         ncConnectionSuccessCount = 0;
         ncConnectionMissCount = 0;
         preUpdateOutputMergedStates = 0;
+        preUpdateOutputClassStates = 0;
         preUpdateOutputMergeRemovedStates = 0;
         compostates = new HashMap<>();
         setupLookupOptimizations();
@@ -2074,9 +2077,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力 pruning 統計", "削除した controllable 遷移数", prunedControllableTransitions, "本");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC 出力 pruning 統計", "出力時マージ対象の旧コントローラ状態数", preUpdateOutputMergedStates, "状態");
+                "OTF-DUC 出力 pruning 統計", "探索上の旧コントローラ相当状態数（出力時マージ前）", preUpdateOutputMergedStates, "状態");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC 出力 pruning 統計", "出力時マージで削減した旧コントローラ状態数", preUpdateOutputMergeRemovedStates, "状態");
+                "OTF-DUC 出力 pruning 統計", "出力上の旧コントローラ相当状態数（マージ後）", preUpdateOutputClassStates, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力 pruning 統計", "出力時マージで削減した旧コントローラ相当状態数", preUpdateOutputMergeRemovedStates, "状態");
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC NC 接続統計", "finishUpdate 遷移数", finishUpdateTransitions, "本");
@@ -2111,9 +2116,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         boolean first = true;
         for (Map.Entry<Long, long[]> entry : byMarking.entrySet()) {
             long[] counts = entry.getValue();
-            if (entry.getKey() == 0L) {
-                UpdatingControllerEvaluationRecorder.recordBeginUpdateReferenceStates(counts[0]);
-            }
             UpdatingControllerEvaluationRecorder.recordStateSpace(
                     "OTF-DUC markingState 別探索規模",
                     "markingState=" + entry.getKey(),
@@ -2419,6 +2421,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return getMarkingState(state) == 0;
     }
 
+    private long countOldControllerStates() {
+        if (ltss == null || idxOC < 0 || idxOC >= ltss.size() || ltss.get(idxOC) == null) {
+            return -1;
+        }
+        return ltss.get(idxOC).getStates().size();
+    }
+
     @SuppressWarnings("unchecked")
     private Action toOutputAction(HAction<State, Action> hAction) {
         return (Action) hAction.toString().replace("_old", "");
@@ -2456,7 +2465,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         if (preUpdateStates.isEmpty()) {
             preUpdateOutputMergedStates = 0;
+            preUpdateOutputClassStates = 0;
             preUpdateOutputMergeRemovedStates = 0;
+            UpdatingControllerEvaluationRecorder.recordOtfPreUpdateStateOverhead(
+                    countOldControllerStates(),
+                    preUpdateOutputMergedStates,
+                    preUpdateOutputClassStates);
             return classOf;
         }
 
@@ -2501,14 +2515,230 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         } while (changed);
 
         preUpdateOutputMergedStates = preUpdateStates.size();
+        preUpdateOutputClassStates = nextClassId;
         preUpdateOutputMergeRemovedStates = preUpdateStates.size() - nextClassId;
+        UpdatingControllerEvaluationRecorder.recordOtfPreUpdateStateOverhead(
+                countOldControllerStates(),
+                preUpdateOutputMergedStates,
+                preUpdateOutputClassStates);
         if (debugLogEnabled && preUpdateOutputMergeRemovedStates > 0) {
             log("  [Director-Merge] merged pre-update output states: raw="
                     + preUpdateOutputMergedStates
                     + ", classes=" + nextClassId
                     + ", removed=" + preUpdateOutputMergeRemovedStates);
         }
+        logPreUpdateOutputMergeProof(preUpdateStates, classOf, directorEdges, nonPreUpdateIds, nextClassId);
         return classOf;
+    }
+
+    private void logPreUpdateOutputMergeProof(
+            List<CompostateDUC<State, Action>> preUpdateStates,
+            Map<CompostateDUC<State, Action>, Integer> finalClassOf,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds,
+            int finalClassCount) {
+
+        if (!debugLogEnabled || !mergeProofLogEnabled) {
+            return;
+        }
+
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController = new LinkedHashMap<>();
+        for (CompostateDUC<State, Action> state : preUpdateStates) {
+            State oldControllerState = state.getStates().get(idxOC);
+            statesByOldController.computeIfAbsent(oldControllerState, k -> new ArrayList<>()).add(state);
+        }
+
+        int splitOldControllerStates = 0;
+        int duplicatedRawStates = 0;
+        int duplicatedFinalClasses = 0;
+        for (List<CompostateDUC<State, Action>> states : statesByOldController.values()) {
+            List<Integer> finalClasses = collectFinalClasses(states, finalClassOf);
+            if (states.size() > 1 || finalClasses.size() > 1) {
+                splitOldControllerStates++;
+            }
+            duplicatedRawStates += Math.max(0, states.size() - 1);
+            duplicatedFinalClasses += Math.max(0, finalClasses.size() - 1);
+        }
+
+        log("  [PreUpdate-MergeProof] rawPreUpdateStates=" + preUpdateStates.size()
+                + ", oldControllerStates=" + statesByOldController.size()
+                + ", finalClasses=" + finalClassCount
+                + ", rawStatesBeyondOldController=" + duplicatedRawStates
+                + ", finalClassesBeyondOldController=" + duplicatedFinalClasses
+                + ", splitOldControllerStates=" + splitOldControllerStates);
+
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry : statesByOldController.entrySet()) {
+            State oldControllerState = entry.getKey();
+            List<CompostateDUC<State, Action>> states = entry.getValue();
+            List<Integer> finalClasses = collectFinalClasses(states, finalClassOf);
+
+            if (states.size() == 1 && finalClasses.size() == 1) {
+                continue;
+            }
+
+            log("  [PreUpdate-MergeProof] oldControllerState=" + oldControllerState
+                    + ", rawStates=" + states.size()
+                    + ", finalClasses=" + finalClasses
+                    + ", varyingComponents=" + describeVaryingComponents(states));
+
+            Map<Integer, List<CompostateDUC<State, Action>>> statesByFinalClass = new LinkedHashMap<>();
+            for (CompostateDUC<State, Action> state : states) {
+                Integer classId = finalClassOf.get(state);
+                statesByFinalClass.computeIfAbsent(classId, k -> new ArrayList<>()).add(state);
+            }
+
+            for (Map.Entry<Integer, List<CompostateDUC<State, Action>>> classEntry : statesByFinalClass.entrySet()) {
+                Integer classId = classEntry.getKey();
+                List<CompostateDUC<State, Action>> members = classEntry.getValue();
+                CompostateDUC<State, Action> representative = members.get(0);
+                List<String> signature = buildPreUpdateOutputSignature(
+                        representative, directorEdges, finalClassOf, nonPreUpdateIds);
+
+                log("    [PreUpdate-MergeProof-Class] class=" + classId
+                        + ", members=" + members.size()
+                        + ", outputActions=" + describeOutputActions(members, directorEdges)
+                        + ", beginUpdateTargets=" + describeActionTargets(
+                                members, UpdateConstants.BEGIN_UPDATE, directorEdges, finalClassOf, nonPreUpdateIds));
+                log("      representative=" + summarizeStateForDiagnostics(representative));
+                log("      signature=" + signature);
+            }
+        }
+    }
+
+    private List<Integer> collectFinalClasses(
+            List<CompostateDUC<State, Action>> states,
+            Map<CompostateDUC<State, Action>, Integer> finalClassOf) {
+
+        List<Integer> finalClasses = new ArrayList<>();
+        for (CompostateDUC<State, Action> state : states) {
+            Integer classId = finalClassOf.get(state);
+            if (!finalClasses.contains(classId)) {
+                finalClasses.add(classId);
+            }
+        }
+        return finalClasses;
+    }
+
+    private String describeVaryingComponents(List<CompostateDUC<State, Action>> states) {
+        if (states.isEmpty()) {
+            return "none";
+        }
+
+        int componentCount = states.get(0).getStates().size();
+        List<String> variations = new ArrayList<>();
+        for (int component = 0; component < componentCount; component++) {
+            List<State> values = new ArrayList<>();
+            for (CompostateDUC<State, Action> state : states) {
+                State value = state.getStates().get(component);
+                if (!values.contains(value)) {
+                    values.add(value);
+                }
+            }
+            if (values.size() > 1) {
+                variations.add(componentName(component) + "=" + limitedValues(values, 6));
+            }
+        }
+
+        if (variations.isEmpty()) {
+            return "none";
+        }
+
+        int maxComponents = 16;
+        if (variations.size() <= maxComponents) {
+            return variations.toString();
+        }
+        List<String> head = new ArrayList<>(variations.subList(0, maxComponents));
+        head.add("... +" + (variations.size() - maxComponents) + " components");
+        return head.toString();
+    }
+
+    private String limitedValues(List<State> values, int maxValues) {
+        if (values.size() <= maxValues) {
+            return values.toString();
+        }
+        List<String> limited = new ArrayList<>();
+        for (int i = 0; i < maxValues; i++) {
+            limited.add(String.valueOf(values.get(i)));
+        }
+        limited.add("... +" + (values.size() - maxValues) + " values");
+        return limited.toString();
+    }
+
+    private String componentName(int component) {
+        if (component == idxMarking) {
+            return "marking[" + component + "]";
+        }
+        if (component == idxOC) {
+            return "oldController[" + component + "]";
+        }
+        if (inComponentRange(component, mappingStart, mappingEnd)) {
+            return "mapEnv[" + component + "]";
+        }
+        if (inComponentRange(component, oldSafeStart, oldSafeEnd)) {
+            return "oldSafe[" + component + "]";
+        }
+        if (inComponentRange(component, newSafeStart, newSafeEnd)) {
+            return "newSafe[" + component + "]";
+        }
+        if (inComponentRange(component, transReqStart, transReqEnd)) {
+            return "transReq[" + component + "]";
+        }
+        if (inComponentRange(component, synthesisStart, synthesisEnd)) {
+            return "synthesis[" + component + "]";
+        }
+        return "component[" + component + "]";
+    }
+
+    private boolean inComponentRange(int component, int start, int end) {
+        return start >= 0 && end >= start && component >= start && component <= end;
+    }
+
+    private String describeOutputActions(
+            List<CompostateDUC<State, Action>> states,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges) {
+
+        List<String> actions = new ArrayList<>();
+        for (CompostateDUC<State, Action> state : states) {
+            List<DirectorEdge> edges = directorEdges.get(state);
+            if (edges == null) {
+                continue;
+            }
+            for (DirectorEdge edge : edges) {
+                String action = edge.outputAction.toString();
+                if (!actions.contains(action)) {
+                    actions.add(action);
+                }
+            }
+        }
+        Collections.sort(actions);
+        return actions.isEmpty() ? "none" : actions.toString();
+    }
+
+    private String describeActionTargets(
+            List<CompostateDUC<State, Action>> states,
+            String actionName,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> preUpdateClasses,
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds) {
+
+        List<String> targets = new ArrayList<>();
+        for (CompostateDUC<State, Action> state : states) {
+            List<DirectorEdge> edges = directorEdges.get(state);
+            if (edges == null) {
+                continue;
+            }
+            for (DirectorEdge edge : edges) {
+                if (!edge.outputAction.toString().equals(actionName)) {
+                    continue;
+                }
+                String target = outputMergeTargetToken(edge, preUpdateClasses, nonPreUpdateIds);
+                if (!targets.contains(target)) {
+                    targets.add(target);
+                }
+            }
+        }
+        Collections.sort(targets);
+        return targets.isEmpty() ? "none" : targets.toString();
     }
 
     private List<String> buildPreUpdateOutputSignature(
