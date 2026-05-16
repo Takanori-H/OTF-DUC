@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,6 +79,28 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
     private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
+    private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "true"));
+    private int beliefRepairAbsoluteMaxStates = Integer.getInteger("otfduc.belief.maxStates", 5000);
+    private int beliefRepairMinBeliefNodes = Integer.getInteger("otfduc.belief.maxNodes.min", 64);
+    private int beliefRepairBeliefNodesPerNewControllerState =
+            Integer.getInteger("otfduc.belief.maxNodes.perNewControllerState", 2);
+    private int beliefRepairBeliefNodesPerRawPreState =
+            Integer.getInteger("otfduc.belief.maxNodes.perRawPreState", 8);
+    private int beliefRepairBeliefNodesPerReachableMapValuation =
+            Integer.getInteger("otfduc.belief.maxNodes.perReachableMapValuation", 4);
+    private int beliefRepairMinAdditionalConcreteStates =
+            Integer.getInteger("otfduc.belief.maxAdditionalConcrete.min", 128);
+    private int beliefRepairAdditionalConcretePerNewControllerState =
+            Integer.getInteger("otfduc.belief.maxAdditionalConcrete.perNewControllerState", 4);
+    private int beliefRepairAdditionalConcretePerRawPreState =
+            Integer.getInteger("otfduc.belief.maxAdditionalConcrete.perRawPreState", 16);
+    private int beliefRepairMinAdditionalTransitions =
+            Integer.getInteger("otfduc.belief.maxAdditionalTransitions.min", 256);
+    private int beliefRepairAdditionalTransitionsPerNewControllerState =
+            Integer.getInteger("otfduc.belief.maxAdditionalTransitions.perNewControllerState", 8);
+    private int beliefRepairAdditionalTransitionsPerRawPreState =
+            Integer.getInteger("otfduc.belief.maxAdditionalTransitions.perRawPreState", 32);
+    private long beliefRepairMaxTimeMs = Long.getLong("otfduc.belief.maxTimeMs", 5000L);
     private PrintWriter logWriter;
     private static final String LOG_FILE_PATH = System.getProperty("otfduc.debug.file", "duc_debug.txt");
 
@@ -172,6 +195,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long directorNcConnectionDebugPrepNanos = 0;
     private long directorNcConnectionSignatureNanos = 0;
     private long directorPreUpdateMergeNanos = 0;
+    private long directorBeliefRepairNanos = 0;
     private long directorIdAssignmentNanos = 0;
     private long directorTransitionEmissionNanos = 0;
 
@@ -205,6 +229,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long directorNcConnectionSignatureCalls = 0;
     private long directorOutputStatesAssigned = 0;
     private long directorTransitionEmissionAttempts = 0;
+    private long beliefRepairCandidateGroups = 0;
+    private long beliefRepairSuccessGroups = 0;
+    private long beliefRepairFallbackGroups = 0;
+    private long beliefRepairGeneratedNodes = 0;
+    private long beliefLazyExpansionRounds = 0;
+    private long beliefLazyExpansionAttempts = 0;
+    private long beliefLazyExpansionExpandedActions = 0;
+    private long beliefLazyExpansionAddedEdges = 0;
+    private long beliefRepairResourceLimitFallbacks = 0;
+    private long beliefRepairMaxObservedBeliefNodes = 0;
+    private long beliefRepairMaxObservedAdditionalConcreteStates = 0;
+    private long beliefRepairMaxObservedAdditionalTransitions = 0;
     private long totalFairnessCandidatesProcessed = 0;
     private long phase2OuterIterations = 0;
     private long phase2InnerIterations = 0;
@@ -795,6 +831,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         directorNcConnectionDebugPrepNanos = 0;
         directorNcConnectionSignatureNanos = 0;
         directorPreUpdateMergeNanos = 0;
+        directorBeliefRepairNanos = 0;
         directorIdAssignmentNanos = 0;
         directorTransitionEmissionNanos = 0;
         heuristicSelectionCalls = 0;
@@ -827,6 +864,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         directorNcConnectionSignatureCalls = 0;
         directorOutputStatesAssigned = 0;
         directorTransitionEmissionAttempts = 0;
+        beliefRepairCandidateGroups = 0;
+        beliefRepairSuccessGroups = 0;
+        beliefRepairFallbackGroups = 0;
+        beliefRepairGeneratedNodes = 0;
+        beliefLazyExpansionRounds = 0;
+        beliefLazyExpansionAttempts = 0;
+        beliefLazyExpansionExpandedActions = 0;
+        beliefLazyExpansionAddedEdges = 0;
+        beliefRepairResourceLimitFallbacks = 0;
+        beliefRepairMaxObservedBeliefNodes = 0;
+        beliefRepairMaxObservedAdditionalConcreteStates = 0;
+        beliefRepairMaxObservedAdditionalTransitions = 0;
         totalFairnessCandidatesProcessed = 0;
         phase2OuterIterations = 0;
         phase2InnerIterations = 0;
@@ -3059,17 +3108,37 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         // ---------------------------------------------------------
-        // ステップ 3: 出力時のみ、旧コントローラ上の同値状態をマージする
+        // ステップ 3: 出力時のみ、旧コントローラ上の同値状態をマージする。
+        // まず従来の簡単な partition refinement を行い、その後に同じ旧状態が
+        // 複数クラスに分かれて残る箇所だけ belief 再探索で 1 対 1 対応を試みる。
         // ---------------------------------------------------------
         long preUpdateMergeStart = profileLogEnabled ? System.nanoTime() : 0L;
-        Map<CompostateDUC<State, Action>, Integer> preUpdateClasses =
+        Map<CompostateDUC<State, Action>, Integer> fallbackPreUpdateClasses =
                 computePreUpdateOutputMergeClasses(reachableOrder, directorEdges);
         if (profileLogEnabled) {
             directorPreUpdateMergeNanos += System.nanoTime() - preUpdateMergeStart;
         }
 
+        BeliefRepairResult beliefRepairResult = new BeliefRepairResult();
+        if (beliefRepairEnabled) {
+            long beliefRepairStart = System.nanoTime();
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges =
+                    collectRawDirectorEdges();
+            beliefRepairResult = repairPreUpdateBeliefs(
+                    reachableOrder, directorEdges, fallbackPreUpdateClasses, rawDirectorEdges);
+            directorBeliefRepairNanos += System.nanoTime() - beliefRepairStart;
+        } else if (debugLogEnabled) {
+            log("  [Belief-Repair] disabled by -Dotfduc.belief.repair=false");
+        }
+
+        Map<CompostateDUC<State, Action>, Integer> preUpdateClasses =
+                buildPreUpdateClassesAfterBeliefRepair(
+                        reachableOrder, fallbackPreUpdateClasses, beliefRepairResult);
+        recordPreUpdateOutputStateOverhead(reachableOrder, preUpdateClasses);
+
         Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
         Map<Integer, Long> preUpdateClassIds = new HashMap<>();
+        Map<BeliefNode, Long> beliefIds = new HashMap<>();
         long idAssignmentStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (CompostateDUC<State, Action> state : reachableOrder) {
             directorOutputStatesAssigned++;
@@ -3088,6 +3157,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 result.addState(id);
             }
         }
+        for (BeliefRepairPlan plan : beliefRepairResult.successPlans.values()) {
+            for (BeliefNode node : plan.nodes) {
+                if (!beliefIds.containsKey(node)) {
+                    Long id = nextId++;
+                    beliefIds.put(node, id);
+                    result.addState(id);
+                    directorOutputStatesAssigned++;
+                }
+            }
+        }
         result.setInitialState(ids.get(initial));
         if (profileLogEnabled) {
             directorIdAssignmentNanos += System.nanoTime() - idAssignmentStart;
@@ -3101,6 +3180,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 continue;
             }
             for (DirectorEdge edge : edges) {
+                if (beliefRepairResult.isRepairedPreUpdateState(source)
+                        && edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+                    // belief 再探索に成功した旧状態では、具象 m=0 状態ごとの
+                    // beginUpdate を出さず、1 本の beginUpdate から belief 状態へ入る。
+                    continue;
+                }
                 Long targetId = edge.isNewControllerConnection()
                         ? edge.ncTargetId
                         : ids.get(edge.child);
@@ -3113,6 +3198,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
         }
+        emitBeliefRepairTransitions(result, ids, beliefIds, beliefRepairResult);
         if (profileLogEnabled) {
             directorTransitionEmissionNanos += System.nanoTime() - transitionEmissionStart;
             directorTraversalNanos += System.nanoTime() - directorBuildStart;
@@ -3172,10 +3258,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             preUpdateOutputMergedStates = 0;
             preUpdateOutputClassStates = 0;
             preUpdateOutputMergeRemovedStates = 0;
-            UpdatingControllerEvaluationRecorder.recordOtfPreUpdateStateOverhead(
-                    countOldControllerStates(),
-                    preUpdateOutputMergedStates,
-                    preUpdateOutputClassStates);
             return classOf;
         }
 
@@ -3222,10 +3304,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         preUpdateOutputMergedStates = preUpdateStates.size();
         preUpdateOutputClassStates = nextClassId;
         preUpdateOutputMergeRemovedStates = preUpdateStates.size() - nextClassId;
-        UpdatingControllerEvaluationRecorder.recordOtfPreUpdateStateOverhead(
-                countOldControllerStates(),
-                preUpdateOutputMergedStates,
-                preUpdateOutputClassStates);
         if (debugLogEnabled && preUpdateOutputMergeRemovedStates > 0) {
             log("  [Director-Merge] merged pre-update output states: raw="
                     + preUpdateOutputMergedStates
@@ -3476,6 +3554,1917 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return "PRE:" + preUpdateClasses.get(edge.child);
         }
         return "UPD:" + nonPreUpdateIds.get(edge.child);
+    }
+
+    private Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> collectRawDirectorEdges() {
+        return collectRawDirectorEdges(true);
+    }
+
+    private Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> collectRawDirectorEdges(boolean logSummary) {
+        Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawEdges = new LinkedHashMap<>();
+        if (compostates == null) {
+            return rawEdges;
+        }
+
+        long rawTransitions = 0;
+        for (CompostateDUC<State, Action> state : compostates.values()) {
+            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition : state.getExploredChildren()) {
+                RawDirectorEdge edge = new RawDirectorEdge(transition.getFirst(), transition.getSecond());
+                rawEdges.computeIfAbsent(state, k -> new ArrayList<>()).add(edge);
+                rawTransitions++;
+            }
+        }
+        otfPeakStates = Math.max(otfPeakStates, compostates.size());
+        otfPeakTrans = Math.max(otfPeakTrans, (int) Math.min(Integer.MAX_VALUE, rawTransitions));
+        if (debugLogEnabled && logSummary) {
+            log("  [Belief-Repair] collected raw explored graph: states="
+                    + rawEdges.size() + ", transitions=" + rawTransitions);
+        }
+        return rawEdges;
+    }
+
+    private long countRawDirectorTransitions(
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        long transitions = 0;
+        if (rawDirectorEdges == null) {
+            return transitions;
+        }
+        for (List<RawDirectorEdge> edges : rawDirectorEdges.values()) {
+            if (edges != null) {
+                transitions += edges.size();
+            }
+        }
+        return transitions;
+    }
+
+    private long countCurrentExploredTransitions() {
+        long transitions = 0;
+        if (compostates == null) {
+            return transitions;
+        }
+        for (CompostateDUC<State, Action> state : compostates.values()) {
+            for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> ignored : state.getExploredChildren()) {
+                transitions++;
+            }
+        }
+        return transitions;
+    }
+
+    private BeliefRepairResourceLimits createBeliefRepairResourceLimits(
+            int rawPreStates,
+            int reachableMapValuations) {
+        int newControllerStates = newController == null || newController.getStates() == null
+                ? 0
+                : newController.getStates().size();
+
+        int dynamicBeliefNodes = maxPositive(
+                beliefRepairMinBeliefNodes,
+                safeMultiplyToInt(beliefRepairBeliefNodesPerNewControllerState, newControllerStates),
+                safeMultiplyToInt(beliefRepairBeliefNodesPerRawPreState, rawPreStates),
+                safeMultiplyToInt(
+                        beliefRepairBeliefNodesPerReachableMapValuation,
+                        reachableMapValuations));
+        int maxBeliefNodes = Math.min(beliefRepairAbsoluteMaxStates, dynamicBeliefNodes);
+
+        int maxAdditionalConcreteStates = maxPositive(
+                beliefRepairMinAdditionalConcreteStates,
+                safeMultiplyToInt(beliefRepairAdditionalConcretePerNewControllerState, newControllerStates),
+                safeMultiplyToInt(beliefRepairAdditionalConcretePerRawPreState, rawPreStates));
+
+        int maxAdditionalTransitions = maxPositive(
+                beliefRepairMinAdditionalTransitions,
+                safeMultiplyToInt(beliefRepairAdditionalTransitionsPerNewControllerState, newControllerStates),
+                safeMultiplyToInt(beliefRepairAdditionalTransitionsPerRawPreState, rawPreStates));
+
+        return new BeliefRepairResourceLimits(
+                maxBeliefNodes,
+                maxAdditionalConcreteStates,
+                maxAdditionalTransitions,
+                beliefRepairMaxTimeMs,
+                reachableMapValuations);
+    }
+
+    private int maxPositive(int first, int second, int third) {
+        return Math.max(1, Math.max(first, Math.max(second, third)));
+    }
+
+    private int maxPositive(int first, int second, int third, int fourth) {
+        return Math.max(1, Math.max(Math.max(first, second), Math.max(third, fourth)));
+    }
+
+    private int safeMultiplyToInt(int left, int right) {
+        if (left <= 0 || right <= 0) {
+            return 0;
+        }
+        long value = (long) left * (long) right;
+        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
+    }
+
+    private int countReachableMapValuations(
+            Iterable<CompostateDUC<State, Action>> seeds,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (seeds == null || mappingStart < 0 || mappingEnd < mappingStart) {
+            return 0;
+        }
+
+        Set<CompostateDUC<State, Action>> visitedStates = new HashSet<>();
+        Set<List<State>> mapValuations = new HashSet<>();
+        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
+
+        for (CompostateDUC<State, Action> seed : seeds) {
+            if (seed != null && visitedStates.add(seed)) {
+                queue.add(seed);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            CompostateDUC<State, Action> state = queue.remove();
+            List<State> vector = state.getStates();
+            if (vector != null && mappingEnd < vector.size()) {
+                List<State> mapValuation = new ArrayList<>();
+                for (int k = mappingStart; k <= mappingEnd; k++) {
+                    mapValuation.add(vector.get(k));
+                }
+                mapValuations.add(mapValuation);
+            }
+
+            List<RawDirectorEdge> edges = rawDirectorEdges == null ? null : rawDirectorEdges.get(state);
+            if (edges == null) {
+                continue;
+            }
+            for (RawDirectorEdge edge : edges) {
+                if (edge.child != null && visitedStates.add(edge.child)) {
+                    queue.add(edge.child);
+                }
+            }
+        }
+
+        return mapValuations.size();
+    }
+
+    private void refreshBeliefRepairResourceLimits(
+            BeliefRepairPlan plan,
+            Iterable<CompostateDUC<State, Action>> seeds,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        int reachableMapValuations = countReachableMapValuations(seeds, rawDirectorEdges);
+        plan.reachableMapValuations = Math.max(plan.reachableMapValuations, reachableMapValuations);
+        plan.resourceLimits = createBeliefRepairResourceLimits(
+                plan.preUpdateStates.size(),
+                plan.reachableMapValuations);
+    }
+
+    private BeliefRepairResult repairPreUpdateBeliefs(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> fallbackPreUpdateClasses,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        BeliefRepairResult result = new BeliefRepairResult();
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController =
+                groupPreUpdateStatesByOldController(reachableOrder);
+
+        if (debugLogEnabled) {
+            log("  [Belief-Repair] start: oldControllerGroups="
+                    + statesByOldController.size()
+                    + ", absoluteMaxBeliefNodes=" + beliefRepairAbsoluteMaxStates
+                    + ", resourceLimitFormula="
+                    + "beliefNodes=max(" + beliefRepairMinBeliefNodes
+                    + ", " + beliefRepairBeliefNodesPerNewControllerState + "*newControllerStates"
+                    + ", " + beliefRepairBeliefNodesPerRawPreState + "*rawPreStates"
+                    + ", " + beliefRepairBeliefNodesPerReachableMapValuation + "*reachableMapValuations)"
+                    + ", additionalConcrete=max(" + beliefRepairMinAdditionalConcreteStates
+                    + ", " + beliefRepairAdditionalConcretePerNewControllerState + "*newControllerStates"
+                    + ", " + beliefRepairAdditionalConcretePerRawPreState + "*rawPreStates)"
+                    + ", additionalTransitions=max(" + beliefRepairMinAdditionalTransitions
+                    + ", " + beliefRepairAdditionalTransitionsPerNewControllerState + "*newControllerStates"
+                    + ", " + beliefRepairAdditionalTransitionsPerRawPreState + "*rawPreStates)"
+                    + ", maxTimeMs=" + beliefRepairMaxTimeMs);
+        }
+
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry : statesByOldController.entrySet()) {
+            State oldControllerState = entry.getKey();
+            List<CompostateDUC<State, Action>> preUpdateStates = entry.getValue();
+            List<Integer> fallbackClasses = collectFinalClasses(preUpdateStates, fallbackPreUpdateClasses);
+
+            // 既存の簡単マージで既に 1 状態へまとまる場合は belief 再探索不要。
+            if (fallbackClasses.size() <= 1) {
+                continue;
+            }
+
+            beliefRepairCandidateGroups++;
+            BeliefRepairPlan plan = runBeliefRepairForOldState(
+                    oldControllerState,
+                    preUpdateStates,
+                    fallbackClasses,
+                    directorEdges,
+                    rawDirectorEdges);
+
+            if (plan.success) {
+                beliefRepairSuccessGroups++;
+                result.addSuccess(plan);
+            } else {
+                beliefRepairFallbackGroups++;
+                result.addFallback(plan);
+            }
+        }
+
+        if (debugLogEnabled) {
+            log("  [Belief-Repair] finished: candidates=" + beliefRepairCandidateGroups
+                    + ", success=" + beliefRepairSuccessGroups
+                    + ", fallback=" + beliefRepairFallbackGroups
+                    + ", generatedBeliefNodes=" + beliefRepairGeneratedNodes);
+        }
+        return result;
+    }
+
+    private Map<State, List<CompostateDUC<State, Action>>> groupPreUpdateStatesByOldController(
+            List<CompostateDUC<State, Action>> reachableOrder) {
+
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController = new LinkedHashMap<>();
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                continue;
+            }
+            State oldControllerState = state.getStates().get(idxOC);
+            statesByOldController.computeIfAbsent(oldControllerState, k -> new ArrayList<>()).add(state);
+        }
+        return statesByOldController;
+    }
+
+    private BeliefRepairPlan runBeliefRepairForOldState(
+            State oldControllerState,
+            List<CompostateDUC<State, Action>> preUpdateStates,
+            List<Integer> fallbackClasses,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        BeliefRepairPlan plan = new BeliefRepairPlan(oldControllerState, preUpdateStates, fallbackClasses);
+        plan.initialConcreteStateCount = compostates == null ? 0 : compostates.size();
+        plan.initialRawTransitionCount = countRawDirectorTransitions(rawDirectorEdges);
+        plan.repairStartNanos = System.nanoTime();
+
+        Set<CompostateDUC<State, Action>> beginTargets = new LinkedHashSet<>();
+        CompostateDUC<State, Action> missingBeginUpdateState = null;
+
+        for (CompostateDUC<State, Action> preUpdateState : preUpdateStates) {
+            List<RawDirectorEdge> edges = rawDirectorEdges.get(preUpdateState);
+            boolean foundBeginUpdate = false;
+            if (edges != null) {
+                for (RawDirectorEdge edge : edges) {
+                    if (!edge.actionName.equals(UpdateConstants.BEGIN_UPDATE)) {
+                        continue;
+                    }
+                    if (!edge.hAction.isControllable()) {
+                        continue;
+                    }
+                    if (!isSafeWinningBeliefChild(edge.child)) {
+                        continue;
+                    }
+                    foundBeginUpdate = true;
+                    beginTargets.add(edge.child);
+                    if (plan.beginUpdateAction == null) {
+                        plan.beginUpdateAction = edge.outputAction;
+                    }
+                }
+            }
+
+            if (!foundBeginUpdate) {
+                missingBeginUpdateState = preUpdateState;
+                break;
+            }
+        }
+
+        refreshBeliefRepairResourceLimits(
+                plan,
+                beginTargets.isEmpty() ? preUpdateStates : beginTargets,
+                rawDirectorEdges);
+
+        if (debugLogEnabled) {
+            log("  [Belief-Repair] candidate oldControllerState=" + oldControllerState
+                    + ", rawPreStates=" + preUpdateStates.size()
+                    + ", fallbackClasses=" + fallbackClasses
+                    + ", varyingComponents=" + describeVaryingComponents(preUpdateStates)
+                    + ", outputActions=" + describeOutputActions(preUpdateStates, directorEdges)
+                    + ", reachableMapValuations=" + plan.reachableMapValuations
+                    + ", limits=" + plan.resourceLimits);
+        }
+
+        if (missingBeginUpdateState != null) {
+            plan.fail("beginUpdate で到達できる GOAL 子がない pre-update 状態がある: "
+                    + summarizeStateForDiagnostics(missingBeginUpdateState));
+            logBeliefRepairPlan(plan);
+            return plan;
+        }
+
+        Set<String> lazyNoProgressActions = new HashSet<>();
+        Set<String> rejectedBeliefActions = new HashSet<>();
+        int lazyRound = 0;
+        while (true) {
+            BeliefSearchContext context = buildBeliefGraphForPlan(
+                    plan, preUpdateStates, beginTargets, rawDirectorEdges);
+            updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
+
+            if (context.limitExceeded) {
+                plan.failByResource("belief node 数が上限を超えた: "
+                        + describeBeliefRepairResourceUsage(plan));
+                beliefRepairResourceLimitFallbacks++;
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+            if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
+                beliefRepairResourceLimitFallbacks++;
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+
+            BeliefLazyExpansionResult updateExpansion = expandBeliefControllableFrontier(
+                    plan, lazyNoProgressActions, rejectedBeliefActions, lazyRound + 1, true);
+            if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
+                beliefRepairResourceLimitFallbacks++;
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+            if (updateExpansion.hasProgress()) {
+                rawDirectorEdges.clear();
+                rawDirectorEdges.putAll(collectRawDirectorEdges(false));
+                refreshBeliefRepairResourceLimits(plan, beginTargets, rawDirectorEdges);
+                updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
+                lazyRound++;
+                continue;
+            }
+
+            BeliefLazyExpansionResult uncontrollableExpansion = expandBeliefUncontrollableClosure(
+                    plan, lazyNoProgressActions, lazyRound + 1);
+            if (uncontrollableExpansion.hasProgress()) {
+                rawDirectorEdges.clear();
+                rawDirectorEdges.putAll(collectRawDirectorEdges(false));
+                refreshBeliefRepairResourceLimits(plan, beginTargets, rawDirectorEdges);
+                updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
+                continue;
+            }
+            markRemainingUnexploredUncontrollablesBad(plan);
+
+            solveBeliefReachability(plan);
+            if (plan.root != null && plan.root.winning) {
+                plan.success = true;
+                plan.reason = "belief graph 上で finishUpdate まで到達可能";
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+
+            if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
+                beliefRepairResourceLimitFallbacks++;
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+
+            BeliefLazyExpansionResult lazyResult = expandBeliefControllableFrontier(
+                    plan, lazyNoProgressActions, rejectedBeliefActions, lazyRound + 1, false);
+            if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
+                beliefRepairResourceLimitFallbacks++;
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+            if (!lazyResult.hasProgress()) {
+                plan.fail("belief graph 上で全候補に共通する勝ち更新戦略を証明できない"
+                        + "（追加展開しても新しい遷移を発見できない）");
+                logBeliefRepairPlan(plan);
+                return plan;
+            }
+
+            rawDirectorEdges.clear();
+            rawDirectorEdges.putAll(collectRawDirectorEdges(false));
+            refreshBeliefRepairResourceLimits(plan, beginTargets, rawDirectorEdges);
+            updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
+            lazyRound++;
+        }
+    }
+
+    private BeliefSearchContext buildBeliefGraphForPlan(
+            BeliefRepairPlan plan,
+            List<CompostateDUC<State, Action>> preUpdateStates,
+            Set<CompostateDUC<State, Action>> beginTargets,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        Map<CompostateDUC<State, Action>, Integer> concreteIds =
+                buildConcreteStateIds(preUpdateStates, rawDirectorEdges);
+        BeliefSearchContext context = new BeliefSearchContext(
+                concreteIds, plan.resourceLimits.maxBeliefNodes);
+
+        plan.nodes.clear();
+        plan.root = context.getOrCreateNode(beginTargets);
+        if (plan.root == null) {
+            context.limitExceeded = true;
+            return context;
+        }
+
+        while (!context.queue.isEmpty() && !context.limitExceeded) {
+            BeliefNode node = context.queue.remove();
+            expandBeliefNode(node, context, rawDirectorEdges);
+        }
+
+        plan.nodes.addAll(context.nodes);
+        beliefRepairGeneratedNodes += context.nodes.size();
+        return context;
+    }
+
+    private void updateBeliefRepairResourceUsage(
+            BeliefRepairPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        int concreteStateCount = compostates == null ? 0 : compostates.size();
+        int additionalConcreteStates = Math.max(0, concreteStateCount - plan.initialConcreteStateCount);
+        long additionalTransitions = Math.max(
+                0L,
+                countCurrentExploredTransitions() - plan.initialRawTransitionCount);
+
+        plan.maxObservedBeliefNodes = Math.max(plan.maxObservedBeliefNodes, plan.nodes.size());
+        plan.maxObservedAdditionalConcreteStates =
+                Math.max(plan.maxObservedAdditionalConcreteStates, additionalConcreteStates);
+        plan.maxObservedAdditionalTransitions =
+                Math.max(plan.maxObservedAdditionalTransitions, additionalTransitions);
+
+        beliefRepairMaxObservedBeliefNodes =
+                Math.max(beliefRepairMaxObservedBeliefNodes, plan.maxObservedBeliefNodes);
+        beliefRepairMaxObservedAdditionalConcreteStates = Math.max(
+                beliefRepairMaxObservedAdditionalConcreteStates,
+                plan.maxObservedAdditionalConcreteStates);
+        beliefRepairMaxObservedAdditionalTransitions = Math.max(
+                beliefRepairMaxObservedAdditionalTransitions,
+                plan.maxObservedAdditionalTransitions);
+    }
+
+    private boolean checkBeliefRepairResourceLimit(
+            BeliefRepairPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
+        BeliefRepairResourceLimits limits = plan.resourceLimits;
+
+        if (plan.maxObservedBeliefNodes > limits.maxBeliefNodes) {
+            plan.failByResource("belief node 数が上限を超えた: "
+                    + describeBeliefRepairResourceUsage(plan));
+            return true;
+        }
+        if (plan.maxObservedAdditionalConcreteStates > limits.maxAdditionalConcreteStates) {
+            plan.failByResource("追加 concrete state 数が上限を超えた: "
+                    + describeBeliefRepairResourceUsage(plan));
+            return true;
+        }
+        if (plan.maxObservedAdditionalTransitions > limits.maxAdditionalTransitions) {
+            plan.failByResource("追加 transition 数が上限を超えた: "
+                    + describeBeliefRepairResourceUsage(plan));
+            return true;
+        }
+        if (limits.maxTimeMs > 0) {
+            long elapsedMs = (System.nanoTime() - plan.repairStartNanos) / 1_000_000L;
+            if (elapsedMs > limits.maxTimeMs) {
+                plan.failByResource("belief repair 時間が上限を超えた: elapsedMs=" + elapsedMs
+                        + ", " + describeBeliefRepairResourceUsage(plan));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String describeBeliefRepairResourceUsage(BeliefRepairPlan plan) {
+        if (plan.resourceLimits == null) {
+            return "resourceLimits=not-initialized";
+        }
+        return "beliefNodes=" + plan.maxObservedBeliefNodes + "/" + plan.resourceLimits.maxBeliefNodes
+                + ", additionalConcreteStates=" + plan.maxObservedAdditionalConcreteStates
+                + "/" + plan.resourceLimits.maxAdditionalConcreteStates
+                + ", additionalTransitions=" + plan.maxObservedAdditionalTransitions
+                + "/" + plan.resourceLimits.maxAdditionalTransitions
+                + ", maxTimeMs=" + plan.resourceLimits.maxTimeMs
+                + ", reachableMapValuations=" + plan.reachableMapValuations;
+    }
+
+    private Map<CompostateDUC<State, Action>, Integer> buildConcreteStateIds(
+            List<CompostateDUC<State, Action>> seedStates,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        Map<CompostateDUC<State, Action>, Integer> ids = new HashMap<>();
+        for (CompostateDUC<State, Action> state : seedStates) {
+            getConcreteStateId(ids, state);
+        }
+        for (Map.Entry<CompostateDUC<State, Action>, List<RawDirectorEdge>> entry : rawDirectorEdges.entrySet()) {
+            getConcreteStateId(ids, entry.getKey());
+            for (RawDirectorEdge edge : entry.getValue()) {
+                getConcreteStateId(ids, edge.child);
+            }
+        }
+        return ids;
+    }
+
+    private int getConcreteStateId(
+            Map<CompostateDUC<State, Action>, Integer> concreteIds,
+            CompostateDUC<State, Action> state) {
+
+        Integer id = concreteIds.get(state);
+        if (id == null) {
+            id = concreteIds.size();
+            concreteIds.put(state, id);
+        }
+        return id;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefControllableFrontier(
+            BeliefRepairPlan plan,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round,
+            boolean updateProtocolOnly) {
+
+        BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
+        while (true) {
+            BeliefExpansionCandidate candidate = selectNextControllableBeliefCandidate(
+                    plan, noProgressActions, rejectedBeliefActions, updateProtocolOnly);
+            if (candidate == null) {
+                break;
+            }
+            if (expandBeliefExpansionCandidate(
+                    candidate, noProgressActions, rejectedBeliefActions, result)) {
+                return result;
+            }
+        }
+
+        if (debugLogEnabled && (result.attemptedActions > 0 || result.addedEdges > 0)) {
+            log("  [Belief-LazyExpansion] oldControllerState=" + plan.oldControllerState
+                    + ", round=" + result.round
+                    + ", mode=C-one-action"
+                    + ", attemptedActions=" + result.attemptedActions
+                    + ", expandedActions=" + result.expandedActions
+                    + ", addedEdges=" + result.addedEdges);
+        }
+        return result;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefUncontrollableClosure(
+            BeliefRepairPlan plan,
+            Set<String> noProgressActions,
+            int round) {
+
+        BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
+        BeliefExpansionCandidate candidate = selectNextUncontrollableBeliefCandidate(plan, noProgressActions);
+        if (candidate != null) {
+            expandBeliefExpansionCandidate(candidate, noProgressActions, Collections.emptySet(), result);
+        }
+        return result;
+    }
+
+    private BeliefExpansionCandidate selectNextControllableBeliefCandidate(
+            BeliefRepairPlan plan,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            boolean updateProtocolOnly) {
+
+        List<BeliefExpansionCandidate> candidates = new ArrayList<>();
+        for (BeliefNode node : plan.nodes) {
+            if (node.bad || node.winning) {
+                continue;
+            }
+
+            // controllable は共通戦略として選ぶ必要があるため、belief 内の全候補で
+            // 同じ出力 action が有効なものだけ候補にする。
+            for (String actionName : collectCommonControllableActionNames(node)) {
+                if (isUpdateProtocolOutputActionName(actionName) != updateProtocolOnly) {
+                    continue;
+                }
+                if (rejectedBeliefActions.contains(beliefActionKey(node, actionName))) {
+                    continue;
+                }
+                if (hasExpandableBeliefAction(node, actionName, true, noProgressActions)) {
+                    candidates.add(new BeliefExpansionCandidate(
+                            plan, node, actionName, true, isUpdateProtocolOutputActionName(actionName)));
+                }
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        candidates.sort(this::compareBeliefExpansionCandidates);
+        return candidates.get(0);
+    }
+
+    private BeliefExpansionCandidate selectNextUncontrollableBeliefCandidate(
+            BeliefRepairPlan plan,
+            Set<String> noProgressActions) {
+
+        List<BeliefExpansionCandidate> candidates = new ArrayList<>();
+        for (BeliefNode node : plan.nodes) {
+            if (node.bad) {
+                continue;
+            }
+            for (String actionName : collectUnexploredUncontrollableActionNames(node, noProgressActions)) {
+                candidates.add(new BeliefExpansionCandidate(
+                        plan, node, actionName, false, false));
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        candidates.sort(this::compareBeliefExpansionCandidates);
+        return candidates.get(0);
+    }
+
+    private boolean expandBeliefExpansionCandidate(
+            BeliefExpansionCandidate candidate,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            BeliefLazyExpansionResult result) {
+
+        int beforeAddedEdges = result.addedEdges;
+        int beforeExpandedActions = result.expandedActions;
+        long beforeGlobalExpandedActions = beliefLazyExpansionExpandedActions;
+        long beforeGlobalAddedEdges = beliefLazyExpansionAddedEdges;
+        for (CompostateDUC<State, Action> member : candidate.node.members) {
+            HAction<State, Action> memberAction = candidate.controllable
+                    ? findEnabledActionByOutputName(member, candidate.actionName, true)
+                    : findEnabledUncontrollableActionByOutputName(member, candidate.actionName);
+            if (memberAction != null) {
+                expandConcreteActionForBelief(member, memberAction, noProgressActions, result);
+            }
+        }
+
+        if (result.addedEdges > beforeAddedEdges) {
+            if (candidate.controllable && !isControllableBeliefCandidateUsable(candidate)) {
+                rejectedBeliefActions.add(beliefActionKey(candidate.node, candidate.actionName));
+                if (debugLogEnabled) {
+                    log("  [Belief-LazyExpansion] discard unsafe controllable candidate: "
+                            + "oldControllerState=" + candidate.plan.oldControllerState
+                            + ", node=" + candidate.node.name()
+                            + ", action=" + candidate.actionName
+                            + ", reason=ERROR child を持つため共通 controllable 戦略として使えない");
+                }
+                result.expandedActions = beforeExpandedActions;
+                result.addedEdges = beforeAddedEdges;
+                beliefLazyExpansionExpandedActions = beforeGlobalExpandedActions;
+                beliefLazyExpansionAddedEdges = beforeGlobalAddedEdges;
+                return false;
+            }
+            if (debugLogEnabled) {
+                log("  [Belief-LazyExpansion] oldControllerState=" + candidate.plan.oldControllerState
+                        + ", round=" + result.round
+                        + ", mode=" + (candidate.controllable ? "C-frontier" : "U-closure")
+                        + ", selectedNode=" + candidate.node.name()
+                        + ", nodeDepth=" + beliefNodeMaxMarkingDepth(candidate.node)
+                        + ", nodeSeq=" + beliefNodeMaxSeq(candidate.node)
+                        + ", action=" + candidate.actionName
+                        + ", actionClass=" + candidate.actionClass()
+                        + ", attemptedActions=" + result.attemptedActions
+                        + ", expandedActions=" + result.expandedActions
+                        + ", addedEdges=" + result.addedEdges);
+            }
+            beliefLazyExpansionRounds++;
+            return true;
+        }
+        return false;
+    }
+
+    private int compareBeliefExpansionCandidates(
+            BeliefExpansionCandidate left,
+            BeliefExpansionCandidate right) {
+
+        int cmp = Integer.compare(
+                beliefNodeMaxMarkingDepth(right.node),
+                beliefNodeMaxMarkingDepth(left.node));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        // 同じ深さなら、通常探索の LIFO に近づけるため、新しく生成された具象状態を
+        // 含む belief node を優先する。
+        cmp = Integer.compare(beliefNodeMaxSeq(right.node), beliefNodeMaxSeq(left.node));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        cmp = Integer.compare(
+                beliefActionPriority(left.actionName, left.controllable),
+                beliefActionPriority(right.actionName, right.controllable));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        cmp = Long.compare(
+                beliefNodeMaxMarkingState(right.node),
+                beliefNodeMaxMarkingState(left.node));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        cmp = Integer.compare(right.node.localId, left.node.localId);
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        return left.actionName.compareTo(right.actionName);
+    }
+
+    private int beliefActionPriority(String actionName, boolean controllableAction) {
+        if (!controllableAction) {
+            return 50;
+        }
+        if (actionName.equals(UpdateConstants.STOP_OLD_SPEC)) {
+            return 10;
+        }
+        if (actionName.equals(UpdateConstants.RECONFIGURE)) {
+            return 20;
+        }
+        if (actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+            return 30;
+        }
+        if (actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+            return 40;
+        }
+        return 100;
+    }
+
+    private int beliefNodeMaxMarkingDepth(BeliefNode node) {
+        int maxDepth = 0;
+        for (CompostateDUC<State, Action> member : node.members) {
+            maxDepth = Math.max(maxDepth, markingDepth(getMarkingState(member)));
+        }
+        return maxDepth;
+    }
+
+    private long beliefNodeMaxMarkingState(BeliefNode node) {
+        long maxMarking = 0;
+        for (CompostateDUC<State, Action> member : node.members) {
+            maxMarking = Math.max(maxMarking, getMarkingState(member));
+        }
+        return maxMarking;
+    }
+
+    private int beliefNodeMaxSeq(BeliefNode node) {
+        int maxSeq = 0;
+        for (CompostateDUC<State, Action> member : node.members) {
+            maxSeq = Math.max(maxSeq, member.seq);
+        }
+        return maxSeq;
+    }
+
+    private int markingDepth(long markingState) {
+        if (markingState == 0) {
+            return 0;
+        }
+        if (markingState == 1) {
+            return 1;
+        }
+        if (markingState == 9) {
+            return 5;
+        }
+        long mask = markingState - 1;
+        return 1 + Long.bitCount(mask);
+    }
+
+    private void markRemainingUnexploredUncontrollablesBad(BeliefRepairPlan plan) {
+        int count = 0;
+        List<String> samples = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (BeliefNode node : plan.nodes) {
+            String firstReason = null;
+            for (CompostateDUC<State, Action> member : node.members) {
+                for (HAction<State, Action> action : member.getTransitions()) {
+                    if (action.isControllable() || hasExploredAction(member, action)) {
+                        continue;
+                    }
+
+                    String key = node.name() + "|" + lazyExpansionKey(member, action);
+                    if (!seen.add(key)) {
+                        continue;
+                    }
+                    count++;
+                    if (samples.size() < 10) {
+                        samples.add(node.name()
+                                + ":" + toOutputAction(action) + "(U)"
+                                + " at " + summarizeStateForDiagnostics(member));
+                    }
+                    if (firstReason == null) {
+                        firstReason = toOutputAction(action) + "(U) が未展開: "
+                                + summarizeStateForDiagnostics(member);
+                    }
+                }
+            }
+            if (firstReason != null) {
+                node.markBad("未展開 uncontrollable が残っているため belief 勝ち判定から除外: "
+                        + firstReason);
+            }
+        }
+
+        if (debugLogEnabled && count > 0) {
+            log("  [Belief-Warning] oldControllerState=" + plan.oldControllerState
+                    + " has unexplored uncontrollable actions inside belief graph: count=" + count
+                    + ", samples=" + samples
+                    + ". 未展開 uncontrollable を持つ belief node は勝ち判定から除外します。");
+        }
+    }
+
+    private List<String> collectCommonControllableActionNames(BeliefNode node) {
+        Set<String> commonNames = null;
+
+        for (CompostateDUC<State, Action> member : node.members) {
+            Set<String> names = new LinkedHashSet<>();
+            for (HAction<State, Action> action : member.getTransitions()) {
+                if (!action.isControllable()) {
+                    continue;
+                }
+                String actionName = toOutputAction(action).toString();
+                names.add(actionName);
+            }
+            if (commonNames == null) {
+                commonNames = names;
+            } else {
+                commonNames.retainAll(names);
+            }
+        }
+
+        if (commonNames == null || commonNames.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> result = new ArrayList<>(commonNames);
+        result.sort((left, right) -> {
+            int cmp = Integer.compare(
+                    beliefActionPriority(left, true),
+                    beliefActionPriority(right, true));
+            if (cmp != 0) {
+                return cmp;
+            }
+            return left.compareTo(right);
+        });
+        return result;
+    }
+
+    private List<String> collectUnexploredUncontrollableActionNames(
+            BeliefNode node,
+            Set<String> noProgressActions) {
+
+        Set<String> actionNames = new LinkedHashSet<>();
+        for (CompostateDUC<State, Action> member : node.members) {
+            for (HAction<State, Action> action : member.getTransitions()) {
+                if (action.isControllable() || hasExploredAction(member, action)) {
+                    continue;
+                }
+                if (noProgressActions.contains(lazyExpansionKey(member, action))) {
+                    continue;
+                }
+                actionNames.add(toOutputAction(action).toString());
+            }
+        }
+
+        List<String> result = new ArrayList<>(actionNames);
+        Collections.sort(result);
+        return result;
+    }
+
+    private boolean hasExpandableBeliefAction(
+            BeliefNode node,
+            String actionName,
+            boolean controllableAction,
+            Set<String> noProgressActions) {
+
+        for (CompostateDUC<State, Action> member : node.members) {
+            HAction<State, Action> action = controllableAction
+                    ? findEnabledActionByOutputName(member, actionName, true)
+                    : findEnabledUncontrollableActionByOutputName(member, actionName);
+            if (action == null || hasExploredAction(member, action)) {
+                continue;
+            }
+            if (!noProgressActions.contains(lazyExpansionKey(member, action))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private HAction<State, Action> findEnabledActionByOutputName(
+            CompostateDUC<State, Action> state,
+            String outputActionName,
+            boolean controllableOnly) {
+
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (controllableOnly && !action.isControllable()) {
+                continue;
+            }
+            if (toOutputAction(action).toString().equals(outputActionName)) {
+                return action;
+            }
+        }
+        return null;
+    }
+
+    private HAction<State, Action> findEnabledUncontrollableActionByOutputName(
+            CompostateDUC<State, Action> state,
+            String outputActionName) {
+
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (action.isControllable()) {
+                continue;
+            }
+            if (toOutputAction(action).toString().equals(outputActionName)) {
+                return action;
+            }
+        }
+        return null;
+    }
+
+    private void expandConcreteActionForBelief(
+            CompostateDUC<State, Action> state,
+            HAction<State, Action> action,
+            Set<String> noProgressActions,
+            BeliefLazyExpansionResult result) {
+
+        if (hasExploredAction(state, action)) {
+            return;
+        }
+
+        String key = lazyExpansionKey(state, action);
+        if (noProgressActions.contains(key)) {
+            return;
+        }
+
+        result.attemptedActions++;
+        beliefLazyExpansionAttempts++;
+        int beforeChildren = exploredChildCount(state, action);
+
+        totalLtsExpansions++;
+        long expansionStart = System.nanoTime();
+        expandDUC(state, action);
+        stateExpansionNanos += System.nanoTime() - expansionStart;
+
+        int addedChildren = exploredChildCount(state, action) - beforeChildren;
+        if (addedChildren > 0) {
+            result.expandedActions++;
+            result.addedEdges += addedChildren;
+            beliefLazyExpansionExpandedActions++;
+            beliefLazyExpansionAddedEdges += addedChildren;
+            if (debugLogEnabled) {
+                log("    [Belief-LazyExpansion] expanded action=" + toOutputAction(action)
+                        + (action.isControllable() ? "(C)" : "(U)")
+                        + ", addedEdges=" + addedChildren
+                        + ", state=" + summarizeStateForDiagnostics(state));
+            }
+        } else {
+            noProgressActions.add(key);
+        }
+    }
+
+    private boolean isControllableBeliefCandidateUsable(BeliefExpansionCandidate candidate) {
+        for (CompostateDUC<State, Action> member : candidate.node.members) {
+            HAction<State, Action> action =
+                    findEnabledActionByOutputName(member, candidate.actionName, true);
+            if (action == null) {
+                return false;
+            }
+
+            Set<CompostateDUC<State, Action>> children =
+                    member.getExploredChildren().getImage(action);
+            if (children == null || children.isEmpty()) {
+                return false;
+            }
+
+            // controllable は belief 全体で同じ action を選ぶため、各候補状態で
+            // その action のすべての探索済み子が安全な勝ち状態でなければならない。
+            for (CompostateDUC<State, Action> child : children) {
+                if (!isSafeWinningBeliefChild(child)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private String beliefActionKey(BeliefNode node, String actionName) {
+        List<Integer> identities = new ArrayList<>();
+        for (CompostateDUC<State, Action> member : node.members) {
+            identities.add(System.identityHashCode(member));
+        }
+        Collections.sort(identities);
+        return identities + "|" + actionName;
+    }
+
+    private boolean hasExploredAction(CompostateDUC<State, Action> state, HAction<State, Action> action) {
+        return exploredChildCount(state, action) > 0;
+    }
+
+    private int exploredChildCount(CompostateDUC<State, Action> state, HAction<State, Action> action) {
+        Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+        return children == null ? 0 : children.size();
+    }
+
+    private String lazyExpansionKey(CompostateDUC<State, Action> state, HAction<State, Action> action) {
+        return System.identityHashCode(state) + "|" + action.hashCode();
+    }
+
+    private void expandBeliefNode(
+            BeliefNode node,
+            BeliefSearchContext context,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        buildBeliefFinishEdge(node, rawDirectorEdges);
+        buildBeliefActionEdges(node, context, rawDirectorEdges);
+
+        if (debugLogEnabled) {
+            log("    [Belief-Node] " + node.name()
+                    + " members=" + describeBeliefMembers(node)
+                    + ", finish=" + (node.finishNcTargetId == null ? "none" : "NC:" + node.finishNcTargetId)
+                    + ", uncontrollable=" + describeBeliefEdges(node.uncontrollableEdges)
+                    + ", controllable=" + describeBeliefEdges(node.controllableEdges)
+                    + (node.bad ? ", BAD=" + node.badReason : ""));
+        }
+    }
+
+    private void buildBeliefFinishEdge(
+            BeliefNode node,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        Set<Long> ncTargets = new LinkedHashSet<>();
+        Action finishAction = null;
+
+        for (CompostateDUC<State, Action> member : node.members) {
+            List<RawDirectorEdge> edges = rawDirectorEdges.get(member);
+            boolean hasFinish = false;
+            if (edges != null) {
+                for (RawDirectorEdge edge : edges) {
+                    if (!edge.actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                        continue;
+                    }
+                    if (getMarkingState(edge.child) != 9 || !isSafeWinningBeliefChild(edge.child)) {
+                        continue;
+                    }
+                    String signature = generateNCSignature(edge.child);
+                    Long ncTarget = signature == null ? null : newControllerConnectionMap.get(signature);
+                    if (ncTarget == null) {
+                        continue;
+                    }
+                    hasFinish = true;
+                    ncTargets.add(ncTarget);
+                    finishAction = edge.outputAction;
+                }
+            }
+            if (!hasFinish) {
+                return;
+            }
+        }
+
+        if (ncTargets.size() == 1) {
+            node.finishNcTargetId = ncTargets.iterator().next();
+            node.finishAction = finishAction;
+        } else if (debugLogEnabled) {
+            log("    [Belief-Repair] finishUpdate postponed at " + node.name()
+                    + " because NC targets differ: " + ncTargets);
+        }
+    }
+
+    private void buildBeliefActionEdges(
+            BeliefNode node,
+            BeliefSearchContext context,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        Map<String, BeliefActionBucket> controllableBuckets = new LinkedHashMap<>();
+        Map<String, BeliefActionBucket> uncontrollableBuckets = new LinkedHashMap<>();
+
+        for (int memberIndex = 0; memberIndex < node.members.size(); memberIndex++) {
+            CompostateDUC<State, Action> member = node.members.get(memberIndex);
+            List<RawDirectorEdge> edges = rawDirectorEdges.get(member);
+            if (edges == null) {
+                continue;
+            }
+            for (RawDirectorEdge edge : edges) {
+                if (edge.actionName.equals(UpdateConstants.BEGIN_UPDATE)
+                        || edge.actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                    continue;
+                }
+                Map<String, BeliefActionBucket> buckets = edge.hAction.isControllable()
+                        ? controllableBuckets
+                        : uncontrollableBuckets;
+                BeliefActionBucket bucket = buckets.get(edge.actionName);
+                if (bucket == null) {
+                    bucket = new BeliefActionBucket(edge.outputAction, edge.hAction.isControllable());
+                    buckets.put(edge.actionName, bucket);
+                }
+                bucket.presentMemberIndexes.add(memberIndex);
+                if (isSafeWinningBeliefChild(edge.child)) {
+                    bucket.children.add(edge.child);
+                } else {
+                    bucket.hasUnsafeChild = true;
+                    bucket.unsafeReason = "action=" + edge.actionName
+                            + " child=" + summarizeStateForDiagnostics(edge.child);
+                }
+            }
+        }
+
+        for (BeliefActionBucket bucket : uncontrollableBuckets.values()) {
+            if (bucket.hasUnsafeChild) {
+                node.markBad("uncontrollable action が安全でない子へ進む可能性: " + bucket.unsafeReason);
+                return;
+            }
+            BeliefNode target = context.getOrCreateNode(bucket.children);
+            if (target == null) {
+                node.markBad("uncontrollable action の先で belief 状態数の上限を超えた: " + bucket.actionName());
+                return;
+            }
+            node.uncontrollableEdges.add(new BeliefTransition(bucket.outputAction, false, target));
+        }
+
+        int memberCount = node.members.size();
+        for (BeliefActionBucket bucket : controllableBuckets.values()) {
+            // controllable は controller が同じ action を選ぶ必要があるため、
+            // belief 内の全候補で有効な action だけを共通戦略として採用できる。
+            if (bucket.presentMemberIndexes.size() != memberCount || bucket.hasUnsafeChild) {
+                continue;
+            }
+            BeliefNode target = context.getOrCreateNode(bucket.children);
+            if (target == null) {
+                continue;
+            }
+            node.controllableEdges.add(new BeliefTransition(bucket.outputAction, true, target));
+        }
+    }
+
+    private void solveBeliefReachability(BeliefRepairPlan plan) {
+        boolean changed;
+        do {
+            changed = propagateBeliefWinning(plan);
+            if (promoteFairBeliefLoops(plan)) {
+                changed = true;
+            }
+        } while (changed);
+
+        if (debugLogEnabled) {
+            int winningNodes = 0;
+            for (BeliefNode node : plan.nodes) {
+                if (node.winning) {
+                    winningNodes++;
+                }
+            }
+            log("  [Belief-Repair] fixed point oldControllerState=" + plan.oldControllerState
+                    + ": winningBeliefNodes=" + winningNodes + "/" + plan.nodes.size());
+        }
+    }
+
+    private boolean propagateBeliefWinning(BeliefRepairPlan plan) {
+        boolean changed = false;
+        for (int i = plan.nodes.size() - 1; i >= 0; i--) {
+            BeliefNode node = plan.nodes.get(i);
+            if (node.winning || node.bad) {
+                continue;
+            }
+
+            boolean allUncontrollableWinning = true;
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
+                    allUncontrollableWinning = false;
+                    break;
+                }
+            }
+            if (!allUncontrollableWinning) {
+                continue;
+            }
+
+            if (markBeliefNodeWinningByDirectProgress(node)) {
+                changed = true;
+                continue;
+            }
+
+            // controllable による次手がなくても、全ての uncontrollable 後続が
+            // 既に勝ちなら、この belief 状態も勝ちとして扱える。ここで出力する
+            // controller は controllable を選ばず、環境の uncontrollable 遷移を
+            // 受け入れて次の勝ち belief へ進む。
+            if (!node.uncontrollableEdges.isEmpty()) {
+                node.winning = true;
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private boolean markBeliefNodeWinningByDirectProgress(BeliefNode node) {
+        if (node.finishNcTargetId != null) {
+            node.winning = true;
+            node.selectedFinish = true;
+            return true;
+        }
+
+        for (BeliefTransition edge : node.controllableEdges) {
+            if (edge.target.winning) {
+                node.winning = true;
+                node.selectedControllableEdge = edge;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean promoteFairBeliefLoops(BeliefRepairPlan plan) {
+        Set<BeliefNode> candidates = new LinkedHashSet<>();
+        for (BeliefNode node : plan.nodes) {
+            if (!node.winning && !node.bad) {
+                candidates.add(node);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return false;
+        }
+
+        boolean innerChanged;
+        Map<BeliefNode, Integer> dist = new HashMap<>();
+        do {
+            innerChanged = false;
+
+            Iterator<BeliefNode> it = candidates.iterator();
+            while (it.hasNext()) {
+                BeliefNode node = it.next();
+                if (!isBeliefUSafe(node, candidates)) {
+                    it.remove();
+                    innerChanged = true;
+                }
+            }
+            if (candidates.isEmpty()) {
+                return false;
+            }
+
+            dist = computeBeliefFairDistances(candidates);
+            it = candidates.iterator();
+            while (it.hasNext()) {
+                BeliefNode node = it.next();
+                if (!dist.containsKey(node)) {
+                    it.remove();
+                    innerChanged = true;
+                }
+            }
+        } while (innerChanged);
+
+        if (candidates.isEmpty()) {
+            return false;
+        }
+
+        int promoted = 0;
+        for (BeliefNode node : candidates) {
+            if (node.winning) {
+                continue;
+            }
+            BeliefTransition selected = selectBeliefFairProgress(node, candidates, dist);
+            boolean usesFinish = node.finishNcTargetId != null
+                    && isBeliefFinishUsableForFairReachability(node, candidates);
+            if (!usesFinish && selected == null) {
+                continue;
+            }
+            if (usesFinish) {
+                node.selectedFinish = true;
+            } else if (selected != null && selected.controllable) {
+                node.selectedControllableEdge = selected;
+            } else if (selected != null) {
+                node.selectedFairUncontrollableEdge = selected;
+            }
+            node.winning = true;
+            promoted++;
+        }
+
+        if (debugLogEnabled && promoted > 0) {
+            log("  [Belief-Fairness] oldControllerState=" + plan.oldControllerState
+                    + " promoted belief nodes by fair SCC: " + promoted);
+        }
+        return promoted > 0;
+    }
+
+    private boolean isBeliefUSafe(BeliefNode node, Set<BeliefNode> candidates) {
+        for (BeliefTransition edge : node.uncontrollableEdges) {
+            if (!edge.target.winning && !candidates.contains(edge.target)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Map<BeliefNode, Integer> computeBeliefFairDistances(Set<BeliefNode> candidates) {
+        Map<BeliefNode, Integer> dist = new HashMap<>();
+        boolean changed;
+        do {
+            changed = false;
+            for (BeliefNode node : candidates) {
+                int best = distanceToFairProgress(node, candidates, dist);
+                if (best == Integer.MAX_VALUE) {
+                    continue;
+                }
+                Integer old = dist.get(node);
+                if (old == null || best < old) {
+                    dist.put(node, best);
+                    changed = true;
+                }
+            }
+        } while (changed);
+        return dist;
+    }
+
+    private int distanceToFairProgress(
+            BeliefNode node,
+            Set<BeliefNode> candidates,
+            Map<BeliefNode, Integer> dist) {
+
+        int best = Integer.MAX_VALUE;
+        if (node.finishNcTargetId != null && isBeliefFinishUsableForFairReachability(node, candidates)) {
+            best = 1;
+        }
+
+        for (BeliefTransition edge : getBeliefTransitions(node)) {
+            if (!canUseBeliefTransitionForFairReachability(node, edge, candidates)) {
+                continue;
+            }
+            int childDistance = beliefTargetDistance(edge.target, candidates, dist);
+            if (childDistance != Integer.MAX_VALUE) {
+                best = Math.min(best, childDistance + 1);
+            }
+        }
+        return best;
+    }
+
+    private int beliefTargetDistance(
+            BeliefNode target,
+            Set<BeliefNode> candidates,
+            Map<BeliefNode, Integer> dist) {
+
+        if (target.winning) {
+            return 0;
+        }
+        if (!candidates.contains(target)) {
+            return Integer.MAX_VALUE;
+        }
+        Integer childDistance = dist.get(target);
+        return childDistance == null ? Integer.MAX_VALUE : childDistance;
+    }
+
+    private BeliefTransition selectBeliefFairProgress(
+            BeliefNode node,
+            Set<BeliefNode> candidates,
+            Map<BeliefNode, Integer> dist) {
+
+        BeliefTransition bestEdge = null;
+        int bestDistance = node.finishNcTargetId != null
+                && isBeliefFinishUsableForFairReachability(node, candidates)
+                        ? 0
+                        : Integer.MAX_VALUE;
+
+        for (BeliefTransition edge : getBeliefTransitions(node)) {
+            if (!canUseBeliefTransitionForFairReachability(node, edge, candidates)) {
+                continue;
+            }
+            int childDistance = beliefTargetDistance(edge.target, candidates, dist);
+            if (childDistance == Integer.MAX_VALUE) {
+                continue;
+            }
+            if (childDistance < bestDistance) {
+                bestDistance = childDistance;
+                bestEdge = edge;
+            } else if (childDistance == bestDistance && shouldPreferBeliefFairEdge(bestEdge, edge)) {
+                bestEdge = edge;
+            }
+        }
+        return bestEdge;
+    }
+
+    private boolean shouldPreferBeliefFairEdge(BeliefTransition current, BeliefTransition candidate) {
+        if (current == null) {
+            return true;
+        }
+        if (!current.controllable && candidate.controllable) {
+            return true;
+        }
+        return !isUpdateProtocolOutputAction(current.outputAction)
+                && isUpdateProtocolOutputAction(candidate.outputAction);
+    }
+
+    private List<BeliefTransition> getBeliefTransitions(BeliefNode node) {
+        List<BeliefTransition> transitions = new ArrayList<>(
+                node.uncontrollableEdges.size() + node.controllableEdges.size());
+        transitions.addAll(node.uncontrollableEdges);
+        transitions.addAll(node.controllableEdges);
+        return transitions;
+    }
+
+    private boolean isBeliefFinishUsableForFairReachability(
+            BeliefNode node,
+            Set<BeliefNode> candidates) {
+
+        return node.finishNcTargetId != null;
+    }
+
+    private boolean canUseBeliefTransitionForFairReachability(
+            BeliefNode node,
+            BeliefTransition edge,
+            Set<BeliefNode> candidates) {
+
+        if (!edge.controllable) {
+            return true;
+        }
+        if (isUpdateProtocolOutputAction(edge.outputAction)) {
+            return true;
+        }
+        return !hasBeliefUncontrollableSuccessorIn(node, candidates);
+    }
+
+    private boolean hasBeliefUncontrollableSuccessorIn(
+            BeliefNode node,
+            Set<BeliefNode> candidates) {
+
+        for (BeliefTransition edge : node.uncontrollableEdges) {
+            if (candidates.contains(edge.target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isUpdateProtocolOutputAction(Action action) {
+        return isUpdateProtocolOutputActionName(action.toString());
+    }
+
+    private boolean isUpdateProtocolOutputActionName(String actionName) {
+        return actionName.equals(UpdateConstants.STOP_OLD_SPEC)
+            || actionName.equals(UpdateConstants.RECONFIGURE)
+            || actionName.equals(UpdateConstants.START_NEW_SPEC)
+            || actionName.equals(UpdateConstants.FINISH_UPDATE);
+    }
+
+    private Map<CompostateDUC<State, Action>, Integer> buildPreUpdateClassesAfterBeliefRepair(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, Integer> fallbackPreUpdateClasses,
+            BeliefRepairResult beliefRepairResult) {
+
+        if (beliefRepairResult.successPlans.isEmpty()) {
+            return fallbackPreUpdateClasses;
+        }
+
+        Map<CompostateDUC<State, Action>, Integer> result = new HashMap<>();
+        Map<State, Integer> repairedClassByOldState = new LinkedHashMap<>();
+        Map<Integer, Integer> fallbackClassRemap = new LinkedHashMap<>();
+        int nextClassId = 0;
+
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                continue;
+            }
+
+            State oldControllerState = state.getStates().get(idxOC);
+            if (beliefRepairResult.isRepairedPreUpdateState(state)) {
+                Integer classId = repairedClassByOldState.get(oldControllerState);
+                if (classId == null) {
+                    classId = nextClassId++;
+                    repairedClassByOldState.put(oldControllerState, classId);
+                }
+                result.put(state, classId);
+            } else {
+                Integer fallbackClass = fallbackPreUpdateClasses.get(state);
+                Integer classId = fallbackClassRemap.get(fallbackClass);
+                if (classId == null) {
+                    classId = nextClassId++;
+                    fallbackClassRemap.put(fallbackClass, classId);
+                }
+                result.put(state, classId);
+            }
+        }
+
+        if (debugLogEnabled) {
+            log("  [Belief-Repair] final pre-update classes after repair: " + nextClassId
+                    + " (repairedOldStates=" + repairedClassByOldState.size()
+                    + ", fallbackClasses=" + fallbackClassRemap.size() + ")");
+        }
+        return result;
+    }
+
+    private void recordPreUpdateOutputStateOverhead(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, Integer> preUpdateClasses) {
+
+        Set<CompostateDUC<State, Action>> preUpdateStates = new LinkedHashSet<>();
+        Set<Integer> outputClasses = new HashSet<>();
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                continue;
+            }
+            preUpdateStates.add(state);
+            Integer classId = preUpdateClasses.get(state);
+            if (classId != null) {
+                outputClasses.add(classId);
+            }
+        }
+
+        preUpdateOutputMergedStates = preUpdateStates.size();
+        preUpdateOutputClassStates = outputClasses.size();
+        preUpdateOutputMergeRemovedStates = preUpdateOutputMergedStates - preUpdateOutputClassStates;
+        UpdatingControllerEvaluationRecorder.recordOtfPreUpdateStateOverhead(
+                countOldControllerStates(),
+                preUpdateOutputMergedStates,
+                preUpdateOutputClassStates);
+    }
+
+    private void emitBeliefRepairTransitions(
+            LTSImpl<Long, Action> result,
+            Map<CompostateDUC<State, Action>, Long> concreteIds,
+            Map<BeliefNode, Long> beliefIds,
+            BeliefRepairResult beliefRepairResult) {
+
+        for (BeliefRepairPlan plan : beliefRepairResult.successPlans.values()) {
+            if (plan.preUpdateStates.isEmpty()) {
+                continue;
+            }
+            Long sourceId = concreteIds.get(plan.preUpdateStates.get(0));
+            Long rootId = beliefIds.get(plan.root);
+            if (sourceId == null || rootId == null) {
+                throw new IllegalStateException("Missing output id for belief repair beginUpdate.");
+            }
+
+            directorTransitionEmissionAttempts++;
+            if (result.addTransition(sourceId, plan.beginUpdateAction, rootId)) {
+                directorOutputTransitions++;
+            }
+
+            for (BeliefNode node : plan.nodes) {
+                if (!node.winning) {
+                    continue;
+                }
+                Long nodeId = beliefIds.get(node);
+                if (nodeId == null) {
+                    throw new IllegalStateException("Missing output id for belief state.");
+                }
+
+                for (BeliefTransition edge : node.uncontrollableEdges) {
+                    if (!edge.target.winning) {
+                        continue;
+                    }
+                    Long targetId = beliefIds.get(edge.target);
+                    if (targetId == null) {
+                        throw new IllegalStateException("Missing output id for belief uncontrollable target.");
+                    }
+                    directorTransitionEmissionAttempts++;
+                    if (result.addTransition(nodeId, edge.outputAction, targetId)) {
+                        directorOutputTransitions++;
+                    }
+                }
+
+                if (node.selectedFinish) {
+                    directorTransitionEmissionAttempts++;
+                    if (result.addTransition(nodeId, node.finishAction, node.finishNcTargetId)) {
+                        directorOutputTransitions++;
+                    }
+                } else if (node.selectedControllableEdge != null) {
+                    Long targetId = beliefIds.get(node.selectedControllableEdge.target);
+                    if (targetId == null) {
+                        throw new IllegalStateException("Missing output id for belief controllable target.");
+                    }
+                    directorTransitionEmissionAttempts++;
+                    if (result.addTransition(nodeId, node.selectedControllableEdge.outputAction, targetId)) {
+                        directorOutputTransitions++;
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean isSafeWinningBeliefChild(CompostateDUC<State, Action> child) {
+        return child != null && child.isStatus(Status.GOAL) && !child.isStatus(Status.ERROR);
+    }
+
+    private void logBeliefRepairPlan(BeliefRepairPlan plan) {
+        if (!debugLogEnabled) {
+            return;
+        }
+
+        log("  [Belief-Repair] " + (plan.success ? "SUCCESS" : "FALLBACK")
+                + " oldControllerState=" + plan.oldControllerState
+                + ", rawPreStates=" + plan.preUpdateStates.size()
+                + ", fallbackClasses=" + plan.fallbackClasses
+                + ", beliefNodes=" + plan.nodes.size()
+                + ", resourceLimit=" + plan.failedByResourceLimit
+                + ", resources=" + describeBeliefRepairResourceUsage(plan)
+                + ", reason=" + plan.reason);
+
+        if (plan.success) {
+            for (BeliefNode node : plan.nodes) {
+                if (!node.winning) {
+                    continue;
+                }
+                String selected = node.selectedFinish
+                        ? UpdateConstants.FINISH_UPDATE + "->NC:" + node.finishNcTargetId
+                        : node.selectedControllableEdge != null
+                                ? node.selectedControllableEdge.toString()
+                                : node.selectedFairUncontrollableEdge != null
+                                        ? "fair-wait:" + node.selectedFairUncontrollableEdge
+                                        : (node.uncontrollableEdges.isEmpty() ? "none" : "wait-uncontrollable");
+                log("    [Belief-Strategy] " + node.name()
+                        + " U=" + describeBeliefEdges(node.uncontrollableEdges)
+                        + " selected=" + selected
+                        + " members=" + describeBeliefMembers(node));
+            }
+        }
+    }
+
+    private String describeBeliefMembers(BeliefNode node) {
+        List<String> members = new ArrayList<>();
+        int max = Math.min(4, node.members.size());
+        for (int i = 0; i < max; i++) {
+            members.add(summarizeStateForDiagnostics(node.members.get(i)));
+        }
+        if (node.members.size() > max) {
+            members.add("... +" + (node.members.size() - max) + " states");
+        }
+        return members.toString();
+    }
+
+    private String describeBeliefEdges(List<BeliefTransition> edges) {
+        if (edges.isEmpty()) {
+            return "none";
+        }
+        List<String> descriptions = new ArrayList<>();
+        for (BeliefTransition edge : edges) {
+            descriptions.add(edge.toString());
+        }
+        return descriptions.toString();
+    }
+
+    private class RawDirectorEdge {
+        private final HAction<State, Action> hAction;
+        private final Action outputAction;
+        private final CompostateDUC<State, Action> child;
+        private final String actionName;
+
+        private RawDirectorEdge(HAction<State, Action> hAction, CompostateDUC<State, Action> child) {
+            this.hAction = hAction;
+            this.outputAction = toOutputAction(hAction);
+            this.child = child;
+            this.actionName = outputAction.toString();
+        }
+    }
+
+    private class BeliefRepairResult {
+        private final Map<State, BeliefRepairPlan> successPlans = new LinkedHashMap<>();
+        private final Map<State, BeliefRepairPlan> fallbackPlans = new LinkedHashMap<>();
+        private final Set<CompostateDUC<State, Action>> repairedPreUpdateStates = new HashSet<>();
+
+        private void addSuccess(BeliefRepairPlan plan) {
+            successPlans.put(plan.oldControllerState, plan);
+            repairedPreUpdateStates.addAll(plan.preUpdateStates);
+        }
+
+        private void addFallback(BeliefRepairPlan plan) {
+            fallbackPlans.put(plan.oldControllerState, plan);
+        }
+
+        private boolean isRepairedPreUpdateState(CompostateDUC<State, Action> state) {
+            return repairedPreUpdateStates.contains(state);
+        }
+    }
+
+    private class BeliefRepairPlan {
+        private final State oldControllerState;
+        private final List<CompostateDUC<State, Action>> preUpdateStates;
+        private final List<Integer> fallbackClasses;
+        private final List<BeliefNode> nodes = new ArrayList<>();
+        private BeliefRepairResourceLimits resourceLimits;
+        private int initialConcreteStateCount;
+        private long initialRawTransitionCount;
+        private long repairStartNanos;
+        private int maxObservedBeliefNodes;
+        private int maxObservedAdditionalConcreteStates;
+        private long maxObservedAdditionalTransitions;
+        private int reachableMapValuations;
+        private Action beginUpdateAction;
+        private BeliefNode root;
+        private boolean success;
+        private boolean failedByResourceLimit;
+        private String reason = "not evaluated";
+
+        private BeliefRepairPlan(
+                State oldControllerState,
+                List<CompostateDUC<State, Action>> preUpdateStates,
+                List<Integer> fallbackClasses) {
+            this.oldControllerState = oldControllerState;
+            this.preUpdateStates = preUpdateStates;
+            this.fallbackClasses = fallbackClasses;
+        }
+
+        private void fail(String reason) {
+            this.success = false;
+            this.reason = reason;
+        }
+
+        private void failByResource(String reason) {
+            this.failedByResourceLimit = true;
+            fail(reason);
+        }
+    }
+
+    private class BeliefRepairResourceLimits {
+        private final int maxBeliefNodes;
+        private final int maxAdditionalConcreteStates;
+        private final int maxAdditionalTransitions;
+        private final long maxTimeMs;
+        private final int reachableMapValuations;
+
+        private BeliefRepairResourceLimits(
+                int maxBeliefNodes,
+                int maxAdditionalConcreteStates,
+                int maxAdditionalTransitions,
+                long maxTimeMs,
+                int reachableMapValuations) {
+            this.maxBeliefNodes = maxBeliefNodes;
+            this.maxAdditionalConcreteStates = maxAdditionalConcreteStates;
+            this.maxAdditionalTransitions = maxAdditionalTransitions;
+            this.maxTimeMs = maxTimeMs;
+            this.reachableMapValuations = reachableMapValuations;
+        }
+
+        @Override
+        public String toString() {
+            return "beliefNodes<=" + maxBeliefNodes
+                    + ", additionalConcreteStates<=" + maxAdditionalConcreteStates
+                    + ", additionalTransitions<=" + maxAdditionalTransitions
+                    + ", timeMs<=" + maxTimeMs
+                    + ", reachableMapValuations=" + reachableMapValuations;
+        }
+    }
+
+    private class BeliefSearchContext {
+        private final Map<CompostateDUC<State, Action>, Integer> concreteIds;
+        private final Map<List<Integer>, BeliefNode> nodesByKey = new LinkedHashMap<>();
+        private final List<BeliefNode> nodes = new ArrayList<>();
+        private final Deque<BeliefNode> queue = new ArrayDeque<>();
+        private final int maxBeliefNodes;
+        private boolean limitExceeded = false;
+
+        private BeliefSearchContext(
+                Map<CompostateDUC<State, Action>, Integer> concreteIds,
+                int maxBeliefNodes) {
+            this.concreteIds = concreteIds;
+            this.maxBeliefNodes = maxBeliefNodes;
+        }
+
+        private BeliefNode getOrCreateNode(Set<CompostateDUC<State, Action>> members) {
+            if (members == null || members.isEmpty()) {
+                return null;
+            }
+
+            List<CompostateDUC<State, Action>> orderedMembers = new ArrayList<>(members);
+            orderedMembers.sort((left, right) -> Integer.compare(
+                    getConcreteStateId(concreteIds, left),
+                    getConcreteStateId(concreteIds, right)));
+
+            List<Integer> key = new ArrayList<>();
+            for (CompostateDUC<State, Action> member : orderedMembers) {
+                key.add(getConcreteStateId(concreteIds, member));
+            }
+
+            BeliefNode existing = nodesByKey.get(key);
+            if (existing != null) {
+                return existing;
+            }
+
+            if (nodes.size() >= maxBeliefNodes) {
+                limitExceeded = true;
+                return null;
+            }
+
+            BeliefNode created = new BeliefNode(nodes.size(), orderedMembers, key);
+            nodesByKey.put(key, created);
+            nodes.add(created);
+            queue.add(created);
+            return created;
+        }
+    }
+
+    private class BeliefNode {
+        private final int localId;
+        private final List<CompostateDUC<State, Action>> members;
+        private final List<Integer> memberIds;
+        private final List<BeliefTransition> uncontrollableEdges = new ArrayList<>();
+        private final List<BeliefTransition> controllableEdges = new ArrayList<>();
+        private Action finishAction;
+        private Long finishNcTargetId;
+        private BeliefTransition selectedControllableEdge;
+        private BeliefTransition selectedFairUncontrollableEdge;
+        private boolean selectedFinish;
+        private boolean winning;
+        private boolean bad;
+        private String badReason = "";
+
+        private BeliefNode(
+                int localId,
+                List<CompostateDUC<State, Action>> members,
+                List<Integer> memberIds) {
+            this.localId = localId;
+            this.members = members;
+            this.memberIds = memberIds;
+        }
+
+        private String name() {
+            return "B" + localId;
+        }
+
+        private void markBad(String reason) {
+            bad = true;
+            badReason = reason;
+        }
+
+        @Override
+        public int hashCode() {
+            return memberIds.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof DirectedControllerSynthesisDUC.BeliefNode)) {
+                return false;
+            }
+            BeliefNode other = (BeliefNode) obj;
+            return memberIds.equals(other.memberIds);
+        }
+    }
+
+    private class BeliefTransition {
+        private final Action outputAction;
+        private final boolean controllable;
+        private final BeliefNode target;
+
+        private BeliefTransition(Action outputAction, boolean controllable, BeliefNode target) {
+            this.outputAction = outputAction;
+            this.controllable = controllable;
+            this.target = target;
+        }
+
+        @Override
+        public String toString() {
+            return outputAction + (controllable ? "(C)" : "(U)") + "->" + target.name();
+        }
+    }
+
+    private class BeliefActionBucket {
+        private final Action outputAction;
+        private final boolean controllable;
+        private final Set<Integer> presentMemberIndexes = new HashSet<>();
+        private final Set<CompostateDUC<State, Action>> children = new LinkedHashSet<>();
+        private boolean hasUnsafeChild;
+        private String unsafeReason = "";
+
+        private BeliefActionBucket(Action outputAction, boolean controllable) {
+            this.outputAction = outputAction;
+            this.controllable = controllable;
+        }
+
+        private String actionName() {
+            return outputAction.toString() + (controllable ? "(C)" : "(U)");
+        }
+    }
+
+    private class BeliefExpansionCandidate {
+        private final BeliefRepairPlan plan;
+        private final BeliefNode node;
+        private final String actionName;
+        private final boolean controllable;
+        private final boolean updateProtocolAction;
+
+        private BeliefExpansionCandidate(
+                BeliefRepairPlan plan,
+                BeliefNode node,
+                String actionName,
+                boolean controllable,
+                boolean updateProtocolAction) {
+            this.plan = plan;
+            this.node = node;
+            this.actionName = actionName;
+            this.controllable = controllable;
+            this.updateProtocolAction = updateProtocolAction;
+        }
+
+        private String actionClass() {
+            if (!controllable) {
+                return "uncontrollable";
+            }
+            return updateProtocolAction ? "update-event" : "ordinary-controllable";
+        }
+    }
+
+    private class BeliefLazyExpansionResult {
+        private final int round;
+        private int attemptedActions;
+        private int expandedActions;
+        private int addedEdges;
+
+        private BeliefLazyExpansionResult(int round) {
+            this.round = round;
+        }
+
+        private boolean hasProgress() {
+            return addedEdges > 0;
+        }
     }
 
     private class DirectorEdge {
@@ -3863,6 +5852,32 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC 出力構築時間内訳", "出力遷移 pruning 判定平均時間", outputPruningDecisionNanos, outputPruningDecisionCalls);
         UpdatingControllerEvaluationRecorder.recordNanoTime(
                 "OTF-DUC 出力構築時間内訳", "director グラフ走査・遷移構築時間", directorTraversalNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 出力構築時間内訳", "旧コントローラ相当状態の belief 再探索時間", directorBeliefRepairNanos);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索の対象旧状態数", beliefRepairCandidateGroups, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で 1 対 1 に修復できた旧状態数", beliefRepairSuccessGroups, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で fallback した旧状態数", beliefRepairFallbackGroups, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で生成した belief 状態数", beliefRepairGeneratedNodes, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で資源上限により fallback した旧状態数", beliefRepairResourceLimitFallbacks, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で観測した最大 belief node 数", beliefRepairMaxObservedBeliefNodes, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で追加生成した最大 concrete state 数", beliefRepairMaxObservedAdditionalConcreteStates, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で追加生成した最大 transition 数", beliefRepairMaxObservedAdditionalTransitions, "遷移");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索中に有効な追加展開を行ったラウンド数", beliefLazyExpansionRounds, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索中に追加展開を試みた action 数", beliefLazyExpansionAttempts, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索中に実際に追加展開できた action 数", beliefLazyExpansionExpandedActions, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索の追加展開で増えた遷移数", beliefLazyExpansionAddedEdges, "遷移");
         UpdatingControllerEvaluationRecorder.recordTime(
                 "DCS (OTF-DUC)", "NC 移設時間", transferNCTime);
         UpdatingControllerEvaluationRecorder.recordTime(
