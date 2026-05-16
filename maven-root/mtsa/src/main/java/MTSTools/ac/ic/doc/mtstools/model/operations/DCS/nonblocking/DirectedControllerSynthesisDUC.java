@@ -13,7 +13,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -52,6 +54,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private int[] traceMasks = new int[10];     // isTrace判定用ビットマスク
     private long[] lookupBuffer;               // アンボクシング＆正規化用
     private StateKey reusableKey;              // 検索専用（new しない）
+    private Map<ComponentStepCacheKey, ComponentStepResult<State>> componentStepCache = new HashMap<>();
+    private Map<String, Boolean> finishUpdateGuardCache = new HashMap<>();
+    private Map<ActionChildrenGoalCacheKey, AllChildrenGoalCacheEntry> allChildrenGoalCache = new HashMap<>();
 
     // ボクシング抑制用定数
     private final State NORMALIZED_VAL = (State) Long.valueOf(-2L);
@@ -71,6 +76,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     final public Statistics statistics = new Statistics();
 
     private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
+    private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
     private PrintWriter logWriter;
     private static final String LOG_FILE_PATH = System.getProperty("otfduc.debug.file", "duc_debug.txt");
@@ -127,6 +133,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long componentSyncNanos = 0;
     private long cartesianProductNanos = 0;
     private long safetySyncNanos = 0;
+    private long buildCompostateNanos = 0;
     private long stateCanonicalizationNanos = 0;
     private long stateLookupNanos = 0;
     private long newStateRegistrationNanos = 0;
@@ -134,6 +141,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long finishUpdateGuardNanos = 0;
     private long childRegistrationNanos = 0;
     private long exploreNanos = 0;
+    private long isErrorCheckNanos = 0;
+    private long setErrorNanos = 0;
     private long loopDetectionNanos = 0;
     private long fairnessAnalysisNanos = 0;
     private long fairPromotionNanos = 0;
@@ -142,21 +151,88 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long propagateGoalPhase1Nanos = 0;
     private long propagateGoalPhase2Nanos = 0;
     private long propagateGoalDistanceUpdateNanos = 0;
+    private long phase2CandidateBuildNanos = 0;
+    private long phase2USafetyFilterNanos = 0;
+    private long phase2DistanceSeedNanos = 0;
+    private long phase2DistancePropagationNanos = 0;
+    private long phase2DistancePruneNanos = 0;
+    private long phase2ExitActionSelectionNanos = 0;
+    private long phase2GoalApplyNanos = 0;
+    private long phase2PostPromotionPropagationNanos = 0;
+    private long fairReachabilityActionCheckNanos = 0;
+    private long fairReachabilityRejectedSummaryNanos = 0;
+    private long hasUncontrollableSuccessorInNanos = 0;
     private long outputPruningDecisionNanos = 0;
     private long directorTraversalNanos = 0;
+    private long directorActionRegistrationNanos = 0;
+    private long directorNcStateTransferNanos = 0;
+    private long directorNcTransitionTransferNanos = 0;
+    private long directorEdgeCollectionNanos = 0;
+    private long directorNcConnectionNanos = 0;
+    private long directorNcConnectionDebugPrepNanos = 0;
+    private long directorNcConnectionSignatureNanos = 0;
+    private long directorPreUpdateMergeNanos = 0;
+    private long directorIdAssignmentNanos = 0;
+    private long directorTransitionEmissionNanos = 0;
 
     private long heuristicSelectionCalls = 0;
     private long heuristicRecomputeRuns = 0;
     private long heuristicRecomputedStates = 0;
     private long heuristicEvaluationCalls = 0;
+    private long successorGenerationCalls = 0;
+    private long componentSyncCalls = 0;
+    private long cartesianProductCalls = 0;
+    private long safetySyncCalls = 0;
+    private long buildCompostateCalls = 0;
     private long stateLookupCalls = 0;
+    private long enforceSafetyCheckCalls = 0;
     private long finishUpdateGuardChecks = 0;
+    private long childRegistrationCalls = 0;
+    private long exploreCalls = 0;
+    private long isErrorChecks = 0;
+    private long setErrorCalls = 0;
     private long loopDetectionCalls = 0;
     private long fairnessAnalysisCalls = 0;
     private long propagateGoalCalls = 0;
     private long propagateErrorCalls = 0;
     private long outputPruningDecisionCalls = 0;
+    private long directorActionRegistrationCount = 0;
+    private long directorNcStatesTransferred = 0;
+    private long directorNcTransitionsTransferred = 0;
+    private long directorReachableStates = 0;
+    private long directorEdgesCollected = 0;
+    private long directorNcConnectionAttempts = 0;
+    private long directorNcConnectionSignatureCalls = 0;
+    private long directorOutputStatesAssigned = 0;
+    private long directorTransitionEmissionAttempts = 0;
     private long totalFairnessCandidatesProcessed = 0;
+    private long phase2OuterIterations = 0;
+    private long phase2InnerIterations = 0;
+    private long phase2CandidateBuildCalls = 0;
+    private long phase2USafetyFilterCalls = 0;
+    private long phase2DistanceSeedCalls = 0;
+    private long phase2DistancePropagationCalls = 0;
+    private long phase2DistancePruneCalls = 0;
+    private long phase2ExitActionSelectionCalls = 0;
+    private long phase2GoalApplyCalls = 0;
+    private long phase2PostPromotionPropagationCalls = 0;
+    private long phase2CandidatesBuiltTotal = 0;
+    private long phase2CandidatesAfterUSafetyTotal = 0;
+    private long phase2CandidatesAfterDistancePruneTotal = 0;
+    private long phase2MaxCandidatesBuilt = 0;
+    private long phase2DistanceSeededStates = 0;
+    private long phase2DistancePropagatedStates = 0;
+    private long fairReachabilityActionCheckCalls = 0;
+    private long fairReachabilityRejectedSummaryCalls = 0;
+    private long hasUncontrollableSuccessorInCalls = 0;
+    private long componentStepCacheHits = 0;
+    private long componentStepCacheMisses = 0;
+    private long componentStepCacheInvalidHits = 0;
+    private long finishUpdateGuardCacheHits = 0;
+    private long finishUpdateGuardCacheMisses = 0;
+    private long allChildrenGoalCacheHits = 0;
+    private long allChildrenGoalCacheMisses = 0;
+    private long allChildrenGoalCacheInvalidations = 0;
 
     // OTF-DUC の直積モデルにおけるコンポーネントのインデックス範囲。
     public int idxMarking = 0;
@@ -174,6 +250,101 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     public int synthesisEnd = -1;
 
     public DirectedControllerSynthesisDUC() {
+    }
+
+    private static final class ComponentStepCacheKey {
+        private final int ltsIndex;
+        private final long markingState;
+        private final Object componentState;
+        private final Object action;
+        private final boolean oldAction;
+        private final int hash;
+
+        private ComponentStepCacheKey(int ltsIndex, long markingState, Object componentState, Object action,
+                boolean oldAction) {
+            this.ltsIndex = ltsIndex;
+            this.markingState = markingState;
+            this.componentState = componentState;
+            this.action = action;
+            this.oldAction = oldAction;
+
+            int h = Integer.hashCode(ltsIndex);
+            h = 31 * h + Long.hashCode(markingState);
+            h = 31 * h + Objects.hashCode(componentState);
+            h = 31 * h + Objects.hashCode(action);
+            h = 31 * h + Boolean.hashCode(oldAction);
+            this.hash = h;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof ComponentStepCacheKey)) return false;
+            ComponentStepCacheKey other = (ComponentStepCacheKey) obj;
+            return ltsIndex == other.ltsIndex
+                    && markingState == other.markingState
+                    && oldAction == other.oldAction
+                    && Objects.equals(componentState, other.componentState)
+                    && Objects.equals(action, other.action);
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+    }
+
+    private static final class ComponentStepResult<S> {
+        private final boolean invalid;
+        private final Set<S> successors;
+
+        private ComponentStepResult(boolean invalid, Set<S> successors) {
+            this.invalid = invalid;
+            this.successors = successors;
+        }
+
+        private static <S> ComponentStepResult<S> invalid() {
+            return new ComponentStepResult<>(true, null);
+        }
+
+        private static <S> ComponentStepResult<S> successors(Set<S> successors) {
+            return new ComponentStepResult<>(false, successors);
+        }
+    }
+
+    private static final class ActionChildrenGoalCacheKey {
+        private final CompostateDUC<?, ?> state;
+        private final Object action;
+        private final int hash;
+
+        private ActionChildrenGoalCacheKey(CompostateDUC<?, ?> state, Object action) {
+            this.state = state;
+            this.action = action;
+            this.hash = 31 * System.identityHashCode(state) + Objects.hashCode(action);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof ActionChildrenGoalCacheKey)) return false;
+            ActionChildrenGoalCacheKey other = (ActionChildrenGoalCacheKey) obj;
+            return state == other.state && Objects.equals(action, other.action);
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+    }
+
+    private static final class AllChildrenGoalCacheEntry {
+        private final int childCount;
+        private final boolean allGoals;
+
+        private AllChildrenGoalCacheEntry(int childCount, boolean allGoals) {
+            this.childCount = childCount;
+            this.allGoals = allGoals;
+        }
     }
 
     @Override
@@ -226,13 +397,23 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         this.newController = nc;
         this.output = output;
 
-        if (debugLogEnabled) {
+        if (debugLogEnabled || profileLogEnabled) {
             try {
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
-                log("=== Starting OTF-DUC Synthesis ===");
-                log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s]",
-                        mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
-                        transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled));
+                if (debugLogEnabled) {
+                    log("=== Starting OTF-DUC Synthesis ===");
+                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s]",
+                            mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
+                            transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled));
+                }
+                if (profileLogEnabled) {
+                    profileLog("=== Starting OTF-DUC Profiling ===");
+                    profileLog(String.format("[Profile-Config] debug=%s, profile=%s, file=%s",
+                            debugLogEnabled, profileLogEnabled, LOG_FILE_PATH));
+                    profileLog(String.format("[Profile-Config] MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d]",
+                            mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
+                            transReqEnd, synthesisStart, synthesisEnd));
+                }
             } catch (IOException e) {
                 System.err.println("Failed to open debug log file: " + e.getMessage());
                 e.printStackTrace();
@@ -317,11 +498,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return null;
 
         } finally {
+            synthesizeDUCTime = System.currentTimeMillis() - synthesizeDUCStart;
             if (logWriter != null) {
-                log("=== Synthesis Finished ===");
+                if (debugLogEnabled) {
+                    emitCacheDiagnostics();
+                    log("=== Synthesis Finished ===");
+                }
+                if (profileLogEnabled) {
+                    emitProfilingDiagnostics();
+                    profileLog("=== Profiling Finished ===");
+                }
                 logWriter.close();
             }
-            synthesizeDUCTime = System.currentTimeMillis() - synthesizeDUCStart;
             // 合成完了後
             recordOtfDcsTimingEvaluation();
             recordOtfDetailedEvaluation();
@@ -333,6 +521,188 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             logWriter.println(message);
             logWriter.flush();
         }
+    }
+
+    private void profileLog(String message) {
+        if (profileLogEnabled && logWriter != null) {
+            logWriter.println(message);
+            logWriter.flush();
+        }
+    }
+
+    private void emitCacheDiagnostics() {
+        log("  [Cache-Stats] componentStep entries=" + safeSize(componentStepCache)
+                + ", hits=" + componentStepCacheHits
+                + ", misses=" + componentStepCacheMisses
+                + ", invalidHits=" + componentStepCacheInvalidHits);
+        log("  [Cache-Stats] finishUpdateGuard entries=" + safeSize(finishUpdateGuardCache)
+                + ", hits=" + finishUpdateGuardCacheHits
+                + ", misses=" + finishUpdateGuardCacheMisses);
+        log("  [Cache-Stats] allChildrenGoal entries=" + safeSize(allChildrenGoalCache)
+                + ", hits=" + allChildrenGoalCacheHits
+                + ", misses=" + allChildrenGoalCacheMisses
+                + ", invalidations=" + allChildrenGoalCacheInvalidations);
+    }
+
+    private void emitProfilingDiagnostics() {
+        long synthesizeNanos = millisToNanos(synthesizeDUCTime);
+        long searchNanos = millisToNanos(searchTime);
+        long effectiveSearchNanos = searchNanos > 0 ? searchNanos : synthesizeNanos;
+
+        profileLog("=== OTF-DUC Profiling Summary ===");
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Time] synthesizeDUC total=%s, search=%s, count=%s, buildDirector=%s, transferNC=%s, stitchNC=%s",
+                formatNanos(synthesizeNanos),
+                formatNanos(searchNanos),
+                formatNanos(millisToNanos(countTime)),
+                formatNanos(millisToNanos(buildDirectorDUCTime)),
+                formatNanos(millisToNanos(transferNCTime)),
+                formatNanos(millisToNanos(stitchingNCTime))));
+
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Counts] expansions=%d, generatedChildren=%d, peakStates=%d, peakTransitions=%d, newStates=%d, existingStateHits=%d",
+                totalLtsExpansions, generatedChildCount, otfPeakStates, otfPeakTrans,
+                newCompostateCount, existingCompostateHitCount));
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Counts] errors=%d, safetyViolationChildren=%d, forcedLoopErrors=%d, detectedLoops=%d, fairPromotedLoops=%d",
+                errorMarkCount, safetyViolationChildCount, loopErrorCount, detectedLoopCount,
+                fairPromotedLoopCount));
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Cache] componentStep entries=%d, hits=%d, misses=%d, invalidHits=%d, hitRate=%s",
+                safeSize(componentStepCache), componentStepCacheHits, componentStepCacheMisses,
+                componentStepCacheInvalidHits,
+                formatRatio(componentStepCacheHits, componentStepCacheHits + componentStepCacheMisses)));
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Cache] finishUpdateGuard entries=%d, hits=%d, misses=%d, hitRate=%s",
+                safeSize(finishUpdateGuardCache), finishUpdateGuardCacheHits, finishUpdateGuardCacheMisses,
+                formatRatio(finishUpdateGuardCacheHits, finishUpdateGuardCacheHits + finishUpdateGuardCacheMisses)));
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Cache] allChildrenGoal entries=%d, hits=%d, misses=%d, invalidations=%d, hitRate=%s",
+                safeSize(allChildrenGoalCache), allChildrenGoalCacheHits, allChildrenGoalCacheMisses,
+                allChildrenGoalCacheInvalidations,
+                formatRatio(allChildrenGoalCacheHits, allChildrenGoalCacheHits + allChildrenGoalCacheMisses)));
+
+        profileLog("[Profile-Note] Percentages use search time as the denominator. Nested timings may overlap.");
+        profileTime("heuristic selection", heuristicSelectionNanos, heuristicSelectionCalls, effectiveSearchNanos);
+        profileTime("heuristic recompute", heuristicRecomputeNanos, heuristicRecomputeRuns, effectiveSearchNanos);
+        profileTime("heuristic frontier", heuristicFrontierNanos, -1, effectiveSearchNanos);
+        profileTime("heuristic evaluation", heuristicEvaluationNanos, heuristicEvaluationCalls, effectiveSearchNanos);
+        profileTime("expandDUC total", stateExpansionNanos, totalLtsExpansions, effectiveSearchNanos);
+        profileTime("successor generation", successorGenerationNanos, successorGenerationCalls, effectiveSearchNanos);
+        profileTime("component sync", componentSyncNanos, componentSyncCalls, effectiveSearchNanos);
+        profileTime("cartesian product", cartesianProductNanos, cartesianProductCalls, effectiveSearchNanos);
+        profileTime("new safety sync", safetySyncNanos, safetySyncCalls, effectiveSearchNanos);
+        profileTime("buildCompostate total", buildCompostateNanos, buildCompostateCalls, effectiveSearchNanos);
+        profileTime("state canonicalization", stateCanonicalizationNanos, buildCompostateCalls, effectiveSearchNanos);
+        profileTime("state lookup", stateLookupNanos, stateLookupCalls, effectiveSearchNanos);
+        profileTime("new state registration", newStateRegistrationNanos, newCompostateCount, effectiveSearchNanos);
+        profileTime("enforce safety check", enforceSafetyCheckNanos, enforceSafetyCheckCalls, effectiveSearchNanos);
+        profileTime("finishUpdate guard", finishUpdateGuardNanos, finishUpdateGuardChecks, effectiveSearchNanos);
+        profileTime("child registration", childRegistrationNanos, childRegistrationCalls, effectiveSearchNanos);
+        profileTime("explore total", exploreNanos, exploreCalls, effectiveSearchNanos);
+        profileTime("isError checks", isErrorCheckNanos, isErrorChecks, effectiveSearchNanos);
+        profileTime("setError", setErrorNanos, setErrorCalls, effectiveSearchNanos);
+        profileTime("loop detection", loopDetectionNanos, loopDetectionCalls, effectiveSearchNanos);
+        profileTime("fairness analysis", fairnessAnalysisNanos, fairnessAnalysisCalls, effectiveSearchNanos);
+        profileTime("fair loop promotion", fairPromotionNanos, -1, effectiveSearchNanos);
+        profileTime("propagate GOAL", propagateGoalNanos, propagateGoalCalls, effectiveSearchNanos);
+        profileTime("propagate GOAL phase1", propagateGoalPhase1Nanos, propagateGoalCalls, effectiveSearchNanos);
+        profileTime("propagate GOAL fairness phase2", propagateGoalPhase2Nanos, propagateGoalCalls, effectiveSearchNanos);
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Phase2] outerIterations=%d, innerIterations=%d, candidatesBuiltTotal=%d, maxCandidatesBuilt=%d, avgCandidatesBuilt=%s, avgCandidatesAfterUSafety=%s, avgCandidatesAfterDistancePrune=%s, distanceSeededStates=%d, distancePropagatedStates=%d",
+                phase2OuterIterations,
+                phase2InnerIterations,
+                phase2CandidatesBuiltTotal,
+                phase2MaxCandidatesBuilt,
+                formatAverage(phase2CandidatesBuiltTotal, phase2CandidateBuildCalls),
+                formatAverage(phase2CandidatesAfterUSafetyTotal, phase2USafetyFilterCalls),
+                formatAverage(phase2CandidatesAfterDistancePruneTotal, phase2DistancePruneCalls),
+                phase2DistanceSeededStates,
+                phase2DistancePropagatedStates));
+        profileTime("phase2 candidate build", phase2CandidateBuildNanos, phase2CandidateBuildCalls, effectiveSearchNanos);
+        profileTime("phase2 U-safety filter", phase2USafetyFilterNanos, phase2USafetyFilterCalls, effectiveSearchNanos);
+        profileTime("phase2 distance seed", phase2DistanceSeedNanos, phase2DistanceSeedCalls, effectiveSearchNanos);
+        profileTime("phase2 distance propagation", phase2DistancePropagationNanos, phase2DistancePropagationCalls, effectiveSearchNanos);
+        profileTime("phase2 distance prune", phase2DistancePruneNanos, phase2DistancePruneCalls, effectiveSearchNanos);
+        profileTime("phase2 exit action selection", phase2ExitActionSelectionNanos, phase2ExitActionSelectionCalls, effectiveSearchNanos);
+        profileTime("phase2 goal apply", phase2GoalApplyNanos, phase2GoalApplyCalls, effectiveSearchNanos);
+        profileTime("phase2 post-promotion propagation", phase2PostPromotionPropagationNanos, phase2PostPromotionPropagationCalls, effectiveSearchNanos);
+        profileTime("fair reachability action check", fairReachabilityActionCheckNanos, fairReachabilityActionCheckCalls, effectiveSearchNanos);
+        profileTime("fair rejected summary build", fairReachabilityRejectedSummaryNanos, fairReachabilityRejectedSummaryCalls, effectiveSearchNanos);
+        profileTime("has U successor in candidates", hasUncontrollableSuccessorInNanos, hasUncontrollableSuccessorInCalls, effectiveSearchNanos);
+        profileTime("propagate GOAL distance update", propagateGoalDistanceUpdateNanos, -1, effectiveSearchNanos);
+        profileTime("propagate ERROR", propagateErrorNanos, propagateErrorCalls, effectiveSearchNanos);
+
+        long directorNanos = millisToNanos(buildDirectorDUCTime);
+        long effectiveDirectorNanos = directorNanos > 0 ? directorNanos : synthesizeNanos;
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Director] reachableStates=%d, collectedEdges=%d, outputStatesAssigned=%d, outputTransitionAttempts=%d, outputTransitions=%d, prunedControllable=%d",
+                directorReachableStates,
+                directorEdgesCollected,
+                directorOutputStatesAssigned,
+                directorTransitionEmissionAttempts,
+                directorOutputTransitions,
+                prunedControllableTransitions));
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Director] ncStates=%d, ncTransitions=%d, finishUpdateAttempts=%d, ncConnectionSuccess=%d, ncConnectionMiss=%d, preUpdateRaw=%d, preUpdateClasses=%d, preUpdateRemoved=%d",
+                directorNcStatesTransferred,
+                directorNcTransitionsTransferred,
+                directorNcConnectionAttempts,
+                ncConnectionSuccessCount,
+                ncConnectionMissCount,
+                preUpdateOutputMergedStates,
+                preUpdateOutputClassStates,
+                preUpdateOutputMergeRemovedStates));
+        profileTime("director action registration", directorActionRegistrationNanos, directorActionRegistrationCount, effectiveDirectorNanos);
+        profileTime("director NC state transfer", directorNcStateTransferNanos, directorNcStatesTransferred, effectiveDirectorNanos);
+        profileTime("director NC transition transfer", directorNcTransitionTransferNanos, directorNcTransitionsTransferred, effectiveDirectorNanos);
+        profileTime("director edge collection", directorEdgeCollectionNanos, directorReachableStates, effectiveDirectorNanos);
+        profileTime("output pruning decision", outputPruningDecisionNanos, outputPruningDecisionCalls, effectiveDirectorNanos);
+        profileTime("director NC connection", directorNcConnectionNanos, directorNcConnectionAttempts, effectiveDirectorNanos);
+        profileTime("director NC debug prep", directorNcConnectionDebugPrepNanos, directorNcConnectionAttempts, effectiveDirectorNanos);
+        profileTime("director NC signature", directorNcConnectionSignatureNanos, directorNcConnectionSignatureCalls, effectiveDirectorNanos);
+        profileTime("director pre-update merge", directorPreUpdateMergeNanos, -1, effectiveDirectorNanos);
+        profileTime("director ID assignment", directorIdAssignmentNanos, directorOutputStatesAssigned, effectiveDirectorNanos);
+        profileTime("director transition emission", directorTransitionEmissionNanos, directorTransitionEmissionAttempts, effectiveDirectorNanos);
+        profileTime("director build total", directorTraversalNanos, -1, effectiveDirectorNanos);
+    }
+
+    private void profileTime(String label, long nanos, long calls, long denominatorNanos) {
+        String callsText = calls >= 0 ? Long.toString(calls) : "-";
+        String averageText = calls > 0 ? formatNanos(nanos / calls) : "-";
+        profileLog(String.format(Locale.ROOT,
+                "[Profile-Time] %-34s total=%s, pct=%s, calls=%s, avg=%s",
+                label, formatNanos(nanos), formatPercent(nanos, denominatorNanos), callsText, averageText));
+    }
+
+    private long millisToNanos(long millis) {
+        return millis * 1_000_000L;
+    }
+
+    private String formatNanos(long nanos) {
+        double millis = nanos / 1_000_000.0;
+        return String.format(Locale.ROOT, "%.3f ms", millis);
+    }
+
+    private String formatPercent(long nanos, long denominatorNanos) {
+        if (denominatorNanos <= 0) {
+            return "-";
+        }
+        return String.format(Locale.ROOT, "%.2f%%", (100.0 * nanos) / denominatorNanos);
+    }
+
+    private String formatRatio(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return "-";
+        }
+        return String.format(Locale.ROOT, "%.2f%%", (100.0 * numerator) / denominator);
+    }
+
+    private String formatAverage(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return "-";
+        }
+        return String.format(Locale.ROOT, "%.2f", ((double) numerator) / denominator);
     }
 
     void addHeuristicRecomputeNanos(long nanos) {
@@ -386,6 +756,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         componentSyncNanos = 0;
         cartesianProductNanos = 0;
         safetySyncNanos = 0;
+        buildCompostateNanos = 0;
         stateCanonicalizationNanos = 0;
         stateLookupNanos = 0;
         newStateRegistrationNanos = 0;
@@ -393,6 +764,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         finishUpdateGuardNanos = 0;
         childRegistrationNanos = 0;
         exploreNanos = 0;
+        isErrorCheckNanos = 0;
+        setErrorNanos = 0;
         loopDetectionNanos = 0;
         fairnessAnalysisNanos = 0;
         fairPromotionNanos = 0;
@@ -401,20 +774,87 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         propagateGoalPhase1Nanos = 0;
         propagateGoalPhase2Nanos = 0;
         propagateGoalDistanceUpdateNanos = 0;
+        phase2CandidateBuildNanos = 0;
+        phase2USafetyFilterNanos = 0;
+        phase2DistanceSeedNanos = 0;
+        phase2DistancePropagationNanos = 0;
+        phase2DistancePruneNanos = 0;
+        phase2ExitActionSelectionNanos = 0;
+        phase2GoalApplyNanos = 0;
+        phase2PostPromotionPropagationNanos = 0;
+        fairReachabilityActionCheckNanos = 0;
+        fairReachabilityRejectedSummaryNanos = 0;
+        hasUncontrollableSuccessorInNanos = 0;
         outputPruningDecisionNanos = 0;
         directorTraversalNanos = 0;
+        directorActionRegistrationNanos = 0;
+        directorNcStateTransferNanos = 0;
+        directorNcTransitionTransferNanos = 0;
+        directorEdgeCollectionNanos = 0;
+        directorNcConnectionNanos = 0;
+        directorNcConnectionDebugPrepNanos = 0;
+        directorNcConnectionSignatureNanos = 0;
+        directorPreUpdateMergeNanos = 0;
+        directorIdAssignmentNanos = 0;
+        directorTransitionEmissionNanos = 0;
         heuristicSelectionCalls = 0;
         heuristicRecomputeRuns = 0;
         heuristicRecomputedStates = 0;
         heuristicEvaluationCalls = 0;
+        successorGenerationCalls = 0;
+        componentSyncCalls = 0;
+        cartesianProductCalls = 0;
+        safetySyncCalls = 0;
+        buildCompostateCalls = 0;
         stateLookupCalls = 0;
+        enforceSafetyCheckCalls = 0;
         finishUpdateGuardChecks = 0;
+        childRegistrationCalls = 0;
+        exploreCalls = 0;
+        isErrorChecks = 0;
+        setErrorCalls = 0;
         loopDetectionCalls = 0;
         fairnessAnalysisCalls = 0;
         propagateGoalCalls = 0;
         propagateErrorCalls = 0;
         outputPruningDecisionCalls = 0;
+        directorActionRegistrationCount = 0;
+        directorNcStatesTransferred = 0;
+        directorNcTransitionsTransferred = 0;
+        directorReachableStates = 0;
+        directorEdgesCollected = 0;
+        directorNcConnectionAttempts = 0;
+        directorNcConnectionSignatureCalls = 0;
+        directorOutputStatesAssigned = 0;
+        directorTransitionEmissionAttempts = 0;
         totalFairnessCandidatesProcessed = 0;
+        phase2OuterIterations = 0;
+        phase2InnerIterations = 0;
+        phase2CandidateBuildCalls = 0;
+        phase2USafetyFilterCalls = 0;
+        phase2DistanceSeedCalls = 0;
+        phase2DistancePropagationCalls = 0;
+        phase2DistancePruneCalls = 0;
+        phase2ExitActionSelectionCalls = 0;
+        phase2GoalApplyCalls = 0;
+        phase2PostPromotionPropagationCalls = 0;
+        phase2CandidatesBuiltTotal = 0;
+        phase2CandidatesAfterUSafetyTotal = 0;
+        phase2CandidatesAfterDistancePruneTotal = 0;
+        phase2MaxCandidatesBuilt = 0;
+        phase2DistanceSeededStates = 0;
+        phase2DistancePropagatedStates = 0;
+        fairReachabilityActionCheckCalls = 0;
+        fairReachabilityRejectedSummaryCalls = 0;
+        hasUncontrollableSuccessorInCalls = 0;
+        componentStepCacheHits = 0;
+        componentStepCacheMisses = 0;
+        componentStepCacheInvalidHits = 0;
+        finishUpdateGuardCacheHits = 0;
+        finishUpdateGuardCacheMisses = 0;
+        allChildrenGoalCacheHits = 0;
+        allChildrenGoalCacheMisses = 0;
+        allChildrenGoalCacheInvalidations = 0;
         lastErrorSummary = "none";
         lastLoopErrorSummary = "none";
         lastFairControllableExitRejectedSummary = "none";
@@ -435,6 +875,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         preUpdateOutputMergedStates = 0;
         preUpdateOutputClassStates = 0;
         preUpdateOutputMergeRemovedStates = 0;
+        componentStepCache.clear();
+        finishUpdateGuardCache.clear();
+        allChildrenGoalCache.clear();
+        log("  [Cache-Config] componentStepCache=true, finishUpdateGuardCache=true, allChildrenGoalCache=true");
         compostates = new HashMap<>();
         setupLookupOptimizations();
         transitions = new ArrayDeque<>(ltss.size());
@@ -502,6 +946,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public CompostateDUC<State, Action> buildCompostate(List<State> states, CompostateDUC<State, Action> parent) {
+        long buildStart = System.nanoTime();
+        buildCompostateCalls++;
+
         // 状態の正規化（Canonicalization）ロジック
         // 現在の更新フェーズにおいて追跡（Trace）対象外となっているコンポーネントは、
         // 将来の挙動に影響を与えないため、状態IDを固定値 -2L に統一する。
@@ -572,6 +1019,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 result.setBestControllable(0, null);
             }
             long safetyCheckStart = System.nanoTime();
+            enforceSafetyCheckCalls++;
             boolean enforceError = checkErrorWithEnforce(result);
             enforceSafetyCheckNanos += System.nanoTime() - safetyCheckStart;
             if (enforceError || heuristic.fullyExplored(result)) {
@@ -581,6 +1029,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         } else {
             existingCompostateHitCount++;
         }
+        buildCompostateNanos += System.nanoTime() - buildStart;
         return result;
     }
 
@@ -742,7 +1191,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             State s = currentStates.get(i);
             if (s instanceof Long && (Long) s == -1L) {
                 if (isEnforce(i, markingState)) {
-                    log("[Safety Violation] Component " + i + " reached Error state -1 at Marking " + markingState);
+                    if(debugLogEnabled)log("[Safety Violation] Component " + i + " reached Error state -1 at Marking " + markingState);
                     return true;
                 }
             }
@@ -756,7 +1205,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     void expandDUC(CompostateDUC<State, Action> state, HAction<State, Action> action) {
         // 同じ状態・アクションの重複展開を検知する。
         Set<CompostateDUC<State, Action>> alreadyExplored = state.getExploredChildren().getImage(action);
-        if (alreadyExplored != null && !alreadyExplored.isEmpty()) {
+        if (debugLogEnabled && alreadyExplored != null && !alreadyExplored.isEmpty()) {
             log("!!! [ALARM] Redundant Expansion detected!");
             log("    State:  " + state.getStates());
             log("    Action: " + action + " has been explored before.");
@@ -782,6 +1231,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         List<List<State>> allNextStates = null;
         if (!blocked) {
             long successorStart = System.nanoTime();
+            successorGenerationCalls++;
             allNextStates = getChildStatesDUC_Nondet(state, action);
             successorGenerationNanos += System.nanoTime() - successorStart;
         }
@@ -826,8 +1276,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 失敗・ブロック時の早期リターン
         if (blocked || allNextStates == null || allNextStates.isEmpty()) {
-            if (blocked) log("[BLOCKED] Transition blocked by finishUpdate condition: " + action);
-            else log("[DEADLOCK/INVALID] No valid next states for action: " + action);
+            if(debugLogEnabled){
+                if (blocked) log("[BLOCKED] Transition blocked by finishUpdate condition: " + action);
+                else log("[DEADLOCK/INVALID] No valid next states for action: " + action);
+            }
             heuristic.expansionDone(state, action, null);
             // if (debugLogEnabled) log("--------------------------------------------------------------------------------");
             return;
@@ -848,7 +1300,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
             // ツリー構造への登録だけを先に行う
             long childRegistrationStart = System.nanoTime();
+            childRegistrationCalls++;
             state.addChild(action, child);
+            invalidateAllChildrenGoalCache(state, action);
             child.addParent(action, state);
             children.add(child);
             childRegistrationNanos += System.nanoTime() - childRegistrationStart;
@@ -858,6 +1312,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         for (CompostateDUC<State, Action> child : children) {
             heuristic.notifyExpandingState(state, action, child);
             long exploreStart = System.nanoTime();
+            exploreCalls++;
             explore(state, action, child);
             exploreNanos += System.nanoTime() - exploreStart;
             child.setExpanded();
@@ -896,59 +1351,28 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         List<Set<State>> possibleStatesPerLTS = new ArrayList<>(ltssSize);
 
         long componentSyncStart = System.nanoTime();
+        componentSyncCalls++;
         for (int i = 0; i < ltssSize; ++i) {
-            if (!isTrace(i, markingState)) {
-                Set<State> s = new HashSet<>();
-                s.add(parentStates.get(i));
-                possibleStatesPerLTS.add(s);
-                continue;
+            ComponentStepResult<State> step = getCachedComponentStep(
+                    i, markingState, parentStates.get(i), action, isOldAction, strippedActionName);
+            if (step.invalid) {
+                return null;
             }
-
-            LTS<State, Action> lts = ltss.get(i);
-            State curr = parentStates.get(i);
-            Action rawAction = action.getAction();
-
-            if (markingState == 0 && isOldAction && i != 1) {
-                boolean found = false;
-                Set<State> s = new HashSet<>();
-                for (Pair<Action, State> trans : lts.getTransitions(curr)) {
-                    if (trans.getFirst().toString().equals(strippedActionName)) {
-                        s.add(trans.getSecond());
-                        found = true;
-                        // break しない！ 非決定的な分岐をすべて拾う
-                    }
-                }
-                if (!found) s.add(curr);
-                possibleStatesPerLTS.add(s);
-            }
-            // 通常の同期ケース。
-            else {
-                Set<State> image = lts.getTransitions(curr).getImage(rawAction);
-                if (image == null || image.isEmpty()) {
-                    // if (lts.getActions().contains(rawAction)) return null; // 無効アクション
-                    if (isActive(i, markingState) && lts.getActions().contains(rawAction)) {
-                        return null; // Active component だけが veto できる
-                    }
-                    // trace 専用または inactive のコンポーネントは自己ループとして扱う。
-                    Set<State> s = new HashSet<>();
-                    s.add(curr);
-                    possibleStatesPerLTS.add(s);
-                } else {
-                    possibleStatesPerLTS.add(image); // 取れる行き先すべてをセット
-                }
-            }
+            possibleStatesPerLTS.add(step.successors);
         }
         componentSyncNanos += System.nanoTime() - componentSyncStart;
 
         // 全LTSの次状態候補から直積（Cartesian Product）を生成
         List<List<State>> cartesianProduct = new ArrayList<>();
         long cartesianStart = System.nanoTime();
+        cartesianProductCalls++;
         generateCartesianProduct(possibleStatesPerLTS, 0, new ArrayList<State>(), cartesianProduct);
         cartesianProductNanos += System.nanoTime() - cartesianStart;
 
         // startNewSpec の場合の Safety の同期(上書き)
         if (actionName.equals(UpdateConstants.START_NEW_SPEC)) {
             long safetySyncStart = System.nanoTime();
+            safetySyncCalls++;
             for (List<State> childVector : cartesianProduct) {
                 applySafetySync(childVector);
             }
@@ -956,6 +1380,64 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         return cartesianProduct;
+    }
+
+    private ComponentStepResult<State> getCachedComponentStep(int ltsIndex, long markingState, State currentState,
+            HAction<State, Action> action, boolean isOldAction, String strippedActionName) {
+
+        ComponentStepCacheKey key = new ComponentStepCacheKey(
+                ltsIndex, markingState, currentState, action.getAction(), isOldAction);
+        ComponentStepResult<State> cached = componentStepCache.get(key);
+        if (cached != null) {
+            componentStepCacheHits++;
+            if (cached.invalid) {
+                componentStepCacheInvalidHits++;
+            }
+            return cached;
+        }
+
+        componentStepCacheMisses++;
+        ComponentStepResult<State> computed = computeComponentStep(
+                ltsIndex, markingState, currentState, action, isOldAction, strippedActionName);
+        componentStepCache.put(key, computed);
+        return computed;
+    }
+
+    private ComponentStepResult<State> computeComponentStep(int ltsIndex, long markingState, State currentState,
+            HAction<State, Action> action, boolean isOldAction, String strippedActionName) {
+
+        if (!isTrace(ltsIndex, markingState)) {
+            return ComponentStepResult.successors(Collections.singleton(currentState));
+        }
+
+        LTS<State, Action> lts = ltss.get(ltsIndex);
+        Action rawAction = action.getAction();
+
+        if (markingState == 0 && isOldAction && ltsIndex != idxOC) {
+            boolean found = false;
+            Set<State> successors = new HashSet<>();
+            for (Pair<Action, State> trans : lts.getTransitions(currentState)) {
+                if (trans.getFirst().toString().equals(strippedActionName)) {
+                    successors.add(trans.getSecond());
+                    found = true;
+                    // 非決定的な分岐はすべて拾う。
+                }
+            }
+            if (!found) {
+                successors.add(currentState);
+            }
+            return ComponentStepResult.successors(successors);
+        }
+
+        Set<State> image = lts.getTransitions(currentState).getImage(rawAction);
+        if (image == null || image.isEmpty()) {
+            if (isActive(ltsIndex, markingState) && lts.getActions().contains(rawAction)) {
+                return ComponentStepResult.invalid();
+            }
+            return ComponentStepResult.successors(Collections.singleton(currentState));
+        }
+
+        return ComponentStepResult.successors(image);
     }
 
     // =====================================================================
@@ -1009,12 +1491,21 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      * 2. 翻訳後の環境と現在の安全性状態の組み合わせが、新コントローラ(NC)に存在すること
      */
     private boolean checkHotswapEndCondition(CompostateDUC<State, Action> state) {
+        String cacheKey = generateMapSignature(state);
+        Boolean cached = finishUpdateGuardCache.get(cacheKey);
+        if (cached != null) {
+            finishUpdateGuardCacheHits++;
+            return cached;
+        }
+        finishUpdateGuardCacheMisses++;
+
         // シグネチャを仮生成して NC マップとの照合を行う
         String signature = generateNCSignature(state);
         
         // 翻訳に失敗した（環境状態がマップにない）場合は null が返る想定
         if (signature == null) {
             log("  [finishUpdate Guard] BLOCKED: Environment state translation failed.");
+            finishUpdateGuardCache.put(cacheKey, false);
             return false;
         }
 
@@ -1022,11 +1513,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         boolean isSafeInNC = newControllerConnectionMap.containsKey(signature);
 
         if (!isSafeInNC && debugLogEnabled) {
-            String debugSignature = generateMapSignature(state);
             // 不整合発見を検証するためのログ
-            log("  [finishUpdate Guard] BLOCKED: MapSignature '(MapEnv) " + debugSignature + " (New Safety)' = Signature '(NewEnv) " + signature + " (New Safety)' is NOT found in New Controller's safe states.");
+            log("  [finishUpdate Guard] BLOCKED: MapSignature '(MapEnv) " + cacheKey + " (New Safety)' = Signature '(NewEnv) " + signature + " (New Safety)' is NOT found in New Controller's safe states.");
         }
 
+        finishUpdateGuardCache.put(cacheKey, isSafeInNC);
         return isSafeInNC;
     }
 
@@ -1189,8 +1680,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         boolean changed;
         do {
             changed = false;
-            // long sP2Init = System.nanoTime();
+            if (profileLogEnabled) {
+                phase2OuterIterations++;
+            }
 
+            long candidateBuildStart = profileLogEnabled ? System.nanoTime() : 0L;
             Set<CompostateDUC<State, Action>> candidates = new HashSet<>();
             for (CompostateDUC<State, Action> s : compostates.values()) {
                 if (s.isStatus(Status.NONE) && s.isLive()) {
@@ -1198,19 +1692,28 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
             totalFairnessCandidatesProcessed += candidates.size();
+            if (profileLogEnabled) {
+                phase2CandidateBuildNanos += System.nanoTime() - candidateBuildStart;
+                phase2CandidateBuildCalls++;
+                phase2CandidatesBuiltTotal += candidates.size();
+                phase2MaxCandidatesBuilt = Math.max(phase2MaxCandidatesBuilt, candidates.size());
+            }
 
             if (candidates.isEmpty()) break;
 
-            // long sP2Loop = System.nanoTime();
             boolean innerChanged;
             Map<CompostateDUC<State, Action>, Integer> dist = new HashMap<>();
 
             // U-safety と fair 到達性の両方が安定するまで候補集合を絞り込む。
             do {
                 innerChanged = false;
+                if (profileLogEnabled) {
+                    phase2InnerIterations++;
+                }
 
                 // 1. U-safety フィルタ: 環境が候補集合の外へ出られるのは、
                 // 既に証明済みの GOAL に向かう場合だけでなければならない。
+                long uSafetyStart = profileLogEnabled ? System.nanoTime() : 0L;
                 Iterator<CompostateDUC<State, Action>> it = candidates.iterator();
                 while (it.hasNext()) {
                     CompostateDUC<State, Action> s = it.next();
@@ -1234,6 +1737,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         innerChanged = true;
                     }
                 }
+                if (profileLogEnabled) {
+                    phase2USafetyFilterNanos += System.nanoTime() - uSafetyStart;
+                    phase2USafetyFilterCalls++;
+                    phase2CandidatesAfterUSafetyTotal += candidates.size();
+                }
 
                 if (candidates.isEmpty()) break;
 
@@ -1242,43 +1750,52 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 Deque<CompostateDUC<State, Action>> distQueue = new ArrayDeque<>();
 
                 // 証明済み GOAL へ 1 手で到達できる状態を距離計算の始点にする。
+                long distanceSeedStart = profileLogEnabled ? System.nanoTime() : 0L;
+                int distSizeBeforeSeed = dist.size();
                 for (CompostateDUC<State, Action> s : candidates) {
                     for (HAction<State, Action> action : s.getTransitions()) {
+                        Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
+                        if (children == null || children.isEmpty()) {
+                            continue;
+                        }
+                        if (!areAllExploredChildrenGoal(s, action, children)) {
+                            continue;
+                        }
                         if (!canUseActionForFairReachability(s, action, candidates)) {
                             continue;
                         }
-                        Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
-                        if (children != null && !children.isEmpty()) {
-                            boolean allGoals = true;
-                            for (CompostateDUC<State, Action> child : children) {
-                                if (!isGoal(child)) {
-                                    allGoals = false; break;
-                                }
-                            }
-                            if (allGoals) {
-                                dist.put(s, 1);
-                                distQueue.add(s);
-                                break;
-                            }
-                        }
+                        dist.put(s, 1);
+                        distQueue.add(s);
+                        break;
                     }
+                }
+                if (profileLogEnabled) {
+                    phase2DistanceSeedNanos += System.nanoTime() - distanceSeedStart;
+                    phase2DistanceSeedCalls++;
+                    phase2DistanceSeededStates += Math.max(0, dist.size() - distSizeBeforeSeed);
                 }
 
                 // 候補集合の内側で fair 距離を逆向きに伝播する。
+                long distancePropagationStart = profileLogEnabled ? System.nanoTime() : 0L;
+                long propagatedStatesThisRound = 0;
                 while (!distQueue.isEmpty()) {
                     CompostateDUC<State, Action> current = distQueue.poll();
+                    propagatedStatesThisRound++;
                     
                     for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> pRel : current.getParents()) {
                         CompostateDUC<State, Action> parent = pRel.getSecond();
                         if (candidates.contains(parent)) {
                             HAction<State, Action> actionFromParent = pRel.getFirst();
+                            Set<CompostateDUC<State, Action>> siblings = parent.getExploredChildren().getImage(actionFromParent);
+                            if (siblings == null || siblings.isEmpty()) {
+                                continue;
+                            }
                             if (!canUseActionForFairReachability(parent, actionFromParent, candidates)) {
                                 continue;
                             }
                             
                             boolean validMove = true;
                             int maxChildD = 0;
-                            Set<CompostateDUC<State, Action>> siblings = parent.getExploredChildren().getImage(actionFromParent);
                             for (CompostateDUC<State, Action> sibling : siblings) {
                                 if (isGoal(sibling)) {
                                     maxChildD = Math.max(maxChildD, 0);
@@ -1302,8 +1819,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
                     }
                 }
+                if (profileLogEnabled) {
+                    phase2DistancePropagationNanos += System.nanoTime() - distancePropagationStart;
+                    phase2DistancePropagationCalls++;
+                    phase2DistancePropagatedStates += propagatedStatesThisRound;
+                }
 
                 // finishUpdate への fair 経路を持たない閉じた成分を候補から外す。
+                long distancePruneStart = profileLogEnabled ? System.nanoTime() : 0L;
                 it = candidates.iterator();
                 while (it.hasNext()) {
                     CompostateDUC<State, Action> s = it.next();
@@ -1312,52 +1835,69 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         innerChanged = true;
                     }
                 }
+                if (profileLogEnabled) {
+                    phase2DistancePruneNanos += System.nanoTime() - distancePruneStart;
+                    phase2DistancePruneCalls++;
+                    phase2CandidatesAfterDistancePruneTotal += candidates.size();
+                }
 
             } while (innerChanged);
 
             // 残った候補は U-safe であり、GOAL への fair 経路を持つ。
             if (!candidates.isEmpty()) {
+                long exitActionSelectionStart = profileLogEnabled ? System.nanoTime() : 0L;
                 Map<CompostateDUC<State, Action>, HAction<State, Action>> exitActions = new HashMap<>();
                 for (CompostateDUC<State, Action> s : candidates) {
                     HAction<State, Action> bestAction = null;
                     int bestDist = Integer.MAX_VALUE;
 
                     for (HAction<State, Action> action : s.getTransitions()) {
+                        Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
+                        if (children == null || children.isEmpty()) {
+                            continue;
+                        }
                         if (!canUseActionForFairReachability(s, action, candidates)) {
                             continue;
                         }
-                        Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(action);
-                        if (children != null && !children.isEmpty()) {
-                            boolean validMove = true;
-                            int maxChildD = 0;
-                            for (CompostateDUC<State, Action> child : children) {
-                                if (isGoal(child)) {
-                                    maxChildD = Math.max(maxChildD, 0);
-                                } else if (candidates.contains(child)) {
-                                    maxChildD = Math.max(maxChildD, dist.get(child));
-                                } else {
-                                    validMove = false; break;
-                                }
+                        boolean validMove = true;
+                        int maxChildD = 0;
+                        for (CompostateDUC<State, Action> child : children) {
+                            if (isGoal(child)) {
+                                maxChildD = Math.max(maxChildD, 0);
+                            } else if (candidates.contains(child)) {
+                                maxChildD = Math.max(maxChildD, dist.get(child));
+                            } else {
+                                validMove = false; break;
                             }
-                            if (validMove) {
-                                if (maxChildD < bestDist) {
-                                    bestDist = maxChildD;
-                                    bestAction = action;
-                                } else if (maxChildD == bestDist && bestAction != null && !bestAction.isControllable() && action.isControllable()) {
-                                    bestAction = action;
-                                }
+                        }
+                        if (validMove) {
+                            if (maxChildD < bestDist) {
+                                bestDist = maxChildD;
+                                bestAction = action;
+                            } else if (maxChildD == bestDist && bestAction != null && !bestAction.isControllable() && action.isControllable()) {
+                                bestAction = action;
                             }
                         }
                     }
                     exitActions.put(s, bestAction);
                 }
+                if (profileLogEnabled) {
+                    phase2ExitActionSelectionNanos += System.nanoTime() - exitActionSelectionStart;
+                    phase2ExitActionSelectionCalls++;
+                }
 
+                long goalApplyStart = profileLogEnabled ? System.nanoTime() : 0L;
                 for (CompostateDUC<State, Action> winner : candidates) {
                     applyGoalStatus(winner, exitActions.get(winner), winners, queue);
                     changed = true;
                 }
+                if (profileLogEnabled) {
+                    phase2GoalApplyNanos += System.nanoTime() - goalApplyStart;
+                    phase2GoalApplyCalls++;
+                }
 
                 // 新しく証明された SCC から通常の GOAL 伝播を再開する。
+                long postPromotionStart = profileLogEnabled ? System.nanoTime() : 0L;
                 while (!queue.isEmpty()) {
                     CompostateDUC<State, Action> current = queue.poll();
                     if (isGoal(current)) continue;
@@ -1400,6 +1940,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
                     }
                 }
+                if (profileLogEnabled) {
+                    phase2PostPromotionPropagationNanos += System.nanoTime() - postPromotionStart;
+                    phase2PostPromotionPropagationCalls++;
+                }
             }
         } while (changed);
         propagateGoalPhase2Nanos += System.nanoTime() - phase2Start;
@@ -1409,41 +1953,91 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         propagateGoalNanos += System.nanoTime() - startTotal;
     }
 
+    private boolean areAllExploredChildrenGoal(
+            CompostateDUC<State, Action> state,
+            HAction<State, Action> action,
+            Set<CompostateDUC<State, Action>> children) {
+
+        ActionChildrenGoalCacheKey key = new ActionChildrenGoalCacheKey(state, action);
+        AllChildrenGoalCacheEntry cached = allChildrenGoalCache.get(key);
+        if (cached != null && cached.childCount == children.size()) {
+            allChildrenGoalCacheHits++;
+            return cached.allGoals;
+        }
+
+        allChildrenGoalCacheMisses++;
+        boolean allGoals = true;
+        for (CompostateDUC<State, Action> child : children) {
+            if (!isGoal(child)) {
+                allGoals = false;
+                break;
+            }
+        }
+        allChildrenGoalCache.put(key, new AllChildrenGoalCacheEntry(children.size(), allGoals));
+        return allGoals;
+    }
+
+    private void invalidateAllChildrenGoalCache(
+            CompostateDUC<State, Action> state,
+            HAction<State, Action> action) {
+        if (allChildrenGoalCache.remove(new ActionChildrenGoalCacheKey(state, action)) != null) {
+            allChildrenGoalCacheInvalidations++;
+        }
+    }
+
     private boolean canUseActionForFairReachability(
             CompostateDUC<State, Action> state,
             HAction<State, Action> action,
             Set<CompostateDUC<State, Action>> candidates) {
 
-        if (!action.isControllable()) {
-            return true;
+        long actionCheckStart = 0L;
+        if (profileLogEnabled) {
+            actionCheckStart = System.nanoTime();
+            fairReachabilityActionCheckCalls++;
         }
+        try {
+            if (!action.isControllable()) {
+                return true;
+            }
 
-        // 更新前状態は、更新中に仮定する fairness の対象外である。
-        // 旧コントローラ上の action が uncontrollable loop を作っていても、
-        // beginUpdate は旧コントローラ状態空間からの有効な進行辺として残す。
-        if (getMarkingState(state) == 0 && action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
-            return true;
-        }
+            // 更新前状態は、更新中に仮定する fairness の対象外である。
+            // 旧コントローラ上の action が uncontrollable loop を作っていても、
+            // beginUpdate は旧コントローラ状態空間からの有効な進行辺として残す。
+            if (getMarkingState(state) == 0 && action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+                return true;
+            }
 
-        // 更新プロトコル action は update controller 内部の進行ステップである。
-        // 環境 action が同じ SCC に戻れる場合でも fair 脱出口として扱う。
-        // これを許さないと、環境の interleaving だけで通常の更新手順まで
-        // 勝てない扱いになってしまう。
-        if (isUpdateProtocolAction(action)) {
-            return true;
-        }
+            // 更新プロトコル action は update controller 内部の進行ステップである。
+            // 環境 action が同じ SCC に戻れる場合でも fair 脱出口として扱う。
+            // これを許さないと、環境の interleaving だけで通常の更新手順まで
+            // 勝てない扱いになってしまう。
+            if (isUpdateProtocolAction(action)) {
+                return true;
+            }
 
-        // 環境 fairness は controllable 脱出口の発火を強制できない。
-        // uncontrollable 遷移で fair SCC 内に留まり続けられる場合、
-        // 同じ状態の通常 controllable 脱出口は finishUpdate への進行根拠にしない。
-        boolean rejected = hasUncontrollableSuccessorIn(state, candidates);
-        if (rejected) {
-            fairControllableExitRejectedCount++;
-            lastFairControllableExitRejectedSummary =
-                    "action=" + action + ", " + summarizeStateForDiagnostics(state)
-                    + ", candidatesByMarking=" + summarizeMarkingHistogram(candidates);
+            // 環境 fairness は controllable 脱出口の発火を強制できない。
+            // uncontrollable 遷移で fair SCC 内に留まり続けられる場合、
+            // 同じ状態の通常 controllable 脱出口は finishUpdate への進行根拠にしない。
+            boolean rejected = hasUncontrollableSuccessorIn(state, candidates);
+            if (rejected) {
+                fairControllableExitRejectedCount++;
+                if (debugLogEnabled) {
+                    long summaryStart = profileLogEnabled ? System.nanoTime() : 0L;
+                    lastFairControllableExitRejectedSummary =
+                            "action=" + action + ", " + summarizeStateForDiagnostics(state)
+                            + ", candidatesByMarking=" + summarizeMarkingHistogram(candidates);
+                    if (profileLogEnabled) {
+                        fairReachabilityRejectedSummaryNanos += System.nanoTime() - summaryStart;
+                        fairReachabilityRejectedSummaryCalls++;
+                    }
+                }
+            }
+            return !rejected;
+        } finally {
+            if (profileLogEnabled) {
+                fairReachabilityActionCheckNanos += System.nanoTime() - actionCheckStart;
+            }
         }
-        return !rejected;
     }
 
     private boolean isUpdateProtocolAction(HAction<State, Action> action) {
@@ -1458,23 +2052,34 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             CompostateDUC<State, Action> state,
             Set<CompostateDUC<State, Action>> candidates) {
 
-        for (HAction<State, Action> action : state.getTransitions()) {
-            if (action.isControllable()) {
-                continue;
-            }
+        long start = 0L;
+        if (profileLogEnabled) {
+            start = System.nanoTime();
+            hasUncontrollableSuccessorInCalls++;
+        }
+        try {
+            for (HAction<State, Action> action : state.getTransitions()) {
+                if (action.isControllable()) {
+                    continue;
+                }
 
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-            if (children == null || children.isEmpty()) {
-                continue;
-            }
+                Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+                if (children == null || children.isEmpty()) {
+                    continue;
+                }
 
-            for (CompostateDUC<State, Action> child : children) {
-                if (candidates.contains(child)) {
-                    return true;
+                for (CompostateDUC<State, Action> child : children) {
+                    if (candidates.contains(child)) {
+                        return true;
+                    }
                 }
             }
+            return false;
+        } finally {
+            if (profileLogEnabled) {
+                hasUncontrollableSuccessorInNanos += System.nanoTime() - start;
+            }
         }
-        return false;
     }
 
     /**
@@ -1497,6 +2102,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // 親をキューに追加し、勝利が伝播するようにする
         for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> parentRel : node.getParents()) {
             CompostateDUC<State, Action> parentNode = parentRel.getSecond();
+            invalidateAllChildrenGoalCache(parentNode, parentRel.getFirst());
             // 親に対しては「子の一つが GOAL になった」暫定情報だけを記録する。
             // 親自身の director action は、親が GOAL と証明された時点で設定する。
             parentNode.setHasGoalChild(parentRel.getFirst());
@@ -1874,11 +2480,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         loopErrorCount++;
-        lastLoopErrorSummary = buildLoopErrorSummary(
+        if (debugLogEnabled) {
+            lastLoopErrorSummary = buildLoopErrorSummary(
                 hasEscapeHatch,
                 hasUncontrollableWait,
                 hasUnexploredUncontrollable,
                 hasOpenUncontrollableExit);
+        }
 
         for (CompostateDUC<State, Action> state : loop) {
             setError(state);
@@ -2093,6 +2701,32 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC lookup table 統計", "new controller connection map entries", safeSize(newControllerConnectionMap), "件");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC lookup table 統計", "safety lookup table entries", countSafetyLookupEntries(), "件");
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "component successor cache entries", safeSize(componentStepCache), "件");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "component successor cache hits", componentStepCacheHits, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "component successor cache misses", componentStepCacheMisses, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "component successor invalid cache hits", componentStepCacheInvalidHits, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "finishUpdate guard cache entries", safeSize(finishUpdateGuardCache), "件");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "finishUpdate guard cache hits", finishUpdateGuardCacheHits, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "finishUpdate guard cache misses", finishUpdateGuardCacheMisses, "回");
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "allChildrenGoal cache entries", safeSize(allChildrenGoalCache), "件");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "allChildrenGoal cache hits", allChildrenGoalCacheHits, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "allChildrenGoal cache misses", allChildrenGoalCacheMisses, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC cache 統計", "allChildrenGoal cache invalidations", allChildrenGoalCacheInvalidations, "回");
+        UpdatingControllerEvaluationRecorder.recordValue(
+                "OTF-DUC cache 統計","allChildrenGoal cache hit rate", formatRatio(allChildrenGoalCacheHits, allChildrenGoalCacheHits + allChildrenGoalCacheMisses));
     }
 
     private void recordOtfMarkingAndStatusBreakdown() {
@@ -2235,6 +2869,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private LTS<Long, Action> buildDirectorDUC() {
+        long directorBuildStart = profileLogEnabled ? System.nanoTime() : 0L;
+
         // 1. 結果を格納する LTS の初期化
         // 状態 ID 0 を初期状態として設定（後に更新コントローラの初期 ID で上書き）
         LTSImpl<Long, Action> result = new LTSImpl<>(0L);
@@ -2244,15 +2880,21 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // result.addActions(alphabet.getActions());
 
         // 1. 全 action の中から "_old" を含まないものだけを登録する。
+        long actionRegistrationStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (Action a : alphabet.getActions()) {
             if (!a.toString().endsWith("_old")) {
                 result.addAction(a);
+                directorActionRegistrationCount++;
             }
         }
 
         @SuppressWarnings("unchecked")
         Set<Action> ncActions = (Set<Action>) newController.getActions();
         result.addActions(ncActions);
+        directorActionRegistrationCount += ncActions.size();
+        if (profileLogEnabled) {
+            directorActionRegistrationNanos += System.nanoTime() - actionRegistrationStart;
+        }
 
         // 状態 ID 管理：NC の状態 ID と衝突しないようにカウンターを管理
         long nextId = 0;
@@ -2264,16 +2906,26 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // ステップ 1: 新コントローラ (NC) の完全移設
         // ---------------------------------------------------------
         log("[Stitching] Pre-populating result LTS with New Controller states and transitions.");
+        long ncStateTransferStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (Long ncState : newController.getStates()) {
             result.addState(ncState);
+            directorNcStatesTransferred++;
             if (ncState >= nextId) nextId = ncState + 1;
         }
+        if (profileLogEnabled) {
+            directorNcStateTransferNanos += System.nanoTime() - ncStateTransferStart;
+        }
+        long ncTransitionTransferStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (Long ncState : newController.getStates()) {
             for (Pair<String, Long> trans : newController.getTransitions(ncState)) {
                 @SuppressWarnings("unchecked")
                 Action action = (Action) trans.getFirst();
                 result.addTransition(ncState, action, trans.getSecond());
+                directorNcTransitionsTransferred++;
             }
+        }
+        if (profileLogEnabled) {
+            directorNcTransitionTransferNanos += System.nanoTime() - ncTransitionTransferStart;
         }
 
         transferNCTime = System.currentTimeMillis() - transferNCStart;
@@ -2289,7 +2941,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         reachableOrder.add(initial);
         queue.add(initial);
 
-        long directorTraversalStart = System.nanoTime();
+        long directorEdgeCollectionStart = profileLogEnabled ? System.nanoTime() : 0L;
         while (!queue.isEmpty()) {
             CompostateDUC<State, Action> current = queue.remove();
 
@@ -2307,55 +2959,90 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     // finishUpdate の場合は NC への接続を試みる
                     if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
                         finishUpdateTransitions++;
+                        directorNcConnectionAttempts++;
 
-                        //評価実験用
+                        long ncConnectionStart = profileLogEnabled ? System.nanoTime() : 0L;
+
+                        // 評価実験用
                         long stitchingNCStart = System.currentTimeMillis();
 
-                        // 【検証ログ 1】利用可能なマップのキーをすべて出力（最初の1回のみでOK）
-                        if(debugLogEnabled) System.out.println("  [Debug-Stitch] Available keys in NC map: " + newControllerConnectionMap.keySet());
+        
+                        // ---------------------------------------------------------
+                        // Debug-Stitch:
+                        // 通常合成には不要な署名確認用ログなので debug 時だけ構築する
+                        // ---------------------------------------------------------
+                        if (debugLogEnabled) {
+                            long debugPrepStart = profileLogEnabled ? System.nanoTime() : 0L;
 
-                        // 【検証ログ 2】シグネチャ構築プロセスの詳細化
-                        List<State> vs = child.getStates();
-                        if(debugLogEnabled) System.out.println("  [Debug-Stitch] Constructing signature for child vector: " + vs);
-    
-                        StringBuilder envPart = new StringBuilder();
-                        for (int k = mappingStart; k <= mappingEnd; k++) {
-                            Object mapEnvState = vs.get(k);
-                            Integer mapEnvId = (mapEnvState instanceof Long) ? ((Long) mapEnvState).intValue() : (Integer) mapEnvState;
-                            Integer newEnvId = mappingMapEnvToNewEnv.get(k - mappingStart).get(mapEnvId);
-                            envPart.append(newEnvId).append(",");
+                            List<State> vs = child.getStates();
+
+                            log("  [Debug-Stitch] Available keys in NC map: " + newControllerConnectionMap.keySet());
+                            log("  [Debug-Stitch] Constructing signature for child vector: " + vs);
+                            
+                            StringBuilder envPart = new StringBuilder();
+                            for (int k = mappingStart; k <= mappingEnd; k++) {
+                                Object mapEnvState = vs.get(k);
+                                Integer mapEnvId = (mapEnvState instanceof Long) ? ((Long) mapEnvState).intValue() : (Integer) mapEnvState;
+                                
+                                Integer newEnvId = mappingMapEnvToNewEnv.get(k - mappingStart).get(mapEnvId);
+
+                                envPart.append(newEnvId).append(",");
+                            }
+                            log("    -> Env part (translated): " + envPart);
+
+                            StringBuilder safePart = new StringBuilder();
+                            for (int k = newSafeStart; k <= newSafeEnd; k++) {
+                                safePart.append(vs.get(k)).append(",");
+                            }
+                            log("    -> Safe part (raw from vector): " + safePart);
+                            
+                            if (profileLogEnabled) {
+                                directorNcConnectionDebugPrepNanos += System.nanoTime() - debugPrepStart;
+                            }
                         }
-                        if(debugLogEnabled) System.out.println("    -> Env part (translated): " + envPart);
-
-                        StringBuilder safePart = new StringBuilder();
-                        for (int k = newSafeStart; k <= newSafeEnd; k++) {
-                            safePart.append(vs.get(k)).append(",");
-                        }
-                        if(debugLogEnabled) System.out.println("    -> Safe part (raw from vector): " + safePart);
-
+                        // ---------------------------------------------------------
+                        // ここから下は通常合成に必要な処理
+                        // finishUpdate の接続先 NC 状態を求める本体
+                        // ---------------------------------------------------------
+                        long signatureStart = profileLogEnabled ? System.nanoTime() : 0L;
+                        
                         String signature = generateNCSignature(child);
-                        // Long ncStateId = newControllerConnectionMap.get(signature);
+                        directorNcConnectionSignatureCalls++;
+                        
+                        if (profileLogEnabled) {
+                            directorNcConnectionSignatureNanos += System.nanoTime() - signatureStart;
+                        }
+                        
                         Long ncStateId = (signature != null) ? newControllerConnectionMap.get(signature) : null;
-
+                        
                         if (ncStateId != null) {
                             ncConnectionSuccessCount++;
-                            if(debugLogEnabled) log("  [Stitch] Connecting " + current.getStates() + " --(finishUpdate)--> NC State " + ncStateId);
-                            directorEdges.computeIfAbsent(current, k -> new ArrayList<>())
-                                    .add(new DirectorEdge(toOutputAction(hAction), child, ncStateId));
+                            
+                            if (debugLogEnabled) {
+                                log("  [Stitch] Connecting " + current.getStates() + " --(finishUpdate)--> NC State " + ncStateId);
+                            }
+                            
+                            directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(new DirectorEdge(toOutputAction(hAction), child, ncStateId));
+                            directorEdgesCollected++;
                         } else {
                             ncConnectionMissCount++;
-                            // 制約5に基づき、エラー時は詳細なベクトルを出力
+                            // これは単なるdebugではなく、出力controller構築不能な異常なので残す
                             System.err.println("!!! [Stitch-Error] No NC state mapping found for signature: " + signature);
                             System.err.println("    Target child vector: " + child.getStates());
+                            
                             throw new IllegalStateException("Missing NC mapping for reached state during stitching.");
                         }
-
-                        //評価実験用
+                        // 評価実験用
                         stitchingNCTime += (System.currentTimeMillis() - stitchingNCStart);
+                        if (profileLogEnabled) {
+                            directorNcConnectionNanos += System.nanoTime() - ncConnectionStart;
+                        }
                     } else {
                         // 通常の遷移
-                        directorEdges.computeIfAbsent(current, k -> new ArrayList<>())
-                                .add(new DirectorEdge(toOutputAction(hAction), child, null));
+                        directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(new DirectorEdge(toOutputAction(hAction), child, null));
+                        
+                        directorEdgesCollected++;
+                        
                         if (reached.add(child)) {
                             reachableOrder.add(child);
                             queue.add(child);
@@ -2366,16 +3053,26 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
             }
         }
+        directorReachableStates = reachableOrder.size();
+        if (profileLogEnabled) {
+            directorEdgeCollectionNanos += System.nanoTime() - directorEdgeCollectionStart;
+        }
 
         // ---------------------------------------------------------
         // ステップ 3: 出力時のみ、旧コントローラ上の同値状態をマージする
         // ---------------------------------------------------------
+        long preUpdateMergeStart = profileLogEnabled ? System.nanoTime() : 0L;
         Map<CompostateDUC<State, Action>, Integer> preUpdateClasses =
                 computePreUpdateOutputMergeClasses(reachableOrder, directorEdges);
+        if (profileLogEnabled) {
+            directorPreUpdateMergeNanos += System.nanoTime() - preUpdateMergeStart;
+        }
 
         Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
         Map<Integer, Long> preUpdateClassIds = new HashMap<>();
+        long idAssignmentStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (CompostateDUC<State, Action> state : reachableOrder) {
+            directorOutputStatesAssigned++;
             if (isPreUpdateOutputState(state)) {
                 Integer classId = preUpdateClasses.get(state);
                 Long id = preUpdateClassIds.get(classId);
@@ -2392,7 +3089,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
         result.setInitialState(ids.get(initial));
+        if (profileLogEnabled) {
+            directorIdAssignmentNanos += System.nanoTime() - idAssignmentStart;
+        }
 
+        long transitionEmissionStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (CompostateDUC<State, Action> source : reachableOrder) {
             Long sourceId = ids.get(source);
             List<DirectorEdge> edges = directorEdges.get(source);
@@ -2406,13 +3107,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 if (targetId == null) {
                     throw new IllegalStateException("Missing output state id for director edge target.");
                 }
+                directorTransitionEmissionAttempts++;
                 if (result.addTransition(sourceId, edge.outputAction, targetId)) {
                     directorOutputTransitions++;
                 }
             }
         }
+        if (profileLogEnabled) {
+            directorTransitionEmissionNanos += System.nanoTime() - transitionEmissionStart;
+            directorTraversalNanos += System.nanoTime() - directorBuildStart;
+        }
 
-        directorTraversalNanos += System.nanoTime() - directorTraversalStart;
         statistics.setControllerUsedStates(result.getStates().size());
         return result;
     }
@@ -2808,8 +3513,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             CompostateDUC<State, Action> child) {
 
         if (!hAction.isControllable()) {
-            logDirectorPruningDecision(current, hAction, child, true,
-                    "uncontrollable action is always preserved");
+            if(debugLogEnabled){
+                logDirectorPruningDecision(current, hAction, child, true,
+                        "uncontrollable action is always preserved");
+            }
             return true;
         }
 
@@ -2818,23 +3525,27 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (getMarkingState(current) == 0
                 && hAction.toString().equals(UpdateConstants.BEGIN_UPDATE)
                 && isGoal(child)) {
-            logDirectorPruningDecision(current, hAction, child, true,
-                    "beginUpdate from a winning pre-update state");
+            if(debugLogEnabled){
+                logDirectorPruningDecision(current, hAction, child, true,
+                        "beginUpdate from a winning pre-update state");
+            }
             return true;
         }
 
         HAction<State, Action> selected = getSelectedControllableAction(current);
         boolean toAdd = selected != null && selected.equals(hAction);
-        if (toAdd) {
-            logDirectorPruningDecision(current, hAction, child, true,
-                    "selected controllable action");
-        } else {
-            String selectedName = selected == null ? "none" : selected.toString();
-            logDirectorPruningDecision(current, hAction, child, false,
-                    "not selected; selected controllable=" + selectedName
-                            + ", directorAction=" + describeAction(current.getDirectorActionToGoal())
-                            + ", actionToGoal=" + describeAction(current.actionToGoal)
-                            + ", bestControllable=" + describeBestControllable(current));
+        if(debugLogEnabled){
+            if (toAdd) {
+                logDirectorPruningDecision(current, hAction, child, true,
+                        "selected controllable action");
+            } else {
+                String selectedName = selected == null ? "none" : selected.toString();
+                logDirectorPruningDecision(current, hAction, child, false,
+                        "not selected; selected controllable=" + selectedName
+                                + ", directorAction=" + describeAction(current.getDirectorActionToGoal())
+                                + ", actionToGoal=" + describeAction(current.actionToGoal)
+                                + ", bestControllable=" + describeBestControllable(current));
+            }
         }
         return toAdd;
     }
@@ -2941,7 +3652,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public boolean isError(CompostateDUC<State, Action> state) {
-        return state.isStatus(Status.ERROR);
+        if (!profileLogEnabled) {
+            return state.isStatus(Status.ERROR);
+        }
+        long start = System.nanoTime();
+        isErrorChecks++;
+        try {
+            return state.isStatus(Status.ERROR);
+        } finally {
+            isErrorCheckNanos += System.nanoTime() - start;
+        }
     }
 
     public boolean isFinished() {
@@ -2949,15 +3669,34 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public void setError(CompostateDUC<State, Action> state) {
-        if (!isError(state)) {
-            errorMarkCount++;
+        long start = 0;
+        if (profileLogEnabled) {
+            start = System.nanoTime();
+            setErrorCalls++;
         }
-        lastErrorSummary = summarizeStateForDiagnostics(state);
+        try {
+            if (!isError(state)) {
+                errorMarkCount++;
+            }
 
-        log("[ERROR DETECTED] State marked as ERROR: " + state.getStates());
-        state.setStatus(Status.ERROR);
+            if (debugLogEnabled) {
+                lastErrorSummary = summarizeStateForDiagnostics(state);
+                log("[ERROR DETECTED] State marked as ERROR: " + state.getStates());
+            }
 
-        heuristic.notifyStateSetErrorOrGoal(state);
+            if (isGoal(state)) {
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> parentRel : state.getParents()) {
+                    invalidateAllChildrenGoalCache(parentRel.getSecond(), parentRel.getFirst());
+                }
+            }
+            state.setStatus(Status.ERROR);
+
+            heuristic.notifyStateSetErrorOrGoal(state);
+        } finally {
+            if (profileLogEnabled) {
+                setErrorNanos += System.nanoTime() - start;
+            }
+        }
     }
 
     /**

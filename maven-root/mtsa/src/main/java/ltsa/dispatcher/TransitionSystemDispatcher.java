@@ -50,6 +50,7 @@ import ltsa.lts.util.MTSUtils;
 import ltsa.ui.MTSAnimator;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
+import ltsa.updatingControllers.synthesis.TraditionalDUCDebugLogger;
 import ltsa.updatingControllers.synthesis.UpdatingControllerSynthesizer;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
 import org.apache.commons.collections15.CollectionUtils;
@@ -230,6 +231,10 @@ public class TransitionSystemDispatcher {
                     "removeOldTransitions 実行時間",
                     removeOldTransitionsTime);
             UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional removeOldTransitions 後");
+            TraditionalDUCDebugLogger.logCompactState(
+                    ltsOutput,
+                    "[6. Final Output Update Controller] after removeOldTransitions",
+                    toCompose.composition);
         }
 
     }

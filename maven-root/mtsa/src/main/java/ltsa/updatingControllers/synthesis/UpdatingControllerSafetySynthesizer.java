@@ -95,6 +95,10 @@ public class UpdatingControllerSafetySynthesizer {
         int prunedStates = safetyEnv.getStates().size();
         int prunedTrans = countTransitions(safetyEnv); // ※このクラス内にも countTransitions メソッドをコピペしてください
         long prunedCountTime = System.currentTimeMillis() - prunedCountStart;
+        TraditionalDUCDebugLogger.logStage(
+                output,
+                "[3. Pruned] Safety Environment before DontDoTwice",
+                safetyEnv);
         UpdatingControllerEvaluationRecorder.recordStateSpace(
                 "Traditional DUC 最大状態数と遷移数",
                 "[3. Pruned] Safety Env (Before DontDoTwice)",

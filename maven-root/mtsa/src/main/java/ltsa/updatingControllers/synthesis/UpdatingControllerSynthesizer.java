@@ -108,6 +108,7 @@ public class UpdatingControllerSynthesizer {
             //old controllerとmapping environmentからゲームを分析するための空間を作る
             UpdatingEnvironmentGenerator updEnvGenerator = new UpdatingEnvironmentGenerator(oldC, mapping);
 		    updEnvGenerator.generateEnvironment();
+            TraditionalDUCDebugLogger.logOldController(output, oldC);
 
             UpdatingEnvironmentGenerateTime = System.currentTimeMillis() - UpdatingEnvironmentGenerateStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
@@ -175,6 +176,11 @@ public class UpdatingControllerSynthesizer {
         int euStates = E_u.getStates().size();
         int euTrans = countTransitions(E_u);
         long euCountTime = System.currentTimeMillis() - euCountStart;
+        TraditionalDUCDebugLogger.logStage(
+                output,
+                "[1. E_u] Updating Environment",
+                E_u,
+                uccs.getOldController().getStates());
         // ▲▲▲ 追加ここまで ▲▲▲
 
         //評価実験用
@@ -215,6 +221,10 @@ public class UpdatingControllerSynthesizer {
         int metaStates = metaEnvironment.getStates().size();
         int metaTrans = countTransitions(metaEnvironment);
         long metaCountTime = System.currentTimeMillis() - metaCountStart;
+        TraditionalDUCDebugLogger.logStage(
+                output,
+                "[2. Meta] E_u || Safety Fluents",
+                metaEnvironment);
         // ▲▲▲ 追加ここまで ▲▲▲
 
 		output.outln("Environment states:"+ metaEnvironment.getStates().size());
@@ -256,6 +266,10 @@ public class UpdatingControllerSynthesizer {
         int safeStates = safetyEnv.getStates().size();
         int safeTrans = countTransitions(safetyEnv);
         long safeCountTime = System.currentTimeMillis() - safeCountStart;
+        TraditionalDUCDebugLogger.logStage(
+                output,
+                "[4. Final] Safety Environment",
+                safetyEnv);
         UpdatingControllerEvaluationRecorder.recordStateSpace(
                 "Traditional DUC 最大状態数と遷移数",
                 "[4. Final] Safety Environment",
@@ -300,6 +314,10 @@ public class UpdatingControllerSynthesizer {
                 "safetyEnv を GR1 で解く時間");
 
         UpdatingControllerGRSynthesizer.synthesizeGR(compactSafetyEnv, uccs, safetyEnv, output);
+        TraditionalDUCDebugLogger.logCompactState(
+                output,
+                "[5. Output Update Controller] GR1 result before removeOldTransitions",
+                uccs.getComposition());
 
         //評価実験用
         long synthesizeGRTime = System.currentTimeMillis() - synthesizeGRStart;
