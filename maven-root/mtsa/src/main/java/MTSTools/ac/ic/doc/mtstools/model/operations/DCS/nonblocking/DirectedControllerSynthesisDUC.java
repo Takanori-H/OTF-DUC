@@ -6,10 +6,12 @@ import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -58,6 +60,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private Map<ComponentStepCacheKey, ComponentStepResult<State>> componentStepCache = new HashMap<>();
     private Map<String, Boolean> finishUpdateGuardCache = new HashMap<>();
     private Map<ActionChildrenGoalCacheKey, AllChildrenGoalCacheEntry> allChildrenGoalCache = new HashMap<>();
+    private Map<ActionChildrenGoalCacheKey, StartNewSpecUnsafePrecheck> startNewSpecPrecheckCache =
+            new HashMap<>();
 
     // ボクシング抑制用定数
     private final State NORMALIZED_VAL = (State) Long.valueOf(-2L);
@@ -79,7 +83,57 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
     private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
-    private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "true"));
+    private BeliefMode beliefMode = parseBeliefMode();
+    private boolean beliefRepairEnabled = beliefMode != BeliefMode.OFF;
+    private int beliefLiteMaxLoggedGroups = Integer.getInteger("otfduc.belief.lite.maxLoggedGroups", 200);
+    private int beliefLiteMaxNodes = Integer.getInteger("otfduc.belief.lite.maxNodes", 256);
+    private int beliefLiteMaxLoggedNodes = Integer.getInteger("otfduc.belief.lite.maxLoggedNodes", 120);
+    private int beliefLiteOutputPlanMaxNodes =
+            Integer.getInteger("otfduc.belief.lite.output.maxNodes", 2048);
+    private boolean beliefLiteEmit =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.emit", "false"));
+    private boolean beliefLiteValidateOutput =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.validateOutput", "true"));
+    private boolean beliefLiteOtfExpansionEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf", "true"));
+    private boolean beliefLiteOtfFocusedRefreshEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.focusedRefresh", "true"));
+    private boolean beliefLiteOtfFocusedSolveEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.focusedSolve", "true"));
+    private boolean beliefLiteOtfFocusedSolveValidationEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.focusedSolve.validate", "false"));
+    private int beliefLiteOtfFocusedSolveValidationMaxStrategyDiffs =
+            Integer.getInteger("otfduc.belief.lite.otf.focusedSolve.validate.maxStrategyDiffs", 8);
+    private boolean beliefLiteOtfDirectFrontierEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.directFrontier", "true"));
+    private boolean beliefLiteOtfIncrementalRawEdgesEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.incrementalRawEdges", "true"));
+    private boolean beliefLiteOtfBeliefNodeDriverEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.beliefNodeDriver", "true"));
+    private int beliefLiteOtfBeliefNodeDriverValidateEvery =
+            Integer.getInteger("otfduc.belief.lite.otf.beliefNodeDriver.validateEvery", 32);
+    private int beliefLiteOtfBeliefNodeDriverSolveBatchNodes =
+            Integer.getInteger("otfduc.belief.lite.otf.beliefNodeDriver.solveBatchNodes", 8);
+    private boolean beliefLiteOtfBeliefNodeDriverRootFocus =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.otf.beliefNodeDriver.rootFocus", "false"));
+    private int beliefLiteStartReadinessMaxLogged =
+            Integer.getInteger("otfduc.belief.lite.startReadiness.maxLogged", 80);
+    private boolean beliefLiteGraphMultiRootsOnly =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.multiRootsOnly", "true"));
+    private int beliefLiteOtfBatchActions =
+            Integer.getInteger("otfduc.belief.lite.otf.batchActions", 8);
+    private boolean beliefLiteUseExploredPreUpdateRoots =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.exploredPreUpdateRoots", "true"));
+    private boolean beliefLiteFrontierContextEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.frontierContext", "true"));
+    private boolean beliefLiteInitialFrontierEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.initialFrontier", "true"));
+    private boolean beliefLiteInitialFrontierFocusUnwinningRoots =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.initialFrontier.focusUnwinningRoots", "true"));
+    private boolean beliefLiteInitialFrontierStopWhenFocusExhausted =
+            Boolean.parseBoolean(System.getProperty("otfduc.belief.lite.initialFrontier.stopWhenFocusExhausted", "true"));
+    private int beliefLiteInitialFrontierBatchNodes =
+            Integer.getInteger("otfduc.belief.lite.initialFrontier.batchNodes", 64);
     private int beliefRepairAbsoluteMaxStates = Integer.getInteger("otfduc.belief.maxStates", 5000);
     private int beliefRepairMinBeliefNodes = Integer.getInteger("otfduc.belief.maxNodes.min", 64);
     private int beliefRepairBeliefNodesPerNewControllerState =
@@ -103,6 +157,38 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long beliefRepairMaxTimeMs = Long.getLong("otfduc.belief.maxTimeMs", 5000L);
     private PrintWriter logWriter;
     private static final String LOG_FILE_PATH = System.getProperty("otfduc.debug.file", "duc_debug.txt");
+
+    private enum BeliefMode {
+        OFF,
+        REPAIR,
+        LITE
+    }
+
+    private static BeliefMode parseBeliefMode() {
+        String configuredMode = System.getProperty("otfduc.belief.mode");
+        if (configuredMode == null || configuredMode.trim().isEmpty()) {
+            boolean legacyRepairEnabled =
+                    Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "true"));
+            return legacyRepairEnabled ? BeliefMode.REPAIR : BeliefMode.OFF;
+        }
+
+        String normalizedMode = configuredMode.trim().toLowerCase(Locale.ROOT);
+        if (normalizedMode.equals("off") || normalizedMode.equals("none")
+                || normalizedMode.equals("false")) {
+            return BeliefMode.OFF;
+        }
+        if (normalizedMode.equals("repair") || normalizedMode.equals("legacy")
+                || normalizedMode.equals("true")) {
+            return BeliefMode.REPAIR;
+        }
+        if (normalizedMode.equals("lite") || normalizedMode.equals("belief-lite")) {
+            return BeliefMode.LITE;
+        }
+
+        System.err.println("Unknown otfduc.belief.mode='" + configuredMode
+                + "'. Falling back to repair mode.");
+        return BeliefMode.REPAIR;
+    }
 
     private List<Map<Integer, Integer>> mappingMapEnvToNewEnv;
     private Map<String, Long> newControllerConnectionMap;
@@ -140,6 +226,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private int totalLtsExpansions = 0;
     private long synthesizeDUCTime = 0;
     private long searchTime = 0;
+    private long searchStartUsedMemoryBytes = -1L;
+    private long searchPeakUsedMemoryBytes = -1L;
+    private boolean searchMemoryTrackingActive = false;
+    private long beliefNodeDriverSearchTimeMs = -1L;
+    private long beliefNodeDriverSearchStartUsedMemoryBytes = -1L;
+    private long beliefNodeDriverSearchPeakUsedMemoryBytes = -1L;
+    private int beliefNodeDriverSearchRounds = 0;
     private long countTime = 0;
     private long buildDirectorDUCTime = 0;
     private long transferNCTime = 0;
@@ -269,6 +362,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long allChildrenGoalCacheHits = 0;
     private long allChildrenGoalCacheMisses = 0;
     private long allChildrenGoalCacheInvalidations = 0;
+    private long beliefLiteStartNewSpecReadinessChecks = 0;
+    private long beliefLiteStartNewSpecUnsafeRejects = 0;
+    private long beliefLiteStartNewSpecUnsafePrecheckRejects = 0;
+    private long beliefLiteStartNewSpecReadinessLogged = 0;
+    private long beliefLiteStartNewSpecReadinessSuppressed = 0;
+    private long beliefLiteStartNewSpecPrecheckCacheHits = 0;
+    private long beliefLiteStartNewSpecPrecheckCacheMisses = 0;
+    private long beliefLiteStartNewSpecPrecheckNanos = 0;
 
     // OTF-DUC の直積モデルにおけるコンポーネントのインデックス範囲。
     public int idxMarking = 0;
@@ -438,14 +539,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
                 if (debugLogEnabled) {
                     log("=== Starting OTF-DUC Synthesis ===");
-                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s]",
+                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], BeliefMode[%s]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
-                            transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled));
+                            transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled, beliefMode));
                 }
                 if (profileLogEnabled) {
                     profileLog("=== Starting OTF-DUC Profiling ===");
-                    profileLog(String.format("[Profile-Config] debug=%s, profile=%s, file=%s",
-                            debugLogEnabled, profileLogEnabled, LOG_FILE_PATH));
+                    profileLog(String.format("[Profile-Config] debug=%s, profile=%s, file=%s, beliefMode=%s",
+                            debugLogEnabled, profileLogEnabled, LOG_FILE_PATH, beliefMode));
                     profileLog(String.format("[Profile-Config] MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
                             transReqEnd, synthesisStart, synthesisEnd));
@@ -462,53 +563,61 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             setupInitialState();
 
             long searchStart = System.currentTimeMillis();
+            beginSearchMemoryTracking();
+            try {
+                // isFinished() は初期状態がGOAL/ERRORになればtrue
+                while (heuristic.somethingLeftToExplore() && !isFinished()) {
+                    updateSearchPeakMemory();
+                    statistics.startHeuristicTime();
 
-            // isFinished() は初期状態がGOAL/ERRORになればtrue
-            while (heuristic.somethingLeftToExplore() && !isFinished()) {
-                statistics.startHeuristicTime();
+                    // --- 1. ヒューリスティック選択（Recompute + Frontier Ops）の計測 ---
+                    // ※詳細な内訳を測る場合は getNextState 内に埋めますが、
+                    //   まずは外側で「選択にかかる総時間」を測ります。
+                    // long startHeuristic = System.currentTimeMillis();
 
-                // --- 1. ヒューリスティック選択（Recompute + Frontier Ops）の計測 ---
-                // ※詳細な内訳を測る場合は getNextState 内に埋めますが、
-                //   まずは外側で「選択にかかる総時間」を測ります。
-                // long startHeuristic = System.currentTimeMillis();
+                    long heuristicSelectionStart = System.nanoTime();
+                    Pair<CompostateDUC<State, Action>, HAction<State, Action>> next = heuristic.getNextAction();
+                    heuristicSelectionNanos += System.nanoTime() - heuristicSelectionStart;
+                    heuristicSelectionCalls++;
+                    updateSearchPeakMemory();
 
-                long heuristicSelectionStart = System.nanoTime();
-                Pair<CompostateDUC<State, Action>, HAction<State, Action>> next = heuristic.getNextAction();
-                heuristicSelectionNanos += System.nanoTime() - heuristicSelectionStart;
-                heuristicSelectionCalls++;
+                    statistics.endHeuristicTime();
 
-                statistics.endHeuristicTime();
+                    if (next == null) break; // 安全策
 
-                if (next == null) break; // 安全策
+                    CompostateDUC<State, Action> state = next.getFirst();
+                    HAction<State, Action> action = next.getSecond();
 
-                CompostateDUC<State, Action> state = next.getFirst();
-                HAction<State, Action> action = next.getSecond();
+                    // log(String.format("[Heuristic-Next] State: %s, Action: %s (%s)", state.getStates(), action, action.isControllable() ? "C" : "U"));
 
-                // log(String.format("[Heuristic-Next] State: %s, Action: %s (%s)", state.getStates(), action, action.isControllable() ? "C" : "U"));
+                    // 状態自体が GOAL と確定した後は、追加の controllable 分岐は
+                    // 出力 controller に採用しない。一方で、GOAL 子を 1 つ見ただけの
+                    // 暫定段階では、非決定分岐や他の controllable 候補の探索を止めない。
+                    if (isGoal(state) && action.isControllable()) {
+                        // log("  [Pruning] Skipping redundant controllable action '" + action + "' for state " + state.getStates());
+                        heuristic.expansionDone(state, action, null);
+                        updateSearchPeakMemory();
+                        continue;
+                    }
 
-                // 状態自体が GOAL と確定した後は、追加の controllable 分岐は
-                // 出力 controller に採用しない。一方で、GOAL 子を 1 つ見ただけの
-                // 暫定段階では、非決定分岐や他の controllable 候補の探索を止めない。
-                if (isGoal(state) && action.isControllable()) {
-                    // log("  [Pruning] Skipping redundant controllable action '" + action + "' for state " + state.getStates());
-                    heuristic.expansionDone(state, action, null);
-                    continue;
+                    // --- 2. 状態展開（Expansion）の計測 ---
+                    // long startExp = System.currentTimeMillis();
+
+                    totalLtsExpansions++; // 展開回数をカウント
+                    long expansionStart = System.nanoTime();
+                    expandDUC(state, action);
+                    stateExpansionNanos += System.nanoTime() - expansionStart;
+                    updateSearchPeakMemory();
                 }
-
-                // --- 2. 状態展開（Expansion）の計測 ---
-                // long startExp = System.currentTimeMillis();
-
-                totalLtsExpansions++; // 展開回数をカウント
-                long expansionStart = System.nanoTime();
-                expandDUC(state, action);
-                stateExpansionNanos += System.nanoTime() - expansionStart;
-
+            } finally {
+                updateSearchPeakMemory();
+                searchMemoryTrackingActive = false;
+                searchTime = System.currentTimeMillis() - searchStart;
             }
 
             statistics.end();
 
             //評価実験用
-            searchTime = System.currentTimeMillis() - searchStart;
             long countStart = System.currentTimeMillis();
             otfPeakStates = compostates.size();
             otfPeakTrans = countOTFTransitions();
@@ -538,6 +647,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (logWriter != null) {
                 if (debugLogEnabled) {
                     emitCacheDiagnostics();
+                    emitSearchResourceDiagnostics();
                     log("=== Synthesis Finished ===");
                 }
                 if (profileLogEnabled) {
@@ -566,6 +676,107 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
+    private void beginSearchMemoryTracking() {
+        long usedMemory = currentUsedHeapBytes();
+        searchStartUsedMemoryBytes = usedMemory;
+        searchPeakUsedMemoryBytes = usedMemory;
+        searchMemoryTrackingActive = true;
+    }
+
+    private void updateSearchPeakMemory() {
+        if (!searchMemoryTrackingActive) {
+            return;
+        }
+        long usedMemory = currentUsedHeapBytes();
+        if (usedMemory > searchPeakUsedMemoryBytes) {
+            searchPeakUsedMemoryBytes = usedMemory;
+        }
+    }
+
+    private void beginBeliefNodeDriverSearchResourceTracking() {
+        long usedMemory = currentUsedHeapBytes();
+        beliefNodeDriverSearchStartUsedMemoryBytes = usedMemory;
+        beliefNodeDriverSearchPeakUsedMemoryBytes = usedMemory;
+        beliefNodeDriverSearchTimeMs = 0L;
+        beliefNodeDriverSearchRounds = 0;
+    }
+
+    private void updateBeliefNodeDriverSearchPeakMemory() {
+        if (beliefNodeDriverSearchStartUsedMemoryBytes < 0) {
+            return;
+        }
+        long usedMemory = currentUsedHeapBytes();
+        if (usedMemory > beliefNodeDriverSearchPeakUsedMemoryBytes) {
+            beliefNodeDriverSearchPeakUsedMemoryBytes = usedMemory;
+        }
+    }
+
+    private void finishBeliefNodeDriverSearchResourceTracking(
+            long startNanos,
+            BeliefLiteOutputPlan plan) {
+
+        updateBeliefNodeDriverSearchPeakMemory();
+        beliefNodeDriverSearchTimeMs =
+                Math.max(0L, (System.nanoTime() - startNanos) / 1_000_000L);
+        beliefNodeDriverSearchRounds = plan == null ? 0 : plan.otfExpansionRounds;
+    }
+
+    private long currentUsedHeapBytes() {
+        Runtime runtime = Runtime.getRuntime();
+        return runtime.totalMemory() - runtime.freeMemory();
+    }
+
+    private String formatMemoryBytes(long bytes) {
+        return Statistics.formatMemory(bytes) + " (" + bytes + " bytes)";
+    }
+
+    private void emitSearchResourceDiagnostics() {
+        if (searchStartUsedMemoryBytes < 0 || searchPeakUsedMemoryBytes < 0) {
+            log("  [Search-Resource] searchTimeMs=" + searchTime
+                    + ", memoryTracking=not-started");
+            return;
+        }
+
+        long deltaBytes =
+                Math.max(0L, searchPeakUsedMemoryBytes - searchStartUsedMemoryBytes);
+        log("  [Search-Resource] searchTimeMs=" + searchTime
+                + ", searchTime=" + formatNanos(millisToNanos(searchTime))
+                + ", buildDirectorTimeMs=" + buildDirectorDUCTime
+                + ", synthesizeTimeMs=" + synthesizeDUCTime
+                + ", usedHeapBeforeSearch="
+                + formatMemoryBytes(searchStartUsedMemoryBytes)
+                + ", peakUsedHeapDuringSearch="
+                + formatMemoryBytes(searchPeakUsedMemoryBytes)
+                + ", peakMinusBefore="
+                + formatMemoryBytes(deltaBytes)
+                + ", expansions=" + totalLtsExpansions
+                + ", peakStates=" + otfPeakStates
+                + ", peakTransitions=" + otfPeakTrans);
+
+        if (beliefNodeDriverSearchTimeMs < 0
+                || beliefNodeDriverSearchStartUsedMemoryBytes < 0
+                || beliefNodeDriverSearchPeakUsedMemoryBytes < 0) {
+            log("  [Belief-Node-Driver-Resource] status=not-run");
+            return;
+        }
+
+        long driverDeltaBytes = Math.max(
+                0L,
+                beliefNodeDriverSearchPeakUsedMemoryBytes
+                        - beliefNodeDriverSearchStartUsedMemoryBytes);
+        log("  [Belief-Node-Driver-Resource] searchTimeMs="
+                + beliefNodeDriverSearchTimeMs
+                + ", searchTime="
+                + formatNanos(millisToNanos(beliefNodeDriverSearchTimeMs))
+                + ", usedHeapBeforeSearch="
+                + formatMemoryBytes(beliefNodeDriverSearchStartUsedMemoryBytes)
+                + ", peakUsedHeapDuringSearch="
+                + formatMemoryBytes(beliefNodeDriverSearchPeakUsedMemoryBytes)
+                + ", peakMinusBefore="
+                + formatMemoryBytes(driverDeltaBytes)
+                + ", rounds=" + beliefNodeDriverSearchRounds);
+    }
+
     private void emitCacheDiagnostics() {
         log("  [Cache-Stats] componentStep entries=" + safeSize(componentStepCache)
                 + ", hits=" + componentStepCacheHits
@@ -578,6 +789,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 + ", hits=" + allChildrenGoalCacheHits
                 + ", misses=" + allChildrenGoalCacheMisses
                 + ", invalidations=" + allChildrenGoalCacheInvalidations);
+        log("  [Cache-Stats] startNewSpecPrecheck entries="
+                + safeSize(startNewSpecPrecheckCache)
+                + ", hits=" + beliefLiteStartNewSpecPrecheckCacheHits
+                + ", misses=" + beliefLiteStartNewSpecPrecheckCacheMisses
+                + ", time=" + formatNanos(beliefLiteStartNewSpecPrecheckNanos));
     }
 
     private void emitProfilingDiagnostics() {
@@ -777,6 +993,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         totalLtsExpansions = 0;
         synthesizeDUCTime = 0;
         searchTime = 0;
+        searchStartUsedMemoryBytes = -1L;
+        searchPeakUsedMemoryBytes = -1L;
+        searchMemoryTrackingActive = false;
+        beliefNodeDriverSearchTimeMs = -1L;
+        beliefNodeDriverSearchStartUsedMemoryBytes = -1L;
+        beliefNodeDriverSearchPeakUsedMemoryBytes = -1L;
+        beliefNodeDriverSearchRounds = 0;
         countTime = 0;
         buildDirectorDUCTime = 0;
         transferNCTime = 0;
@@ -904,6 +1127,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         allChildrenGoalCacheHits = 0;
         allChildrenGoalCacheMisses = 0;
         allChildrenGoalCacheInvalidations = 0;
+        beliefLiteStartNewSpecReadinessChecks = 0;
+        beliefLiteStartNewSpecUnsafeRejects = 0;
+        beliefLiteStartNewSpecUnsafePrecheckRejects = 0;
+        beliefLiteStartNewSpecReadinessLogged = 0;
+        beliefLiteStartNewSpecReadinessSuppressed = 0;
+        beliefLiteStartNewSpecPrecheckCacheHits = 0;
+        beliefLiteStartNewSpecPrecheckCacheMisses = 0;
+        beliefLiteStartNewSpecPrecheckNanos = 0;
         lastErrorSummary = "none";
         lastLoopErrorSummary = "none";
         lastFairControllableExitRejectedSummary = "none";
@@ -927,7 +1158,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         componentStepCache.clear();
         finishUpdateGuardCache.clear();
         allChildrenGoalCache.clear();
-        log("  [Cache-Config] componentStepCache=true, finishUpdateGuardCache=true, allChildrenGoalCache=true");
+        startNewSpecPrecheckCache.clear();
+        log("  [Cache-Config] componentStepCache=true, finishUpdateGuardCache=true, allChildrenGoalCache=true, startNewSpecPrecheckCache=true");
         compostates = new HashMap<>();
         setupLookupOptimizations();
         transitions = new ArrayDeque<>(ltss.size());
@@ -2643,7 +2875,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return count;
     }
 
-    private String summarizeMarkingHistogram(Set<CompostateDUC<State, Action>> states) {
+    private String summarizeMarkingHistogram(Iterable<CompostateDUC<State, Action>> states) {
         Map<Long, Integer> counts = new HashMap<>();
         if (states != null) {
             for (CompostateDUC<State, Action> state : states) {
@@ -3119,16 +3351,43 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             directorPreUpdateMergeNanos += System.nanoTime() - preUpdateMergeStart;
         }
 
+        Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges = null;
+        if (beliefRepairEnabled || beliefMode == BeliefMode.LITE) {
+            rawDirectorEdges = collectRawDirectorEdges();
+        }
+        if (beliefMode == BeliefMode.LITE) {
+            logBeliefLiteStageOneToThree(reachableOrder, rawDirectorEdges);
+            logBeliefLiteStageFour(reachableOrder, rawDirectorEdges);
+        }
+
+        BeliefLiteOutputPlan beliefLiteOutputPlan = null;
+        if (beliefMode == BeliefMode.LITE) {
+            beliefLiteOutputPlan = buildBeliefLiteOutputPlan(
+                    reachableOrder, directorEdges, rawDirectorEdges);
+            logBeliefLiteOutputPlan(beliefLiteOutputPlan);
+            if (beliefLiteEmit && beliefLiteOutputPlan.isReadyForEmit()) {
+                emitBeliefLiteOutput(
+                        result, nextId, reachableOrder, directorEdges, rawDirectorEdges,
+                        beliefLiteOutputPlan);
+                if (profileLogEnabled) {
+                    directorTraversalNanos += System.nanoTime() - directorBuildStart;
+                }
+                statistics.setControllerUsedStates(result.getStates().size());
+                return result;
+            } else if (beliefLiteEmit && debugLogEnabled) {
+                log("  [Belief-Lite-Emit] fallback to repair output because output plan is not ready: "
+                        + beliefLiteOutputPlan.notReadyReason());
+            }
+        }
+
         BeliefRepairResult beliefRepairResult = new BeliefRepairResult();
         if (beliefRepairEnabled) {
             long beliefRepairStart = System.nanoTime();
-            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges =
-                    collectRawDirectorEdges();
             beliefRepairResult = repairPreUpdateBeliefs(
                     reachableOrder, directorEdges, fallbackPreUpdateClasses, rawDirectorEdges);
             directorBeliefRepairNanos += System.nanoTime() - beliefRepairStart;
         } else if (debugLogEnabled) {
-            log("  [Belief-Repair] disabled by -Dotfduc.belief.repair=false");
+            log("  [Belief-Repair] disabled by belief mode: " + beliefMode);
         }
 
         Map<CompostateDUC<State, Action>, Integer> preUpdateClasses =
@@ -3577,10 +3836,70 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         otfPeakStates = Math.max(otfPeakStates, compostates.size());
         otfPeakTrans = Math.max(otfPeakTrans, (int) Math.min(Integer.MAX_VALUE, rawTransitions));
         if (debugLogEnabled && logSummary) {
-            log("  [Belief-Repair] collected raw explored graph: states="
+            log("  [Belief] collected raw explored graph: states="
                     + rawEdges.size() + ", transitions=" + rawTransitions);
         }
         return rawEdges;
+    }
+
+    private List<RawDirectorEdge> collectRawDirectorEdgesForState(
+            CompostateDUC<State, Action> state) {
+
+        if (state == null) {
+            return Collections.emptyList();
+        }
+
+        List<RawDirectorEdge> edges = new ArrayList<>();
+        for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition
+                : state.getExploredChildren()) {
+            edges.add(new RawDirectorEdge(transition.getFirst(), transition.getSecond()));
+        }
+        return edges;
+    }
+
+    private void refreshRawDirectorEdgesAfterBeliefLiteOtfExpansion(
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            Set<CompostateDUC<State, Action>> touchedConcreteStates,
+            BeliefLiteOutputPlan plan) {
+
+        if (rawDirectorEdges == null) {
+            return;
+        }
+
+        if (!beliefLiteOtfIncrementalRawEdgesEnabled
+                || touchedConcreteStates == null
+                || touchedConcreteStates.isEmpty()) {
+            rawDirectorEdges.clear();
+            rawDirectorEdges.putAll(collectRawDirectorEdges(false));
+            if (plan != null) {
+                plan.otfRawEdgeFullRefreshes++;
+            }
+            return;
+        }
+
+        int refreshedStates = 0;
+        for (CompostateDUC<State, Action> state : touchedConcreteStates) {
+            if (state == null) {
+                continue;
+            }
+            List<RawDirectorEdge> edges = collectRawDirectorEdgesForState(state);
+            if (edges.isEmpty()) {
+                rawDirectorEdges.remove(state);
+            } else {
+                rawDirectorEdges.put(state, edges);
+            }
+            refreshedStates++;
+        }
+
+        otfPeakStates = Math.max(otfPeakStates, compostates == null ? 0 : compostates.size());
+        otfPeakTrans = Math.max(
+                otfPeakTrans,
+                (int) Math.min(Integer.MAX_VALUE, countCurrentExploredTransitions()));
+
+        if (plan != null) {
+            plan.otfRawEdgeIncrementalRefreshes++;
+            plan.otfRawEdgeIncrementalStates += refreshedStates;
+        }
     }
 
     private long countRawDirectorTransitions(
@@ -3792,6 +4111,4752 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             statesByOldController.computeIfAbsent(oldControllerState, k -> new ArrayList<>()).add(state);
         }
         return statesByOldController;
+    }
+
+    private Map<State, List<CompostateDUC<State, Action>>> groupBeliefLitePreUpdateStatesByOldController(
+            List<CompostateDUC<State, Action>> reachableOrder) {
+
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController =
+                new LinkedHashMap<>();
+        Set<CompostateDUC<State, Action>> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        addBeliefLitePreUpdateStatesByOldController(
+                statesByOldController, seen, reachableOrder);
+        if (beliefLiteUseExploredPreUpdateRoots && compostates != null) {
+            addBeliefLitePreUpdateStatesByOldController(
+                    statesByOldController, seen, compostates.values());
+        }
+        return statesByOldController;
+    }
+
+    private void addBeliefLitePreUpdateStatesByOldController(
+            Map<State, List<CompostateDUC<State, Action>>> statesByOldController,
+            Set<CompostateDUC<State, Action>> seen,
+            Collection<CompostateDUC<State, Action>> candidates) {
+
+        if (candidates == null) {
+            return;
+        }
+        for (CompostateDUC<State, Action> state : candidates) {
+            if (state == null || !isPreUpdateOutputState(state) || isError(state)
+                    || !seen.add(state)) {
+                continue;
+            }
+            State oldControllerState = state.getStates().get(idxOC);
+            statesByOldController.computeIfAbsent(
+                    oldControllerState, k -> new ArrayList<>()).add(state);
+        }
+    }
+
+    private void logBeliefLiteStageOneToThree(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (!debugLogEnabled) {
+            return;
+        }
+
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController =
+                groupPreUpdateStatesByOldController(reachableOrder);
+
+        int rawPreStates = 0;
+        int splitPreGroups = 0;
+        for (List<CompostateDUC<State, Action>> preUpdateStates : statesByOldController.values()) {
+            rawPreStates += preUpdateStates.size();
+            if (preUpdateStates.size() > 1) {
+                splitPreGroups++;
+            }
+        }
+
+        log("  [Belief-Lite] mode=lite, emit=" + beliefLiteEmit
+                + ", validateOutput=" + beliefLiteValidateOutput
+                + ", otfExpansion=" + beliefLiteOtfExpansionEnabled
+                + ", otfFocusedRefresh=" + beliefLiteOtfFocusedRefreshEnabled
+                + ", otfFocusedSolve=" + beliefLiteOtfFocusedSolveEnabled
+                + ", otfFocusedSolveValidate="
+                + beliefLiteOtfFocusedSolveValidationEnabled
+                + ", otfFocusedSolveValidateMaxStrategyDiffs="
+                + Math.max(0, beliefLiteOtfFocusedSolveValidationMaxStrategyDiffs)
+                + ", otfDirectFrontier=" + beliefLiteOtfDirectFrontierEnabled
+                + ", otfIncrementalRawEdges=" + beliefLiteOtfIncrementalRawEdgesEnabled
+                + ", otfBeliefNodeDriver=" + beliefLiteOtfBeliefNodeDriverEnabled
+                + ", otfBeliefNodeDriverValidateEvery="
+                + Math.max(0, beliefLiteOtfBeliefNodeDriverValidateEvery)
+                + ", initialFrontierStopWhenFocusExhausted="
+                + beliefLiteInitialFrontierStopWhenFocusExhausted
+                + ", repairFallback=" + (beliefRepairEnabled ? "enabled" : "disabled"));
+        log("  [Belief-Lite-Coverage] oldControllerStates="
+                + statesByOldController.size()
+                + ", oldControllerTotal=" + countOldControllerStates()
+                + ", rawPreStates=" + rawPreStates
+                + ", splitPreGroups=" + splitPreGroups
+                + ", maxLoggedGroups=" + beliefLiteMaxLoggedGroups);
+
+        int loggedGroups = 0;
+        int suppressedGroups = 0;
+        int singletonRoots = 0;
+        int multiRoots = 0;
+        int emptyRoots = 0;
+        int missingBeginUpdateGroups = 0;
+        int missingBeginUpdateStates = 0;
+        int totalBeginEdges = 0;
+        int totalGoalTargets = 0;
+        int totalErrorTargets = 0;
+        int totalDistinctBeginTargets = 0;
+
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry : statesByOldController.entrySet()) {
+            State oldControllerState = entry.getKey();
+            List<CompostateDUC<State, Action>> preUpdateStates = entry.getValue();
+
+            Set<CompostateDUC<State, Action>> beginTargets = new LinkedHashSet<>();
+            List<CompostateDUC<State, Action>> missingBeginUpdatePreStates = new ArrayList<>();
+            int beginEdges = 0;
+            int goalTargets = 0;
+            int errorTargets = 0;
+
+            for (CompostateDUC<State, Action> preUpdateState : preUpdateStates) {
+                boolean foundBeginUpdate = false;
+                List<RawDirectorEdge> edges = rawDirectorEdges == null ? null : rawDirectorEdges.get(preUpdateState);
+                if (edges != null) {
+                    for (RawDirectorEdge edge : edges) {
+                        if (!edge.actionName.equals(UpdateConstants.BEGIN_UPDATE)
+                                || !edge.hAction.isControllable()) {
+                            continue;
+                        }
+                        foundBeginUpdate = true;
+                        beginEdges++;
+                        beginTargets.add(edge.child);
+                        if (edge.child != null && edge.child.isStatus(Status.GOAL)) {
+                            goalTargets++;
+                        }
+                        if (edge.child == null || edge.child.isStatus(Status.ERROR)) {
+                            errorTargets++;
+                        }
+                    }
+                }
+                if (!foundBeginUpdate) {
+                    missingBeginUpdatePreStates.add(preUpdateState);
+                }
+            }
+
+            if (beginTargets.isEmpty()) {
+                emptyRoots++;
+            } else if (beginTargets.size() == 1) {
+                singletonRoots++;
+            } else {
+                multiRoots++;
+            }
+            if (!missingBeginUpdatePreStates.isEmpty()) {
+                missingBeginUpdateGroups++;
+                missingBeginUpdateStates += missingBeginUpdatePreStates.size();
+            }
+            totalBeginEdges += beginEdges;
+            totalGoalTargets += goalTargets;
+            totalErrorTargets += errorTargets;
+            totalDistinctBeginTargets += beginTargets.size();
+
+            if (loggedGroups < beliefLiteMaxLoggedGroups) {
+                log("  [Belief-Lite-Coverage] oldState=" + oldControllerState
+                        + ", preMembers=" + preUpdateStates.size()
+                        + ", varyingComponents=" + describeVaryingComponents(preUpdateStates));
+                log("  [Belief-Lite-Root] oldState=" + oldControllerState
+                        + ", preMembers=" + preUpdateStates.size()
+                        + ", beginEdges=" + beginEdges
+                        + ", beginTargets=" + beginTargets.size()
+                        + ", singleton=" + (beginTargets.size() == 1)
+                        + ", targetMarkings=" + summarizeMarkingHistogram(beginTargets)
+                        + ", targetStatuses=" + summarizeStatusHistogram(beginTargets)
+                        + ", targetVaryingComponents="
+                        + describeVaryingComponents(new ArrayList<>(beginTargets)));
+                if (!missingBeginUpdatePreStates.isEmpty()) {
+                    log("  [Belief-Lite-Root-Warning] oldState=" + oldControllerState
+                            + ", missingBeginUpdatePreMembers="
+                            + missingBeginUpdatePreStates.size()
+                            + ", samples=" + limitedStateSummaries(missingBeginUpdatePreStates, 3));
+                }
+                loggedGroups++;
+            } else {
+                suppressedGroups++;
+            }
+        }
+
+        log("  [Belief-Lite-Root-Summary] groups=" + statesByOldController.size()
+                + ", singletonRoots=" + singletonRoots
+                + ", multiRoots=" + multiRoots
+                + ", emptyRoots=" + emptyRoots
+                + ", missingBeginUpdateGroups=" + missingBeginUpdateGroups
+                + ", missingBeginUpdateStates=" + missingBeginUpdateStates
+                + ", beginEdges=" + totalBeginEdges
+                + ", distinctBeginTargetsTotal=" + totalDistinctBeginTargets
+                + ", goalTargets=" + totalGoalTargets
+                + ", errorTargets=" + totalErrorTargets
+                + ", suppressedGroups=" + suppressedGroups);
+    }
+
+    private String summarizeStatusHistogram(Iterable<CompostateDUC<State, Action>> states) {
+        Map<String, Integer> counts = new TreeMap<>();
+        if (states != null) {
+            for (CompostateDUC<State, Action> state : states) {
+                String status = state == null ? "null" : state.getStatus().toString();
+                counts.put(status, counts.getOrDefault(status, 0) + 1);
+            }
+        }
+        return counts.toString();
+    }
+
+    private String limitedStateSummaries(
+            List<CompostateDUC<State, Action>> states,
+            int maxStates) {
+
+        List<String> summaries = new ArrayList<>();
+        int limit = Math.min(states.size(), maxStates);
+        for (int i = 0; i < limit; i++) {
+            summaries.add(summarizeStateForDiagnostics(states.get(i)));
+        }
+        if (states.size() > limit) {
+            summaries.add("... +" + (states.size() - limit) + " states");
+        }
+        return summaries.toString();
+    }
+
+    private void logBeliefLiteStageFour(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (!debugLogEnabled) {
+            return;
+        }
+
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController =
+                groupPreUpdateStatesByOldController(reachableOrder);
+
+        log("  [Belief-Lite-Graph] dryRun=true, maxNodes=" + beliefLiteMaxNodes
+                + ", maxLoggedNodes=" + beliefLiteMaxLoggedNodes
+                + ", multiRootsOnly=" + beliefLiteGraphMultiRootsOnly);
+
+        int candidateGroups = 0;
+        int skippedSingletonRoots = 0;
+        int skippedEmptyRoots = 0;
+        int totalNodes = 0;
+        int totalUncontrollableEdges = 0;
+        int totalControllableEdges = 0;
+        int totalFinishNodes = 0;
+        int totalBadNodes = 0;
+        int limitExceededGroups = 0;
+        int totalRejectedControllableMissing = 0;
+        int totalRejectedControllableUnsafe = 0;
+        int totalUnsafeUncontrollable = 0;
+        int totalSuppressedNodes = 0;
+        int totalWinningNodes = 0;
+        int totalUnresolvedNodes = 0;
+        int rootWinningGroups = 0;
+        int winningSkippedGroups = 0;
+
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry : statesByOldController.entrySet()) {
+            State oldControllerState = entry.getKey();
+            BeliefLiteRootInfo rootInfo = collectBeliefLiteRootInfo(
+                    oldControllerState, entry.getValue(), rawDirectorEdges);
+
+            if (rootInfo.beginTargets.isEmpty()) {
+                skippedEmptyRoots++;
+                log("  [Belief-Lite-Graph-Skip] oldState=" + oldControllerState
+                        + ", reason=no-beginUpdate-target"
+                        + ", preMembers=" + rootInfo.preUpdateStates.size()
+                        + ", missingBeginUpdatePreMembers="
+                        + rootInfo.missingBeginUpdatePreStates.size());
+                continue;
+            }
+
+            if (beliefLiteGraphMultiRootsOnly && rootInfo.beginTargets.size() <= 1) {
+                skippedSingletonRoots++;
+                continue;
+            }
+
+            candidateGroups++;
+            BeliefLiteGraphStats stats = buildBeliefLiteDryRunGraph(rootInfo, rawDirectorEdges);
+            totalNodes += stats.nodes;
+            totalUncontrollableEdges += stats.uncontrollableEdges;
+            totalControllableEdges += stats.controllableEdges;
+            totalFinishNodes += stats.finishNodes;
+            totalBadNodes += stats.badNodes;
+            totalRejectedControllableMissing += stats.rejectedControllableMissing;
+            totalRejectedControllableUnsafe += stats.rejectedControllableUnsafe;
+            totalUnsafeUncontrollable += stats.unsafeUncontrollable;
+            totalSuppressedNodes += stats.suppressedNodes;
+            totalWinningNodes += stats.winningNodes;
+            totalUnresolvedNodes += stats.unresolvedNodes;
+            if (stats.rootWinning) {
+                rootWinningGroups++;
+            }
+            if (stats.winningSkipped) {
+                winningSkippedGroups++;
+            }
+            if (stats.limitExceeded) {
+                limitExceededGroups++;
+            }
+        }
+
+        log("  [Belief-Lite-Graph-Summary] candidateGroups=" + candidateGroups
+                + ", skippedSingletonRoots=" + skippedSingletonRoots
+                + ", skippedEmptyRoots=" + skippedEmptyRoots
+                + ", totalNodes=" + totalNodes
+                + ", totalUncontrollableEdges=" + totalUncontrollableEdges
+                + ", totalControllableEdges=" + totalControllableEdges
+                + ", finishNodes=" + totalFinishNodes
+                + ", badNodes=" + totalBadNodes
+                + ", rejectedControllableMissing=" + totalRejectedControllableMissing
+                + ", rejectedControllableUnsafe=" + totalRejectedControllableUnsafe
+                + ", unsafeUncontrollable=" + totalUnsafeUncontrollable
+                + ", limitExceededGroups=" + limitExceededGroups
+                + ", suppressedNodes=" + totalSuppressedNodes
+                + ", rootWinningGroups=" + rootWinningGroups
+                + ", winningNodes=" + totalWinningNodes
+                + ", unresolvedNodes=" + totalUnresolvedNodes
+                + ", winningSkippedGroups=" + winningSkippedGroups);
+    }
+
+    private BeliefLiteRootInfo collectBeliefLiteRootInfo(
+            State oldControllerState,
+            List<CompostateDUC<State, Action>> preUpdateStates,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        BeliefLiteRootInfo info = new BeliefLiteRootInfo(oldControllerState, preUpdateStates);
+        for (CompostateDUC<State, Action> preUpdateState : preUpdateStates) {
+            boolean foundBeginUpdate = false;
+            List<RawDirectorEdge> edges = rawDirectorEdges == null ? null : rawDirectorEdges.get(preUpdateState);
+            if (edges != null) {
+                for (RawDirectorEdge edge : edges) {
+                    if (!edge.actionName.equals(UpdateConstants.BEGIN_UPDATE)
+                            || !edge.hAction.isControllable()) {
+                        continue;
+                    }
+                    foundBeginUpdate = true;
+                    info.beginEdges++;
+                    if (info.beginUpdateAction == null) {
+                        info.beginUpdateAction = edge.outputAction;
+                    }
+                    info.beginTargets.add(edge.child);
+                    if (edge.child != null && edge.child.isStatus(Status.GOAL)) {
+                        info.goalTargets++;
+                    }
+                    if (edge.child == null || edge.child.isStatus(Status.ERROR)) {
+                        info.errorTargets++;
+                    }
+                }
+            }
+            if (!foundBeginUpdate) {
+                info.missingBeginUpdatePreStates.add(preUpdateState);
+            }
+        }
+        return info;
+    }
+
+    private BeliefLiteGraphStats buildBeliefLiteDryRunGraph(
+            BeliefLiteRootInfo rootInfo,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        Map<CompostateDUC<State, Action>, Integer> concreteIds =
+                buildConcreteStateIds(rootInfo.preUpdateStates, rawDirectorEdges);
+        BeliefSearchContext context = new BeliefSearchContext(concreteIds, beliefLiteMaxNodes);
+
+        BeliefNode root = context.getOrCreateNode(rootInfo.beginTargets);
+        if (root == null) {
+            stats.limitExceeded = true;
+            stats.winningSkipped = true;
+            log("  [Belief-Lite-Graph-Plan] oldState=" + rootInfo.oldControllerState
+                    + ", root=none, reason=belief-node-limit-before-root"
+                    + ", preMembers=" + rootInfo.preUpdateStates.size()
+                    + ", beginTargets=" + rootInfo.beginTargets.size());
+            return stats;
+        }
+
+        log("  [Belief-Lite-Graph-Plan] oldState=" + rootInfo.oldControllerState
+                + ", root=" + root.name()
+                + ", preMembers=" + rootInfo.preUpdateStates.size()
+                + ", beginTargets=" + rootInfo.beginTargets.size()
+                + ", targetMarkings=" + summarizeMarkingHistogram(rootInfo.beginTargets)
+                + ", targetStatuses=" + summarizeStatusHistogram(rootInfo.beginTargets)
+                + ", targetVaryingComponents="
+                + describeVaryingComponents(new ArrayList<>(rootInfo.beginTargets)));
+
+        while (!context.queue.isEmpty() && !context.limitExceeded) {
+            BeliefNode node = context.queue.remove();
+            expandBeliefLiteDryRunNode(rootInfo.oldControllerState, node, context, rawDirectorEdges, stats, true);
+        }
+
+        stats.nodes = context.nodes.size();
+        stats.limitExceeded = context.limitExceeded;
+        if (context.limitExceeded) {
+            log("  [Belief-Lite-Graph-Limit] oldState=" + rootInfo.oldControllerState
+                    + ", nodes=" + context.nodes.size()
+                    + ", maxNodes=" + beliefLiteMaxNodes);
+            stats.winningSkipped = true;
+        } else {
+            solveBeliefReachability(
+                    context.nodes,
+                    rootInfo.oldControllerState,
+                    "Belief-Lite-Winning",
+                    "Belief-Lite-Fairness");
+            improveBeliefLiteSelectedStrategy(
+                    context.nodes,
+                    rootInfo.oldControllerState,
+                    "Belief-Lite-Strategy");
+            collectBeliefLiteWinningStats(root, context.nodes, stats);
+            logBeliefLiteWinningPlan(rootInfo.oldControllerState, root, stats);
+        }
+
+        log("  [Belief-Lite-Graph-Summary] oldState=" + rootInfo.oldControllerState
+                + ", nodes=" + stats.nodes
+                + ", uncontrollableEdges=" + stats.uncontrollableEdges
+                + ", controllableEdges=" + stats.controllableEdges
+                + ", finishNodes=" + stats.finishNodes
+                + ", badNodes=" + stats.badNodes
+                + ", rejectedControllableMissing=" + stats.rejectedControllableMissing
+                + ", rejectedControllableUnsafe=" + stats.rejectedControllableUnsafe
+                + ", unsafeUncontrollable=" + stats.unsafeUncontrollable
+                + ", finishUnavailableNodes=" + stats.finishUnavailableNodes
+                + ", finishNcTargetMismatches=" + stats.finishNcTargetMismatches
+                + ", limitExceeded=" + stats.limitExceeded
+                + ", suppressedNodes=" + stats.suppressedNodes
+                + ", rootWinning=" + stats.rootWinning
+                + ", winningNodes=" + stats.winningNodes
+                + ", unresolvedNodes=" + stats.unresolvedNodes
+                + ", winningSkipped=" + stats.winningSkipped);
+        return stats;
+    }
+
+    private void collectBeliefLiteWinningStats(
+            BeliefNode root,
+            List<BeliefNode> nodes,
+            BeliefLiteGraphStats stats) {
+
+        stats.rootWinning = root != null && root.winning;
+        stats.winningNodes = 0;
+        stats.unresolvedNodes = 0;
+        stats.finishStrategyNodes = 0;
+        stats.controllableStrategyNodes = 0;
+        stats.fairUncontrollableStrategyNodes = 0;
+        stats.waitUncontrollableStrategyNodes = 0;
+
+        for (BeliefNode node : nodes) {
+            if (node.winning) {
+                stats.winningNodes++;
+                if (node.selectedFinish) {
+                    stats.finishStrategyNodes++;
+                } else if (node.selectedControllableEdge != null) {
+                    stats.controllableStrategyNodes++;
+                } else if (node.selectedFairUncontrollableEdge != null) {
+                    stats.fairUncontrollableStrategyNodes++;
+                } else if (!node.uncontrollableEdges.isEmpty()) {
+                    stats.waitUncontrollableStrategyNodes++;
+                }
+            } else if (!node.bad) {
+                stats.unresolvedNodes++;
+            }
+        }
+    }
+
+    private void logBeliefLiteWinningPlan(
+            State oldControllerState,
+            BeliefNode root,
+            BeliefLiteGraphStats stats) {
+
+        if (!debugLogEnabled) {
+            return;
+        }
+
+        log("  [Belief-Lite-Winning-Summary] oldState=" + oldControllerState
+                + ", root=" + (root == null ? "none" : root.name())
+                + ", rootWinning=" + stats.rootWinning
+                + ", rootSelected=" + describeBeliefSelectedStrategy(root)
+                + ", winningNodes=" + stats.winningNodes + "/" + stats.nodes
+                + ", unresolvedNodes=" + stats.unresolvedNodes
+                + ", badNodes=" + stats.badNodes
+                + ", selectedFinish=" + stats.finishStrategyNodes
+                + ", selectedControllable=" + stats.controllableStrategyNodes
+                + ", selectedFairUncontrollable=" + stats.fairUncontrollableStrategyNodes
+                + ", waitUncontrollable=" + stats.waitUncontrollableStrategyNodes);
+    }
+
+    private String describeBeliefSelectedStrategy(BeliefNode node) {
+        if (node == null) {
+            return "none";
+        }
+        if (!node.winning) {
+            return node.bad ? "bad:" + node.badReason : "unresolved";
+        }
+        if (node.selectedFinish) {
+            return UpdateConstants.FINISH_UPDATE + "->NC:" + node.finishNcTargetId;
+        }
+        if (node.selectedControllableEdge != null) {
+            return node.selectedControllableEdge.toString();
+        }
+        if (node.selectedFairUncontrollableEdge != null) {
+            return "fair-wait:" + node.selectedFairUncontrollableEdge;
+        }
+        if (!node.uncontrollableEdges.isEmpty()) {
+            return "wait-uncontrollable";
+        }
+        return "winning-no-selected-edge";
+    }
+
+    private BeliefLiteOutputPlan buildBeliefLiteOutputPlan(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        BeliefLiteOutputPlan plan = buildBeliefLiteOutputPlanOnce(
+                reachableOrder, directorEdges, rawDirectorEdges);
+        if (!beliefLiteEmit || !beliefLiteOtfExpansionEnabled || plan.isReadyForEmit()) {
+            return plan;
+        }
+        return expandBeliefLiteOutputPlanOnTheFly(
+                reachableOrder, directorEdges, rawDirectorEdges, plan);
+    }
+
+    private BeliefLiteOutputPlan buildBeliefLiteOutputPlanOnce(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        BeliefLiteOutputPlan plan = new BeliefLiteOutputPlan();
+        Map<State, List<CompostateDUC<State, Action>>> directorStatesByOldController =
+                groupPreUpdateStatesByOldController(reachableOrder);
+        Map<State, List<CompostateDUC<State, Action>>> statesByOldController =
+                groupBeliefLitePreUpdateStatesByOldController(reachableOrder);
+        plan.statesByOldController.putAll(statesByOldController);
+        plan.directorRootGroups = directorStatesByOldController.size();
+        plan.exploredRootGroups = statesByOldController.size();
+        plan.extraExploredRootGroups =
+                Math.max(0, statesByOldController.size() - directorStatesByOldController.size());
+        plan.preUpdateRootSource = beliefLiteUseExploredPreUpdateRoots
+                ? "explored-pre-update"
+                : "director-reachable";
+
+        List<CompostateDUC<State, Action>> preUpdateStates = new ArrayList<>();
+        for (List<CompostateDUC<State, Action>> states : statesByOldController.values()) {
+            preUpdateStates.addAll(states);
+        }
+
+        Map<CompostateDUC<State, Action>, Integer> concreteIds =
+                buildConcreteStateIds(preUpdateStates, rawDirectorEdges);
+        BeliefSearchContext context = new BeliefSearchContext(
+                concreteIds, beliefLiteOutputPlanMaxNodes);
+        plan.context = context;
+
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry : statesByOldController.entrySet()) {
+            State oldControllerState = entry.getKey();
+            BeliefLiteRootInfo rootInfo = collectBeliefLiteRootInfo(
+                    oldControllerState, entry.getValue(), rawDirectorEdges);
+            plan.rootInfos.put(oldControllerState, rootInfo);
+
+            if (rootInfo.beginTargets.isEmpty()) {
+                plan.missingRootGroups++;
+                plan.missingBeginUpdatePreStates += rootInfo.missingBeginUpdatePreStates.size();
+                continue;
+            }
+
+            BeliefNode root = context.getOrCreateNode(rootInfo.beginTargets);
+            if (root == null) {
+                plan.rootLimitFailures++;
+                continue;
+            }
+            plan.rootsByOldState.put(oldControllerState, root);
+        }
+
+        buildBeliefLiteInitialOutputGraph(plan, rawDirectorEdges);
+
+        return plan;
+    }
+
+    private void buildBeliefLiteInitialOutputGraph(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (beliefLiteOtfExpansionEnabled && beliefLiteOtfBeliefNodeDriverEnabled) {
+            plan.initialGraphKind = "belief-node-driver-root-only";
+            plan.initialFrontierStopReason = "driver-root-only";
+            plan.initialFrontierQueueRemaining =
+                    plan.context == null ? 0 : plan.context.queue.size();
+            evaluateBeliefLiteOutputPlanGraph(
+                    plan,
+                    rawDirectorEdges,
+                    new BeliefLiteGraphStats(),
+                    null,
+                    null,
+                    null);
+            plan.initialFrontierQueueRemaining =
+                    plan.context == null ? 0 : plan.context.queue.size();
+            return;
+        }
+
+        if (!beliefLiteInitialFrontierEnabled) {
+            plan.initialGraphKind = "full-reachable";
+            refreshBeliefLiteOutputPlanGraph(plan, rawDirectorEdges);
+            plan.initialFrontierQueueRemaining =
+                    plan.context == null ? 0 : plan.context.queue.size();
+            return;
+        }
+
+        plan.initialGraphKind = "root-frontier";
+        expandBeliefLiteInitialOutputGraphByFrontier(plan, rawDirectorEdges);
+    }
+
+    private void expandBeliefLiteInitialOutputGraphByFrontier(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (plan == null || plan.context == null) {
+            return;
+        }
+
+        BeliefSearchContext context = plan.context;
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        int batchLimit = Math.max(1, beliefLiteInitialFrontierBatchNodes);
+        plan.initialFrontierStopReason = "running";
+
+        while (!context.queue.isEmpty() && !context.limitExceeded) {
+            int expandedThisRound = 0;
+            int focusedBefore = plan.initialFrontierFocusedNodes;
+            int fallbackBefore = plan.initialFrontierFallbackNodes;
+            while (expandedThisRound < batchLimit
+                    && !context.queue.isEmpty()
+                    && !context.limitExceeded) {
+                BeliefNode node = pollBeliefLiteInitialFrontierNode(plan);
+                if (node == null) {
+                    break;
+                }
+                expandBeliefLiteDryRunNode(null, node, context, rawDirectorEdges, stats, false);
+                expandedThisRound++;
+                plan.initialFrontierExpandedNodes++;
+            }
+
+            plan.initialFrontierRounds++;
+            evaluateBeliefLiteOutputPlanGraph(
+                    plan,
+                    rawDirectorEdges,
+                    stats,
+                    null,
+                    null,
+                    null);
+            plan.initialFrontierQueueRemaining = context.queue.size();
+            int focusedQueueRemaining = countBeliefLiteInitialFocusedQueueNodes(plan);
+
+            if (debugLogEnabled) {
+                log("  [Belief-Lite-Initial-Frontier] round="
+                        + plan.initialFrontierRounds
+                        + ", expandedNodes=" + plan.initialFrontierExpandedNodes
+                    + ", contextNodes=" + plan.nodes().size()
+                    + ", queueRemaining=" + plan.initialFrontierQueueRemaining
+                    + ", focusedThisRound="
+                    + (plan.initialFrontierFocusedNodes - focusedBefore)
+                    + ", fallbackThisRound="
+                    + (plan.initialFrontierFallbackNodes - fallbackBefore)
+                    + ", focusedQueueRemaining="
+                    + focusedQueueRemaining
+                    + ", rootWinningGroups=" + plan.rootWinningGroups
+                    + "/" + plan.statesByOldController.size()
+                    + ", readyForEmit=" + plan.isReadyForEmit());
+            }
+
+            if (plan.isReadyForEmit()) {
+                plan.initialFrontierStopReason = "readyForEmit";
+                break;
+            }
+            if (shouldStopBeliefLiteInitialFrontierOnFocusExhaustion(
+                    plan, focusedQueueRemaining)) {
+                plan.initialFrontierStopReason = "focused-frontier-exhausted";
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-Initial-Frontier] stop="
+                            + plan.initialFrontierStopReason
+                            + ", unresolvedRoots="
+                            + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", queueRemaining=" + plan.initialFrontierQueueRemaining
+                            + ", rootWinningGroups=" + plan.rootWinningGroups
+                            + "/" + plan.statesByOldController.size());
+                }
+                break;
+            }
+        }
+
+        if (context.limitExceeded) {
+            plan.initialFrontierStopReason = "limit-exceeded";
+            evaluateBeliefLiteOutputPlanGraph(
+                    plan,
+                    rawDirectorEdges,
+                    stats,
+                    null,
+                    null,
+                    null);
+        } else if (context.queue.isEmpty()
+                && !"readyForEmit".equals(plan.initialFrontierStopReason)
+                && !"focused-frontier-exhausted".equals(plan.initialFrontierStopReason)) {
+            plan.initialFrontierStopReason = "queue-empty";
+        }
+        plan.initialFrontierQueueRemaining = context.queue.size();
+    }
+
+    private boolean shouldStopBeliefLiteInitialFrontierOnFocusExhaustion(
+            BeliefLiteOutputPlan plan,
+            int focusedQueueRemaining) {
+
+        if (!beliefLiteInitialFrontierStopWhenFocusExhausted
+                || !beliefLiteInitialFrontierFocusUnwinningRoots
+                || plan == null
+                || plan.isReadyForEmit()
+                || plan.statesByOldController.isEmpty()) {
+            return false;
+        }
+
+        return plan.rootWinningGroups > 0
+                && plan.rootWinningGroups < plan.statesByOldController.size()
+                && focusedQueueRemaining == 0;
+    }
+
+    private BeliefNode pollBeliefLiteInitialFrontierNode(BeliefLiteOutputPlan plan) {
+        if (plan == null || plan.context == null || plan.context.queue.isEmpty()) {
+            return null;
+        }
+
+        if (!beliefLiteInitialFrontierFocusUnwinningRoots
+                || plan.rootWinningGroups == 0) {
+            plan.initialFrontierFallbackNodes++;
+            return plan.context.queue.remove();
+        }
+
+        Set<BeliefNode> focusedNodes =
+                new HashSet<>(collectBeliefLiteNodesReachableFromUnwinningRoots(plan));
+        if (!focusedNodes.isEmpty()) {
+            Iterator<BeliefNode> it = plan.context.queue.iterator();
+            while (it.hasNext()) {
+                BeliefNode node = it.next();
+                if (focusedNodes.contains(node)) {
+                    it.remove();
+                    plan.initialFrontierFocusedNodes++;
+                    return node;
+                }
+            }
+        }
+
+        if (shouldStopBeliefLiteInitialFrontierOnFocusExhaustion(plan, 0)) {
+            return null;
+        }
+
+        plan.initialFrontierFallbackNodes++;
+        return plan.context.queue.remove();
+    }
+
+    private int countBeliefLiteInitialFocusedQueueNodes(BeliefLiteOutputPlan plan) {
+        if (plan == null || plan.context == null || plan.context.queue.isEmpty()
+                || !beliefLiteInitialFrontierFocusUnwinningRoots
+                || plan.rootWinningGroups == 0) {
+            return 0;
+        }
+
+        Set<BeliefNode> focusedNodes =
+                new HashSet<>(collectBeliefLiteNodesReachableFromUnwinningRoots(plan));
+        int count = 0;
+        for (BeliefNode node : plan.context.queue) {
+            if (focusedNodes.contains(node)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void refreshBeliefLiteOutputPlanGraph(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (plan == null || plan.context == null) {
+            return;
+        }
+
+        BeliefSearchContext context = plan.context;
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        context.queue.clear();
+        for (BeliefNode node : context.nodes) {
+            resetBeliefLiteNodeGraphState(context, node);
+            context.queue.add(node);
+        }
+
+        while (!context.queue.isEmpty() && !context.limitExceeded) {
+            BeliefNode node = context.queue.remove();
+            expandBeliefLiteDryRunNode(null, node, context, rawDirectorEdges, stats, false);
+        }
+
+        evaluateBeliefLiteOutputPlanGraph(
+                plan,
+                rawDirectorEdges,
+                stats,
+                "Belief-Lite-Output-Winning",
+                "Belief-Lite-Output-Fairness",
+                "Belief-Lite-Output-Strategy");
+    }
+
+    private void refreshBeliefLiteOutputPlanGraphAfterOtfExpansion(
+            BeliefLiteOutputPlan plan,
+            State oldControllerState,
+            Set<CompostateDUC<State, Action>> touchedConcreteStates,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (!beliefLiteOtfFocusedRefreshEnabled) {
+            plan.otfFullRefreshes++;
+            refreshBeliefLiteOutputPlanGraph(plan, rawDirectorEdges);
+            return;
+        }
+
+        int refreshedNodes = refreshBeliefLiteOutputPlanGraphFocused(
+                plan, oldControllerState, touchedConcreteStates, rawDirectorEdges);
+        if (refreshedNodes < 0) {
+            plan.otfFullRefreshes++;
+            refreshBeliefLiteOutputPlanGraph(plan, rawDirectorEdges);
+            return;
+        }
+
+        plan.otfFocusedRefreshes++;
+        plan.otfFocusedRefreshNodes += refreshedNodes;
+    }
+
+    private int refreshBeliefLiteOutputPlanGraphFocused(
+            BeliefLiteOutputPlan plan,
+            State oldControllerState,
+            Set<CompostateDUC<State, Action>> touchedConcreteStates,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        if (plan == null || plan.context == null || oldControllerState == null) {
+            return -1;
+        }
+
+        BeliefNode root = plan.rootsByOldState.get(oldControllerState);
+        if (root == null) {
+            return -1;
+        }
+
+        BeliefSearchContext context = plan.context;
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        LinkedHashSet<BeliefNode> seeds = new LinkedHashSet<>();
+        seeds.add(root);
+        int memberIndexSeeds = addBeliefLiteNodesContainingTouchedStates(
+                context, touchedConcreteStates, seeds);
+
+        Deque<BeliefNode> queue = new ArrayDeque<>(seeds);
+        Set<BeliefNode> scheduled = new LinkedHashSet<>(seeds);
+        Set<BeliefNode> refreshed = new LinkedHashSet<>();
+        context.queue.clear();
+
+        while (!queue.isEmpty() && !context.limitExceeded) {
+            BeliefNode node = queue.remove();
+            if (!refreshed.add(node)) {
+                continue;
+            }
+
+            resetBeliefLiteNodeGraphState(context, node);
+            expandBeliefLiteDryRunNode(null, node, context, rawDirectorEdges, stats, false);
+            for (BeliefTransition edge : getBeliefTransitions(node)) {
+                if (edge.target != null && scheduled.add(edge.target)) {
+                    queue.add(edge.target);
+                }
+            }
+        }
+
+        context.queue.clear();
+        if (!evaluateBeliefLiteOutputPlanGraphFocused(
+                plan,
+                rawDirectorEdges,
+                stats,
+                oldControllerState,
+                refreshed)) {
+            plan.otfFocusedSolveFallbacks++;
+            evaluateBeliefLiteOutputPlanGraph(
+                    plan,
+                    rawDirectorEdges,
+                    stats,
+                    "Belief-Lite-Output-Winning",
+                    "Belief-Lite-Output-Fairness",
+                    "Belief-Lite-Output-Strategy");
+        }
+
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-OTF-Refresh] kind=focused"
+                    + ", targetOldState=" + oldControllerState
+                    + ", seedNodes=" + seeds.size()
+                    + ", refreshedNodes=" + refreshed.size()
+                    + ", focusedSolveRefreshes=" + plan.otfFocusedSolveRefreshes
+                    + ", focusedSolveNodes=" + plan.otfFocusedSolveNodes
+                    + ", focusedSolveFallbacks=" + plan.otfFocusedSolveFallbacks
+                    + ", memberIndexSeeds=" + memberIndexSeeds
+                    + ", memberLinks=" + context.memberLinkCount()
+                    + ", touchedConcreteStates="
+                    + (touchedConcreteStates == null ? 0 : touchedConcreteStates.size())
+                    + ", contextNodes=" + plan.nodes().size()
+                    + ", rootWinningGroups=" + plan.rootWinningGroups
+                    + "/" + plan.statesByOldController.size());
+        }
+        return refreshed.size();
+    }
+
+    private int addBeliefLiteNodesContainingTouchedStates(
+            BeliefSearchContext context,
+            Set<CompostateDUC<State, Action>> touchedConcreteStates,
+            Set<BeliefNode> seeds) {
+
+        if (context == null
+                || touchedConcreteStates == null
+                || touchedConcreteStates.isEmpty()
+                || seeds == null) {
+            return 0;
+        }
+        int added = 0;
+        for (BeliefNode node : context.nodesContainingMembers(touchedConcreteStates)) {
+            if (seeds.add(node)) {
+                added++;
+            }
+        }
+        return added;
+    }
+
+    private void evaluateBeliefLiteOutputPlanGraph(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            String fixedPointLogLabel,
+            String fairnessLogLabel,
+            String strategyLogLabel) {
+
+        if (plan == null || plan.context == null || stats == null) {
+            return;
+        }
+        BeliefSearchContext context = plan.context;
+        stats.nodes = context.nodes.size();
+        stats.limitExceeded = context.limitExceeded;
+        refreshBeliefLiteStructuralStatsFromNodes(stats, context.nodes);
+        if (!context.limitExceeded) {
+            solveBeliefReachability(
+                    context.nodes,
+                    "GLOBAL",
+                    fixedPointLogLabel,
+                    fairnessLogLabel);
+            improveBeliefLiteSelectedStrategy(
+                    context.nodes,
+                    "GLOBAL",
+                    strategyLogLabel);
+            collectBeliefLiteWinningStats(null, context.nodes, stats);
+        } else {
+            stats.winningSkipped = true;
+        }
+        plan.stats = stats;
+        refreshBeliefLiteOutputPlanMetrics(plan, rawDirectorEdges);
+    }
+
+    private boolean evaluateBeliefLiteOutputPlanGraphFocused(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            State oldControllerState,
+            Set<BeliefNode> refreshedNodes) {
+
+        if (!beliefLiteOtfFocusedSolveEnabled
+                || plan == null
+                || plan.context == null
+                || stats == null
+                || refreshedNodes == null
+                || refreshedNodes.isEmpty()) {
+            return false;
+        }
+
+        BeliefSearchContext context = plan.context;
+        stats.nodes = context.nodes.size();
+        stats.limitExceeded = context.limitExceeded;
+        refreshBeliefLiteStructuralStatsFromNodes(stats, context.nodes);
+        if (context.limitExceeded) {
+            stats.winningSkipped = true;
+            plan.stats = stats;
+            refreshBeliefLiteOutputPlanMetrics(plan, rawDirectorEdges);
+            return true;
+        }
+
+        List<BeliefNode> solveScope =
+                collectBeliefLiteFocusedSolveScope(context, refreshedNodes);
+        if (solveScope.isEmpty()) {
+            return false;
+        }
+
+        solveBeliefReachabilityFocused(
+                solveScope,
+                oldControllerState,
+                "Belief-Lite-Output-Winning",
+                "Belief-Lite-Output-Fairness");
+        improveBeliefLiteSelectedStrategy(
+                solveScope,
+                context.nodes,
+                oldControllerState,
+                "Belief-Lite-Output-Strategy");
+        collectBeliefLiteWinningStats(null, context.nodes, stats);
+        plan.stats = stats;
+        refreshBeliefLiteOutputPlanMetrics(plan, rawDirectorEdges);
+        validateBeliefLiteFocusedSolve(
+                plan,
+                rawDirectorEdges,
+                stats,
+                oldControllerState,
+                solveScope,
+                refreshedNodes);
+
+        plan.otfFocusedSolveRefreshes++;
+        plan.otfFocusedSolveNodes += solveScope.size();
+        plan.otfFocusedSolveLastNodes = solveScope.size();
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-OTF-Solve] kind=focused"
+                    + ", targetOldState=" + oldControllerState
+                    + ", refreshedNodes=" + refreshedNodes.size()
+                    + ", solveScopeNodes=" + solveScope.size()
+                    + ", contextNodes=" + context.nodes.size()
+                    + ", predecessorLinks=" + context.predecessorLinkCount()
+                    + ", memberLinks=" + context.memberLinkCount()
+                    + ", rootWinningGroups=" + plan.rootWinningGroups
+                    + "/" + plan.statesByOldController.size());
+        }
+        return true;
+    }
+
+    private void validateBeliefLiteFocusedSolve(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats focusedStats,
+            State oldControllerState,
+            List<BeliefNode> solveScope,
+            Set<BeliefNode> refreshedNodes) {
+
+        if (!beliefLiteOtfFocusedSolveValidationEnabled
+                || plan == null
+                || plan.context == null
+                || focusedStats == null) {
+            return;
+        }
+        if (shouldSkipBeliefLiteFocusedSolveValidationForDriver(plan)) {
+            plan.otfDriverFocusedSolveValidationSkips++;
+            return;
+        }
+
+        BeliefSearchContext context = plan.context;
+        Map<BeliefNode, BeliefLiteSolveSnapshot> snapshots =
+                snapshotBeliefLiteSolveState(context.nodes);
+        int focusedRootWinningGroups = plan.rootWinningGroups;
+        int focusedWinningNodes = focusedStats.winningNodes;
+        int focusedUnresolvedNodes = focusedStats.unresolvedNodes;
+        int focusedEmitReachableNodes = plan.emitReachableBeliefNodes;
+        int focusedSelectedTransitions = plan.selectedBeliefTransitions;
+        boolean focusedReadyForEmit = plan.isReadyForEmit();
+
+        BeliefLiteGraphStats globalStats = new BeliefLiteGraphStats();
+        refreshBeliefLiteStructuralStatsFromNodes(globalStats, context.nodes);
+        solveBeliefReachability(context.nodes, "GLOBAL-VALIDATE", null, null);
+        improveBeliefLiteSelectedStrategy(context.nodes, "GLOBAL-VALIDATE", null);
+        collectBeliefLiteWinningStats(null, context.nodes, globalStats);
+        plan.stats = globalStats;
+        refreshBeliefLiteOutputPlanMetrics(plan, rawDirectorEdges);
+
+        int winningDiffs = 0;
+        int strategyDiffs = 0;
+        int fairWaitStrategyDiffs = 0;
+        int maxStrategyDiffSamples =
+                Math.max(0, beliefLiteOtfFocusedSolveValidationMaxStrategyDiffs);
+        List<String> strategyDiffSamples = new ArrayList<>();
+        Set<BeliefNode> solveScopeSet = solveScope == null
+                ? Collections.emptySet()
+                : new HashSet<>(solveScope);
+        Set<BeliefNode> refreshedSet = refreshedNodes == null
+                ? Collections.emptySet()
+                : new HashSet<>(refreshedNodes);
+        for (BeliefNode node : context.nodes) {
+            BeliefLiteSolveSnapshot snapshot = snapshots.get(node);
+            if (snapshot == null) {
+                continue;
+            }
+            if (snapshot.winning != node.winning) {
+                winningDiffs++;
+            }
+            String globalStrategy = describeBeliefSelectedStrategy(node);
+            if (!Objects.equals(snapshot.strategy, globalStrategy)) {
+                if (isBeliefLiteFairWaitOnlyStrategyDiff(snapshot, node)) {
+                    fairWaitStrategyDiffs++;
+                    continue;
+                }
+                strategyDiffs++;
+                if (strategyDiffSamples.size() < maxStrategyDiffSamples) {
+                    strategyDiffSamples.add(
+                            "node=" + node.name()
+                                    + ", inSolveScope=" + solveScopeSet.contains(node)
+                                    + ", refreshed=" + refreshedSet.contains(node)
+                                    + ", focusedWinning=" + snapshot.winning
+                                    + ", globalWinning=" + node.winning
+                                    + ", focusedSelected=" + snapshot.strategy
+                                    + ", globalSelected=" + globalStrategy
+                                    + ", members=" + describeBeliefMembers(node));
+                }
+            }
+        }
+
+        int rootWinningDiffs = 0;
+        for (BeliefNode root : plan.rootsByOldState.values()) {
+            BeliefLiteSolveSnapshot snapshot = snapshots.get(root);
+            if (snapshot != null && snapshot.winning != root.winning) {
+                rootWinningDiffs++;
+            }
+        }
+
+        int globalRootWinningGroups = plan.rootWinningGroups;
+        int globalWinningNodes = globalStats.winningNodes;
+        int globalUnresolvedNodes = globalStats.unresolvedNodes;
+        int globalEmitReachableNodes = plan.emitReachableBeliefNodes;
+        int globalSelectedTransitions = plan.selectedBeliefTransitions;
+        boolean globalReadyForEmit = plan.isReadyForEmit();
+
+        boolean ok = winningDiffs == 0
+                && rootWinningDiffs == 0
+                && focusedRootWinningGroups == globalRootWinningGroups
+                && focusedWinningNodes == globalWinningNodes
+                && focusedUnresolvedNodes == globalUnresolvedNodes
+                && focusedEmitReachableNodes == globalEmitReachableNodes
+                && focusedSelectedTransitions == globalSelectedTransitions
+                && focusedReadyForEmit == globalReadyForEmit;
+
+        plan.otfFocusedSolveValidationRuns++;
+        if (!ok) {
+            plan.otfFocusedSolveValidationMismatches++;
+        }
+        plan.otfFocusedSolveValidationWinningDiffs += winningDiffs;
+        plan.otfFocusedSolveValidationStrategyDiffs += strategyDiffs;
+        plan.otfFocusedSolveValidationFairWaitStrategyDiffs += fairWaitStrategyDiffs;
+
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-OTF-Solve-Validate] status="
+                    + (ok ? "OK" : "WARNING")
+                    + ", targetOldState=" + oldControllerState
+                    + ", refreshedNodes="
+                    + (refreshedNodes == null ? 0 : refreshedNodes.size())
+                    + ", solveScopeNodes="
+                    + (solveScope == null ? 0 : solveScope.size())
+                    + ", contextNodes=" + context.nodes.size()
+                    + ", winningDiffs=" + winningDiffs
+                    + ", rootWinningDiffs=" + rootWinningDiffs
+                    + ", strategyDiffs=" + strategyDiffs
+                    + ", fairWaitStrategyDiffs=" + fairWaitStrategyDiffs
+                    + ", focusedRootWinningGroups="
+                    + focusedRootWinningGroups + "/" + plan.statesByOldController.size()
+                    + ", globalRootWinningGroups="
+                    + globalRootWinningGroups + "/" + plan.statesByOldController.size()
+                    + ", focusedWinningNodes=" + focusedWinningNodes
+                    + ", globalWinningNodes=" + globalWinningNodes
+                    + ", focusedUnresolvedNodes=" + focusedUnresolvedNodes
+                    + ", globalUnresolvedNodes=" + globalUnresolvedNodes
+                    + ", focusedEmitReachableNodes=" + focusedEmitReachableNodes
+                    + ", globalEmitReachableNodes=" + globalEmitReachableNodes
+                    + ", focusedSelectedTransitions="
+                    + focusedSelectedTransitions
+                    + ", globalSelectedTransitions="
+                    + globalSelectedTransitions
+                    + ", focusedReadyForEmit=" + focusedReadyForEmit
+                    + ", globalReadyForEmit=" + globalReadyForEmit);
+            for (String sample : strategyDiffSamples) {
+                log("    [Belief-Lite-OTF-Solve-Validate-StrategyDiff] " + sample);
+            }
+            int suppressedStrategyDiffs = strategyDiffs - strategyDiffSamples.size();
+            if (suppressedStrategyDiffs > 0) {
+                log("    [Belief-Lite-OTF-Solve-Validate-StrategyDiff] suppressed="
+                        + suppressedStrategyDiffs);
+            }
+        }
+
+        restoreBeliefLiteSolveState(snapshots);
+        refreshBeliefLiteStructuralStatsFromNodes(focusedStats, context.nodes);
+        collectBeliefLiteWinningStats(null, context.nodes, focusedStats);
+        plan.stats = focusedStats;
+        refreshBeliefLiteOutputPlanMetrics(plan, rawDirectorEdges);
+    }
+
+    private boolean shouldSkipBeliefLiteFocusedSolveValidationForDriver(
+            BeliefLiteOutputPlan plan) {
+
+        if (plan == null
+                || !"belief-node-driver".equals(plan.otfSearchKind)
+                || !beliefLiteOtfBeliefNodeDriverEnabled) {
+            return false;
+        }
+
+        int validateEvery = Math.max(0, beliefLiteOtfBeliefNodeDriverValidateEvery);
+        if (validateEvery == 0) {
+            return true;
+        }
+        if (validateEvery <= 1 || plan.isReadyForEmit()) {
+            return false;
+        }
+
+        int nextFocusedSolve = plan.otfFocusedSolveRefreshes + 1;
+        return nextFocusedSolve % validateEvery != 0;
+    }
+
+    private boolean isBeliefLiteFairWaitOnlyStrategyDiff(
+            BeliefLiteSolveSnapshot focusedSnapshot,
+            BeliefNode globalNode) {
+
+        if (focusedSnapshot == null || globalNode == null) {
+            return false;
+        }
+        return focusedSnapshot.winning == globalNode.winning
+                && focusedSnapshot.selectedFinish == globalNode.selectedFinish
+                && focusedSnapshot.selectedControllableEdge == globalNode.selectedControllableEdge
+                && focusedSnapshot.selectedFairUncontrollableEdge
+                        != globalNode.selectedFairUncontrollableEdge;
+    }
+
+    private Map<BeliefNode, BeliefLiteSolveSnapshot> snapshotBeliefLiteSolveState(
+            List<BeliefNode> nodes) {
+
+        Map<BeliefNode, BeliefLiteSolveSnapshot> snapshots = new IdentityHashMap<>();
+        if (nodes == null) {
+            return snapshots;
+        }
+        for (BeliefNode node : nodes) {
+            snapshots.put(node, new BeliefLiteSolveSnapshot(node));
+        }
+        return snapshots;
+    }
+
+    private void restoreBeliefLiteSolveState(
+            Map<BeliefNode, BeliefLiteSolveSnapshot> snapshots) {
+
+        if (snapshots == null) {
+            return;
+        }
+        for (Map.Entry<BeliefNode, BeliefLiteSolveSnapshot> entry : snapshots.entrySet()) {
+            entry.getValue().restore(entry.getKey());
+        }
+    }
+
+    private List<BeliefNode> collectBeliefLiteFocusedSolveScope(
+            BeliefSearchContext context,
+            Set<BeliefNode> refreshedNodes) {
+
+        if (context == null
+                || context.nodes == null
+                || context.nodes.isEmpty()
+                || refreshedNodes == null || refreshedNodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LinkedHashSet<BeliefNode> scope = new LinkedHashSet<>();
+        Deque<BeliefNode> queue = new ArrayDeque<>();
+
+        for (BeliefNode node : refreshedNodes) {
+            if (node != null && scope.add(node)) {
+                queue.add(node);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            BeliefNode node = queue.remove();
+            Collection<BeliefNode> incoming = context.predecessorsOf(node);
+            if (incoming == null || incoming.isEmpty()) {
+                continue;
+            }
+            for (BeliefNode predecessor : incoming) {
+                if (scope.add(predecessor)) {
+                    queue.add(predecessor);
+                }
+            }
+        }
+
+        return new ArrayList<>(scope);
+    }
+
+    private void refreshBeliefLiteStructuralStatsFromNodes(
+            BeliefLiteGraphStats stats,
+            List<BeliefNode> nodes) {
+
+        stats.nodes = nodes == null ? 0 : nodes.size();
+        stats.uncontrollableEdges = 0;
+        stats.controllableEdges = 0;
+        stats.finishNodes = 0;
+        stats.badNodes = 0;
+        if (nodes == null) {
+            return;
+        }
+        for (BeliefNode node : nodes) {
+            stats.uncontrollableEdges += node.uncontrollableEdges.size();
+            stats.controllableEdges += node.controllableEdges.size();
+            if (node.finishNcTargetId != null) {
+                stats.finishNodes++;
+            }
+            if (node.bad) {
+                stats.badNodes++;
+            }
+        }
+    }
+
+    private void resetBeliefLiteNodeGraphState(
+            BeliefSearchContext context,
+            BeliefNode node) {
+
+        if (context != null) {
+            context.removeOutgoingEdges(node);
+        } else {
+            node.uncontrollableEdges.clear();
+            node.controllableEdges.clear();
+        }
+        node.finishAction = null;
+        node.finishNcTargetId = null;
+        node.selectedControllableEdge = null;
+        node.selectedFairUncontrollableEdge = null;
+        node.selectedFinish = false;
+        node.winning = false;
+        node.bad = false;
+        node.badReason = "";
+    }
+
+    private void refreshBeliefLiteOutputPlanMetrics(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        plan.rootWinningGroups = 0;
+        plan.distinctRootNodes = 0;
+        plan.rootAliases = 0;
+        plan.sharedReachableNodes = 0;
+        plan.maxIncoming = 0;
+        plan.selfLoops = 0;
+        plan.preUpdateOldActionTransitions = 0;
+        plan.beginUpdateOutputTransitions = 0;
+        plan.selectedBeliefTransitions = 0;
+        plan.estimatedOutputStates = 0;
+        plan.estimatedOutputTransitions = 0;
+
+        Set<BeliefNode> distinctRoots = new LinkedHashSet<>(plan.rootsByOldState.values());
+        for (BeliefNode root : plan.rootsByOldState.values()) {
+            if (root.winning) {
+                plan.rootWinningGroups++;
+            }
+        }
+        plan.distinctRootNodes = distinctRoots.size();
+        plan.rootAliases = plan.rootsByOldState.size() - distinctRoots.size();
+        recordBeliefLiteEmitReachabilityStats(plan);
+
+        Map<BeliefNode, Integer> incomingCounts = buildBeliefIncomingCounts(
+                plan.nodes(), plan.rootsByOldState);
+        for (BeliefNode node : plan.nodes()) {
+            int incoming = incomingCounts.getOrDefault(node, 0);
+            if (incoming > 1) {
+                plan.sharedReachableNodes++;
+            }
+            plan.maxIncoming = Math.max(plan.maxIncoming, incoming);
+            for (BeliefTransition edge : getBeliefTransitions(node)) {
+                if (edge.target == node) {
+                    plan.selfLoops++;
+                }
+            }
+        }
+
+        int oldControllerOutputStates = plan.statesByOldController.size();
+        int ncOutputStates = newController == null ? 0 : newController.getStates().size();
+        plan.estimatedOutputStates = ncOutputStates
+                + oldControllerOutputStates
+                + plan.emitReachableBeliefNodes;
+        plan.beginUpdateOutputTransitions = plan.rootsByOldState.size();
+        plan.preUpdateOldActionTransitions =
+                countBeliefLitePreUpdateOldActionTransitions(
+                        plan.statesByOldController, rawDirectorEdges);
+        plan.selectedBeliefTransitions =
+                countSelectedBeliefOutputTransitions(plan.emitReachableNodes);
+        plan.estimatedOutputTransitions = plan.preUpdateOldActionTransitions
+                + plan.beginUpdateOutputTransitions
+                + plan.selectedBeliefTransitions;
+    }
+
+    private BeliefLiteOutputPlan expandBeliefLiteOutputPlanOnTheFly(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteOutputPlan initialPlan) {
+
+        if (beliefLiteOtfBeliefNodeDriverEnabled) {
+            return expandBeliefLiteOutputPlanWithBeliefNodeDriver(
+                    rawDirectorEdges, initialPlan);
+        }
+
+        if (beliefLiteFrontierContextEnabled) {
+            return expandBeliefLiteOutputPlanWithFrontierContext(
+                    rawDirectorEdges, initialPlan);
+        }
+
+        BeliefLiteOutputPlan plan = initialPlan;
+        int totalRootGroups = plan.statesByOldController.size();
+        if (totalRootGroups == 0 || plan.rootWinningGroups == totalRootGroups) {
+            return plan;
+        }
+
+        List<CompostateDUC<State, Action>> preUpdateStates =
+                collectBeliefLitePreUpdateStates(plan);
+        int initialConcreteStateCount = compostates == null ? 0 : compostates.size();
+        long initialTransitionCount = countCurrentExploredTransitions();
+        long startNanos = System.nanoTime();
+        Map<State, Set<String>> noProgressActionsByOldState = new LinkedHashMap<>();
+        Map<State, Set<String>> rejectedBeliefActionsByOldState = new LinkedHashMap<>();
+        BeliefRepairResourceLimits limits =
+                createBeliefLiteOtfResourceLimits(plan, rawDirectorEdges);
+
+        plan.otfExpansionAttempted = true;
+        plan.otfRootWinningBefore = plan.rootWinningGroups;
+        plan.otfRootWinningAfter = plan.rootWinningGroups;
+        plan.otfStopReason = "not-started";
+
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-OTF] start"
+                    + ", rootWinningGroups=" + plan.rootWinningGroups + "/" + totalRootGroups
+                    + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                    + ", limits=" + limits);
+        }
+
+        while (plan.rootWinningGroups < totalRootGroups) {
+            String limitReason = checkBeliefLiteOtfResourceLimit(
+                    plan, limits, initialConcreteStateCount, initialTransitionCount, startNanos);
+            if (limitReason != null) {
+                plan.otfExpansionLimitExceeded = true;
+                plan.otfStopReason = limitReason;
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + limitReason);
+                }
+                return plan;
+            }
+
+            int roundStart = plan.otfExpansionRounds + 1;
+            int rootWinningBefore = plan.rootWinningGroups;
+            long transitionsBefore = countCurrentExploredTransitions();
+            int concreteStatesBefore = compostates == null ? 0 : compostates.size();
+            String expansionMode = "";
+            State expandedOldState = null;
+            int expandedFrontierNodes = 0;
+            boolean expanded = false;
+            int expandedRounds = 0;
+
+            for (State oldControllerState : collectBeliefLiteUnwinningOldStates(plan)) {
+                Set<String> noProgressActions =
+                        noProgressActionsByOldState.computeIfAbsent(
+                                oldControllerState, k -> new HashSet<>());
+                Set<String> rejectedBeliefActions =
+                        rejectedBeliefActionsByOldState.computeIfAbsent(
+                                oldControllerState, k -> new HashSet<>());
+
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] round=" + roundStart
+                            + ", targetOldState=" + oldControllerState
+                            + ", rootWinningBefore=" + rootWinningBefore + "/" + totalRootGroups
+                            + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", batchActions<=" + Math.max(1, beliefLiteOtfBatchActions));
+                }
+
+                BeliefLiteOtfBatchResult batch = expandBeliefLiteOldStateOnTheFly(
+                        oldControllerState,
+                        plan.rootInfos.get(oldControllerState),
+                        rawDirectorEdges,
+                        noProgressActions,
+                        rejectedBeliefActions,
+                        roundStart,
+                        limits.maxBeliefNodes);
+
+                if (!batch.hasProgress()) {
+                    if (debugLogEnabled) {
+                        log("  [Belief-Lite-OTF] round=" + roundStart
+                                + ", targetOldState=" + oldControllerState
+                                + ", mode=none"
+                                + ", localRootWinning=" + batch.localRootWinning
+                                + ", frontierNodes=" + batch.frontierNodes
+                                + ", rejectedBeliefActions=" + rejectedBeliefActions.size()
+                                + ", noProgressActions=" + noProgressActions.size());
+                    }
+                    continue;
+                }
+
+                expanded = true;
+                expandedOldState = oldControllerState;
+                expandedFrontierNodes = batch.frontierNodes;
+                expandedRounds = batch.expansionRounds;
+                expansionMode = batch.lastMode;
+                plan.otfDirectFrontierExpansions += batch.directFrontierExpansions;
+                break;
+            }
+
+            plan.otfLastFrontierNodes = expandedFrontierNodes;
+            if (!expanded) {
+                plan.otfStopReason = "追加展開しても新しい遷移を発見できない";
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + plan.otfStopReason
+                            + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", rejectedBeliefActions="
+                            + countBeliefLiteOtfTrackedActions(rejectedBeliefActionsByOldState)
+                            + ", noProgressActions="
+                            + countBeliefLiteOtfTrackedActions(noProgressActionsByOldState));
+                }
+                return plan;
+            }
+
+            plan = buildBeliefLiteOutputPlanOnce(reachableOrder, directorEdges, rawDirectorEdges);
+            plan.otfExpansionAttempted = true;
+            plan.otfExpansionRounds = roundStart + Math.max(1, expandedRounds) - 1;
+            plan.otfRootWinningBefore = initialPlan.otfRootWinningBefore;
+            plan.otfRootWinningAfter = plan.rootWinningGroups;
+            plan.otfAddedConcreteStates =
+                    Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+            plan.otfAddedTransitions =
+                    Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+            plan.otfLastFrontierNodes = expandedFrontierNodes;
+            plan.otfStopReason = "running";
+            limits = createBeliefLiteOtfResourceLimits(plan, rawDirectorEdges);
+
+            if (debugLogEnabled) {
+                log("  [Belief-Lite-OTF] round=" + plan.otfExpansionRounds
+                        + ", targetOldState=" + expandedOldState
+                        + ", mode=" + expansionMode
+                        + ", batchExpandedActions=" + Math.max(1, expandedRounds)
+                        + ", rootWinningAfter=" + plan.rootWinningGroups + "/" + totalRootGroups
+                        + ", addedEdgesThisRound="
+                        + Math.max(0L, countCurrentExploredTransitions() - transitionsBefore)
+                        + ", addedConcreteThisRound="
+                        + Math.max(0, (compostates == null ? 0 : compostates.size()) - concreteStatesBefore)
+                        + ", totalAddedConcrete=" + plan.otfAddedConcreteStates
+                        + ", totalAddedTransitions=" + plan.otfAddedTransitions
+                        + ", focusedRefreshes=" + plan.otfFocusedRefreshes
+                        + ", focusedRefreshNodes=" + plan.otfFocusedRefreshNodes
+                        + ", focusedSolveRefreshes=" + plan.otfFocusedSolveRefreshes
+                        + ", focusedSolveNodes=" + plan.otfFocusedSolveNodes
+                        + ", focusedSolveLastNodes=" + plan.otfFocusedSolveLastNodes
+                        + ", focusedSolveFallbacks=" + plan.otfFocusedSolveFallbacks
+                        + ", fullRefreshes=" + plan.otfFullRefreshes
+                        + ", directFrontierExpansions="
+                        + plan.otfDirectFrontierExpansions
+                        + ", rawEdgeIncrementalRefreshes="
+                        + plan.otfRawEdgeIncrementalRefreshes
+                        + ", rawEdgeIncrementalStates="
+                        + plan.otfRawEdgeIncrementalStates
+                        + ", rawEdgeFullRefreshes="
+                        + plan.otfRawEdgeFullRefreshes);
+            }
+
+            if (plan.isReadyForEmit()) {
+                plan.otfStopReason = "readyForEmit";
+                return plan;
+            }
+        }
+
+        plan.otfStopReason = plan.rootWinningGroups == totalRootGroups
+                ? "all roots winning"
+                : "rootWinningGroups=" + plan.rootWinningGroups + "/" + totalRootGroups;
+        return plan;
+    }
+
+    private BeliefLiteOutputPlan expandBeliefLiteOutputPlanWithBeliefNodeDriver(
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteOutputPlan initialPlan) {
+
+        BeliefLiteOutputPlan plan = initialPlan;
+        if (plan == null || plan.context == null) {
+            return plan;
+        }
+
+        int totalRootGroups = plan.statesByOldController.size();
+        if (totalRootGroups == 0 || plan.rootWinningGroups == totalRootGroups) {
+            return plan;
+        }
+
+        int initialConcreteStateCount = compostates == null ? 0 : compostates.size();
+        long initialTransitionCount = countCurrentExploredTransitions();
+        long startNanos = System.nanoTime();
+        Set<String> noProgressActions = new HashSet<>();
+        Set<String> rejectedBeliefActions = new HashSet<>();
+        BeliefRepairResourceLimits limits =
+                createBeliefLiteOtfResourceLimits(plan, rawDirectorEdges);
+
+        plan.otfExpansionAttempted = true;
+        plan.otfRootWinningBefore = plan.rootWinningGroups;
+        plan.otfRootWinningAfter = plan.rootWinningGroups;
+        plan.otfStopReason = "not-started";
+        plan.otfSearchKind = "belief-node-driver";
+        plan.otfLastFrontierNodes = plan.context.queue.size();
+        plan.otfDriverTargetOldState = null;
+        beginBeliefNodeDriverSearchResourceTracking();
+
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-OTF] start"
+                    + ", searchKind=" + plan.otfSearchKind
+                    + ", rootWinningGroups=" + plan.rootWinningGroups + "/" + totalRootGroups
+                    + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                    + ", contextNodes=" + plan.nodes().size()
+                    + ", queueRemaining=" + plan.context.queue.size()
+                    + ", solveBatchNodes<="
+                    + Math.max(1, beliefLiteOtfBeliefNodeDriverSolveBatchNodes)
+                    + ", frontierNodeOrder=marking-depth-lifo"
+                    + ", frontierScope="
+                    + (beliefLiteOtfBeliefNodeDriverRootFocus
+                            ? "root-focused"
+                            : "global")
+                    + ", ordinaryControllableChoice=duc-rank"
+                    + ", limits=" + limits);
+        }
+
+        while (plan.rootWinningGroups < totalRootGroups) {
+            updateBeliefNodeDriverSearchPeakMemory();
+            String limitReason = checkBeliefLiteOtfResourceLimit(
+                    plan, limits, initialConcreteStateCount, initialTransitionCount, startNanos);
+            if (limitReason != null) {
+                plan.otfExpansionLimitExceeded = true;
+                plan.otfStopReason = limitReason;
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + limitReason);
+                }
+                finishBeliefNodeDriverSearchResourceTracking(startNanos, plan);
+                return plan;
+            }
+
+            State targetOldState = beliefLiteOtfBeliefNodeDriverRootFocus
+                    ? selectBeliefLiteDriverTargetOldState(plan)
+                    : null;
+            if (beliefLiteOtfBeliefNodeDriverRootFocus && targetOldState == null) {
+                plan.otfStopReason = "belief-node-driver frontier queue empty";
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + plan.otfStopReason
+                            + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", rejectedBeliefActions=" + rejectedBeliefActions.size()
+                            + ", noProgressActions=" + noProgressActions.size());
+                }
+                finishBeliefNodeDriverSearchResourceTracking(startNanos, plan);
+                return plan;
+            }
+
+            int roundStart = plan.otfExpansionRounds + 1;
+            long transitionsBefore = countCurrentExploredTransitions();
+            int concreteStatesBefore = compostates == null ? 0 : compostates.size();
+            int contextNodesBefore = plan.nodes().size();
+            int queueBefore = plan.context.queue.size();
+
+            BeliefLiteOtfBatchResult batch = expandBeliefLiteDriverBatch(
+                    plan,
+                    targetOldState,
+                    rawDirectorEdges,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    roundStart,
+                    limits,
+                    initialConcreteStateCount,
+                    initialTransitionCount,
+                    startNanos);
+            updateBeliefNodeDriverSearchPeakMemory();
+
+            if (batch.limitReason != null) {
+                plan.otfExpansionLimitExceeded = true;
+                plan.otfStopReason = batch.limitReason;
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + batch.limitReason);
+                }
+                finishBeliefNodeDriverSearchResourceTracking(startNanos, plan);
+                return plan;
+            }
+
+            if (batch.expansionRounds == 0 && batch.refreshedNodes.isEmpty()) {
+                plan.otfStopReason = "belief-node-driver frontier queue empty";
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + plan.otfStopReason
+                            + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", rejectedBeliefActions=" + rejectedBeliefActions.size()
+                            + ", noProgressActions=" + noProgressActions.size());
+                }
+                finishBeliefNodeDriverSearchResourceTracking(startNanos, plan);
+                return plan;
+            }
+
+            plan.otfExpansionRounds = roundStart + Math.max(1, batch.expansionRounds) - 1;
+            plan.otfRootWinningAfter = plan.rootWinningGroups;
+            plan.otfAddedConcreteStates =
+                    Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+            plan.otfAddedTransitions =
+                    Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+            plan.otfLastFrontierNodes = plan.context.queue.size();
+            limits = createBeliefLiteOtfResourceLimits(plan, rawDirectorEdges);
+
+            if (debugLogEnabled) {
+                log("  [Belief-Lite-OTF] round=" + roundStart
+                        + ".." + plan.otfExpansionRounds
+                        + ", searchKind=" + plan.otfSearchKind
+                        + ", targetOldState="
+                        + (targetOldState == null ? "GLOBAL" : targetOldState)
+                        + ", batchNodes=" + batch.expansionRounds
+                        + ", refreshedNodes=" + batch.refreshedNodes.size()
+                        + ", solveBatches=" + plan.otfDriverSolveBatches
+                        + ", mode=" + batch.lastMode
+                        + ", attemptedActions=" + batch.attemptedActions
+                        + ", expandedActions=" + batch.expandedActions
+                        + ", addedEdges=" + batch.addedEdges
+                        + ", touchedConcreteStates=" + batch.touchedConcreteStates.size()
+                        + ", queueBefore=" + queueBefore
+                        + ", queueAfter=" + plan.context.queue.size()
+                        + ", contextNodesBefore=" + contextNodesBefore
+                        + ", contextNodesAfter=" + plan.nodes().size()
+                        + ", addedEdgesThisRound="
+                        + Math.max(0L, countCurrentExploredTransitions() - transitionsBefore)
+                        + ", addedConcreteThisRound="
+                        + Math.max(0, (compostates == null ? 0 : compostates.size()) - concreteStatesBefore)
+                        + ", rootWinningAfter=" + plan.rootWinningGroups + "/" + totalRootGroups
+                        + ", focusedRefreshes=" + plan.otfFocusedRefreshes
+                        + ", focusedSolveRefreshes=" + plan.otfFocusedSolveRefreshes
+                        + ", focusedSolveNodes=" + plan.otfFocusedSolveNodes
+                        + ", focusedSolveLastNodes=" + plan.otfFocusedSolveLastNodes
+                        + ", focusedSolveFallbacks=" + plan.otfFocusedSolveFallbacks
+                        + ", rawEdgeIncrementalRefreshes="
+                        + plan.otfRawEdgeIncrementalRefreshes
+                        + ", rawEdgeIncrementalStates="
+                        + plan.otfRawEdgeIncrementalStates
+                        + ", rawEdgeFullRefreshes="
+                        + plan.otfRawEdgeFullRefreshes);
+            }
+
+            if (plan.isReadyForEmit()) {
+                plan.otfStopReason = "readyForEmit";
+                finishBeliefNodeDriverSearchResourceTracking(startNanos, plan);
+                return plan;
+            }
+        }
+
+        plan.otfStopReason = plan.rootWinningGroups == totalRootGroups
+                ? "all roots winning"
+                : "rootWinningGroups=" + plan.rootWinningGroups + "/" + totalRootGroups;
+        finishBeliefNodeDriverSearchResourceTracking(startNanos, plan);
+        return plan;
+    }
+
+    private BeliefNode pollBeliefLiteDriverNode(BeliefLiteOutputPlan plan) {
+        if (plan == null || plan.context == null || plan.context.queue.isEmpty()) {
+            return null;
+        }
+
+        State targetOldState = beliefLiteOtfBeliefNodeDriverRootFocus
+                ? selectBeliefLiteDriverTargetOldState(plan)
+                : null;
+        if (beliefLiteOtfBeliefNodeDriverRootFocus && targetOldState == null) {
+            return null;
+        }
+        return pollBeliefLiteDriverNode(plan, targetOldState);
+    }
+
+    private BeliefNode pollBeliefLiteDriverNode(
+            BeliefLiteOutputPlan plan,
+            State targetOldState) {
+
+        if (plan == null || plan.context == null || plan.context.queue.isEmpty()) {
+            return null;
+        }
+
+        BeliefNode best = null;
+        if (targetOldState == null) {
+            for (BeliefNode node : plan.context.queue) {
+                if (best == null
+                        || compareBeliefDriverFrontierNodes(node, best) < 0) {
+                    best = node;
+                }
+            }
+        } else {
+            Set<BeliefNode> focusedNodes =
+                    new HashSet<>(collectBeliefLiteNodesReachableFromRoot(
+                            plan, targetOldState));
+            for (BeliefNode node : plan.context.queue) {
+                if (focusedNodes.contains(node)) {
+                    if (best == null
+                            || compareBeliefDriverFrontierNodes(node, best) < 0) {
+                        best = node;
+                    }
+                }
+            }
+        }
+
+        if (best != null) {
+            Iterator<BeliefNode> it = plan.context.queue.iterator();
+            while (it.hasNext()) {
+                if (it.next() == best) {
+                    it.remove();
+                    return best;
+                }
+            }
+        }
+        return null;
+    }
+
+    private int compareBeliefDriverFrontierNodes(
+            BeliefNode left,
+            BeliefNode right) {
+
+        int cmp = Integer.compare(
+                beliefNodeMaxMarkingDepth(right),
+                beliefNodeMaxMarkingDepth(left));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        cmp = Integer.compare(
+                beliefNodeMaxSeq(right),
+                beliefNodeMaxSeq(left));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        cmp = Long.compare(
+                beliefNodeMaxMarkingState(right),
+                beliefNodeMaxMarkingState(left));
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        return Integer.compare(right.localId, left.localId);
+    }
+
+    private State selectBeliefLiteDriverTargetOldState(BeliefLiteOutputPlan plan) {
+        if (plan == null || plan.context == null || plan.context.queue.isEmpty()) {
+            return null;
+        }
+
+        if (isBeliefLiteDriverTargetUsable(plan, plan.otfDriverTargetOldState)) {
+            return plan.otfDriverTargetOldState;
+        }
+
+        State previousTarget = plan.otfDriverTargetOldState;
+        for (State oldControllerState : collectBeliefLiteUnwinningOldStates(plan)) {
+            if (!hasQueuedBeliefLiteDriverNodeReachableFromRoot(plan, oldControllerState)) {
+                continue;
+            }
+            plan.otfDriverTargetOldState = oldControllerState;
+            if (!Objects.equals(previousTarget, oldControllerState)) {
+                plan.otfDriverTargetSwitches++;
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] searchKind=" + plan.otfSearchKind
+                            + ", targetOldState=" + oldControllerState
+                            + ", targetSwitches=" + plan.otfDriverTargetSwitches
+                            + ", rootWinningGroups=" + plan.rootWinningGroups
+                            + "/" + plan.statesByOldController.size()
+                            + ", queueRemaining=" + plan.context.queue.size());
+                }
+            }
+            return oldControllerState;
+        }
+
+        plan.otfDriverTargetOldState = null;
+        return null;
+    }
+
+    private boolean isBeliefLiteDriverTargetUsable(
+            BeliefLiteOutputPlan plan,
+            State oldControllerState) {
+
+        if (oldControllerState == null) {
+            return false;
+        }
+        BeliefNode root = plan.rootsByOldState.get(oldControllerState);
+        return root != null
+                && !root.winning
+                && hasQueuedBeliefLiteDriverNodeReachableFromRoot(
+                        plan, oldControllerState);
+    }
+
+    private boolean hasQueuedBeliefLiteDriverNodeReachableFromRoot(
+            BeliefLiteOutputPlan plan,
+            State oldControllerState) {
+
+        if (plan == null || plan.context == null || oldControllerState == null) {
+            return false;
+        }
+
+        Set<BeliefNode> reachable =
+                new HashSet<>(collectBeliefLiteNodesReachableFromRoot(
+                        plan, oldControllerState));
+        if (reachable.isEmpty()) {
+            return false;
+        }
+
+        for (BeliefNode queued : plan.context.queue) {
+            if (reachable.contains(queued)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private BeliefLiteOtfBatchResult expandBeliefLiteDriverBatch(
+            BeliefLiteOutputPlan plan,
+            State targetOldState,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int startRound,
+            BeliefRepairResourceLimits limits,
+            int initialConcreteStateCount,
+            long initialTransitionCount,
+            long startNanos) {
+
+        BeliefLiteOtfBatchResult batch = new BeliefLiteOtfBatchResult();
+        if (plan == null || plan.context == null) {
+            return batch;
+        }
+
+        BeliefSearchContext context = plan.context;
+        int batchLimit = Math.max(1, beliefLiteOtfBeliefNodeDriverSolveBatchNodes);
+        for (int batchIndex = 0; batchIndex < batchLimit; batchIndex++) {
+            String limitReason = checkBeliefLiteOtfResourceLimit(
+                    plan, limits, initialConcreteStateCount, initialTransitionCount, startNanos);
+            if (limitReason != null) {
+                batch.limitReason = limitReason;
+                break;
+            }
+
+            BeliefNode node = pollBeliefLiteDriverNode(plan, targetOldState);
+            if (node == null) {
+                break;
+            }
+
+            BeliefLiteOtfBatchResult nodeBatch = expandBeliefLiteDriverNode(
+                    plan,
+                    node,
+                    rawDirectorEdges,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    startRound + batch.expansionRounds);
+
+            batch.expansionRounds++;
+            batch.frontierNodes = Math.max(batch.frontierNodes, nodeBatch.frontierNodes);
+            batch.attemptedActions += nodeBatch.attemptedActions;
+            batch.expandedActions += nodeBatch.expandedActions;
+            batch.addedEdges += nodeBatch.addedEdges;
+            batch.touchedConcreteStates.addAll(nodeBatch.touchedConcreteStates);
+            batch.refreshedNodes.addAll(nodeBatch.refreshedNodes);
+            if (!"none".equals(nodeBatch.lastMode)) {
+                batch.lastMode = nodeBatch.lastMode;
+            }
+        }
+
+        if (batch.refreshedNodes.isEmpty() && batch.touchedConcreteStates.isEmpty()) {
+            return batch;
+        }
+
+        LinkedHashSet<BeliefNode> refreshedNodes = new LinkedHashSet<>();
+        refreshedNodes.addAll(batch.refreshedNodes);
+        refreshedNodes.addAll(context.nodesContainingMembers(batch.touchedConcreteStates));
+
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        for (BeliefNode refreshedNode : refreshedNodes) {
+            resetBeliefLiteNodeGraphState(context, refreshedNode);
+            expandBeliefLiteDryRunNode(
+                    null,
+                    refreshedNode,
+                    context,
+                    rawDirectorEdges,
+                    stats,
+                    false);
+        }
+
+        evaluateBeliefLiteDriverRefreshedNodes(
+                plan,
+                rawDirectorEdges,
+                stats,
+                targetOldState,
+                refreshedNodes);
+        plan.otfDriverSolveBatches++;
+        plan.otfDriverBatchNodes += batch.expansionRounds;
+        plan.otfDriverRefreshedNodes += refreshedNodes.size();
+
+        for (BeliefNode refreshedNode : refreshedNodes) {
+            if (shouldRequeueBeliefLiteDriverNode(
+                    refreshedNode,
+                    noProgressActions,
+                    rejectedBeliefActions)) {
+                context.enqueueIfAbsent(refreshedNode);
+            }
+        }
+
+        batch.localRootWinning =
+                plan.rootsByOldState.containsKey(targetOldState)
+                        && plan.rootsByOldState.get(targetOldState).winning;
+        batch.refreshedNodes.clear();
+        batch.refreshedNodes.addAll(refreshedNodes);
+        return batch;
+    }
+
+    private BeliefLiteOtfBatchResult expandBeliefLiteDriverNode(
+            BeliefLiteOutputPlan plan,
+            BeliefNode node,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round) {
+
+        BeliefLiteOtfBatchResult batch = new BeliefLiteOtfBatchResult();
+        if (plan == null || plan.context == null || node == null) {
+            return batch;
+        }
+
+        BeliefSearchContext context = plan.context;
+        batch.frontierNodes = context.queue.size() + 1;
+        boolean wasWinning = node.winning;
+        batch.localRootWinning = wasWinning;
+
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        resetBeliefLiteNodeGraphState(context, node);
+        expandBeliefLiteDryRunNode(null, node, context, rawDirectorEdges, stats, false);
+        batch.refreshedNodes.add(node);
+
+        node.winning = wasWinning;
+        if (wasWinning
+                && !hasPendingBeliefLiteDriverUncontrollable(node, noProgressActions)) {
+            return batch;
+        }
+
+        BeliefLazyExpansionResult expansion = expandBeliefLiteDriverCandidates(
+                "belief-node-driver",
+                node,
+                noProgressActions,
+                rejectedBeliefActions,
+                round);
+
+        if (!expansion.touchedConcreteStates.isEmpty()) {
+            batch.touchedConcreteStates.addAll(expansion.touchedConcreteStates);
+            refreshRawDirectorEdgesAfterBeliefLiteOtfExpansion(
+                    rawDirectorEdges,
+                    expansion.touchedConcreteStates,
+                    plan);
+            enqueueBeliefLiteDriverTouchedMemberNodes(
+                    context,
+                    expansion.touchedConcreteStates,
+                    node);
+        }
+
+        batch.attemptedActions = expansion.attemptedActions;
+        batch.expandedActions = expansion.expandedActions;
+        batch.addedEdges = expansion.addedEdges;
+        batch.lastMode = expansion.mode;
+        return batch;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefLiteDriverCandidates(
+            Object oldControllerState,
+            BeliefNode node,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round) {
+
+        List<BeliefNode> singletonNode = Collections.singletonList(node);
+        BeliefLazyExpansionResult expansion =
+                expandBeliefLiteDirectControllableFrontier(
+                        oldControllerState,
+                        singletonNode,
+                        noProgressActions,
+                        rejectedBeliefActions,
+                        round,
+                        true);
+        if (expansion.hasProgress()) {
+            expansion.mode = "update-event";
+            return expansion;
+        }
+
+        expansion = expandBeliefLiteDriverUncontrollableStep(
+                oldControllerState,
+                node,
+                noProgressActions,
+                round);
+        if (expansion.hasProgress()) {
+            expansion.mode = "uncontrollable";
+            return expansion;
+        }
+
+        expansion = expandBeliefLiteDirectControllableFrontier(
+                oldControllerState,
+                singletonNode,
+                noProgressActions,
+                rejectedBeliefActions,
+                round,
+                false);
+        if (expansion.hasProgress()) {
+            expansion.mode = "ordinary-controllable";
+        }
+        return expansion;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefLiteDriverUncontrollableStep(
+            Object oldControllerState,
+            BeliefNode node,
+            Set<String> noProgressActions,
+            int round) {
+
+        BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
+        List<BeliefNode> singletonNode = Collections.singletonList(node);
+        BeliefExpansionCandidate candidate =
+                selectNextUncontrollableBeliefCandidate(
+                        oldControllerState,
+                        singletonNode,
+                        noProgressActions);
+        if (candidate != null) {
+            expandBeliefExpansionCandidate(
+                    candidate,
+                    noProgressActions,
+                    Collections.emptySet(),
+                    result,
+                    true,
+                    "Belief-Lite-OTF");
+        }
+        return result;
+    }
+
+    private void evaluateBeliefLiteDriverRefreshedNode(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            BeliefNode node) {
+
+        Set<BeliefNode> refreshedNodes = new LinkedHashSet<>();
+        refreshedNodes.add(node);
+        evaluateBeliefLiteDriverRefreshedNodes(
+                plan,
+                rawDirectorEdges,
+                stats,
+                null,
+                refreshedNodes);
+    }
+
+    private void evaluateBeliefLiteDriverRefreshedNodes(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            State oldControllerState,
+            Set<BeliefNode> refreshedNodes) {
+
+        if (refreshedNodes == null || refreshedNodes.isEmpty()) {
+            return;
+        }
+        if (!evaluateBeliefLiteOutputPlanGraphFocused(
+                plan,
+                rawDirectorEdges,
+                stats,
+                oldControllerState,
+                refreshedNodes)) {
+            plan.otfFocusedSolveFallbacks++;
+            evaluateBeliefLiteOutputPlanGraph(
+                    plan,
+                    rawDirectorEdges,
+                    stats,
+                    "Belief-Lite-Output-Winning",
+                    "Belief-Lite-Output-Fairness",
+                    "Belief-Lite-Output-Strategy");
+        }
+    }
+
+    private int enqueueBeliefLiteDriverTouchedMemberNodes(
+            BeliefSearchContext context,
+            Set<CompostateDUC<State, Action>> touchedConcreteStates,
+            BeliefNode currentNode) {
+
+        if (context == null
+                || touchedConcreteStates == null
+                || touchedConcreteStates.isEmpty()) {
+            return 0;
+        }
+
+        int added = 0;
+        for (BeliefNode node : context.nodesContainingMembers(touchedConcreteStates)) {
+            if (node == null || node == currentNode) {
+                continue;
+            }
+            if (context.enqueueIfAbsent(node)) {
+                added++;
+            }
+        }
+        return added;
+    }
+
+    private boolean shouldRequeueBeliefLiteDriverNode(
+            BeliefNode node,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions) {
+
+        if (node == null || node.bad) {
+            return false;
+        }
+        if (hasPendingBeliefLiteDriverUncontrollable(node, noProgressActions)) {
+            return true;
+        }
+        return !node.winning
+                && hasPendingBeliefLiteDriverControllable(
+                        node, noProgressActions, rejectedBeliefActions);
+    }
+
+    private boolean hasPendingBeliefLiteDriverUncontrollable(
+            BeliefNode node,
+            Set<String> noProgressActions) {
+
+        return !collectUnexploredUncontrollableActionNames(
+                node, noProgressActions).isEmpty();
+    }
+
+    private boolean hasPendingBeliefLiteDriverControllable(
+            BeliefNode node,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions) {
+
+        for (String actionName : collectCommonControllableActionNames(node)) {
+            if (rejectedBeliefActions.contains(beliefActionKey(node, actionName))) {
+                continue;
+            }
+            if (hasExpandableBeliefAction(node, actionName, true, noProgressActions)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private BeliefLiteOutputPlan expandBeliefLiteOutputPlanWithFrontierContext(
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteOutputPlan initialPlan) {
+
+        BeliefLiteOutputPlan plan = initialPlan;
+        int totalRootGroups = plan.statesByOldController.size();
+        if (totalRootGroups == 0 || plan.rootWinningGroups == totalRootGroups) {
+            return plan;
+        }
+
+        int initialConcreteStateCount = compostates == null ? 0 : compostates.size();
+        long initialTransitionCount = countCurrentExploredTransitions();
+        long startNanos = System.nanoTime();
+        Map<State, Set<String>> noProgressActionsByOldState = new LinkedHashMap<>();
+        Map<State, Set<String>> rejectedBeliefActionsByOldState = new LinkedHashMap<>();
+        BeliefRepairResourceLimits limits =
+                createBeliefLiteOtfResourceLimits(plan, rawDirectorEdges);
+
+        plan.otfExpansionAttempted = true;
+        plan.otfRootWinningBefore = plan.rootWinningGroups;
+        plan.otfRootWinningAfter = plan.rootWinningGroups;
+        plan.otfStopReason = "not-started";
+        plan.otfSearchKind = beliefLiteOtfDirectFrontierEnabled
+                ? "direct-belief-frontier"
+                : "frontier-context";
+        if (beliefLiteOtfFocusedRefreshEnabled) {
+            plan.otfSearchKind += "-focused-refresh";
+        }
+
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-OTF] start"
+                    + ", searchKind=" + plan.otfSearchKind
+                    + ", rootWinningGroups=" + plan.rootWinningGroups + "/" + totalRootGroups
+                    + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                    + ", contextNodes=" + plan.nodes().size()
+                    + ", limits=" + limits);
+        }
+
+        while (plan.rootWinningGroups < totalRootGroups) {
+            String limitReason = checkBeliefLiteOtfResourceLimit(
+                    plan, limits, initialConcreteStateCount, initialTransitionCount, startNanos);
+            if (limitReason != null) {
+                plan.otfExpansionLimitExceeded = true;
+                plan.otfStopReason = limitReason;
+                plan.otfRootWinningAfter = plan.rootWinningGroups;
+                plan.otfAddedConcreteStates =
+                        Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+                plan.otfAddedTransitions =
+                        Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + limitReason);
+                }
+                return plan;
+            }
+
+            int roundStart = plan.otfExpansionRounds + 1;
+            int rootWinningBefore = plan.rootWinningGroups;
+            long transitionsBefore = countCurrentExploredTransitions();
+            int concreteStatesBefore = compostates == null ? 0 : compostates.size();
+            String expansionMode = "";
+            State expandedOldState = null;
+            int expandedFrontierNodes = 0;
+            boolean expanded = false;
+            int expandedRounds = 0;
+
+            for (State oldControllerState : collectBeliefLiteUnwinningOldStates(plan)) {
+                Set<String> noProgressActions =
+                        noProgressActionsByOldState.computeIfAbsent(
+                                oldControllerState, k -> new HashSet<>());
+                Set<String> rejectedBeliefActions =
+                        rejectedBeliefActionsByOldState.computeIfAbsent(
+                                oldControllerState, k -> new HashSet<>());
+
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] round=" + roundStart
+                            + ", searchKind=" + plan.otfSearchKind
+                            + ", targetOldState=" + oldControllerState
+                            + ", rootWinningBefore=" + rootWinningBefore + "/" + totalRootGroups
+                            + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", batchActions<=" + Math.max(1, beliefLiteOtfBatchActions));
+                }
+
+                BeliefLiteOtfBatchResult batch =
+                        expandBeliefLiteOldStateFromFrontierContext(
+                                oldControllerState,
+                                plan,
+                                rawDirectorEdges,
+                                noProgressActions,
+                                rejectedBeliefActions,
+                                roundStart);
+
+                if (!batch.hasProgress()) {
+                    if (debugLogEnabled) {
+                        log("  [Belief-Lite-OTF] round=" + roundStart
+                                + ", searchKind=" + plan.otfSearchKind
+                                + ", targetOldState=" + oldControllerState
+                                + ", mode=none"
+                                + ", localRootWinning=" + batch.localRootWinning
+                                + ", frontierNodes=" + batch.frontierNodes
+                                + ", rejectedBeliefActions=" + rejectedBeliefActions.size()
+                                + ", noProgressActions=" + noProgressActions.size());
+                    }
+                    continue;
+                }
+
+                expanded = true;
+                expandedOldState = oldControllerState;
+                expandedFrontierNodes = batch.frontierNodes;
+                expandedRounds = batch.expansionRounds;
+                expansionMode = batch.lastMode;
+                plan.otfDirectFrontierExpansions += batch.directFrontierExpansions;
+                break;
+            }
+
+            plan.otfLastFrontierNodes = expandedFrontierNodes;
+            plan.otfAddedConcreteStates =
+                    Math.max(0, (compostates == null ? 0 : compostates.size()) - initialConcreteStateCount);
+            plan.otfAddedTransitions =
+                    Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+            plan.otfRootWinningAfter = plan.rootWinningGroups;
+
+            if (!expanded) {
+                plan.otfStopReason = "追加展開しても新しい遷移を発見できない";
+                if (debugLogEnabled) {
+                    log("  [Belief-Lite-OTF] stop: " + plan.otfStopReason
+                            + ", unresolvedRoots=" + describeBeliefLiteUnwinningRoots(plan, 12)
+                            + ", rejectedBeliefActions="
+                            + countBeliefLiteOtfTrackedActions(rejectedBeliefActionsByOldState)
+                            + ", noProgressActions="
+                            + countBeliefLiteOtfTrackedActions(noProgressActionsByOldState));
+                }
+                return plan;
+            }
+
+            plan.otfExpansionRounds = roundStart + Math.max(1, expandedRounds) - 1;
+            plan.otfStopReason = "running";
+            limits = createBeliefLiteOtfResourceLimits(plan, rawDirectorEdges);
+
+            if (debugLogEnabled) {
+                log("  [Belief-Lite-OTF] round=" + plan.otfExpansionRounds
+                        + ", searchKind=" + plan.otfSearchKind
+                        + ", targetOldState=" + expandedOldState
+                        + ", mode=" + expansionMode
+                        + ", batchExpandedActions=" + Math.max(1, expandedRounds)
+                        + ", rootWinningAfter=" + plan.rootWinningGroups + "/" + totalRootGroups
+                        + ", contextNodes=" + plan.nodes().size()
+                        + ", addedEdgesThisRound="
+                        + Math.max(0L, countCurrentExploredTransitions() - transitionsBefore)
+                        + ", addedConcreteThisRound="
+                        + Math.max(0, (compostates == null ? 0 : compostates.size()) - concreteStatesBefore)
+                        + ", totalAddedConcrete=" + plan.otfAddedConcreteStates
+                        + ", totalAddedTransitions=" + plan.otfAddedTransitions
+                        + ", focusedRefreshes=" + plan.otfFocusedRefreshes
+                        + ", focusedRefreshNodes=" + plan.otfFocusedRefreshNodes
+                        + ", focusedSolveRefreshes=" + plan.otfFocusedSolveRefreshes
+                        + ", focusedSolveNodes=" + plan.otfFocusedSolveNodes
+                        + ", focusedSolveLastNodes=" + plan.otfFocusedSolveLastNodes
+                        + ", focusedSolveFallbacks=" + plan.otfFocusedSolveFallbacks
+                        + ", fullRefreshes=" + plan.otfFullRefreshes
+                        + ", directFrontierExpansions="
+                        + plan.otfDirectFrontierExpansions
+                        + ", rawEdgeIncrementalRefreshes="
+                        + plan.otfRawEdgeIncrementalRefreshes
+                        + ", rawEdgeIncrementalStates="
+                        + plan.otfRawEdgeIncrementalStates
+                        + ", rawEdgeFullRefreshes="
+                        + plan.otfRawEdgeFullRefreshes);
+            }
+
+            if (plan.isReadyForEmit()) {
+                plan.otfStopReason = "readyForEmit";
+                return plan;
+            }
+        }
+
+        plan.otfStopReason = plan.rootWinningGroups == totalRootGroups
+                ? "all roots winning"
+                : "rootWinningGroups=" + plan.rootWinningGroups + "/" + totalRootGroups;
+        return plan;
+    }
+
+    private BeliefLiteOtfBatchResult expandBeliefLiteOldStateFromFrontierContext(
+            State oldControllerState,
+            BeliefLiteOutputPlan outputPlan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int startRound) {
+
+        if (beliefLiteOtfDirectFrontierEnabled) {
+            return expandBeliefLiteOldStateFromDirectFrontier(
+                    oldControllerState,
+                    outputPlan,
+                    rawDirectorEdges,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    startRound);
+        }
+
+        BeliefLiteOtfBatchResult batch = new BeliefLiteOtfBatchResult();
+        if (outputPlan == null || outputPlan.context == null) {
+            return batch;
+        }
+
+        int batchLimit = Math.max(1, beliefLiteOtfBatchActions);
+        for (int batchIndex = 0; batchIndex < batchLimit; batchIndex++) {
+            BeliefRepairPlan frontierPlan =
+                    buildBeliefLiteFrontierExpansionPlan(outputPlan, oldControllerState);
+            batch.frontierNodes = Math.max(batch.frontierNodes, frontierPlan.nodes.size());
+            batch.localRootWinning = frontierPlan.root != null && frontierPlan.root.winning;
+            if (frontierPlan.root == null || batch.localRootWinning) {
+                break;
+            }
+
+            List<BeliefNode> focusedNodes = collectBeliefLiteFocusedExpansionNodes(frontierPlan);
+            BeliefLazyExpansionResult expansion = expandBeliefLiteLocalCandidates(
+                    frontierPlan,
+                    focusedNodes,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    startRound + batch.expansionRounds);
+
+            if (!expansion.hasProgress() && focusedNodes.size() != frontierPlan.nodes.size()) {
+                expansion = expandBeliefLiteLocalCandidates(
+                        frontierPlan,
+                        frontierPlan.nodes,
+                        noProgressActions,
+                        rejectedBeliefActions,
+                        startRound + batch.expansionRounds);
+            }
+
+            if (!expansion.hasProgress()) {
+                break;
+            }
+
+            batch.expansionRounds++;
+            batch.attemptedActions += expansion.attemptedActions;
+            batch.expandedActions += expansion.expandedActions;
+            batch.addedEdges += expansion.addedEdges;
+            batch.lastMode = expansion.mode;
+            batch.touchedConcreteStates.addAll(expansion.touchedConcreteStates);
+
+            refreshRawDirectorEdgesAfterBeliefLiteOtfExpansion(
+                    rawDirectorEdges,
+                    expansion.touchedConcreteStates,
+                    outputPlan);
+            refreshBeliefLiteOutputPlanGraphAfterOtfExpansion(
+                    outputPlan,
+                    oldControllerState,
+                    expansion.touchedConcreteStates,
+                    rawDirectorEdges);
+        }
+        return batch;
+    }
+
+    private BeliefLiteOtfBatchResult expandBeliefLiteOldStateFromDirectFrontier(
+            State oldControllerState,
+            BeliefLiteOutputPlan outputPlan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int startRound) {
+
+        BeliefLiteOtfBatchResult batch = new BeliefLiteOtfBatchResult();
+        if (outputPlan == null || outputPlan.context == null) {
+            return batch;
+        }
+
+        int batchLimit = Math.max(1, beliefLiteOtfBatchActions);
+        for (int batchIndex = 0; batchIndex < batchLimit; batchIndex++) {
+            BeliefNode root = outputPlan.rootsByOldState.get(oldControllerState);
+            List<BeliefNode> frontierNodes =
+                    collectBeliefLiteNodesReachableFromRoot(outputPlan, oldControllerState);
+            batch.frontierNodes = Math.max(batch.frontierNodes, frontierNodes.size());
+            batch.localRootWinning = root != null && root.winning;
+            if (root == null || batch.localRootWinning) {
+                break;
+            }
+
+            List<BeliefNode> focusedNodes =
+                    collectBeliefLiteFocusedExpansionNodes(root, frontierNodes);
+            BeliefLazyExpansionResult expansion = expandBeliefLiteDirectCandidates(
+                    oldControllerState,
+                    focusedNodes,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    startRound + batch.expansionRounds);
+
+            if (!expansion.hasProgress() && focusedNodes.size() != frontierNodes.size()) {
+                expansion = expandBeliefLiteDirectCandidates(
+                        oldControllerState,
+                        frontierNodes,
+                        noProgressActions,
+                        rejectedBeliefActions,
+                        startRound + batch.expansionRounds);
+            }
+
+            if (!expansion.hasProgress()) {
+                break;
+            }
+
+            batch.expansionRounds++;
+            batch.attemptedActions += expansion.attemptedActions;
+            batch.expandedActions += expansion.expandedActions;
+            batch.addedEdges += expansion.addedEdges;
+            batch.lastMode = expansion.mode;
+            batch.touchedConcreteStates.addAll(expansion.touchedConcreteStates);
+            batch.directFrontierExpansions++;
+
+            refreshRawDirectorEdgesAfterBeliefLiteOtfExpansion(
+                    rawDirectorEdges,
+                    expansion.touchedConcreteStates,
+                    outputPlan);
+            refreshBeliefLiteOutputPlanGraphAfterOtfExpansion(
+                    outputPlan,
+                    oldControllerState,
+                    expansion.touchedConcreteStates,
+                    rawDirectorEdges);
+        }
+        return batch;
+    }
+
+    private BeliefRepairPlan buildBeliefLiteFrontierExpansionPlan(
+            BeliefLiteOutputPlan outputPlan,
+            State oldControllerState) {
+
+        BeliefLiteRootInfo rootInfo = outputPlan.rootInfos.get(oldControllerState);
+        List<CompostateDUC<State, Action>> preUpdateStates = rootInfo == null
+                ? Collections.emptyList()
+                : rootInfo.preUpdateStates;
+        BeliefRepairPlan plan = new BeliefRepairPlan(
+                oldControllerState,
+                preUpdateStates,
+                Collections.emptyList());
+        plan.root = outputPlan.rootsByOldState.get(oldControllerState);
+        plan.nodes.addAll(collectBeliefLiteNodesReachableFromRoot(
+                outputPlan, oldControllerState));
+        return plan;
+    }
+
+    private BeliefLiteOtfBatchResult expandBeliefLiteOldStateOnTheFly(
+            State oldControllerState,
+            BeliefLiteRootInfo rootInfo,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int startRound,
+            int maxBeliefNodes) {
+
+        BeliefLiteOtfBatchResult batch = new BeliefLiteOtfBatchResult();
+        if (rootInfo == null || rootInfo.beginTargets.isEmpty()) {
+            return batch;
+        }
+
+        int batchLimit = Math.max(1, beliefLiteOtfBatchActions);
+        for (int batchIndex = 0; batchIndex < batchLimit; batchIndex++) {
+            BeliefRepairPlan localPlan = buildBeliefLiteLocalExpansionPlan(
+                    oldControllerState,
+                    rootInfo,
+                    rawDirectorEdges,
+                    maxBeliefNodes);
+            batch.frontierNodes = Math.max(batch.frontierNodes, localPlan.nodes.size());
+            batch.localRootWinning = localPlan.root != null && localPlan.root.winning;
+            if (localPlan.root == null || batch.localRootWinning) {
+                break;
+            }
+
+            List<BeliefNode> focusedNodes = collectBeliefLiteFocusedExpansionNodes(localPlan);
+            BeliefLazyExpansionResult expansion = expandBeliefLiteLocalCandidates(
+                    localPlan,
+                    focusedNodes,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    startRound + batch.expansionRounds);
+
+            if (!expansion.hasProgress() && focusedNodes.size() != localPlan.nodes.size()) {
+                expansion = expandBeliefLiteLocalCandidates(
+                        localPlan,
+                        localPlan.nodes,
+                        noProgressActions,
+                        rejectedBeliefActions,
+                        startRound + batch.expansionRounds);
+            }
+
+            if (!expansion.hasProgress()) {
+                break;
+            }
+
+            batch.expansionRounds++;
+            batch.attemptedActions += expansion.attemptedActions;
+            batch.expandedActions += expansion.expandedActions;
+            batch.addedEdges += expansion.addedEdges;
+            batch.lastMode = expansion.mode;
+
+            rawDirectorEdges.clear();
+            rawDirectorEdges.putAll(collectRawDirectorEdges(false));
+        }
+        return batch;
+    }
+
+    private BeliefRepairPlan buildBeliefLiteLocalExpansionPlan(
+            State oldControllerState,
+            BeliefLiteRootInfo rootInfo,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            int maxBeliefNodes) {
+
+        BeliefRepairPlan plan = new BeliefRepairPlan(
+                oldControllerState,
+                rootInfo.preUpdateStates,
+                Collections.emptyList());
+
+        Map<CompostateDUC<State, Action>, Integer> concreteIds = new HashMap<>();
+        for (CompostateDUC<State, Action> state : rootInfo.preUpdateStates) {
+            getConcreteStateId(concreteIds, state);
+        }
+        for (CompostateDUC<State, Action> state : rootInfo.beginTargets) {
+            getConcreteStateId(concreteIds, state);
+        }
+
+        BeliefSearchContext context = new BeliefSearchContext(concreteIds, maxBeliefNodes);
+        plan.root = context.getOrCreateNode(rootInfo.beginTargets);
+        if (plan.root == null) {
+            return plan;
+        }
+
+        BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        while (!context.queue.isEmpty() && !context.limitExceeded) {
+            BeliefNode node = context.queue.remove();
+            expandBeliefLiteDryRunNode(
+                    oldControllerState,
+                    node,
+                    context,
+                    rawDirectorEdges,
+                    stats,
+                    false);
+        }
+
+        plan.nodes.addAll(context.nodes);
+        if (!context.limitExceeded) {
+            solveBeliefReachability(plan.nodes, oldControllerState, null, null);
+        }
+        return plan;
+    }
+
+    private List<BeliefNode> collectBeliefLiteFocusedExpansionNodes(BeliefRepairPlan plan) {
+        if (plan.root == null || plan.nodes.isEmpty()) {
+            return plan.nodes;
+        }
+        return collectBeliefLiteFocusedExpansionNodes(plan.root, plan.nodes);
+    }
+
+    private List<BeliefNode> collectBeliefLiteFocusedExpansionNodes(
+            BeliefNode root,
+            List<BeliefNode> nodes) {
+
+        if (root == null || nodes == null || nodes.isEmpty()) {
+            return nodes == null ? Collections.emptyList() : nodes;
+        }
+
+        Map<BeliefNode, Integer> potentialFinishDistances =
+                computeBeliefPotentialFinishDistances(nodes);
+        LinkedHashSet<BeliefNode> focused = new LinkedHashSet<>();
+        Deque<BeliefNode> queue = new ArrayDeque<>();
+        focused.add(root);
+        queue.add(root);
+
+        while (!queue.isEmpty()) {
+            BeliefNode node = queue.remove();
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (focused.add(edge.target)) {
+                    queue.add(edge.target);
+                }
+            }
+
+            for (BeliefTransition edge : node.controllableEdges) {
+                if (isUpdateProtocolOutputAction(edge.outputAction)
+                        || isBeliefLitePotentialProgressEdge(
+                                node, edge, potentialFinishDistances)) {
+                    if (focused.add(edge.target)) {
+                        queue.add(edge.target);
+                    }
+                }
+            }
+        }
+
+        if (focused.isEmpty()) {
+            return nodes;
+        }
+        return new ArrayList<>(focused);
+    }
+
+    private Map<BeliefNode, Integer> computeBeliefPotentialFinishDistances(
+            List<BeliefNode> nodes) {
+
+        Map<BeliefNode, Integer> distances = new HashMap<>();
+        for (BeliefNode node : nodes) {
+            if (!node.bad && node.finishNcTargetId != null) {
+                distances.put(node, 0);
+            }
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (BeliefNode node : nodes) {
+                if (node.bad || node.finishNcTargetId != null) {
+                    continue;
+                }
+
+                Integer current = distances.get(node);
+                int best = current == null ? Integer.MAX_VALUE : current;
+                for (BeliefTransition edge : getBeliefTransitions(node)) {
+                    if (edge.target.bad || edge.target == node) {
+                        continue;
+                    }
+                    Integer targetDistance = distances.get(edge.target);
+                    if (targetDistance == null) {
+                        continue;
+                    }
+                    best = Math.min(best, targetDistance + 1);
+                }
+
+                if (best != Integer.MAX_VALUE && (current == null || best < current)) {
+                    distances.put(node, best);
+                    changed = true;
+                }
+            }
+        } while (changed);
+
+        return distances;
+    }
+
+    private boolean isBeliefLitePotentialProgressEdge(
+            BeliefNode source,
+            BeliefTransition edge,
+            Map<BeliefNode, Integer> potentialFinishDistances) {
+
+        Integer sourceDistance = potentialFinishDistances.get(source);
+        Integer targetDistance = potentialFinishDistances.get(edge.target);
+        return sourceDistance != null
+                && targetDistance != null
+                && targetDistance < sourceDistance;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefLiteLocalCandidates(
+            BeliefRepairPlan localPlan,
+            List<BeliefNode> candidateNodes,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round) {
+
+        BeliefRepairPlan expansionPlan = new BeliefRepairPlan(
+                localPlan.oldControllerState,
+                localPlan.preUpdateStates,
+                Collections.emptyList());
+        expansionPlan.root = localPlan.root;
+        expansionPlan.nodes.addAll(candidateNodes);
+
+        BeliefLazyExpansionResult expansion = expandBeliefControllableFrontier(
+                expansionPlan,
+                noProgressActions,
+                rejectedBeliefActions,
+                round,
+                true,
+                true,
+                "Belief-Lite-OTF");
+        if (expansion.hasProgress()) {
+            expansion.mode = "update-event";
+            return expansion;
+        }
+
+        expansion = expandBeliefUncontrollableClosure(
+                expansionPlan,
+                noProgressActions,
+                round,
+                true,
+                "Belief-Lite-OTF");
+        if (expansion.hasProgress()) {
+            expansion.mode = "uncontrollable";
+            return expansion;
+        }
+
+        expansion = expandBeliefControllableFrontier(
+                expansionPlan,
+                noProgressActions,
+                rejectedBeliefActions,
+                round,
+                false,
+                true,
+                "Belief-Lite-OTF");
+        if (expansion.hasProgress()) {
+            expansion.mode = "ordinary-controllable";
+        }
+        return expansion;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefLiteDirectCandidates(
+            Object oldControllerState,
+            List<BeliefNode> candidateNodes,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round) {
+
+        BeliefLazyExpansionResult expansion = expandBeliefLiteDirectControllableFrontier(
+                oldControllerState,
+                candidateNodes,
+                noProgressActions,
+                rejectedBeliefActions,
+                round,
+                true);
+        if (expansion.hasProgress()) {
+            expansion.mode = "update-event";
+            return expansion;
+        }
+
+        expansion = expandBeliefLiteDirectUncontrollableClosure(
+                oldControllerState,
+                candidateNodes,
+                noProgressActions,
+                round);
+        if (expansion.hasProgress()) {
+            expansion.mode = "uncontrollable";
+            return expansion;
+        }
+
+        expansion = expandBeliefLiteDirectControllableFrontier(
+                oldControllerState,
+                candidateNodes,
+                noProgressActions,
+                rejectedBeliefActions,
+                round,
+                false);
+        if (expansion.hasProgress()) {
+            expansion.mode = "ordinary-controllable";
+        }
+        return expansion;
+    }
+
+    private List<CompostateDUC<State, Action>> collectBeliefLitePreUpdateStates(
+            BeliefLiteOutputPlan plan) {
+
+        List<CompostateDUC<State, Action>> preUpdateStates = new ArrayList<>();
+        for (List<CompostateDUC<State, Action>> states : plan.statesByOldController.values()) {
+            preUpdateStates.addAll(states);
+        }
+        return preUpdateStates;
+    }
+
+    private BeliefRepairResourceLimits createBeliefLiteOtfResourceLimits(
+            BeliefLiteOutputPlan plan,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        List<CompostateDUC<State, Action>> seeds = new ArrayList<>();
+        int rawPreStates = 0;
+        for (BeliefLiteRootInfo rootInfo : plan.rootInfos.values()) {
+            rawPreStates += rootInfo.preUpdateStates.size();
+            seeds.addAll(rootInfo.beginTargets);
+        }
+        if (seeds.isEmpty()) {
+            seeds.addAll(collectBeliefLitePreUpdateStates(plan));
+        }
+
+        int reachableMapValuations = countReachableMapValuations(seeds, rawDirectorEdges);
+        BeliefRepairResourceLimits repairLimits =
+                createBeliefRepairResourceLimits(rawPreStates, reachableMapValuations);
+        return new BeliefRepairResourceLimits(
+                beliefLiteOutputPlanMaxNodes,
+                repairLimits.maxAdditionalConcreteStates,
+                repairLimits.maxAdditionalTransitions,
+                repairLimits.maxTimeMs,
+                reachableMapValuations);
+    }
+
+    private String checkBeliefLiteOtfResourceLimit(
+            BeliefLiteOutputPlan plan,
+            BeliefRepairResourceLimits limits,
+            int initialConcreteStateCount,
+            long initialTransitionCount,
+            long startNanos) {
+
+        if (plan.stats.limitExceeded || plan.nodes().size() > limits.maxBeliefNodes) {
+            return "belief node 数が上限を超えた: beliefNodes="
+                    + plan.nodes().size() + "/" + limits.maxBeliefNodes;
+        }
+
+        int concreteStateCount = compostates == null ? 0 : compostates.size();
+        int additionalConcreteStates =
+                Math.max(0, concreteStateCount - initialConcreteStateCount);
+        if (additionalConcreteStates > limits.maxAdditionalConcreteStates) {
+            return "追加 concrete state 数が上限を超えた: additionalConcreteStates="
+                    + additionalConcreteStates + "/" + limits.maxAdditionalConcreteStates;
+        }
+
+        long additionalTransitions =
+                Math.max(0L, countCurrentExploredTransitions() - initialTransitionCount);
+        if (additionalTransitions > limits.maxAdditionalTransitions) {
+            return "追加 transition 数が上限を超えた: additionalTransitions="
+                    + additionalTransitions + "/" + limits.maxAdditionalTransitions;
+        }
+
+        if (limits.maxTimeMs > 0) {
+            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            if (elapsedMs > limits.maxTimeMs) {
+                return "belief-lite OTF 時間が上限を超えた: elapsedMs="
+                        + elapsedMs + "/" + limits.maxTimeMs;
+            }
+        }
+        return null;
+    }
+
+    private List<BeliefNode> collectBeliefLiteNodesReachableFromUnwinningRoots(
+            BeliefLiteOutputPlan plan) {
+
+        LinkedHashSet<BeliefNode> reachable = new LinkedHashSet<>();
+        Deque<BeliefNode> queue = new ArrayDeque<>();
+
+        for (BeliefNode root : plan.rootsByOldState.values()) {
+            if (root == null || root.winning) {
+                continue;
+            }
+            if (reachable.add(root)) {
+                queue.add(root);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            BeliefNode node = queue.remove();
+            for (BeliefTransition edge : getBeliefTransitions(node)) {
+                if (edge.target != null && reachable.add(edge.target)) {
+                    queue.add(edge.target);
+                }
+            }
+        }
+
+        return new ArrayList<>(reachable);
+    }
+
+    private List<State> collectBeliefLiteUnwinningOldStates(
+            BeliefLiteOutputPlan plan) {
+
+        List<State> oldStates = new ArrayList<>();
+        for (State oldControllerState : plan.statesByOldController.keySet()) {
+            BeliefNode root = plan.rootsByOldState.get(oldControllerState);
+            if (root == null || !root.winning) {
+                oldStates.add(oldControllerState);
+            }
+        }
+        return oldStates;
+    }
+
+    private List<BeliefNode> collectBeliefLiteNodesReachableFromRoot(
+            BeliefLiteOutputPlan plan,
+            State oldControllerState) {
+
+        BeliefNode root = plan.rootsByOldState.get(oldControllerState);
+        if (root == null) {
+            return Collections.emptyList();
+        }
+
+        LinkedHashSet<BeliefNode> reachable = new LinkedHashSet<>();
+        Deque<BeliefNode> queue = new ArrayDeque<>();
+        reachable.add(root);
+        queue.add(root);
+
+        while (!queue.isEmpty()) {
+            BeliefNode node = queue.remove();
+            for (BeliefTransition edge : getBeliefTransitions(node)) {
+                if (edge.target != null && reachable.add(edge.target)) {
+                    queue.add(edge.target);
+                }
+            }
+        }
+
+        return new ArrayList<>(reachable);
+    }
+
+    private int countBeliefLiteOtfTrackedActions(
+            Map<State, Set<String>> actionsByOldState) {
+
+        int count = 0;
+        for (Set<String> actions : actionsByOldState.values()) {
+            count += actions.size();
+        }
+        return count;
+    }
+
+    private String describeBeliefLiteUnwinningRoots(
+            BeliefLiteOutputPlan plan,
+            int maxValues) {
+
+        List<String> values = new ArrayList<>();
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry
+                : plan.statesByOldController.entrySet()) {
+            BeliefNode root = plan.rootsByOldState.get(entry.getKey());
+            if (root == null || !root.winning) {
+                values.add(entry.getKey().toString());
+            }
+        }
+        return limitedStrings(values, maxValues);
+    }
+
+    private void recordBeliefLiteEmitReachabilityStats(BeliefLiteOutputPlan plan) {
+        plan.emitReachableNodes.clear();
+        plan.emitReachableBeliefNodes = 0;
+        plan.emitReachableWinningBeliefNodes = 0;
+        plan.emitReachableUnresolvedBeliefNodes = 0;
+        plan.emitReachableBadBeliefNodes = 0;
+        plan.emitReachableFinishNodes = 0;
+        plan.emitReachableNonWinningUncontrollableTargets = 0;
+        plan.emitReachableMissingWinningUncontrollableTargets = 0;
+        plan.emitReachableMissingSelectedControllableTargets = 0;
+        plan.emitReachableMissingSelectedFinishTargets = 0;
+
+        if (plan.context == null || plan.stats == null
+                || plan.stats.limitExceeded || plan.stats.winningSkipped) {
+            return;
+        }
+
+        plan.emitReachableNodes.addAll(collectBeliefLiteEmitReachableNodes(plan));
+        plan.emitReachableBeliefNodes = plan.emitReachableNodes.size();
+        Set<BeliefNode> emitReachable = new HashSet<>(plan.emitReachableNodes);
+
+        for (BeliefNode node : plan.emitReachableNodes) {
+            if (node.bad) {
+                plan.emitReachableBadBeliefNodes++;
+            } else if (node.winning) {
+                plan.emitReachableWinningBeliefNodes++;
+            } else {
+                plan.emitReachableUnresolvedBeliefNodes++;
+            }
+            if (node.selectedFinish) {
+                if (node.finishAction == null || node.finishNcTargetId == null) {
+                    plan.emitReachableMissingSelectedFinishTargets++;
+                } else {
+                    plan.emitReachableFinishNodes++;
+                }
+            }
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
+                    plan.emitReachableNonWinningUncontrollableTargets++;
+                } else if (!emitReachable.contains(edge.target)) {
+                    plan.emitReachableMissingWinningUncontrollableTargets++;
+                }
+            }
+
+            if (!node.selectedFinish && node.selectedControllableEdge != null) {
+                BeliefTransition selected = node.selectedControllableEdge;
+                if (!selected.target.winning || !emitReachable.contains(selected.target)) {
+                    plan.emitReachableMissingSelectedControllableTargets++;
+                }
+            }
+        }
+    }
+
+    private void logBeliefLiteOutputPlan(BeliefLiteOutputPlan plan) {
+        if (!debugLogEnabled || plan == null) {
+            return;
+        }
+
+        log("  [Belief-Lite-Output-Plan] dryRun=true, emit=" + beliefLiteEmit
+                + ", singletonAsBelief=true"
+                + ", rootSource=" + plan.preUpdateRootSource
+                + ", initialGraphKind=" + plan.initialGraphKind
+                + ", initialFrontierRounds=" + plan.initialFrontierRounds
+                + ", initialFrontierExpandedNodes=" + plan.initialFrontierExpandedNodes
+                + ", initialFrontierQueueRemaining=" + plan.initialFrontierQueueRemaining
+                + ", initialFrontierStopReason=" + plan.initialFrontierStopReason
+                + ", initialFrontierFocusedNodes=" + plan.initialFrontierFocusedNodes
+                + ", initialFrontierFallbackNodes=" + plan.initialFrontierFallbackNodes
+                + ", maxNodes=" + beliefLiteOutputPlanMaxNodes
+                + ", oldControllerStates=" + plan.statesByOldController.size()
+                + ", directorRootGroups=" + plan.directorRootGroups
+                + ", exploredRootGroups=" + plan.exploredRootGroups
+                + ", extraExploredRootGroups=" + plan.extraExploredRootGroups
+                + ", rootGroups=" + plan.rootsByOldState.size()
+                + ", missingRootGroups=" + plan.missingRootGroups
+                + ", missingBeginUpdatePreStates=" + plan.missingBeginUpdatePreStates
+                + ", rootLimitFailures=" + plan.rootLimitFailures
+                + ", distinctRootNodes=" + plan.distinctRootNodes
+                + ", rootAliases=" + plan.rootAliases
+                + ", beliefNodes=" + plan.nodes().size()
+                + ", beliefMemberLinks="
+                + (plan.context == null ? 0 : plan.context.memberLinkCount())
+                + ", sharedReachableNodes=" + plan.sharedReachableNodes
+                + ", maxIncoming=" + plan.maxIncoming
+                + ", selfLoops=" + plan.selfLoops
+                + ", rootWinningGroups=" + plan.rootWinningGroups
+                + ", winningNodes=" + plan.stats.winningNodes
+                + ", unresolvedNodes=" + plan.stats.unresolvedNodes
+                + ", badNodes=" + plan.stats.badNodes
+                + ", unsafeUncontrollable=" + plan.stats.unsafeUncontrollable
+                + ", finishNcTargetMismatches=" + plan.stats.finishNcTargetMismatches
+                + ", emitReachableBeliefNodes=" + plan.emitReachableBeliefNodes
+                + ", emitReachableWinningNodes="
+                + plan.emitReachableWinningBeliefNodes
+                + ", emitReachableUnresolvedNodes="
+                + plan.emitReachableUnresolvedBeliefNodes
+                + ", emitReachableBadNodes=" + plan.emitReachableBadBeliefNodes
+                + ", emitReachableFinishNodes=" + plan.emitReachableFinishNodes
+                + ", emitReachableNonWinningUncontrollableTargets="
+                + plan.emitReachableNonWinningUncontrollableTargets
+                + ", emitReachableMissingWinningUncontrollableTargets="
+                + plan.emitReachableMissingWinningUncontrollableTargets
+                + ", emitReachableMissingSelectedControllableTargets="
+                + plan.emitReachableMissingSelectedControllableTargets
+                + ", emitReachableMissingSelectedFinishTargets="
+                + plan.emitReachableMissingSelectedFinishTargets
+                + ", limitExceeded=" + plan.stats.limitExceeded
+                + ", winningSkipped=" + plan.stats.winningSkipped
+                + ", otfExpansionAttempted=" + plan.otfExpansionAttempted
+                + ", otfSearchKind=" + plan.otfSearchKind
+                + ", startNewSpecReadinessChecks="
+                + beliefLiteStartNewSpecReadinessChecks
+                + ", startNewSpecUnsafeRejects="
+                + beliefLiteStartNewSpecUnsafeRejects
+                + ", startNewSpecUnsafePrecheckRejects="
+                + beliefLiteStartNewSpecUnsafePrecheckRejects
+                + ", startNewSpecReadinessLogged="
+                + beliefLiteStartNewSpecReadinessLogged
+                + ", startNewSpecReadinessSuppressed="
+                + beliefLiteStartNewSpecReadinessSuppressed
+                + ", startNewSpecPrecheckCacheHits="
+                + beliefLiteStartNewSpecPrecheckCacheHits
+                + ", startNewSpecPrecheckCacheMisses="
+                + beliefLiteStartNewSpecPrecheckCacheMisses
+                + ", otfExpansionRounds=" + plan.otfExpansionRounds
+                + ", otfExpansionLimitExceeded=" + plan.otfExpansionLimitExceeded
+                + ", otfBatchActions=" + Math.max(1, beliefLiteOtfBatchActions)
+                + ", otfRootWinningBefore=" + plan.otfRootWinningBefore
+                + ", otfRootWinningAfter=" + plan.otfRootWinningAfter
+                + ", otfLastFrontierNodes=" + plan.otfLastFrontierNodes
+                + ", otfDriverTargetOldState=" + plan.otfDriverTargetOldState
+                + ", otfDriverTargetSwitches=" + plan.otfDriverTargetSwitches
+                + ", otfDriverSolveBatchNodes<="
+                + Math.max(1, beliefLiteOtfBeliefNodeDriverSolveBatchNodes)
+                + ", otfDriverSolveBatches=" + plan.otfDriverSolveBatches
+                + ", otfDriverBatchNodes=" + plan.otfDriverBatchNodes
+                + ", otfDriverRefreshedNodes=" + plan.otfDriverRefreshedNodes
+                + ", otfAddedConcreteStates=" + plan.otfAddedConcreteStates
+                + ", otfAddedTransitions=" + plan.otfAddedTransitions
+                + ", otfFocusedRefreshes=" + plan.otfFocusedRefreshes
+                + ", otfFocusedRefreshNodes=" + plan.otfFocusedRefreshNodes
+                + ", otfFocusedSolveRefreshes=" + plan.otfFocusedSolveRefreshes
+                + ", otfFocusedSolveNodes=" + plan.otfFocusedSolveNodes
+                + ", otfFocusedSolveLastNodes=" + plan.otfFocusedSolveLastNodes
+                + ", otfFocusedSolveFallbacks=" + plan.otfFocusedSolveFallbacks
+                + ", otfFocusedSolveValidationRuns="
+                + plan.otfFocusedSolveValidationRuns
+                + ", otfFocusedSolveValidationMismatches="
+                + plan.otfFocusedSolveValidationMismatches
+                + ", otfFocusedSolveValidationWinningDiffs="
+                + plan.otfFocusedSolveValidationWinningDiffs
+                + ", otfFocusedSolveValidationStrategyDiffs="
+                + plan.otfFocusedSolveValidationStrategyDiffs
+                + ", otfFocusedSolveValidationFairWaitStrategyDiffs="
+                + plan.otfFocusedSolveValidationFairWaitStrategyDiffs
+                + ", otfDriverFocusedSolveValidationSkips="
+                + plan.otfDriverFocusedSolveValidationSkips
+                + ", otfFullRefreshes=" + plan.otfFullRefreshes
+                + ", otfDirectFrontierExpansions="
+                + plan.otfDirectFrontierExpansions
+                + ", otfRawEdgeIncrementalRefreshes="
+                + plan.otfRawEdgeIncrementalRefreshes
+                + ", otfRawEdgeIncrementalStates="
+                + plan.otfRawEdgeIncrementalStates
+                + ", otfRawEdgeFullRefreshes="
+                + plan.otfRawEdgeFullRefreshes
+                + ", otfStopReason=" + plan.otfStopReason
+                + ", readyForEmit=" + plan.isReadyForEmit()
+                + ", notReadyReason=" + plan.notReadyReason()
+                + ", preUpdateOldActionTransitions=" + plan.preUpdateOldActionTransitions
+                + ", beginUpdateTransitions=" + plan.beginUpdateOutputTransitions
+                + ", selectedBeliefTransitions=" + plan.selectedBeliefTransitions
+                + ", estimatedOutputStates=" + plan.estimatedOutputStates
+                + ", estimatedOutputTransitionsWithoutNC=" + plan.estimatedOutputTransitions);
+
+        int loggedRoots = 0;
+        for (Map.Entry<State, BeliefNode> entry : plan.rootsByOldState.entrySet()) {
+            if (loggedRoots >= beliefLiteMaxLoggedGroups) {
+                break;
+            }
+            State oldControllerState = entry.getKey();
+            BeliefNode root = entry.getValue();
+            BeliefLiteRootInfo rootInfo = plan.rootInfos.get(oldControllerState);
+            log("    [Belief-Lite-Output-Root] oldState=" + oldControllerState
+                    + ", root=" + root.name()
+                    + ", preMembers=" + rootInfo.preUpdateStates.size()
+                    + ", beginTargets=" + rootInfo.beginTargets.size()
+                    + ", beginAction=" + rootInfo.beginUpdateAction
+                    + ", rootWinning=" + root.winning
+                    + ", selected=" + describeBeliefSelectedStrategy(root)
+                    + ", markings=" + summarizeMarkingHistogram(root.members)
+                    + ", varyingComponents=" + describeVaryingComponents(root.members));
+            loggedRoots++;
+        }
+    }
+
+    private Map<BeliefNode, Integer> buildBeliefIncomingCounts(
+            List<BeliefNode> nodes,
+            Map<State, BeliefNode> rootsByOldState) {
+
+        Map<BeliefNode, Integer> incomingCounts = new HashMap<>();
+        for (BeliefNode root : rootsByOldState.values()) {
+            incomingCounts.put(root, incomingCounts.getOrDefault(root, 0) + 1);
+        }
+        for (BeliefNode node : nodes) {
+            for (BeliefTransition edge : getBeliefTransitions(node)) {
+                incomingCounts.put(edge.target, incomingCounts.getOrDefault(edge.target, 0) + 1);
+            }
+        }
+        return incomingCounts;
+    }
+
+    private int countSelectedBeliefOutputTransitions(Iterable<BeliefNode> nodes) {
+        int count = 0;
+        for (BeliefNode node : nodes) {
+            if (!node.winning) {
+                continue;
+            }
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (edge.target.winning) {
+                    count++;
+                }
+            }
+            if (node.selectedFinish || node.selectedControllableEdge != null) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int countBeliefLitePreUpdateOldActionTransitions(
+            Map<State, List<CompostateDUC<State, Action>>> statesByOldController,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        Set<String> transitions = new LinkedHashSet<>();
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry : statesByOldController.entrySet()) {
+            State sourceOldState = entry.getKey();
+            for (CompostateDUC<State, Action> preUpdateState : entry.getValue()) {
+                List<RawDirectorEdge> edges = rawDirectorEdges == null ? null : rawDirectorEdges.get(preUpdateState);
+                if (edges == null) {
+                    continue;
+                }
+                for (RawDirectorEdge edge : edges) {
+                    if (edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE)
+                            || edge.child == null
+                            || !isPreUpdateOutputState(edge.child)) {
+                        continue;
+                    }
+                    State targetOldState = edge.child.getStates().get(idxOC);
+                    transitions.add(sourceOldState + "|" + edge.outputAction + "|" + targetOldState);
+                }
+            }
+        }
+        return transitions.size();
+    }
+
+    private List<PreUpdateOutputEdge> collectBeliefLitePreUpdateOutputEdges(
+            List<RawDirectorEdge> rawEdges,
+            List<DirectorEdge> fallbackEdges) {
+
+        List<PreUpdateOutputEdge> result = new ArrayList<>();
+        if (rawEdges != null) {
+            for (RawDirectorEdge edge : rawEdges) {
+                if (edge == null
+                        || edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE)
+                        || edge.child == null
+                        || !isPreUpdateOutputState(edge.child)) {
+                    continue;
+                }
+                result.add(new PreUpdateOutputEdge(edge.outputAction, edge.child));
+            }
+        }
+
+        if (!result.isEmpty() || fallbackEdges == null) {
+            return result;
+        }
+
+        for (DirectorEdge edge : fallbackEdges) {
+            if (edge == null
+                    || edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE)
+                    || edge.isNewControllerConnection()
+                    || edge.child == null
+                    || !isPreUpdateOutputState(edge.child)) {
+                continue;
+            }
+            result.add(new PreUpdateOutputEdge(edge.outputAction, edge.child));
+        }
+        return result;
+    }
+
+    private void emitBeliefLiteOutput(
+            LTSImpl<Long, Action> result,
+            long nextId,
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteOutputPlan plan) {
+
+        long idAssignmentStart = profileLogEnabled ? System.nanoTime() : 0L;
+        Map<State, Long> oldControllerStateIds = new LinkedHashMap<>();
+        for (State oldControllerState : plan.statesByOldController.keySet()) {
+            Long id = nextId++;
+            oldControllerStateIds.put(oldControllerState, id);
+            result.addState(id);
+            directorOutputStatesAssigned++;
+        }
+
+        List<BeliefNode> emitReachableBeliefNodes = collectBeliefLiteEmitReachableNodes(plan);
+        Map<BeliefNode, Long> beliefIds = new HashMap<>();
+        for (BeliefNode node : emitReachableBeliefNodes) {
+            Long id = nextId++;
+            beliefIds.put(node, id);
+            result.addState(id);
+            directorOutputStatesAssigned++;
+        }
+
+        State initialOldControllerState = initial.getStates().get(idxOC);
+        Long initialOutputId = oldControllerStateIds.get(initialOldControllerState);
+        if (initialOutputId == null) {
+            throw new IllegalStateException("Missing Method2-lite initial old-controller output state.");
+        }
+        result.setInitialState(initialOutputId);
+        recordBeliefLitePreUpdateOutputStateOverhead(reachableOrder, plan.statesByOldController);
+        if (profileLogEnabled) {
+            directorIdAssignmentNanos += System.nanoTime() - idAssignmentStart;
+        }
+
+        long transitionEmissionStart = profileLogEnabled ? System.nanoTime() : 0L;
+        int emittedPreUpdateOldTransitions = 0;
+        int emittedBeginUpdateTransitions = 0;
+        int emittedBeliefTransitions = 0;
+        int skippedUnexpectedPreUpdateEdges = 0;
+        Set<String> emittedPreUpdateEdges = new HashSet<>();
+
+        for (Map.Entry<State, List<CompostateDUC<State, Action>>> entry
+                : plan.statesByOldController.entrySet()) {
+            State oldControllerState = entry.getKey();
+            Long sourceId = oldControllerStateIds.get(oldControllerState);
+            if (sourceId == null) {
+                throw new IllegalStateException("Missing Method2-lite old-controller output id.");
+            }
+
+            for (CompostateDUC<State, Action> preUpdateState : entry.getValue()) {
+                List<RawDirectorEdge> rawEdges = rawDirectorEdges == null
+                        ? null
+                        : rawDirectorEdges.get(preUpdateState);
+                List<DirectorEdge> fallbackEdges = directorEdges == null
+                        ? null
+                        : directorEdges.get(preUpdateState);
+                List<PreUpdateOutputEdge> edges =
+                        collectBeliefLitePreUpdateOutputEdges(rawEdges, fallbackEdges);
+                if (edges == null) {
+                    continue;
+                }
+                for (PreUpdateOutputEdge edge : edges) {
+                    if (edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+                        continue;
+                    }
+                    if (edge.child == null
+                            || !isPreUpdateOutputState(edge.child)) {
+                        skippedUnexpectedPreUpdateEdges++;
+                        continue;
+                    }
+
+                    State targetOldControllerState = edge.child.getStates().get(idxOC);
+                    Long targetId = oldControllerStateIds.get(targetOldControllerState);
+                    if (targetId == null) {
+                        throw new IllegalStateException("Missing Method2-lite target old-controller output id.");
+                    }
+
+                    String key = sourceId + "|" + edge.outputAction + "|" + targetId;
+                    if (!emittedPreUpdateEdges.add(key)) {
+                        continue;
+                    }
+                    directorTransitionEmissionAttempts++;
+                    if (result.addTransition(sourceId, edge.outputAction, targetId)) {
+                        directorOutputTransitions++;
+                        emittedPreUpdateOldTransitions++;
+                    }
+                }
+            }
+
+            BeliefLiteRootInfo rootInfo = plan.rootInfos.get(oldControllerState);
+            BeliefNode root = plan.rootsByOldState.get(oldControllerState);
+            if (rootInfo == null || rootInfo.beginUpdateAction == null || root == null) {
+                throw new IllegalStateException("Method2-lite output plan is missing beginUpdate root.");
+            }
+            Long rootId = beliefIds.get(root);
+            if (rootId == null) {
+                throw new IllegalStateException("Missing Method2-lite belief root output id.");
+            }
+            directorTransitionEmissionAttempts++;
+            if (result.addTransition(sourceId, rootInfo.beginUpdateAction, rootId)) {
+                directorOutputTransitions++;
+                emittedBeginUpdateTransitions++;
+            }
+        }
+
+        for (BeliefNode node : emitReachableBeliefNodes) {
+            if (!node.winning) {
+                continue;
+            }
+            Long sourceId = beliefIds.get(node);
+            if (sourceId == null) {
+                throw new IllegalStateException("Missing Method2-lite belief output id.");
+            }
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
+                    continue;
+                }
+                Long targetId = beliefIds.get(edge.target);
+                if (targetId == null) {
+                    throw new IllegalStateException("Missing Method2-lite uncontrollable target id.");
+                }
+                directorTransitionEmissionAttempts++;
+                if (result.addTransition(sourceId, edge.outputAction, targetId)) {
+                    directorOutputTransitions++;
+                    emittedBeliefTransitions++;
+                }
+            }
+
+            if (node.selectedFinish) {
+                directorTransitionEmissionAttempts++;
+                if (result.addTransition(sourceId, node.finishAction, node.finishNcTargetId)) {
+                    directorOutputTransitions++;
+                    emittedBeliefTransitions++;
+                }
+            } else if (node.selectedControllableEdge != null) {
+                Long targetId = beliefIds.get(node.selectedControllableEdge.target);
+                if (targetId == null) {
+                    throw new IllegalStateException("Missing Method2-lite controllable target id.");
+                }
+                directorTransitionEmissionAttempts++;
+                if (result.addTransition(sourceId, node.selectedControllableEdge.outputAction, targetId)) {
+                    directorOutputTransitions++;
+                    emittedBeliefTransitions++;
+                }
+            }
+        }
+
+        if (profileLogEnabled) {
+            directorTransitionEmissionNanos += System.nanoTime() - transitionEmissionStart;
+        }
+        if (debugLogEnabled) {
+            log("  [Belief-Lite-Emit] output=method2-lite"
+                    + ", rootSource=" + plan.preUpdateRootSource
+                    + ", oldControllerStates=" + oldControllerStateIds.size()
+                    + ", beliefStates=" + beliefIds.size()
+                    + ", prunedBeliefStates=" + (plan.nodes().size() - beliefIds.size())
+                    + ", preUpdateOldTransitions=" + emittedPreUpdateOldTransitions
+                    + ", beginUpdateTransitions=" + emittedBeginUpdateTransitions
+                    + ", beliefTransitions=" + emittedBeliefTransitions
+                    + ", prunedBeliefTransitions="
+                    + (plan.selectedBeliefTransitions - emittedBeliefTransitions)
+                    + ", skippedUnexpectedPreUpdateEdges=" + skippedUnexpectedPreUpdateEdges
+                    + ", outputStates=" + result.getStates().size()
+                    + ", outputTransitions=" + directorOutputTransitions);
+        }
+        if (debugLogEnabled && beliefLiteValidateOutput) {
+            logBeliefLiteOutputValidation(
+                    result,
+                    plan,
+                    oldControllerStateIds,
+                    beliefIds,
+                    emittedPreUpdateOldTransitions,
+                    emittedBeginUpdateTransitions,
+                    emittedBeliefTransitions,
+                    skippedUnexpectedPreUpdateEdges);
+        }
+    }
+
+    private void logBeliefLiteOutputValidation(
+            LTSImpl<Long, Action> result,
+            BeliefLiteOutputPlan plan,
+            Map<State, Long> oldControllerStateIds,
+            Map<BeliefNode, Long> beliefIds,
+            int emittedPreUpdateOldTransitions,
+            int emittedBeginUpdateTransitions,
+            int emittedBeliefTransitions,
+            int skippedUnexpectedPreUpdateEdges) {
+
+        Set<Long> preUpdateIds = new HashSet<>(oldControllerStateIds.values());
+        Set<Long> beliefStateIds = new HashSet<>(beliefIds.values());
+
+        int actualPreUpdateOldTransitions = 0;
+        int actualBeginUpdateTransitions = 0;
+        int beginUpdateToBeliefRoots = 0;
+        int beginUpdateWrongTargets = 0;
+        int oldStatesMissingBeginUpdate = 0;
+        int oldStatesWithMultipleBeginUpdate = 0;
+        int unexpectedPreUpdateTransitions = 0;
+
+        for (Long sourceId : oldControllerStateIds.values()) {
+            BinaryRelation<Action, Long> transitions = result.getTransitions(sourceId);
+            int beginUpdateCount = 0;
+            if (transitions != null) {
+                for (Pair<Action, Long> transition : transitions) {
+                    Action action = transition.getFirst();
+                    Long targetId = transition.getSecond();
+                    if (action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+                        actualBeginUpdateTransitions++;
+                        beginUpdateCount++;
+                        if (beliefStateIds.contains(targetId)) {
+                            beginUpdateToBeliefRoots++;
+                        } else {
+                            beginUpdateWrongTargets++;
+                        }
+                    } else if (preUpdateIds.contains(targetId)) {
+                        actualPreUpdateOldTransitions++;
+                    } else {
+                        unexpectedPreUpdateTransitions++;
+                    }
+                }
+            }
+            if (beginUpdateCount == 0) {
+                oldStatesMissingBeginUpdate++;
+            } else if (beginUpdateCount > 1) {
+                oldStatesWithMultipleBeginUpdate++;
+            }
+        }
+
+        int actualBeliefTransitions = 0;
+        int beliefToBeliefTransitions = 0;
+        int beliefToOldTransitions = 0;
+        int beliefToNcTransitions = 0;
+        int finishToNcTransitions = 0;
+        int unexpectedBeliefTransitions = 0;
+        int nonWinningBeliefStates = 0;
+        int winningBeliefDeadlocks = 0;
+
+        for (BeliefNode node : plan.nodes()) {
+            Long sourceId = beliefIds.get(node);
+            if (sourceId == null) {
+                continue;
+            }
+            if (!node.winning) {
+                nonWinningBeliefStates++;
+            }
+
+            int outgoing = 0;
+            BinaryRelation<Action, Long> transitions = result.getTransitions(sourceId);
+            if (transitions != null) {
+                for (Pair<Action, Long> transition : transitions) {
+                    outgoing++;
+                    actualBeliefTransitions++;
+
+                    Action action = transition.getFirst();
+                    Long targetId = transition.getSecond();
+                    boolean targetIsBelief = beliefStateIds.contains(targetId);
+                    boolean targetIsOld = preUpdateIds.contains(targetId);
+
+                    if (targetIsBelief) {
+                        beliefToBeliefTransitions++;
+                    } else if (targetIsOld) {
+                        beliefToOldTransitions++;
+                    } else {
+                        beliefToNcTransitions++;
+                    }
+
+                    if (action.toString().equals(UpdateConstants.FINISH_UPDATE)) {
+                        if (!targetIsBelief && !targetIsOld) {
+                            finishToNcTransitions++;
+                        } else {
+                            unexpectedBeliefTransitions++;
+                        }
+                    } else if (!targetIsBelief) {
+                        unexpectedBeliefTransitions++;
+                    }
+                }
+            }
+
+            if (node.winning && outgoing == 0) {
+                winningBeliefDeadlocks++;
+            }
+        }
+
+        int expectedPreUpdateOldTransitions = plan.preUpdateOldActionTransitions;
+        int expectedBeginUpdateTransitions = plan.beginUpdateOutputTransitions;
+        int expectedBeliefTransitions = countSelectedBeliefOutputTransitions(beliefIds.keySet());
+        boolean ok = oldControllerStateIds.size() == plan.statesByOldController.size()
+                && actualPreUpdateOldTransitions == expectedPreUpdateOldTransitions
+                && actualPreUpdateOldTransitions == emittedPreUpdateOldTransitions
+                && actualBeginUpdateTransitions == expectedBeginUpdateTransitions
+                && actualBeginUpdateTransitions == emittedBeginUpdateTransitions
+                && actualBeginUpdateTransitions == oldControllerStateIds.size()
+                && beginUpdateToBeliefRoots == actualBeginUpdateTransitions
+                && beginUpdateWrongTargets == 0
+                && oldStatesMissingBeginUpdate == 0
+                && oldStatesWithMultipleBeginUpdate == 0
+                && unexpectedPreUpdateTransitions == 0
+                && actualBeliefTransitions == expectedBeliefTransitions
+                && actualBeliefTransitions == emittedBeliefTransitions
+                && nonWinningBeliefStates == 0
+                && winningBeliefDeadlocks == 0
+                && beliefToOldTransitions == 0
+                && unexpectedBeliefTransitions == 0
+                && skippedUnexpectedPreUpdateEdges == 0;
+
+        log("  [Belief-Lite-Emit-Check] status=" + (ok ? "OK" : "WARNING")
+                + ", oldControllerStates=" + oldControllerStateIds.size()
+                + ", preUpdateStates=" + preUpdateIds.size()
+                + ", beginUpdate=" + actualBeginUpdateTransitions + "/" + expectedBeginUpdateTransitions
+                + ", beginUpdateToBeliefRoots=" + beginUpdateToBeliefRoots
+                + ", missingBeginUpdateStates=" + oldStatesMissingBeginUpdate
+                + ", multiBeginUpdateStates=" + oldStatesWithMultipleBeginUpdate
+                + ", beginUpdateWrongTargets=" + beginUpdateWrongTargets
+                + ", preUpdateOldTransitions=" + actualPreUpdateOldTransitions + "/" + expectedPreUpdateOldTransitions
+                + ", unexpectedPreUpdateTransitions=" + unexpectedPreUpdateTransitions
+                + ", beliefStates=" + beliefStateIds.size()
+                + ", nonWinningBeliefStates=" + nonWinningBeliefStates
+                + ", winningBeliefDeadlocks=" + winningBeliefDeadlocks
+                + ", beliefTransitions=" + actualBeliefTransitions + "/" + expectedBeliefTransitions
+                + ", beliefToBeliefTransitions=" + beliefToBeliefTransitions
+                + ", beliefToOldTransitions=" + beliefToOldTransitions
+                + ", beliefToNcTransitions=" + beliefToNcTransitions
+                + ", finishToNcTransitions=" + finishToNcTransitions
+                + ", unexpectedBeliefTransitions=" + unexpectedBeliefTransitions
+                + ", skippedUnexpectedPreUpdateEdges=" + skippedUnexpectedPreUpdateEdges
+                + ", totalStates=" + result.getStates().size()
+                + ", totalTransitions=" + result.getTransitionsNumber());
+
+        logBeliefLiteReachabilityValidation(result, preUpdateIds, beliefStateIds);
+        logBeliefLiteProtocolValidation(
+                result, plan, preUpdateIds, beliefStateIds, beliefIds);
+        logBeliefLiteProgressValidation(result, beliefIds);
+        logBeliefLiteFairProgressValidation(result, beliefIds);
+    }
+
+    private List<BeliefNode> collectBeliefLiteEmitReachableNodes(BeliefLiteOutputPlan plan) {
+        LinkedHashSet<BeliefNode> reachable = new LinkedHashSet<>();
+        Deque<BeliefNode> queue = new ArrayDeque<>();
+
+        for (BeliefNode root : plan.rootsByOldState.values()) {
+            if (root == null || !root.winning || !reachable.add(root)) {
+                continue;
+            }
+            queue.add(root);
+        }
+
+        while (!queue.isEmpty()) {
+            BeliefNode node = queue.remove();
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
+                    continue;
+                }
+                if (reachable.add(edge.target)) {
+                    queue.add(edge.target);
+                }
+            }
+
+            if (!node.selectedFinish && node.selectedControllableEdge != null
+                    && node.selectedControllableEdge.target.winning
+                    && reachable.add(node.selectedControllableEdge.target)) {
+                queue.add(node.selectedControllableEdge.target);
+            }
+        }
+
+        return new ArrayList<>(reachable);
+    }
+
+    private void logBeliefLiteReachabilityValidation(
+            LTSImpl<Long, Action> result,
+            Set<Long> preUpdateIds,
+            Set<Long> beliefStateIds) {
+
+        Set<Long> reachable = collectReachableOutputStates(result);
+        int reachablePreUpdateStates = 0;
+        int reachableBeliefStates = 0;
+        int reachableNcStates = 0;
+        int unreachablePreUpdateStates = 0;
+        int unreachableBeliefStates = 0;
+        int unreachableNcStates = 0;
+        int reachableTransitions = 0;
+
+        for (Long state : result.getStates()) {
+            boolean isReachable = reachable.contains(state);
+            boolean isPreUpdate = preUpdateIds.contains(state);
+            boolean isBelief = beliefStateIds.contains(state);
+            if (isReachable) {
+                BinaryRelation<Action, Long> transitions = result.getTransitions(state);
+                reachableTransitions += transitions == null ? 0 : transitions.size();
+                if (isPreUpdate) {
+                    reachablePreUpdateStates++;
+                } else if (isBelief) {
+                    reachableBeliefStates++;
+                } else {
+                    reachableNcStates++;
+                }
+            } else if (isPreUpdate) {
+                unreachablePreUpdateStates++;
+            } else if (isBelief) {
+                unreachableBeliefStates++;
+            } else {
+                unreachableNcStates++;
+            }
+        }
+
+        boolean ok = unreachablePreUpdateStates == 0
+                && reachableBeliefStates > 0
+                && reachableNcStates > 0;
+
+        log("  [Belief-Lite-Reachability-Check] status=" + (ok ? "OK" : "WARNING")
+                + ", reachableStates=" + reachable.size() + "/" + result.getStates().size()
+                + ", reachableTransitions=" + reachableTransitions
+                + ", reachablePreUpdateStates=" + reachablePreUpdateStates
+                + ", reachableBeliefStates=" + reachableBeliefStates
+                + ", reachableNcStates=" + reachableNcStates
+                + ", unreachablePreUpdateStates=" + unreachablePreUpdateStates
+                + ", unreachableBeliefStates=" + unreachableBeliefStates
+                + ", unreachableNcStates=" + unreachableNcStates);
+    }
+
+    private Set<Long> collectReachableOutputStates(LTSImpl<Long, Action> result) {
+        Set<Long> reachable = new HashSet<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        Long initialState = result.getInitialState();
+        if (initialState == null) {
+            return reachable;
+        }
+
+        reachable.add(initialState);
+        queue.add(initialState);
+        while (!queue.isEmpty()) {
+            Long state = queue.remove();
+            BinaryRelation<Action, Long> transitions = result.getTransitions(state);
+            if (transitions == null) {
+                continue;
+            }
+            for (Pair<Action, Long> transition : transitions) {
+                Long target = transition.getSecond();
+                if (reachable.add(target)) {
+                    queue.add(target);
+                }
+            }
+        }
+        return reachable;
+    }
+
+    private void logBeliefLiteProtocolValidation(
+            LTSImpl<Long, Action> result,
+            BeliefLiteOutputPlan plan,
+            Set<Long> preUpdateIds,
+            Set<Long> beliefStateIds,
+            Map<BeliefNode, Long> beliefIds) {
+
+        Map<Long, BeliefNode> nodeById = new HashMap<>();
+        for (Map.Entry<BeliefNode, Long> entry : beliefIds.entrySet()) {
+            nodeById.put(entry.getValue(), entry.getKey());
+        }
+
+        int preBeginUpdateTransitions = 0;
+        int preNonBeginUpdateProtocolTransitions = 0;
+        int beliefBeginUpdateTransitions = 0;
+        int beliefStopOldSpecTransitions = 0;
+        int beliefReconfigureTransitions = 0;
+        int beliefStartNewSpecTransitions = 0;
+        int beliefFinishUpdateTransitions = 0;
+        int beliefFinishWrongTargets = 0;
+        int beliefNonFinishToNonBeliefTargets = 0;
+        int ncUpdateProtocolTransitions = 0;
+        int ncBeginUpdateTransitions = 0;
+        int finishWithoutSelectedFinish = 0;
+        int nonFinishUpdateWithoutSelectedControllable = 0;
+        int mixedMarkingUpdateProtocolSources = 0;
+
+        for (Long source : result.getStates()) {
+            BinaryRelation<Action, Long> transitions = result.getTransitions(source);
+            if (transitions == null) {
+                continue;
+            }
+            boolean sourceIsPreUpdate = preUpdateIds.contains(source);
+            boolean sourceIsBelief = beliefStateIds.contains(source);
+            boolean sourceIsNc = !sourceIsPreUpdate && !sourceIsBelief;
+            BeliefNode sourceNode = nodeById.get(source);
+
+            for (Pair<Action, Long> transition : transitions) {
+                String actionName = transition.getFirst().toString();
+                Long target = transition.getSecond();
+                boolean targetIsBelief = beliefStateIds.contains(target);
+                boolean targetIsPreUpdate = preUpdateIds.contains(target);
+                boolean isBeginUpdate = actionName.equals(UpdateConstants.BEGIN_UPDATE);
+                boolean isUpdateProtocol = isUpdateProtocolOutputActionName(actionName);
+                boolean isAnyUpdateProtocol = isBeginUpdate || isUpdateProtocol;
+
+                if (sourceIsPreUpdate) {
+                    if (isBeginUpdate) {
+                        preBeginUpdateTransitions++;
+                    } else if (isUpdateProtocol) {
+                        preNonBeginUpdateProtocolTransitions++;
+                    }
+                    continue;
+                }
+
+                if (sourceIsNc) {
+                    if (isBeginUpdate) {
+                        ncBeginUpdateTransitions++;
+                    } else if (isUpdateProtocol) {
+                        ncUpdateProtocolTransitions++;
+                    }
+                    continue;
+                }
+
+                if (!sourceIsBelief) {
+                    continue;
+                }
+
+                if (isBeginUpdate) {
+                    beliefBeginUpdateTransitions++;
+                } else if (actionName.equals(UpdateConstants.STOP_OLD_SPEC)) {
+                    beliefStopOldSpecTransitions++;
+                } else if (actionName.equals(UpdateConstants.RECONFIGURE)) {
+                    beliefReconfigureTransitions++;
+                } else if (actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+                    beliefStartNewSpecTransitions++;
+                } else if (actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                    beliefFinishUpdateTransitions++;
+                }
+
+                if (actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                    if (targetIsBelief || targetIsPreUpdate) {
+                        beliefFinishWrongTargets++;
+                    }
+                    if (sourceNode == null || !sourceNode.selectedFinish) {
+                        finishWithoutSelectedFinish++;
+                    }
+                } else {
+                    if (!targetIsBelief) {
+                        beliefNonFinishToNonBeliefTargets++;
+                    }
+                    if (isUpdateProtocol && (sourceNode == null
+                            || sourceNode.selectedControllableEdge == null
+                            || !sourceNode.selectedControllableEdge.outputAction.toString().equals(actionName))) {
+                        nonFinishUpdateWithoutSelectedControllable++;
+                    }
+                }
+
+                if (isAnyUpdateProtocol && sourceNode != null
+                        && hasMixedMarkingStates(sourceNode.members)) {
+                    mixedMarkingUpdateProtocolSources++;
+                }
+            }
+        }
+
+        int missingWinningUncontrollableTransitions = 0;
+        int missingSelectedControllableTransitions = 0;
+        int missingSelectedFinishTransitions = 0;
+        int emittedUnselectedControllableTransitions = 0;
+
+        for (BeliefNode node : plan.nodes()) {
+            Long source = beliefIds.get(node);
+            if (source == null || !node.winning) {
+                continue;
+            }
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
+                    continue;
+                }
+                Long target = beliefIds.get(edge.target);
+                if (target == null || !hasOutputTransition(result, source, edge.outputAction, target)) {
+                    missingWinningUncontrollableTransitions++;
+                }
+            }
+
+            if (node.selectedFinish) {
+                if (!hasOutputTransition(result, source, node.finishAction, node.finishNcTargetId)) {
+                    missingSelectedFinishTransitions++;
+                }
+            }
+
+            if (node.selectedControllableEdge != null) {
+                Long selectedTarget = beliefIds.get(node.selectedControllableEdge.target);
+                if (selectedTarget == null
+                        || !hasOutputTransition(
+                                result,
+                                source,
+                                node.selectedControllableEdge.outputAction,
+                                selectedTarget)) {
+                    missingSelectedControllableTransitions++;
+                }
+            }
+
+            for (BeliefTransition edge : node.controllableEdges) {
+                if (edge == node.selectedControllableEdge) {
+                    continue;
+                }
+                Long target = beliefIds.get(edge.target);
+                if (target != null && hasOutputTransition(result, source, edge.outputAction, target)) {
+                    emittedUnselectedControllableTransitions++;
+                }
+            }
+        }
+
+        boolean ok = preBeginUpdateTransitions == plan.beginUpdateOutputTransitions
+                && preNonBeginUpdateProtocolTransitions == 0
+                && beliefBeginUpdateTransitions == 0
+                && beliefFinishWrongTargets == 0
+                && beliefNonFinishToNonBeliefTargets == 0
+                && ncBeginUpdateTransitions == 0
+                && ncUpdateProtocolTransitions == 0
+                && finishWithoutSelectedFinish == 0
+                && nonFinishUpdateWithoutSelectedControllable == 0
+                && mixedMarkingUpdateProtocolSources == 0
+                && missingWinningUncontrollableTransitions == 0
+                && missingSelectedControllableTransitions == 0
+                && missingSelectedFinishTransitions == 0
+                && emittedUnselectedControllableTransitions == 0;
+
+        log("  [Belief-Lite-Protocol-Check] status=" + (ok ? "OK" : "WARNING")
+                + ", preBeginUpdateTransitions=" + preBeginUpdateTransitions
+                + ", preNonBeginUpdateProtocolTransitions=" + preNonBeginUpdateProtocolTransitions
+                + ", beliefBeginUpdateTransitions=" + beliefBeginUpdateTransitions
+                + ", beliefStopOldSpecTransitions=" + beliefStopOldSpecTransitions
+                + ", beliefReconfigureTransitions=" + beliefReconfigureTransitions
+                + ", beliefStartNewSpecTransitions=" + beliefStartNewSpecTransitions
+                + ", beliefFinishUpdateTransitions=" + beliefFinishUpdateTransitions
+                + ", beliefFinishWrongTargets=" + beliefFinishWrongTargets
+                + ", beliefNonFinishToNonBeliefTargets=" + beliefNonFinishToNonBeliefTargets
+                + ", ncBeginUpdateTransitions=" + ncBeginUpdateTransitions
+                + ", ncUpdateProtocolTransitions=" + ncUpdateProtocolTransitions
+                + ", finishWithoutSelectedFinish=" + finishWithoutSelectedFinish
+                + ", nonFinishUpdateWithoutSelectedControllable="
+                + nonFinishUpdateWithoutSelectedControllable
+                + ", mixedMarkingUpdateProtocolSources=" + mixedMarkingUpdateProtocolSources
+                + ", missingWinningUncontrollableTransitions="
+                + missingWinningUncontrollableTransitions
+                + ", missingSelectedControllableTransitions="
+                + missingSelectedControllableTransitions
+                + ", missingSelectedFinishTransitions=" + missingSelectedFinishTransitions
+                + ", emittedUnselectedControllableTransitions="
+                + emittedUnselectedControllableTransitions);
+    }
+
+    private boolean hasOutputTransition(
+            LTSImpl<Long, Action> result,
+            Long source,
+            Action action,
+            Long target) {
+
+        BinaryRelation<Action, Long> transitions = result.getTransitions(source);
+        if (transitions == null) {
+            return false;
+        }
+        for (Pair<Action, Long> transition : transitions) {
+            if (Objects.equals(action, transition.getFirst())
+                    && Objects.equals(target, transition.getSecond())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void logBeliefLiteProgressValidation(
+            LTSImpl<Long, Action> result,
+            Map<BeliefNode, Long> beliefIds) {
+
+        Set<BeliefNode> emittedNodes = new LinkedHashSet<>(beliefIds.keySet());
+        Map<BeliefNode, BeliefNode> selectedControllableTargets = new HashMap<>();
+        Map<BeliefNode, List<BeliefNode>> reverseEmittedBeliefEdges = new HashMap<>();
+        Deque<BeliefNode> finishReverseQueue = new ArrayDeque<>();
+        Set<BeliefNode> finishReachable = new LinkedHashSet<>();
+
+        int selectedFinishNodes = 0;
+        int selectedControllableEdges = 0;
+        int selectedControllableEdgesMissingOutput = 0;
+        int selectedControllableSelfLoops = 0;
+        int fairWaitNodes = 0;
+        int waitUncontrollableNodes = 0;
+
+        for (BeliefNode node : emittedNodes) {
+            Long source = beliefIds.get(node);
+            if (source == null) {
+                continue;
+            }
+
+            if (node.selectedFinish) {
+                selectedFinishNodes++;
+                if (hasOutputTransition(result, source, node.finishAction, node.finishNcTargetId)
+                        && finishReachable.add(node)) {
+                    finishReverseQueue.add(node);
+                }
+            }
+
+            if (node.selectedFairUncontrollableEdge != null) {
+                fairWaitNodes++;
+            } else if (!node.selectedFinish && node.selectedControllableEdge == null
+                    && !node.uncontrollableEdges.isEmpty()) {
+                waitUncontrollableNodes++;
+            }
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning || !emittedNodes.contains(edge.target)) {
+                    continue;
+                }
+                Long target = beliefIds.get(edge.target);
+                if (target != null && hasOutputTransition(result, source, edge.outputAction, target)) {
+                    reverseEmittedBeliefEdges
+                            .computeIfAbsent(edge.target, key -> new ArrayList<>())
+                            .add(node);
+                }
+            }
+
+            if (node.selectedControllableEdge != null
+                    && emittedNodes.contains(node.selectedControllableEdge.target)) {
+                BeliefTransition edge = node.selectedControllableEdge;
+                Long target = beliefIds.get(edge.target);
+                if (target != null && hasOutputTransition(result, source, edge.outputAction, target)) {
+                    selectedControllableEdges++;
+                    selectedControllableTargets.put(node, edge.target);
+                    if (edge.target == node) {
+                        selectedControllableSelfLoops++;
+                    }
+                    reverseEmittedBeliefEdges
+                            .computeIfAbsent(edge.target, key -> new ArrayList<>())
+                            .add(node);
+                } else {
+                    selectedControllableEdgesMissingOutput++;
+                }
+            }
+        }
+
+        while (!finishReverseQueue.isEmpty()) {
+            BeliefNode node = finishReverseQueue.remove();
+            List<BeliefNode> predecessors = reverseEmittedBeliefEdges.get(node);
+            if (predecessors == null) {
+                continue;
+            }
+            for (BeliefNode predecessor : predecessors) {
+                if (finishReachable.add(predecessor)) {
+                    finishReverseQueue.add(predecessor);
+                }
+            }
+        }
+
+        Set<BeliefNode> globallyProcessed = new HashSet<>();
+        Set<BeliefNode> selectedControllableCycleNodes = new LinkedHashSet<>();
+        List<String> selectedControllableCycleSamples = new ArrayList<>();
+        int selectedControllableCycles = 0;
+
+        for (BeliefNode start : emittedNodes) {
+            if (globallyProcessed.contains(start)) {
+                continue;
+            }
+
+            Map<BeliefNode, Integer> pathIndex = new HashMap<>();
+            List<BeliefNode> path = new ArrayList<>();
+            BeliefNode current = start;
+
+            while (current != null
+                    && selectedControllableTargets.containsKey(current)
+                    && !globallyProcessed.contains(current)) {
+                Integer seenIndex = pathIndex.get(current);
+                if (seenIndex != null) {
+                    selectedControllableCycles++;
+                    for (int i = seenIndex; i < path.size(); i++) {
+                        selectedControllableCycleNodes.add(path.get(i));
+                    }
+                    if (selectedControllableCycleSamples.size() < 5) {
+                        selectedControllableCycleSamples.add(
+                                describeSelectedControllableCycle(path, seenIndex));
+                    }
+                    break;
+                }
+                pathIndex.put(current, path.size());
+                path.add(current);
+                current = selectedControllableTargets.get(current);
+            }
+
+            globallyProcessed.addAll(path);
+        }
+
+        int finishUnreachableBeliefNodes = emittedNodes.size() - finishReachable.size();
+        List<String> finishUnreachableSamples = new ArrayList<>();
+        if (finishUnreachableBeliefNodes > 0) {
+            for (BeliefNode node : emittedNodes) {
+                if (finishReachable.contains(node)) {
+                    continue;
+                }
+                finishUnreachableSamples.add(describeBeliefProgressNode(node));
+                if (finishUnreachableSamples.size() >= 8) {
+                    break;
+                }
+            }
+        }
+
+        boolean ok = selectedControllableEdgesMissingOutput == 0
+                && selectedControllableSelfLoops == 0
+                && selectedControllableCycles == 0
+                && finishUnreachableBeliefNodes == 0;
+
+        log("  [Belief-Lite-Progress-Check] status=" + (ok ? "OK" : "WARNING")
+                + ", beliefStates=" + emittedNodes.size()
+                + ", selectedFinishNodes=" + selectedFinishNodes
+                + ", selectedControllableEdges=" + selectedControllableEdges
+                + ", selectedControllableEdgesMissingOutput="
+                + selectedControllableEdgesMissingOutput
+                + ", selectedControllableSelfLoops=" + selectedControllableSelfLoops
+                + ", selectedControllableCycles=" + selectedControllableCycles
+                + ", selectedControllableCycleNodes="
+                + selectedControllableCycleNodes.size()
+                + ", fairWaitNodes=" + fairWaitNodes
+                + ", waitUncontrollableNodes=" + waitUncontrollableNodes
+                + ", finishReachableBeliefNodes=" + finishReachable.size()
+                + ", finishUnreachableBeliefNodes="
+                + finishUnreachableBeliefNodes);
+        if (!ok) {
+            log("  [Belief-Lite-Progress-Warning] selectedControllableCycleSamples="
+                    + limitedStrings(selectedControllableCycleSamples, 5)
+                    + ", finishUnreachableSamples="
+                    + limitedStrings(finishUnreachableSamples, 8));
+        }
+    }
+
+    private void logBeliefLiteFairProgressValidation(
+            LTSImpl<Long, Action> result,
+            Map<BeliefNode, Long> beliefIds) {
+
+        BeliefLiteFairOutputGraph graph =
+                buildBeliefLiteFairOutputGraph(result, beliefIds);
+
+        Set<BeliefNode> fairWinning = new LinkedHashSet<>(graph.finishNodes);
+        int directPromotedNodes = 0;
+        int fairSccPromotedNodes = 0;
+        int iterations = 0;
+
+        boolean changed;
+        do {
+            changed = false;
+            iterations++;
+
+            for (BeliefNode node : graph.emittedNodes) {
+                if (fairWinning.contains(node)) {
+                    continue;
+                }
+                if (!allFairOutputUncontrollableTargetsIn(node, graph, fairWinning)) {
+                    continue;
+                }
+
+                BeliefTransition selected = graph.selectedControllableEdges.get(node);
+                if (selected != null && fairWinning.contains(selected.target)) {
+                    fairWinning.add(node);
+                    directPromotedNodes++;
+                    changed = true;
+                    continue;
+                }
+                if (!graph.uncontrollableEdges.getOrDefault(node, Collections.emptyList()).isEmpty()) {
+                    fairWinning.add(node);
+                    directPromotedNodes++;
+                    changed = true;
+                }
+            }
+
+            Set<BeliefNode> candidates = new LinkedHashSet<>(graph.emittedNodes);
+            candidates.removeAll(fairWinning);
+            Set<BeliefNode> fairScc = computeBeliefLiteFairOutputPromotionCandidates(
+                    candidates, fairWinning, graph);
+            if (!fairScc.isEmpty()) {
+                fairWinning.addAll(fairScc);
+                fairSccPromotedNodes += fairScc.size();
+                changed = true;
+            }
+        } while (changed);
+
+        Set<BeliefNode> unresolved = new LinkedHashSet<>(graph.emittedNodes);
+        unresolved.removeAll(fairWinning);
+
+        int ordinaryControllableBlockedByUncontrollable = 0;
+        int updateEventWithUncontrollable = 0;
+        for (BeliefNode node : graph.emittedNodes) {
+            BeliefTransition selected = graph.selectedControllableEdges.get(node);
+            if (selected == null) {
+                continue;
+            }
+            boolean hasUncontrollable =
+                    !graph.uncontrollableEdges.getOrDefault(node, Collections.emptyList()).isEmpty();
+            if (isUpdateProtocolOutputAction(selected.outputAction)) {
+                if (hasUncontrollable) {
+                    updateEventWithUncontrollable++;
+                }
+            } else if (hasFairOutputUncontrollableSuccessorIn(node, graph, unresolved)) {
+                ordinaryControllableBlockedByUncontrollable++;
+            }
+        }
+
+        int missingOutputTransitions = graph.missingUncontrollableEdges
+                + graph.missingSelectedControllableEdges
+                + graph.missingSelectedFinishEdges;
+        boolean ok = missingOutputTransitions == 0
+                && !graph.finishNodes.isEmpty()
+                && unresolved.isEmpty();
+
+        log("  [Belief-Lite-Fair-Progress-Check] status=" + (ok ? "OK" : "WARNING")
+                + ", beliefStates=" + graph.emittedNodes.size()
+                + ", fairWinningBeliefStates=" + fairWinning.size()
+                + ", fairUnresolvedBeliefStates=" + unresolved.size()
+                + ", finishSeedNodes=" + graph.finishNodes.size()
+                + ", uncontrollableEdges=" + graph.uncontrollableEdgesCount
+                + ", selectedUpdateEventEdges=" + graph.selectedUpdateEventEdges
+                + ", selectedOrdinaryControllableEdges="
+                + graph.selectedOrdinaryControllableEdges
+                + ", directPromotedNodes=" + directPromotedNodes
+                + ", fairSccPromotedNodes=" + fairSccPromotedNodes
+                + ", updateEventWithUncontrollable="
+                + updateEventWithUncontrollable
+                + ", ordinaryControllableBlockedByUncontrollable="
+                + ordinaryControllableBlockedByUncontrollable
+                + ", missingUncontrollableEdges=" + graph.missingUncontrollableEdges
+                + ", missingSelectedControllableEdges="
+                + graph.missingSelectedControllableEdges
+                + ", missingSelectedFinishEdges=" + graph.missingSelectedFinishEdges
+                + ", iterations=" + iterations);
+        if (!ok) {
+            List<String> samples = new ArrayList<>();
+            for (BeliefNode node : unresolved) {
+                samples.add(describeBeliefProgressNode(node));
+                if (samples.size() >= 8) {
+                    break;
+                }
+            }
+            log("  [Belief-Lite-Fair-Progress-Warning] unresolvedSamples="
+                    + limitedStrings(samples, 8));
+        }
+    }
+
+    private BeliefLiteFairOutputGraph buildBeliefLiteFairOutputGraph(
+            LTSImpl<Long, Action> result,
+            Map<BeliefNode, Long> beliefIds) {
+
+        BeliefLiteFairOutputGraph graph = new BeliefLiteFairOutputGraph();
+        graph.emittedNodes.addAll(beliefIds.keySet());
+
+        for (BeliefNode node : graph.emittedNodes) {
+            Long source = beliefIds.get(node);
+            if (source == null) {
+                continue;
+            }
+
+            List<BeliefTransition> emittedUncontrollable = new ArrayList<>();
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
+                    continue;
+                }
+                Long target = beliefIds.get(edge.target);
+                if (target != null && hasOutputTransition(result, source, edge.outputAction, target)) {
+                    emittedUncontrollable.add(edge);
+                    graph.uncontrollableEdgesCount++;
+                } else {
+                    graph.missingUncontrollableEdges++;
+                }
+            }
+            graph.uncontrollableEdges.put(node, emittedUncontrollable);
+
+            if (node.selectedFinish) {
+                if (hasOutputTransition(result, source, node.finishAction, node.finishNcTargetId)) {
+                    graph.finishNodes.add(node);
+                } else {
+                    graph.missingSelectedFinishEdges++;
+                }
+            }
+
+            BeliefTransition selected = node.selectedControllableEdge;
+            if (selected == null) {
+                continue;
+            }
+            Long target = beliefIds.get(selected.target);
+            if (target != null && hasOutputTransition(result, source, selected.outputAction, target)) {
+                graph.selectedControllableEdges.put(node, selected);
+                if (isUpdateProtocolOutputAction(selected.outputAction)) {
+                    graph.selectedUpdateEventEdges++;
+                } else {
+                    graph.selectedOrdinaryControllableEdges++;
+                }
+            } else {
+                graph.missingSelectedControllableEdges++;
+            }
+        }
+
+        return graph;
+    }
+
+    private Set<BeliefNode> computeBeliefLiteFairOutputPromotionCandidates(
+            Set<BeliefNode> initialCandidates,
+            Set<BeliefNode> fairWinning,
+            BeliefLiteFairOutputGraph graph) {
+
+        Set<BeliefNode> candidates = new LinkedHashSet<>(initialCandidates);
+        boolean innerChanged;
+        do {
+            innerChanged = false;
+
+            Iterator<BeliefNode> it = candidates.iterator();
+            while (it.hasNext()) {
+                BeliefNode node = it.next();
+                if (!isBeliefLiteFairOutputUSafe(node, candidates, fairWinning, graph)) {
+                    it.remove();
+                    innerChanged = true;
+                }
+            }
+            if (candidates.isEmpty()) {
+                return candidates;
+            }
+
+            Map<BeliefNode, Integer> distances =
+                    computeBeliefLiteFairOutputDistances(candidates, fairWinning, graph);
+            it = candidates.iterator();
+            while (it.hasNext()) {
+                BeliefNode node = it.next();
+                if (!distances.containsKey(node)) {
+                    it.remove();
+                    innerChanged = true;
+                }
+            }
+        } while (innerChanged);
+
+        return candidates;
+    }
+
+    private boolean isBeliefLiteFairOutputUSafe(
+            BeliefNode node,
+            Set<BeliefNode> candidates,
+            Set<BeliefNode> fairWinning,
+            BeliefLiteFairOutputGraph graph) {
+
+        for (BeliefTransition edge : graph.uncontrollableEdges
+                .getOrDefault(node, Collections.emptyList())) {
+            if (!fairWinning.contains(edge.target) && !candidates.contains(edge.target)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Map<BeliefNode, Integer> computeBeliefLiteFairOutputDistances(
+            Set<BeliefNode> candidates,
+            Set<BeliefNode> fairWinning,
+            BeliefLiteFairOutputGraph graph) {
+
+        Map<BeliefNode, Integer> distances = new HashMap<>();
+        boolean changed;
+        do {
+            changed = false;
+            for (BeliefNode node : candidates) {
+                int best = distanceToBeliefLiteFairOutputProgress(
+                        node, candidates, fairWinning, distances, graph);
+                if (best == Integer.MAX_VALUE) {
+                    continue;
+                }
+                Integer old = distances.get(node);
+                if (old == null || best < old) {
+                    distances.put(node, best);
+                    changed = true;
+                }
+            }
+        } while (changed);
+        return distances;
+    }
+
+    private int distanceToBeliefLiteFairOutputProgress(
+            BeliefNode node,
+            Set<BeliefNode> candidates,
+            Set<BeliefNode> fairWinning,
+            Map<BeliefNode, Integer> distances,
+            BeliefLiteFairOutputGraph graph) {
+
+        int best = Integer.MAX_VALUE;
+        for (BeliefTransition edge : graph.uncontrollableEdges
+                .getOrDefault(node, Collections.emptyList())) {
+            int childDistance = beliefLiteFairOutputTargetDistance(
+                    edge.target, candidates, fairWinning, distances);
+            if (childDistance != Integer.MAX_VALUE) {
+                best = Math.min(best, childDistance + 1);
+            }
+        }
+
+        BeliefTransition selected = graph.selectedControllableEdges.get(node);
+        if (selected != null
+                && canUseBeliefLiteFairOutputControllable(node, selected, candidates, graph)) {
+            int childDistance = beliefLiteFairOutputTargetDistance(
+                    selected.target, candidates, fairWinning, distances);
+            if (childDistance != Integer.MAX_VALUE) {
+                best = Math.min(best, childDistance + 1);
+            }
+        }
+        return best;
+    }
+
+    private int beliefLiteFairOutputTargetDistance(
+            BeliefNode target,
+            Set<BeliefNode> candidates,
+            Set<BeliefNode> fairWinning,
+            Map<BeliefNode, Integer> distances) {
+
+        if (fairWinning.contains(target)) {
+            return 0;
+        }
+        if (!candidates.contains(target)) {
+            return Integer.MAX_VALUE;
+        }
+        Integer distance = distances.get(target);
+        return distance == null ? Integer.MAX_VALUE : distance;
+    }
+
+    private boolean canUseBeliefLiteFairOutputControllable(
+            BeliefNode node,
+            BeliefTransition edge,
+            Set<BeliefNode> candidates,
+            BeliefLiteFairOutputGraph graph) {
+
+        if (isUpdateProtocolOutputAction(edge.outputAction)) {
+            return true;
+        }
+        return !hasFairOutputUncontrollableSuccessorIn(node, graph, candidates);
+    }
+
+    private boolean allFairOutputUncontrollableTargetsIn(
+            BeliefNode node,
+            BeliefLiteFairOutputGraph graph,
+            Set<BeliefNode> targetSet) {
+
+        for (BeliefTransition edge : graph.uncontrollableEdges
+                .getOrDefault(node, Collections.emptyList())) {
+            if (!targetSet.contains(edge.target)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasFairOutputUncontrollableSuccessorIn(
+            BeliefNode node,
+            BeliefLiteFairOutputGraph graph,
+            Set<BeliefNode> targetSet) {
+
+        for (BeliefTransition edge : graph.uncontrollableEdges
+                .getOrDefault(node, Collections.emptyList())) {
+            if (targetSet.contains(edge.target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String describeSelectedControllableCycle(
+            List<BeliefNode> path,
+            int cycleStartIndex) {
+
+        List<String> segments = new ArrayList<>();
+        for (int i = cycleStartIndex; i < path.size(); i++) {
+            BeliefNode node = path.get(i);
+            BeliefTransition edge = node.selectedControllableEdge;
+            String targetName = edge == null || edge.target == null
+                    ? "none"
+                    : edge.target.name();
+            String actionName = edge == null || edge.outputAction == null
+                    ? "none"
+                    : edge.outputAction.toString();
+            segments.add(node.name() + " --" + actionName + "--> " + targetName
+                    + " markings=" + summarizeMarkingHistogram(node.members)
+                    + " selected=" + describeBeliefSelectedStrategy(node));
+        }
+        return segments.toString();
+    }
+
+    private String describeBeliefProgressNode(BeliefNode node) {
+        return node.name()
+                + " selected=" + describeBeliefSelectedStrategy(node)
+                + ", markings=" + summarizeMarkingHistogram(node.members)
+                + ", statuses=" + summarizeStatusHistogram(node.members)
+                + ", U=" + describeBeliefEdges(node.uncontrollableEdges)
+                + ", C=" + describeBeliefEdges(node.controllableEdges);
+    }
+
+    private boolean hasMixedMarkingStates(List<CompostateDUC<State, Action>> states) {
+        Long firstMarking = null;
+        for (CompostateDUC<State, Action> state : states) {
+            long marking = getMarkingState(state);
+            if (firstMarking == null) {
+                firstMarking = marking;
+            } else if (firstMarking.longValue() != marking) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void recordBeliefLitePreUpdateOutputStateOverhead(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<State, List<CompostateDUC<State, Action>>> statesByOldController) {
+
+        int rawPreUpdateStates = 0;
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (isPreUpdateOutputState(state)) {
+                rawPreUpdateStates++;
+            }
+        }
+
+        preUpdateOutputMergedStates = rawPreUpdateStates;
+        preUpdateOutputClassStates = statesByOldController.size();
+        preUpdateOutputMergeRemovedStates = preUpdateOutputMergedStates - preUpdateOutputClassStates;
+        UpdatingControllerEvaluationRecorder.recordOtfPreUpdateStateOverhead(
+                countOldControllerStates(),
+                preUpdateOutputMergedStates,
+                preUpdateOutputClassStates);
+    }
+
+    private void expandBeliefLiteDryRunNode(
+            State oldControllerState,
+            BeliefNode node,
+            BeliefSearchContext context,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            boolean logNode) {
+
+        BeliefLiteNodeDiagnostics diagnostics = new BeliefLiteNodeDiagnostics();
+        buildBeliefLiteFinishEdge(node, rawDirectorEdges, stats, diagnostics);
+        buildBeliefLiteActionEdges(node, context, rawDirectorEdges, stats, diagnostics);
+
+        stats.uncontrollableEdges += node.uncontrollableEdges.size();
+        stats.controllableEdges += node.controllableEdges.size();
+        if (node.finishNcTargetId != null) {
+            stats.finishNodes++;
+        }
+        if (node.bad) {
+            stats.badNodes++;
+        }
+
+        if (!logNode) {
+            return;
+        }
+
+        if (stats.loggedNodes < beliefLiteMaxLoggedNodes) {
+            log("    [Belief-Lite-Node] oldState=" + oldControllerState
+                    + ", node=" + node.name()
+                    + ", members=" + node.members.size()
+                    + ", markings=" + summarizeMarkingHistogram(node.members)
+                    + ", statuses=" + summarizeStatusHistogram(node.members)
+                    + ", varyingComponents=" + describeVaryingComponents(node.members)
+                    + ", finish=" + describeBeliefLiteFinish(node, diagnostics)
+                    + ", U=" + describeBeliefEdges(node.uncontrollableEdges)
+                    + ", C=" + describeBeliefEdges(node.controllableEdges)
+                    + ", rejectedC=" + limitedStrings(diagnostics.rejectedControllable, 6)
+                    + (node.bad ? ", BAD=" + node.badReason : ""));
+            stats.loggedNodes++;
+        } else {
+            stats.suppressedNodes++;
+        }
+    }
+
+    private void buildBeliefLiteFinishEdge(
+            BeliefNode node,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            BeliefLiteNodeDiagnostics diagnostics) {
+
+        Set<Long> ncTargets = new LinkedHashSet<>();
+        Action finishAction = null;
+
+        for (CompostateDUC<State, Action> member : node.members) {
+            List<RawDirectorEdge> edges = rawDirectorEdges == null ? null : rawDirectorEdges.get(member);
+            boolean hasFinish = false;
+            if (edges != null) {
+                for (RawDirectorEdge edge : edges) {
+                    if (!edge.actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                        continue;
+                    }
+                    if (edge.child == null || getMarkingState(edge.child) != 9
+                            || !isSafeBeliefLiteConcreteChild(edge.child)) {
+                        continue;
+                    }
+                    String signature = generateNCSignature(edge.child);
+                    Long ncTarget = signature == null ? null : newControllerConnectionMap.get(signature);
+                    if (ncTarget == null) {
+                        continue;
+                    }
+                    hasFinish = true;
+                    ncTargets.add(ncTarget);
+                    finishAction = edge.outputAction;
+                }
+            }
+            if (!hasFinish) {
+                stats.finishUnavailableNodes++;
+                diagnostics.finishReason = "missing-member";
+                return;
+            }
+        }
+
+        if (ncTargets.size() == 1) {
+            node.finishNcTargetId = ncTargets.iterator().next();
+            node.finishAction = finishAction;
+            diagnostics.finishReason = "enabled";
+        } else {
+            stats.finishNcTargetMismatches++;
+            diagnostics.finishReason = "nc-target-mismatch:" + ncTargets;
+        }
+    }
+
+    private void buildBeliefLiteActionEdges(
+            BeliefNode node,
+            BeliefSearchContext context,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            BeliefLiteGraphStats stats,
+            BeliefLiteNodeDiagnostics diagnostics) {
+
+        Map<String, BeliefActionBucket> controllableBuckets = new LinkedHashMap<>();
+        Map<String, BeliefActionBucket> uncontrollableBuckets = new LinkedHashMap<>();
+
+        for (int memberIndex = 0; memberIndex < node.members.size(); memberIndex++) {
+            CompostateDUC<State, Action> member = node.members.get(memberIndex);
+            List<RawDirectorEdge> edges = rawDirectorEdges == null ? null : rawDirectorEdges.get(member);
+            if (edges == null) {
+                continue;
+            }
+            for (RawDirectorEdge edge : edges) {
+                if (edge.actionName.equals(UpdateConstants.BEGIN_UPDATE)
+                        || edge.actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                    continue;
+                }
+                Map<String, BeliefActionBucket> buckets = edge.hAction.isControllable()
+                        ? controllableBuckets
+                        : uncontrollableBuckets;
+                BeliefActionBucket bucket = buckets.get(edge.actionName);
+                if (bucket == null) {
+                    bucket = new BeliefActionBucket(edge.outputAction, edge.hAction.isControllable());
+                    buckets.put(edge.actionName, bucket);
+                }
+                bucket.presentMemberIndexes.add(memberIndex);
+                if (isSafeBeliefLiteConcreteChild(edge.child)) {
+                    bucket.children.add(edge.child);
+                } else {
+                    bucket.hasUnsafeChild = true;
+                    bucket.unsafeReason = "action=" + edge.actionName
+                            + " child=" + summarizeStateForDiagnostics(edge.child);
+                }
+            }
+        }
+
+        for (BeliefActionBucket bucket : uncontrollableBuckets.values()) {
+            if (bucket.hasUnsafeChild) {
+                stats.unsafeUncontrollable++;
+                node.markBad("uncontrollable action が安全でない子へ進む可能性: "
+                        + bucket.unsafeReason);
+                diagnostics.unsafeUncontrollable.add(bucket.actionName());
+                return;
+            }
+            BeliefNode target = context.getOrCreateNode(bucket.children);
+            if (target == null) {
+                node.markBad("uncontrollable action の先で belief 状態数の上限を超えた: "
+                        + bucket.actionName());
+                return;
+            }
+            context.addTransition(
+                    node,
+                    new BeliefTransition(bucket.outputAction, false, target));
+        }
+
+        int memberCount = node.members.size();
+        for (BeliefActionBucket bucket : controllableBuckets.values()) {
+            if (bucket.presentMemberIndexes.size() != memberCount) {
+                stats.rejectedControllableMissing++;
+                diagnostics.rejectedControllable.add(
+                        bucket.actionName()
+                        + ":missingMembers=" + (memberCount - bucket.presentMemberIndexes.size()));
+                continue;
+            }
+            if (bucket.hasUnsafeChild) {
+                stats.rejectedControllableUnsafe++;
+                diagnostics.rejectedControllable.add(bucket.actionName() + ":unsafeChild");
+                continue;
+            }
+            BeliefNode target = context.getOrCreateNode(bucket.children);
+            if (target == null) {
+                diagnostics.rejectedControllable.add(bucket.actionName() + ":nodeLimit");
+                continue;
+            }
+            context.addTransition(
+                    node,
+                    new BeliefTransition(bucket.outputAction, true, target));
+        }
+    }
+
+    private boolean isSafeBeliefLiteConcreteChild(CompostateDUC<State, Action> child) {
+        return child != null && !child.isStatus(Status.ERROR);
+    }
+
+    private String describeBeliefLiteFinish(
+            BeliefNode node,
+            BeliefLiteNodeDiagnostics diagnostics) {
+
+        if (node.finishNcTargetId != null) {
+            return "NC:" + node.finishNcTargetId;
+        }
+        if (diagnostics.finishReason == null || diagnostics.finishReason.isEmpty()) {
+            return "none";
+        }
+        return "none(" + diagnostics.finishReason + ")";
+    }
+
+    private String limitedStrings(List<String> values, int maxValues) {
+        if (values == null || values.isEmpty()) {
+            return "none";
+        }
+        if (values.size() <= maxValues) {
+            return values.toString();
+        }
+        List<String> limited = new ArrayList<>(values.subList(0, maxValues));
+        limited.add("... +" + (values.size() - maxValues) + " entries");
+        return limited.toString();
     }
 
     private BeliefRepairPlan runBeliefRepairForOldState(
@@ -4079,6 +9144,25 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             int round,
             boolean updateProtocolOnly) {
 
+        return expandBeliefControllableFrontier(
+                plan,
+                noProgressActions,
+                rejectedBeliefActions,
+                round,
+                updateProtocolOnly,
+                false,
+                "Belief-LazyExpansion");
+    }
+
+    private BeliefLazyExpansionResult expandBeliefControllableFrontier(
+            BeliefRepairPlan plan,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round,
+            boolean updateProtocolOnly,
+            boolean liteSafety,
+            String logLabel) {
+
         BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
         while (true) {
             BeliefExpansionCandidate candidate = selectNextControllableBeliefCandidate(
@@ -4087,13 +9171,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 break;
             }
             if (expandBeliefExpansionCandidate(
-                    candidate, noProgressActions, rejectedBeliefActions, result)) {
+                    candidate,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    result,
+                    liteSafety,
+                    logLabel)) {
                 return result;
             }
         }
 
         if (debugLogEnabled && (result.attemptedActions > 0 || result.addedEdges > 0)) {
-            log("  [Belief-LazyExpansion] oldControllerState=" + plan.oldControllerState
+            log("  [" + logLabel + "] oldControllerState=" + describeBeliefExpansionOwner(plan)
                     + ", round=" + result.round
                     + ", mode=C-one-action"
                     + ", attemptedActions=" + result.attemptedActions
@@ -4108,10 +9197,95 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Set<String> noProgressActions,
             int round) {
 
+        return expandBeliefUncontrollableClosure(
+                plan,
+                noProgressActions,
+                round,
+                false,
+                "Belief-LazyExpansion");
+    }
+
+    private BeliefLazyExpansionResult expandBeliefUncontrollableClosure(
+            BeliefRepairPlan plan,
+            Set<String> noProgressActions,
+            int round,
+            boolean liteSafety,
+            String logLabel) {
+
         BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
         BeliefExpansionCandidate candidate = selectNextUncontrollableBeliefCandidate(plan, noProgressActions);
         if (candidate != null) {
-            expandBeliefExpansionCandidate(candidate, noProgressActions, Collections.emptySet(), result);
+            expandBeliefExpansionCandidate(
+                    candidate,
+                    noProgressActions,
+                    Collections.emptySet(),
+                    result,
+                    liteSafety,
+                    logLabel);
+        }
+        return result;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefLiteDirectControllableFrontier(
+            Object oldControllerState,
+            List<BeliefNode> nodes,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            int round,
+            boolean updateProtocolOnly) {
+
+        BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
+        while (true) {
+            BeliefExpansionCandidate candidate = selectNextControllableBeliefCandidate(
+                    oldControllerState,
+                    nodes,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    updateProtocolOnly);
+            if (candidate == null) {
+                break;
+            }
+            if (expandBeliefExpansionCandidate(
+                    candidate,
+                    noProgressActions,
+                    rejectedBeliefActions,
+                    result,
+                    true,
+                    "Belief-Lite-OTF")) {
+                return result;
+            }
+        }
+
+        if (debugLogEnabled && (result.attemptedActions > 0 || result.addedEdges > 0)) {
+            log("  [Belief-Lite-OTF] oldControllerState=" + oldControllerState
+                    + ", round=" + result.round
+                    + ", mode=C-one-action"
+                    + ", attemptedActions=" + result.attemptedActions
+                    + ", expandedActions=" + result.expandedActions
+                    + ", addedEdges=" + result.addedEdges);
+        }
+        return result;
+    }
+
+    private BeliefLazyExpansionResult expandBeliefLiteDirectUncontrollableClosure(
+            Object oldControllerState,
+            List<BeliefNode> nodes,
+            Set<String> noProgressActions,
+            int round) {
+
+        BeliefLazyExpansionResult result = new BeliefLazyExpansionResult(round);
+        BeliefExpansionCandidate candidate = selectNextUncontrollableBeliefCandidate(
+                oldControllerState,
+                nodes,
+                noProgressActions);
+        if (candidate != null) {
+            expandBeliefExpansionCandidate(
+                    candidate,
+                    noProgressActions,
+                    Collections.emptySet(),
+                    result,
+                    true,
+                    "Belief-Lite-OTF");
         }
         return result;
     }
@@ -4150,6 +9324,43 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return candidates.get(0);
     }
 
+    private BeliefExpansionCandidate selectNextControllableBeliefCandidate(
+            Object oldControllerState,
+            List<BeliefNode> nodes,
+            Set<String> noProgressActions,
+            Set<String> rejectedBeliefActions,
+            boolean updateProtocolOnly) {
+
+        List<BeliefExpansionCandidate> candidates = new ArrayList<>();
+        for (BeliefNode node : nodes) {
+            if (node.bad || node.winning) {
+                continue;
+            }
+
+            for (String actionName : collectCommonControllableActionNames(node)) {
+                if (isUpdateProtocolOutputActionName(actionName) != updateProtocolOnly) {
+                    continue;
+                }
+                if (rejectedBeliefActions.contains(beliefActionKey(node, actionName))) {
+                    continue;
+                }
+                if (hasExpandableBeliefAction(node, actionName, true, noProgressActions)) {
+                    candidates.add(new BeliefExpansionCandidate(
+                            oldControllerState,
+                            node,
+                            actionName,
+                            true,
+                            isUpdateProtocolOutputActionName(actionName)));
+                }
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        candidates.sort(this::compareBeliefExpansionCandidates);
+        return candidates.get(0);
+    }
+
     private BeliefExpansionCandidate selectNextUncontrollableBeliefCandidate(
             BeliefRepairPlan plan,
             Set<String> noProgressActions) {
@@ -4171,11 +9382,39 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return candidates.get(0);
     }
 
+    private BeliefExpansionCandidate selectNextUncontrollableBeliefCandidate(
+            Object oldControllerState,
+            List<BeliefNode> nodes,
+            Set<String> noProgressActions) {
+
+        List<BeliefExpansionCandidate> candidates = new ArrayList<>();
+        for (BeliefNode node : nodes) {
+            if (node.bad) {
+                continue;
+            }
+            for (String actionName : collectUnexploredUncontrollableActionNames(node, noProgressActions)) {
+                candidates.add(new BeliefExpansionCandidate(
+                        oldControllerState,
+                        node,
+                        actionName,
+                        false,
+                        false));
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        candidates.sort(this::compareBeliefExpansionCandidates);
+        return candidates.get(0);
+    }
+
     private boolean expandBeliefExpansionCandidate(
             BeliefExpansionCandidate candidate,
             Set<String> noProgressActions,
             Set<String> rejectedBeliefActions,
-            BeliefLazyExpansionResult result) {
+            BeliefLazyExpansionResult result,
+            boolean liteSafety,
+            String logLabel) {
 
         int beforeAddedEdges = result.addedEdges;
         int beforeExpandedActions = result.expandedActions;
@@ -4186,19 +9425,44 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     ? findEnabledActionByOutputName(member, candidate.actionName, true)
                     : findEnabledUncontrollableActionByOutputName(member, candidate.actionName);
             if (memberAction != null) {
+                if (candidate.controllable
+                        && candidate.actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+                    StartNewSpecUnsafePrecheck precheck =
+                            precheckUnsafeStartNewSpec(member, memberAction);
+                    if (precheck.unsafe) {
+                        rejectedBeliefActions.add(beliefActionKey(
+                                candidate.node,
+                                candidate.actionName));
+                        beliefLiteStartNewSpecUnsafeRejects++;
+                        beliefLiteStartNewSpecUnsafePrecheckRejects++;
+                        if (debugLogEnabled) {
+                            log("  [" + logLabel + "] discard unsafe controllable candidate before expansion: "
+                                    + "oldControllerState=" + describeBeliefExpansionOwner(candidate)
+                                    + ", node=" + candidate.node.name()
+                                    + ", action=" + candidate.actionName
+                                    + ", reason=startNewSpec safety sync precheck found ERROR child"
+                                    + startNewSpecPrecheckLogSuffix(precheck));
+                        }
+                        return false;
+                    }
+                }
                 expandConcreteActionForBelief(member, memberAction, noProgressActions, result);
             }
         }
 
         if (result.addedEdges > beforeAddedEdges) {
-            if (candidate.controllable && !isControllableBeliefCandidateUsable(candidate)) {
+            if (candidate.controllable && !isControllableBeliefCandidateUsable(candidate, liteSafety)) {
                 rejectedBeliefActions.add(beliefActionKey(candidate.node, candidate.actionName));
+                if (candidate.actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+                    beliefLiteStartNewSpecUnsafeRejects++;
+                }
                 if (debugLogEnabled) {
-                    log("  [Belief-LazyExpansion] discard unsafe controllable candidate: "
-                            + "oldControllerState=" + candidate.plan.oldControllerState
+                    log("  [" + logLabel + "] discard unsafe controllable candidate: "
+                            + "oldControllerState=" + describeBeliefExpansionOwner(candidate)
                             + ", node=" + candidate.node.name()
                             + ", action=" + candidate.actionName
-                            + ", reason=ERROR child を持つため共通 controllable 戦略として使えない");
+                            + ", reason=ERROR child を持つため共通 controllable 戦略として使えない"
+                            + startNewSpecReadinessLogSuffix(candidate, liteSafety));
                 }
                 result.expandedActions = beforeExpandedActions;
                 result.addedEdges = beforeAddedEdges;
@@ -4207,9 +9471,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 return false;
             }
             if (debugLogEnabled) {
-                log("  [Belief-LazyExpansion] oldControllerState=" + candidate.plan.oldControllerState
+                log("  [" + logLabel + "] oldControllerState="
+                        + describeBeliefExpansionOwner(candidate)
                         + ", round=" + result.round
-                        + ", mode=" + (candidate.controllable ? "C-frontier" : "U-closure")
+                        + ", mode=" + (candidate.controllable ? "C-frontier" : "U-frontier")
                         + ", selectedNode=" + candidate.node.name()
                         + ", nodeDepth=" + beliefNodeMaxMarkingDepth(candidate.node)
                         + ", nodeSeq=" + beliefNodeMaxSeq(candidate.node)
@@ -4217,10 +9482,425 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         + ", actionClass=" + candidate.actionClass()
                         + ", attemptedActions=" + result.attemptedActions
                         + ", expandedActions=" + result.expandedActions
-                        + ", addedEdges=" + result.addedEdges);
+                        + ", addedEdges=" + result.addedEdges
+                        + startNewSpecReadinessLogSuffix(candidate, liteSafety));
             }
             beliefLazyExpansionRounds++;
             return true;
+        }
+        return false;
+    }
+
+    private String startNewSpecPrecheckLogSuffix(
+            StartNewSpecUnsafePrecheck precheck) {
+
+        beliefLiteStartNewSpecReadinessChecks++;
+        int maxLogged = Math.max(0, beliefLiteStartReadinessMaxLogged);
+        if (beliefLiteStartNewSpecReadinessLogged >= maxLogged) {
+            beliefLiteStartNewSpecReadinessSuppressed++;
+            return "";
+        }
+
+        beliefLiteStartNewSpecReadinessLogged++;
+        return ", precheck={" + precheck.describe() + "}";
+    }
+
+    private StartNewSpecUnsafePrecheck precheckUnsafeStartNewSpec(
+            CompostateDUC<State, Action> member,
+            HAction<State, Action> action) {
+
+        ActionChildrenGoalCacheKey cacheKey =
+                new ActionChildrenGoalCacheKey(member, action);
+        StartNewSpecUnsafePrecheck cached =
+                startNewSpecPrecheckCache.get(cacheKey);
+        if (cached != null) {
+            beliefLiteStartNewSpecPrecheckCacheHits++;
+            return cached;
+        }
+
+        beliefLiteStartNewSpecPrecheckCacheMisses++;
+        long startNanos = System.nanoTime();
+        StartNewSpecUnsafePrecheck result = new StartNewSpecUnsafePrecheck();
+        try {
+            result.preSynthesisGroups.add(stateSegmentSignature(
+                    member,
+                    synthesisStart,
+                    synthesisEnd));
+            result.preNewSafetyGroups.add(stateSegmentSignature(
+                    member,
+                    newSafeStart,
+                    newSafeEnd));
+
+            List<List<State>> childVectors = getChildStatesDUC_Nondet(member, action);
+            if (childVectors == null || childVectors.isEmpty()) {
+                result.invalidOrDeadlocked = true;
+                return result;
+            }
+
+            for (List<State> childVector : childVectors) {
+                result.children++;
+                result.startSyncSourceGroups.add(
+                        describeSafetySyncSourceSignature(childVector));
+                String postNewSafety = vectorSegmentSignature(
+                        childVector,
+                        newSafeStart,
+                        newSafeEnd);
+                result.postNewSafetyGroups.add(postNewSafety);
+                result.postMarkingGroups.add(String.valueOf(
+                        getMarkingStateFromList(childVector)));
+
+                if (vectorHasEnforcedError(childVector)) {
+                    result.unsafe = true;
+                    result.unsafeChildren++;
+                    result.unsafePostNewSafetyGroups.add(postNewSafety);
+                    if (vectorHasErrorInRange(childVector, newSafeStart, newSafeEnd)) {
+                        result.unsafeNewSafetyChildren++;
+                    } else {
+                        result.unsafeOtherChildren++;
+                    }
+                    if (result.samples.size() < 4) {
+                        result.samples.add("unsafeVector m="
+                                + getMarkingStateFromList(childVector)
+                                + ", errors=" + describeVectorErrorComponents(childVector)
+                                + ", syncSource="
+                                + describeSafetySyncSourceSignature(childVector)
+                                + ", newSafety=" + postNewSafety);
+                    }
+                } else {
+                    result.safeChildren++;
+                }
+            }
+            return result;
+        } finally {
+            beliefLiteStartNewSpecPrecheckNanos += System.nanoTime() - startNanos;
+            startNewSpecPrecheckCache.put(cacheKey, result);
+        }
+    }
+
+    private String startNewSpecReadinessLogSuffix(
+            BeliefExpansionCandidate candidate,
+            boolean liteSafety) {
+
+        if (candidate == null
+                || candidate.node == null
+                || !UpdateConstants.START_NEW_SPEC.equals(candidate.actionName)) {
+            return "";
+        }
+
+        beliefLiteStartNewSpecReadinessChecks++;
+        int maxLogged = Math.max(0, beliefLiteStartReadinessMaxLogged);
+        if (beliefLiteStartNewSpecReadinessLogged >= maxLogged) {
+            beliefLiteStartNewSpecReadinessSuppressed++;
+            return "";
+        }
+
+        beliefLiteStartNewSpecReadinessLogged++;
+        return ", startReadiness={"
+                + describeStartNewSpecReadiness(candidate.node, liteSafety)
+                + "}";
+    }
+
+    private String describeStartNewSpecReadiness(
+            BeliefNode node,
+            boolean liteSafety) {
+
+        int members = node == null ? 0 : node.members.size();
+        int missingActionMembers = 0;
+        int unexploredMembers = 0;
+        int allChildrenSafeMembers = 0;
+        int membersWithSafeChild = 0;
+        int membersWithUnsafeChild = 0;
+        int totalChildren = 0;
+        int safeChildren = 0;
+        int unsafeChildren = 0;
+        int unsafeNewSafetyChildren = 0;
+        int unsafeOtherChildren = 0;
+        Set<String> preSynthesisGroups = new LinkedHashSet<>();
+        Set<String> preNewSafetyGroups = new LinkedHashSet<>();
+        Set<String> startSyncSourceGroups = new LinkedHashSet<>();
+        Set<String> postNewSafetyGroups = new LinkedHashSet<>();
+        Set<String> unsafePostNewSafetyGroups = new LinkedHashSet<>();
+        Set<String> postMarkingGroups = new LinkedHashSet<>();
+        List<String> samples = new ArrayList<>();
+
+        if (node != null) {
+            for (int memberIndex = 0; memberIndex < node.members.size(); memberIndex++) {
+                CompostateDUC<State, Action> member = node.members.get(memberIndex);
+                preSynthesisGroups.add(stateSegmentSignature(
+                        member, synthesisStart, synthesisEnd));
+                preNewSafetyGroups.add(stateSegmentSignature(
+                        member, newSafeStart, newSafeEnd));
+
+                HAction<State, Action> action = findEnabledActionByOutputName(
+                        member,
+                        UpdateConstants.START_NEW_SPEC,
+                        true);
+                if (action == null) {
+                    missingActionMembers++;
+                    addStartReadinessSample(samples, "member#" + memberIndex
+                            + ":missingAction preSynthesis="
+                            + stateSegmentSignature(member, synthesisStart, synthesisEnd));
+                    continue;
+                }
+
+                Set<CompostateDUC<State, Action>> children =
+                        member.getExploredChildren().getImage(action);
+                if (children == null || children.isEmpty()) {
+                    unexploredMembers++;
+                    addStartReadinessSample(samples, "member#" + memberIndex
+                            + ":unexplored preSynthesis="
+                            + stateSegmentSignature(member, synthesisStart, synthesisEnd));
+                    continue;
+                }
+
+                boolean memberAllChildrenSafe = true;
+                boolean memberHasSafeChild = false;
+                boolean memberHasUnsafeChild = false;
+                for (CompostateDUC<State, Action> child : children) {
+                    totalChildren++;
+                    postMarkingGroups.add(child == null ? "null" : String.valueOf(getMarkingState(child)));
+                    startSyncSourceGroups.add(describeSafetySyncSourceSignature(child));
+                    String postNewSafety = stateSegmentSignature(child, newSafeStart, newSafeEnd);
+                    postNewSafetyGroups.add(postNewSafety);
+
+                    boolean safeChild = liteSafety
+                            ? isSafeBeliefLiteConcreteChild(child)
+                            : isSafeWinningBeliefChild(child);
+                    if (safeChild) {
+                        safeChildren++;
+                        memberHasSafeChild = true;
+                    } else {
+                        unsafeChildren++;
+                        memberAllChildrenSafe = false;
+                        memberHasUnsafeChild = true;
+                        unsafePostNewSafetyGroups.add(postNewSafety);
+                        if (hasErrorComponentInRange(child, newSafeStart, newSafeEnd)) {
+                            unsafeNewSafetyChildren++;
+                        } else {
+                            unsafeOtherChildren++;
+                        }
+                        addStartReadinessSample(samples, "member#" + memberIndex
+                                + ":unsafeChild "
+                                + summarizeStartNewSpecChildForReadiness(child));
+                    }
+                }
+
+                if (memberAllChildrenSafe) {
+                    allChildrenSafeMembers++;
+                }
+                if (memberHasSafeChild) {
+                    membersWithSafeChild++;
+                }
+                if (memberHasUnsafeChild) {
+                    membersWithUnsafeChild++;
+                }
+            }
+        }
+
+        boolean ready = members > 0
+                && missingActionMembers == 0
+                && unexploredMembers == 0
+                && unsafeChildren == 0
+                && allChildrenSafeMembers == members;
+
+        return "ready=" + ready
+                + ", members=" + members
+                + ", allChildrenSafeMembers=" + allChildrenSafeMembers
+                + ", membersWithSafeChild=" + membersWithSafeChild
+                + ", membersWithUnsafeChild=" + membersWithUnsafeChild
+                + ", missingActionMembers=" + missingActionMembers
+                + ", unexploredMembers=" + unexploredMembers
+                + ", children=" + totalChildren
+                + ", safeChildren=" + safeChildren
+                + ", unsafeChildren=" + unsafeChildren
+                + ", unsafeNewSafetyChildren=" + unsafeNewSafetyChildren
+                + ", unsafeOtherChildren=" + unsafeOtherChildren
+                + ", preSynthesisGroups=" + describeLimitedGroups(preSynthesisGroups, 3)
+                + ", preNewSafetyGroups=" + describeLimitedGroups(preNewSafetyGroups, 3)
+                + ", startSyncSourceGroups=" + describeLimitedGroups(startSyncSourceGroups, 3)
+                + ", postNewSafetyGroups=" + describeLimitedGroups(postNewSafetyGroups, 3)
+                + ", unsafePostNewSafetyGroups=" + describeLimitedGroups(unsafePostNewSafetyGroups, 3)
+                + ", postMarkings=" + describeLimitedGroups(postMarkingGroups, 8)
+                + ", samples=" + limitedStrings(samples, 4);
+    }
+
+    private void addStartReadinessSample(List<String> samples, String sample) {
+        if (samples.size() < 8) {
+            samples.add(sample);
+        }
+    }
+
+    private String describeLimitedGroups(Set<String> groups, int maxValues) {
+        if (groups == null || groups.isEmpty()) {
+            return "0:none";
+        }
+        return groups.size() + ":" + limitedStrings(new ArrayList<>(groups), maxValues);
+    }
+
+    private String stateSegmentSignature(
+            CompostateDUC<State, Action> state,
+            int start,
+            int end) {
+
+        if (state == null) {
+            return "null";
+        }
+        return vectorSegmentSignature(state.getStates(), start, end);
+    }
+
+    private String vectorSegmentSignature(List<State> states, int start, int end) {
+        if (states == null) {
+            return "null";
+        }
+        if (start < 0 || end < start) {
+            return "n/a";
+        }
+        List<String> values = new ArrayList<>();
+        for (int i = start; i <= end; i++) {
+            if (i < states.size()) {
+                values.add(String.valueOf(states.get(i)));
+            } else {
+                values.add("?");
+            }
+        }
+        return values.toString();
+    }
+
+    private String describeSafetySyncSourceSignature(CompostateDUC<State, Action> state) {
+        if (state == null) {
+            return "null";
+        }
+        return describeSafetySyncSourceSignature(state.getStates());
+    }
+
+    private String describeSafetySyncSourceSignature(List<State> states) {
+        if (states == null) {
+            return "null";
+        }
+        if (safetyComponentIndicesMap == null || safetyComponentIndicesMap.isEmpty()) {
+            return "n/a";
+        }
+
+        List<String> entries = new ArrayList<>();
+        for (Map.Entry<Integer, List<Integer>> entry : safetyComponentIndicesMap.entrySet()) {
+            List<String> values = new ArrayList<>();
+            for (int component : entry.getValue()) {
+                String value = component < states.size()
+                        ? String.valueOf(states.get(component))
+                        : "?";
+                values.add(componentName(component) + "=" + value);
+            }
+            entries.add(componentName(entry.getKey()) + "<-" + values);
+        }
+        return entries.toString();
+    }
+
+    private String summarizeStartNewSpecChildForReadiness(
+            CompostateDUC<State, Action> child) {
+
+        if (child == null) {
+            return "null";
+        }
+        return "m=" + getMarkingState(child)
+                + ", status=" + child.getStatus()
+                + ", errors=" + describeErrorComponents(child)
+                + ", syncSource=" + describeSafetySyncSourceSignature(child)
+                + ", newSafety=" + stateSegmentSignature(child, newSafeStart, newSafeEnd);
+    }
+
+    private String describeErrorComponents(CompostateDUC<State, Action> state) {
+        if (state == null) {
+            return "null";
+        }
+
+        List<String> components = new ArrayList<>();
+        long markingState = getMarkingState(state);
+        List<State> states = state.getStates();
+        for (int component = 0; component < states.size(); component++) {
+            if (!isErrorStateValue(states.get(component))) {
+                continue;
+            }
+            components.add(componentName(component)
+                    + (isEnforce(component, markingState)
+                            ? ":enforced"
+                            : ":notEnforced"));
+        }
+        return limitedStrings(components, 6);
+    }
+
+    private boolean hasErrorComponentInRange(
+            CompostateDUC<State, Action> state,
+            int start,
+            int end) {
+
+        if (state == null || start < 0 || end < start) {
+            return false;
+        }
+
+        List<State> states = state.getStates();
+        int safeEnd = Math.min(end, states.size() - 1);
+        for (int component = start; component <= safeEnd; component++) {
+            if (isErrorStateValue(states.get(component))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean vectorHasEnforcedError(List<State> states) {
+        if (states == null || states.isEmpty()) {
+            return false;
+        }
+
+        long markingState = getMarkingStateFromList(states);
+        for (int component = 0; component < states.size(); component++) {
+            if (isErrorStateValue(states.get(component))
+                    && isEnforce(component, markingState)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean vectorHasErrorInRange(List<State> states, int start, int end) {
+        if (states == null || start < 0 || end < start) {
+            return false;
+        }
+
+        int safeEnd = Math.min(end, states.size() - 1);
+        for (int component = start; component <= safeEnd; component++) {
+            if (isErrorStateValue(states.get(component))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String describeVectorErrorComponents(List<State> states) {
+        if (states == null) {
+            return "null";
+        }
+
+        List<String> components = new ArrayList<>();
+        long markingState = getMarkingStateFromList(states);
+        for (int component = 0; component < states.size(); component++) {
+            if (!isErrorStateValue(states.get(component))) {
+                continue;
+            }
+            components.add(componentName(component)
+                    + (isEnforce(component, markingState)
+                            ? ":enforced"
+                            : ":notEnforced"));
+        }
+        return limitedStrings(components, 6);
+    }
+
+    private boolean isErrorStateValue(Object value) {
+        if (value instanceof Long) {
+            return ((Long) value).longValue() == -1L;
+        }
+        if (value instanceof Integer) {
+            return ((Integer) value).intValue() == -1;
         }
         return false;
     }
@@ -4500,6 +10180,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         int addedChildren = exploredChildCount(state, action) - beforeChildren;
         if (addedChildren > 0) {
+            result.touchedConcreteStates.add(state);
+            Set<CompostateDUC<State, Action>> children =
+                    state.getExploredChildren().getImage(action);
+            if (children != null) {
+                result.touchedConcreteStates.addAll(children);
+            }
             result.expandedActions++;
             result.addedEdges += addedChildren;
             beliefLazyExpansionExpandedActions++;
@@ -4515,7 +10201,23 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
-    private boolean isControllableBeliefCandidateUsable(BeliefExpansionCandidate candidate) {
+    private String describeBeliefExpansionOwner(BeliefRepairPlan plan) {
+        return plan.oldControllerState == null ? "GLOBAL" : plan.oldControllerState.toString();
+    }
+
+    private String describeBeliefExpansionOwner(BeliefExpansionCandidate candidate) {
+        if (candidate == null) {
+            return "GLOBAL";
+        }
+        if (candidate.owner != null) {
+            return candidate.owner.toString();
+        }
+        return candidate.plan == null
+                ? "GLOBAL"
+                : describeBeliefExpansionOwner(candidate.plan);
+    }
+
+    private boolean isControllableBeliefCandidateUsable(BeliefExpansionCandidate candidate, boolean liteSafety) {
         for (CompostateDUC<State, Action> member : candidate.node.members) {
             HAction<State, Action> action =
                     findEnabledActionByOutputName(member, candidate.actionName, true);
@@ -4532,7 +10234,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // controllable は belief 全体で同じ action を選ぶため、各候補状態で
             // その action のすべての探索済み子が安全な勝ち状態でなければならない。
             for (CompostateDUC<State, Action> child : children) {
-                if (!isSafeWinningBeliefChild(child)) {
+                boolean safeChild = liteSafety
+                        ? isSafeBeliefLiteConcreteChild(child)
+                        : isSafeWinningBeliefChild(child);
+                if (!safeChild) {
                     return false;
                 }
             }
@@ -4689,30 +10394,286 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private void solveBeliefReachability(BeliefRepairPlan plan) {
+        solveBeliefReachability(
+                plan.nodes,
+                plan.oldControllerState,
+                "Belief-Repair",
+                "Belief-Fairness");
+    }
+
+    private void solveBeliefReachability(
+            List<BeliefNode> nodes,
+            Object oldControllerState,
+            String fixedPointLogLabel,
+            String fairnessLogLabel) {
+
+        resetBeliefReachabilityMarks(nodes);
+
         boolean changed;
         do {
-            changed = propagateBeliefWinning(plan);
-            if (promoteFairBeliefLoops(plan)) {
+            changed = propagateBeliefWinning(nodes);
+            if (promoteFairBeliefLoops(nodes, oldControllerState, fairnessLogLabel)) {
                 changed = true;
             }
         } while (changed);
 
-        if (debugLogEnabled) {
+        if (debugLogEnabled && fixedPointLogLabel != null) {
             int winningNodes = 0;
-            for (BeliefNode node : plan.nodes) {
+            for (BeliefNode node : nodes) {
                 if (node.winning) {
                     winningNodes++;
                 }
             }
-            log("  [Belief-Repair] fixed point oldControllerState=" + plan.oldControllerState
-                    + ": winningBeliefNodes=" + winningNodes + "/" + plan.nodes.size());
+            log("  [" + fixedPointLogLabel + "] fixed point oldControllerState=" + oldControllerState
+                    + ": winningBeliefNodes=" + winningNodes + "/" + nodes.size());
         }
     }
 
-    private boolean propagateBeliefWinning(BeliefRepairPlan plan) {
+    private void solveBeliefReachabilityFocused(
+            List<BeliefNode> nodes,
+            Object oldControllerState,
+            String fixedPointLogLabel,
+            String fairnessLogLabel) {
+
+        resetBeliefReachabilityMarks(nodes);
+
+        boolean changed;
+        do {
+            changed = propagateBeliefWinning(nodes);
+            if (promoteFairBeliefLoops(nodes, oldControllerState, fairnessLogLabel)) {
+                changed = true;
+            }
+        } while (changed);
+
+        if (debugLogEnabled && fixedPointLogLabel != null) {
+            int winningNodes = 0;
+            for (BeliefNode node : nodes) {
+                if (node.winning) {
+                    winningNodes++;
+                }
+            }
+            log("  [" + fixedPointLogLabel + "] focused fixed point oldControllerState="
+                    + oldControllerState
+                    + ": winningBeliefNodes=" + winningNodes + "/" + nodes.size());
+        }
+    }
+
+    private void improveBeliefLiteSelectedStrategy(
+            List<BeliefNode> nodes,
+            Object oldControllerState,
+            String logLabel) {
+
+        improveBeliefLiteSelectedStrategy(nodes, nodes, oldControllerState, logLabel);
+    }
+
+    private void improveBeliefLiteSelectedStrategy(
+            List<BeliefNode> strategyNodes,
+            List<BeliefNode> distanceNodes,
+            Object oldControllerState,
+            String logLabel) {
+
+        Map<BeliefNode, Integer> finishDistances =
+                computeBeliefFinishDistances(distanceNodes);
+
+        int finishSeeds = 0;
+        int selectedFinishNodes = 0;
+        int selectedUpdateEventNodes = 0;
+        int selectedOrdinaryControllableNodes = 0;
+        int fairWaitNodes = 0;
+        int waitUncontrollableNodes = 0;
+        int noFiniteControllableNodes = 0;
+        int changedSelections = 0;
+
+        for (BeliefNode node : strategyNodes) {
+            if (!node.winning || node.bad) {
+                continue;
+            }
+            if (node.finishNcTargetId != null) {
+                finishSeeds++;
+            }
+
+            String previousSelection = debugLogEnabled
+                    ? describeBeliefSelectedStrategy(node)
+                    : null;
+            BeliefTransition previousFairUncontrollable =
+                    node.selectedFairUncontrollableEdge;
+
+            node.selectedFinish = false;
+            node.selectedControllableEdge = null;
+            node.selectedFairUncontrollableEdge = null;
+
+            if (node.finishNcTargetId != null) {
+                node.selectedFinish = true;
+                selectedFinishNodes++;
+            } else {
+                BeliefTransition selected =
+                        selectBeliefControllableByFinishDistance(node, finishDistances);
+                if (selected != null) {
+                    node.selectedControllableEdge = selected;
+                    if (isUpdateProtocolOutputAction(selected.outputAction)) {
+                        selectedUpdateEventNodes++;
+                    } else {
+                        selectedOrdinaryControllableNodes++;
+                    }
+                } else {
+                    node.selectedFairUncontrollableEdge = previousFairUncontrollable;
+                    if (previousFairUncontrollable != null) {
+                        fairWaitNodes++;
+                    } else if (!node.uncontrollableEdges.isEmpty()) {
+                        waitUncontrollableNodes++;
+                    }
+                    if (!node.controllableEdges.isEmpty()) {
+                        noFiniteControllableNodes++;
+                    }
+                }
+            }
+
+            if (debugLogEnabled
+                    && !previousSelection.equals(describeBeliefSelectedStrategy(node))) {
+                changedSelections++;
+            }
+        }
+
+        if (debugLogEnabled && logLabel != null) {
+            log("  [" + logLabel + "] oldControllerState=" + oldControllerState
+                    + ", strategyNodes=" + strategyNodes.size()
+                    + ", distanceNodes=" + distanceNodes.size()
+                    + ", finishSeeds=" + finishSeeds
+                    + ", finiteDistanceNodes=" + finishDistances.size()
+                    + ", selectedFinishNodes=" + selectedFinishNodes
+                    + ", selectedUpdateEventNodes=" + selectedUpdateEventNodes
+                    + ", selectedOrdinaryControllableNodes="
+                    + selectedOrdinaryControllableNodes
+                    + ", fairWaitNodes=" + fairWaitNodes
+                    + ", waitUncontrollableNodes=" + waitUncontrollableNodes
+                    + ", noFiniteControllableNodes=" + noFiniteControllableNodes
+                    + ", changedSelections=" + changedSelections);
+        }
+    }
+
+    private Map<BeliefNode, Integer> computeBeliefFinishDistances(
+            List<BeliefNode> nodes) {
+
+        Map<BeliefNode, Integer> distances = new HashMap<>();
+        for (BeliefNode node : nodes) {
+            if (node.winning && !node.bad && node.finishNcTargetId != null) {
+                distances.put(node, 0);
+            }
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (BeliefNode node : nodes) {
+                if (!node.winning || node.bad || node.finishNcTargetId != null) {
+                    continue;
+                }
+
+                Integer currentDistance = distances.get(node);
+                int bestDistance = currentDistance == null
+                        ? Integer.MAX_VALUE
+                        : currentDistance;
+                for (BeliefTransition edge : getBeliefTransitions(node)) {
+                    if (!edge.target.winning || edge.target.bad) {
+                        continue;
+                    }
+                    Integer targetDistance = distances.get(edge.target);
+                    if (targetDistance == null) {
+                        continue;
+                    }
+                    int candidateDistance = targetDistance + 1;
+                    if (candidateDistance < bestDistance) {
+                        bestDistance = candidateDistance;
+                    }
+                }
+
+                if (bestDistance != Integer.MAX_VALUE
+                        && (currentDistance == null || bestDistance < currentDistance)) {
+                    distances.put(node, bestDistance);
+                    changed = true;
+                }
+            }
+        } while (changed);
+
+        return distances;
+    }
+
+    private BeliefTransition selectBeliefControllableByFinishDistance(
+            BeliefNode node,
+            Map<BeliefNode, Integer> finishDistances) {
+
+        BeliefTransition updateEvent =
+                selectBeliefControllableByFinishDistance(node, finishDistances, true);
+        if (updateEvent != null) {
+            return updateEvent;
+        }
+        return selectBeliefControllableByFinishDistance(node, finishDistances, false);
+    }
+
+    private BeliefTransition selectBeliefControllableByFinishDistance(
+            BeliefNode node,
+            Map<BeliefNode, Integer> finishDistances,
+            boolean updateProtocolOnly) {
+
+        // Distances may use uncontrollable edges to prove finish reachability,
+        // but pruning selects only controllable edges. Update protocol actions
+        // are allowed to keep their own progress path even when an
+        // uncontrollable shortcut reaches another root's update path.
+        BeliefTransition best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        int bestPriority = Integer.MAX_VALUE;
+        String bestActionName = "";
+
+        for (BeliefTransition edge : node.controllableEdges) {
+            if (!edge.target.winning || edge.target.bad || edge.target == node) {
+                continue;
+            }
+            boolean updateProtocol = isUpdateProtocolOutputAction(edge.outputAction);
+            if (updateProtocol != updateProtocolOnly) {
+                continue;
+            }
+            Integer targetDistance = finishDistances.get(edge.target);
+            if (targetDistance == null) {
+                continue;
+            }
+
+            String actionName = edge.outputAction.toString();
+            int priority = beliefActionPriority(actionName, true);
+            Integer sourceDistance = finishDistances.get(node);
+            if (!updateProtocolOnly
+                    && sourceDistance != null
+                    && targetDistance >= sourceDistance) {
+                continue;
+            }
+            if (best == null
+                    || targetDistance < bestDistance
+                    || (targetDistance == bestDistance && priority < bestPriority)
+                    || (targetDistance == bestDistance
+                            && priority == bestPriority
+                            && actionName.compareTo(bestActionName) < 0)) {
+                best = edge;
+                bestDistance = targetDistance;
+                bestPriority = priority;
+                bestActionName = actionName;
+            }
+        }
+
+        return best;
+    }
+
+    private void resetBeliefReachabilityMarks(List<BeliefNode> nodes) {
+        for (BeliefNode node : nodes) {
+            node.winning = false;
+            node.selectedFinish = false;
+            node.selectedControllableEdge = null;
+            node.selectedFairUncontrollableEdge = null;
+        }
+    }
+
+    private boolean propagateBeliefWinning(List<BeliefNode> nodes) {
         boolean changed = false;
-        for (int i = plan.nodes.size() - 1; i >= 0; i--) {
-            BeliefNode node = plan.nodes.get(i);
+        for (int i = nodes.size() - 1; i >= 0; i--) {
+            BeliefNode node = nodes.get(i);
             if (node.winning || node.bad) {
                 continue;
             }
@@ -4762,9 +10723,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return false;
     }
 
-    private boolean promoteFairBeliefLoops(BeliefRepairPlan plan) {
+    private boolean promoteFairBeliefLoops(
+            List<BeliefNode> nodes,
+            Object oldControllerState,
+            String fairnessLogLabel) {
         Set<BeliefNode> candidates = new LinkedHashSet<>();
-        for (BeliefNode node : plan.nodes) {
+        for (BeliefNode node : nodes) {
             if (!node.winning && !node.bad) {
                 candidates.add(node);
             }
@@ -4827,8 +10791,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             promoted++;
         }
 
-        if (debugLogEnabled && promoted > 0) {
-            log("  [Belief-Fairness] oldControllerState=" + plan.oldControllerState
+        if (debugLogEnabled && fairnessLogLabel != null && promoted > 0) {
+            log("  [" + fairnessLogLabel + "] oldControllerState=" + oldControllerState
                     + " promoted belief nodes by fair SCC: " + promoted);
         }
         return promoted > 0;
@@ -5188,6 +11152,300 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return descriptions.toString();
     }
 
+    private class BeliefLiteOutputPlan {
+        private final Map<State, List<CompostateDUC<State, Action>>> statesByOldController =
+                new LinkedHashMap<>();
+        private final Map<State, BeliefLiteRootInfo> rootInfos = new LinkedHashMap<>();
+        private final Map<State, BeliefNode> rootsByOldState = new LinkedHashMap<>();
+        private BeliefSearchContext context;
+        private BeliefLiteGraphStats stats = new BeliefLiteGraphStats();
+        private String preUpdateRootSource = "";
+        private String initialGraphKind = "full-reachable";
+        private String initialFrontierStopReason = "";
+        private int initialFrontierRounds;
+        private int initialFrontierExpandedNodes;
+        private int initialFrontierQueueRemaining;
+        private int initialFrontierFocusedNodes;
+        private int initialFrontierFallbackNodes;
+        private int directorRootGroups;
+        private int exploredRootGroups;
+        private int extraExploredRootGroups;
+        private int missingRootGroups;
+        private int missingBeginUpdatePreStates;
+        private int rootLimitFailures;
+        private int distinctRootNodes;
+        private int rootAliases;
+        private int sharedReachableNodes;
+        private int maxIncoming;
+        private int selfLoops;
+        private int rootWinningGroups;
+        private int preUpdateOldActionTransitions;
+        private int beginUpdateOutputTransitions;
+        private int selectedBeliefTransitions;
+        private int estimatedOutputStates;
+        private int estimatedOutputTransitions;
+        private final List<BeliefNode> emitReachableNodes = new ArrayList<>();
+        private int emitReachableBeliefNodes;
+        private int emitReachableWinningBeliefNodes;
+        private int emitReachableUnresolvedBeliefNodes;
+        private int emitReachableBadBeliefNodes;
+        private int emitReachableFinishNodes;
+        private int emitReachableNonWinningUncontrollableTargets;
+        private int emitReachableMissingWinningUncontrollableTargets;
+        private int emitReachableMissingSelectedControllableTargets;
+        private int emitReachableMissingSelectedFinishTargets;
+        private boolean otfExpansionAttempted;
+        private boolean otfExpansionLimitExceeded;
+        private int otfExpansionRounds;
+        private int otfRootWinningBefore;
+        private int otfRootWinningAfter;
+        private int otfLastFrontierNodes;
+        private State otfDriverTargetOldState;
+        private int otfDriverTargetSwitches;
+        private int otfDriverSolveBatches;
+        private int otfDriverBatchNodes;
+        private int otfDriverRefreshedNodes;
+        private int otfAddedConcreteStates;
+        private long otfAddedTransitions;
+        private int otfFocusedRefreshes;
+        private int otfFocusedRefreshNodes;
+        private int otfFocusedSolveRefreshes;
+        private int otfFocusedSolveNodes;
+        private int otfFocusedSolveLastNodes;
+        private int otfFocusedSolveFallbacks;
+        private int otfFocusedSolveValidationRuns;
+        private int otfFocusedSolveValidationMismatches;
+        private int otfFocusedSolveValidationWinningDiffs;
+        private int otfFocusedSolveValidationStrategyDiffs;
+        private int otfFocusedSolveValidationFairWaitStrategyDiffs;
+        private int otfDriverFocusedSolveValidationSkips;
+        private int otfFullRefreshes;
+        private int otfDirectFrontierExpansions;
+        private int otfRawEdgeIncrementalRefreshes;
+        private int otfRawEdgeIncrementalStates;
+        private int otfRawEdgeFullRefreshes;
+        private String otfStopReason = "";
+        private String otfSearchKind = "local-rebuild";
+
+        private List<BeliefNode> nodes() {
+            return context == null ? Collections.emptyList() : context.nodes;
+        }
+
+        private boolean isReadyForEmit() {
+            return statesByOldController.size() == rootsByOldState.size()
+                    && missingRootGroups == 0
+                    && missingBeginUpdatePreStates == 0
+                    && rootLimitFailures == 0
+                    && stats != null
+                    && !stats.limitExceeded
+                    && !stats.winningSkipped
+                    && emitReachableBeliefNodes > 0
+                    && emitReachableBadBeliefNodes == 0
+                    && emitReachableUnresolvedBeliefNodes == 0
+                    && emitReachableNonWinningUncontrollableTargets == 0
+                    && emitReachableMissingWinningUncontrollableTargets == 0
+                    && emitReachableMissingSelectedControllableTargets == 0
+                    && emitReachableMissingSelectedFinishTargets == 0
+                    && rootWinningGroups == statesByOldController.size();
+        }
+
+        private String notReadyReason() {
+            if (statesByOldController.size() != rootsByOldState.size()) {
+                return "rootGroups=" + rootsByOldState.size()
+                        + "/" + statesByOldController.size();
+            }
+            if (missingRootGroups != 0) {
+                return "missingRootGroups=" + missingRootGroups;
+            }
+            if (missingBeginUpdatePreStates != 0) {
+                return "missingBeginUpdatePreStates=" + missingBeginUpdatePreStates;
+            }
+            if (rootLimitFailures != 0) {
+                return "rootLimitFailures=" + rootLimitFailures;
+            }
+            if (stats == null) {
+                return "stats=missing";
+            }
+            if (stats.limitExceeded) {
+                return "limitExceeded";
+            }
+            if (stats.winningSkipped) {
+                return "winningSkipped";
+            }
+            if (emitReachableBeliefNodes == 0) {
+                return "emitReachableBeliefNodes=0";
+            }
+            if (emitReachableBadBeliefNodes != 0) {
+                return "emitReachableBadNodes=" + emitReachableBadBeliefNodes;
+            }
+            if (emitReachableUnresolvedBeliefNodes != 0) {
+                return "emitReachableUnresolvedNodes="
+                        + emitReachableUnresolvedBeliefNodes;
+            }
+            if (emitReachableNonWinningUncontrollableTargets != 0) {
+                return "emitReachableNonWinningUncontrollableTargets="
+                        + emitReachableNonWinningUncontrollableTargets;
+            }
+            if (emitReachableMissingWinningUncontrollableTargets != 0) {
+                return "emitReachableMissingWinningUncontrollableTargets="
+                        + emitReachableMissingWinningUncontrollableTargets;
+            }
+            if (emitReachableMissingSelectedControllableTargets != 0) {
+                return "emitReachableMissingSelectedControllableTargets="
+                        + emitReachableMissingSelectedControllableTargets;
+            }
+            if (emitReachableMissingSelectedFinishTargets != 0) {
+                return "emitReachableMissingSelectedFinishTargets="
+                        + emitReachableMissingSelectedFinishTargets;
+            }
+            if (rootWinningGroups != statesByOldController.size()) {
+                return "rootWinningGroups=" + rootWinningGroups
+                        + "/" + statesByOldController.size();
+            }
+            return "ready";
+        }
+    }
+
+    private class BeliefLiteSolveSnapshot {
+        private final BeliefTransition selectedControllableEdge;
+        private final BeliefTransition selectedFairUncontrollableEdge;
+        private final boolean selectedFinish;
+        private final boolean winning;
+        private final String strategy;
+
+        private BeliefLiteSolveSnapshot(BeliefNode node) {
+            selectedControllableEdge = node.selectedControllableEdge;
+            selectedFairUncontrollableEdge = node.selectedFairUncontrollableEdge;
+            selectedFinish = node.selectedFinish;
+            winning = node.winning;
+            strategy = describeBeliefSelectedStrategy(node);
+        }
+
+        private void restore(BeliefNode node) {
+            node.selectedControllableEdge = selectedControllableEdge;
+            node.selectedFairUncontrollableEdge = selectedFairUncontrollableEdge;
+            node.selectedFinish = selectedFinish;
+            node.winning = winning;
+        }
+    }
+
+    private class BeliefLiteOtfBatchResult {
+        private int expansionRounds;
+        private int frontierNodes;
+        private int attemptedActions;
+        private int expandedActions;
+        private int addedEdges;
+        private String lastMode = "none";
+        private String limitReason;
+        private boolean localRootWinning;
+        private int directFrontierExpansions;
+        private final Set<CompostateDUC<State, Action>> touchedConcreteStates =
+                Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Set<BeliefNode> refreshedNodes = new LinkedHashSet<>();
+
+        private boolean hasProgress() {
+            return addedEdges > 0;
+        }
+    }
+
+    private class StartNewSpecUnsafePrecheck {
+        private boolean unsafe;
+        private boolean invalidOrDeadlocked;
+        private int children;
+        private int safeChildren;
+        private int unsafeChildren;
+        private int unsafeNewSafetyChildren;
+        private int unsafeOtherChildren;
+        private final Set<String> preSynthesisGroups = new LinkedHashSet<>();
+        private final Set<String> preNewSafetyGroups = new LinkedHashSet<>();
+        private final Set<String> startSyncSourceGroups = new LinkedHashSet<>();
+        private final Set<String> postNewSafetyGroups = new LinkedHashSet<>();
+        private final Set<String> unsafePostNewSafetyGroups = new LinkedHashSet<>();
+        private final Set<String> postMarkingGroups = new LinkedHashSet<>();
+        private final List<String> samples = new ArrayList<>();
+
+        private String describe() {
+            return "unsafe=" + unsafe
+                    + ", invalidOrDeadlocked=" + invalidOrDeadlocked
+                    + ", children=" + children
+                    + ", safeChildren=" + safeChildren
+                    + ", unsafeChildren=" + unsafeChildren
+                    + ", unsafeNewSafetyChildren=" + unsafeNewSafetyChildren
+                    + ", unsafeOtherChildren=" + unsafeOtherChildren
+                    + ", preSynthesisGroups=" + describeLimitedGroups(preSynthesisGroups, 3)
+                    + ", preNewSafetyGroups=" + describeLimitedGroups(preNewSafetyGroups, 3)
+                    + ", startSyncSourceGroups=" + describeLimitedGroups(startSyncSourceGroups, 3)
+                    + ", postNewSafetyGroups=" + describeLimitedGroups(postNewSafetyGroups, 3)
+                    + ", unsafePostNewSafetyGroups="
+                    + describeLimitedGroups(unsafePostNewSafetyGroups, 3)
+                    + ", postMarkings=" + describeLimitedGroups(postMarkingGroups, 8)
+                    + ", samples=" + limitedStrings(samples, 4);
+        }
+    }
+
+    private class BeliefLiteRootInfo {
+        private final State oldControllerState;
+        private final List<CompostateDUC<State, Action>> preUpdateStates;
+        private final Set<CompostateDUC<State, Action>> beginTargets = new LinkedHashSet<>();
+        private final List<CompostateDUC<State, Action>> missingBeginUpdatePreStates = new ArrayList<>();
+        private Action beginUpdateAction;
+        private int beginEdges;
+        private int goalTargets;
+        private int errorTargets;
+
+        private BeliefLiteRootInfo(
+                State oldControllerState,
+                List<CompostateDUC<State, Action>> preUpdateStates) {
+            this.oldControllerState = oldControllerState;
+            this.preUpdateStates = preUpdateStates;
+        }
+    }
+
+    private class BeliefLiteGraphStats {
+        private int nodes;
+        private int uncontrollableEdges;
+        private int controllableEdges;
+        private int finishNodes;
+        private int badNodes;
+        private int rejectedControllableMissing;
+        private int rejectedControllableUnsafe;
+        private int unsafeUncontrollable;
+        private int finishUnavailableNodes;
+        private int finishNcTargetMismatches;
+        private int loggedNodes;
+        private int suppressedNodes;
+        private int winningNodes;
+        private int unresolvedNodes;
+        private int finishStrategyNodes;
+        private int controllableStrategyNodes;
+        private int fairUncontrollableStrategyNodes;
+        private int waitUncontrollableStrategyNodes;
+        private boolean limitExceeded;
+        private boolean rootWinning;
+        private boolean winningSkipped;
+    }
+
+    private class BeliefLiteNodeDiagnostics {
+        private final List<String> rejectedControllable = new ArrayList<>();
+        private final List<String> unsafeUncontrollable = new ArrayList<>();
+        private String finishReason = "";
+    }
+
+    private class BeliefLiteFairOutputGraph {
+        private final Set<BeliefNode> emittedNodes = new LinkedHashSet<>();
+        private final Map<BeliefNode, List<BeliefTransition>> uncontrollableEdges =
+                new HashMap<>();
+        private final Map<BeliefNode, BeliefTransition> selectedControllableEdges =
+                new HashMap<>();
+        private final Set<BeliefNode> finishNodes = new LinkedHashSet<>();
+        private int uncontrollableEdgesCount;
+        private int selectedUpdateEventEdges;
+        private int selectedOrdinaryControllableEdges;
+        private int missingUncontrollableEdges;
+        private int missingSelectedControllableEdges;
+        private int missingSelectedFinishEdges;
+    }
+
     private class RawDirectorEdge {
         private final HAction<State, Action> hAction;
         private final Action outputAction;
@@ -5199,6 +11457,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             this.outputAction = toOutputAction(hAction);
             this.child = child;
             this.actionName = outputAction.toString();
+        }
+    }
+
+    private class PreUpdateOutputEdge {
+        private final Action outputAction;
+        private final CompostateDUC<State, Action> child;
+
+        private PreUpdateOutputEdge(Action outputAction, CompostateDUC<State, Action> child) {
+            this.outputAction = outputAction;
+            this.child = child;
         }
     }
 
@@ -5293,6 +11561,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private class BeliefSearchContext {
         private final Map<CompostateDUC<State, Action>, Integer> concreteIds;
         private final Map<List<Integer>, BeliefNode> nodesByKey = new LinkedHashMap<>();
+        private final Map<CompostateDUC<State, Action>, Set<BeliefNode>> nodesByMember =
+                new IdentityHashMap<>();
+        private final Map<BeliefNode, Set<BeliefNode>> predecessors = new HashMap<>();
         private final List<BeliefNode> nodes = new ArrayList<>();
         private final Deque<BeliefNode> queue = new ArrayDeque<>();
         private final int maxBeliefNodes;
@@ -5333,8 +11604,100 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             BeliefNode created = new BeliefNode(nodes.size(), orderedMembers, key);
             nodesByKey.put(key, created);
             nodes.add(created);
+            for (CompostateDUC<State, Action> member : orderedMembers) {
+                nodesByMember.computeIfAbsent(
+                        member, k -> new LinkedHashSet<>()).add(created);
+            }
             queue.add(created);
             return created;
+        }
+
+        private void addTransition(BeliefNode source, BeliefTransition edge) {
+            if (source == null || edge == null || edge.target == null) {
+                return;
+            }
+            if (edge.controllable) {
+                source.controllableEdges.add(edge);
+            } else {
+                source.uncontrollableEdges.add(edge);
+            }
+            predecessors.computeIfAbsent(
+                    edge.target, k -> new LinkedHashSet<>()).add(source);
+        }
+
+        private void removeOutgoingEdges(BeliefNode source) {
+            if (source == null) {
+                return;
+            }
+            removeOutgoingEdgesFromPredecessorMap(source, source.uncontrollableEdges);
+            removeOutgoingEdgesFromPredecessorMap(source, source.controllableEdges);
+            source.uncontrollableEdges.clear();
+            source.controllableEdges.clear();
+        }
+
+        private void removeOutgoingEdgesFromPredecessorMap(
+                BeliefNode source,
+                List<BeliefTransition> edges) {
+
+            for (BeliefTransition edge : edges) {
+                if (edge == null || edge.target == null) {
+                    continue;
+                }
+                Set<BeliefNode> incoming = predecessors.get(edge.target);
+                if (incoming == null) {
+                    continue;
+                }
+                incoming.remove(source);
+                if (incoming.isEmpty()) {
+                    predecessors.remove(edge.target);
+                }
+            }
+        }
+
+        private Collection<BeliefNode> predecessorsOf(BeliefNode node) {
+            Set<BeliefNode> incoming = predecessors.get(node);
+            return incoming == null ? Collections.emptyList() : incoming;
+        }
+
+        private Collection<BeliefNode> nodesContainingMembers(
+                Collection<CompostateDUC<State, Action>> members) {
+
+            if (members == null || members.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            LinkedHashSet<BeliefNode> result = new LinkedHashSet<>();
+            for (CompostateDUC<State, Action> member : members) {
+                Set<BeliefNode> containing = nodesByMember.get(member);
+                if (containing != null) {
+                    result.addAll(containing);
+                }
+            }
+            return result;
+        }
+
+        private boolean enqueueIfAbsent(BeliefNode node) {
+            if (node == null || queue.contains(node)) {
+                return false;
+            }
+            queue.add(node);
+            return true;
+        }
+
+        private int predecessorLinkCount() {
+            int count = 0;
+            for (Set<BeliefNode> incoming : predecessors.values()) {
+                count += incoming.size();
+            }
+            return count;
+        }
+
+        private int memberLinkCount() {
+            int count = 0;
+            for (Set<BeliefNode> containing : nodesByMember.values()) {
+                count += containing.size();
+            }
+            return count;
         }
     }
 
@@ -5426,6 +11789,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private class BeliefExpansionCandidate {
         private final BeliefRepairPlan plan;
+        private final Object owner;
         private final BeliefNode node;
         private final String actionName;
         private final boolean controllable;
@@ -5438,6 +11802,21 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 boolean controllable,
                 boolean updateProtocolAction) {
             this.plan = plan;
+            this.owner = plan == null ? null : plan.oldControllerState;
+            this.node = node;
+            this.actionName = actionName;
+            this.controllable = controllable;
+            this.updateProtocolAction = updateProtocolAction;
+        }
+
+        private BeliefExpansionCandidate(
+                Object owner,
+                BeliefNode node,
+                String actionName,
+                boolean controllable,
+                boolean updateProtocolAction) {
+            this.plan = null;
+            this.owner = owner;
             this.node = node;
             this.actionName = actionName;
             this.controllable = controllable;
@@ -5457,6 +11836,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         private int attemptedActions;
         private int expandedActions;
         private int addedEdges;
+        private String mode = "none";
+        private final Set<CompostateDUC<State, Action>> touchedConcreteStates =
+                Collections.newSetFromMap(new IdentityHashMap<>());
 
         private BeliefLazyExpansionResult(int round) {
             this.round = round;
