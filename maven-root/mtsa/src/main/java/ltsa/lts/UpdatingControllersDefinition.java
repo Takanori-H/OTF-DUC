@@ -803,11 +803,20 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         addAlphabet(knownActions, mappingComponents);
         knownActions.remove("tau");
 
-        int uncontrollableCount = Math.max(0, knownActions.size() - safeSize(controllableSet));
+        Set<String> normalizedControllableActions = new HashSet<>();
+        if (controllableSet != null) {
+            normalizedControllableActions.addAll(controllableSet);
+        }
+        normalizedControllableActions.remove("tau");
+        Set<String> allActions = new HashSet<>(knownActions);
+        allActions.addAll(normalizedControllableActions);
+        allActions.remove("tau");
+        int controllableCount = normalizedControllableActions.size();
+        int uncontrollableCount = Math.max(0, allActions.size() - controllableCount);
         UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "既知 action 数", knownActions.size(), "個");
+                "入力規模", "全 action 数（controllable + uncontrollable）", allActions.size(), "個");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "推定 uncontrollable action 数", uncontrollableCount, "個");
+                "入力規模", "uncontrollable action 数（推定）", uncontrollableCount, "個");
     }
 
     private static int countTransitions(MTS<Long, String> mts) {

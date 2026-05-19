@@ -34,6 +34,7 @@ import ltsa.ui.update.UpdateGraphSimulation;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
+import ltsa.updatingControllers.synthesis.UpdatePhaseEvaluator;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -317,6 +318,7 @@ public class HPWindow extends JFrame implements Runnable {
         LTSCanvas.newLabelFormat = setNewLabelFormat.isSelected();
         LTSDrawWindow.singleMode = !setMultipleLTS.isSelected();
         LTSLayoutWindow.singleMode = !setMultipleLTS.isSelected();
+        newPrintWindow(window_print.isSelected());
         newDrawWindow(window_draw.isSelected());
         newLayoutWindow(window_layout.isSelected());
     }
@@ -623,7 +625,7 @@ public class HPWindow extends JFrame implements Runnable {
         window_alpha.addActionListener(new WinAlphabetAction());
         window.add(window_alpha);
         window_print = new JCheckBoxMenuItem("Transitions");
-        window_print.setSelected(false);
+        window_print.setSelected(true);
         window_print.addActionListener(new WinPrintAction());
         window.add(window_print);
         window_draw = new JCheckBoxMenuItem("Draw");
@@ -2468,6 +2470,29 @@ public class HPWindow extends JFrame implements Runnable {
                     outputStates,
                     outputTransitions,
                     outputCountTime);
+            if (UpdatingControllerEvaluationRecorder.isUpdatingControllerMode()) {
+                UpdatePhaseEvaluator.recordCompactStateUpdatePhaseStateSpace(
+                        UpdatePhaseEvaluator.SECTION_OUTPUT,
+                        "Output Update Controller",
+                        current.composition);
+                UpdatePhaseEvaluator.recordCompactStateUpdateEventTransitionCounts(
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_UPDATE_EVENTS,
+                        "Output Update Controller",
+                        current.composition);
+                UpdatePhaseEvaluator.recordCompactStateUpdatePhaseTransitionAnalysis(
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_PHASE_DETAILS,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_PHASE_FLOW,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_COMPLETION_PATH,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_NORMAL_ACTIONS,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_NEXT_UPDATE_EVENT_DISTANCE,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_PROGRESS_FREE_CYCLES,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_ENABLED_UPDATE_EVENTS,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_UPDATE_ORDER_PATTERNS,
+                        UpdatePhaseEvaluator.SECTION_OUTPUT_NORMAL_RUN_LENGTH,
+                        "Output Update Controller",
+                        current.composition,
+                        null);
+            }
 
             long beginUpdateCountStart = System.currentTimeMillis();
             long beginUpdateStates = countStatesWithOutgoingAction(

@@ -155,6 +155,7 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "solveControlProblem 全体時間");
+        Set<String> controllableActions = uccs.getControllableActions();
 
         //UpdatingEnvironmentからMTSへ変換
         long convertEuStart = System.currentTimeMillis();
@@ -237,6 +238,27 @@ public class UpdatingControllerSynthesizer {
                 euTrans,
                 euCountTime,
                 "旧コントローラと Mapping Environment を並列合成した、従来 DUC の基本更新環境。");
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseStateSpace(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL,
+                "[1. E_u] (Old Controller || Mapping Environment)",
+                E_u);
+        UpdatePhaseEvaluator.recordMtsUpdateEventTransitionCounts(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_EVENTS,
+                "[1. E_u] (Old Controller || Mapping Environment)",
+                E_u);
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseTransitionAnalysis(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_DETAILS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_FLOW,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_COMPLETION_PATH,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_ACTIONS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NEXT_UPDATE_EVENT_DISTANCE,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PROGRESS_FREE_CYCLES,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_ENABLED_UPDATE_EVENTS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_ORDER_PATTERNS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_RUN_LENGTH,
+                "[1. E_u] (Old Controller || Mapping Environment)",
+                E_u,
+                controllableActions);
         UpdatingControllerEvaluationRecorder.recordStateSpace(
                 "Traditional DUC 最大状態数と遷移数",
                 "[2. Meta] Meta Environment (PEAK)",
@@ -244,6 +266,27 @@ public class UpdatingControllerSynthesizer {
                 metaTrans,
                 metaCountTime,
                 "E_u に safety 用 Fluent を組み込んだ環境。状態空間が最大になりやすい段階。");
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseStateSpace(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL,
+                "[2. Meta] Meta Environment (PEAK)",
+                metaEnvironment);
+        UpdatePhaseEvaluator.recordMtsUpdateEventTransitionCounts(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_EVENTS,
+                "[2. Meta] Meta Environment (PEAK)",
+                metaEnvironment);
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseTransitionAnalysis(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_DETAILS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_FLOW,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_COMPLETION_PATH,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_ACTIONS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NEXT_UPDATE_EVENT_DISTANCE,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PROGRESS_FREE_CYCLES,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_ENABLED_UPDATE_EVENTS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_ORDER_PATTERNS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_RUN_LENGTH,
+                "[2. Meta] Meta Environment (PEAK)",
+                metaEnvironment,
+                controllableActions);
 
         //評価実験用
         long buildSafetyEnvStart = System.currentTimeMillis();
@@ -277,6 +320,27 @@ public class UpdatingControllerSynthesizer {
                 safeTrans,
                 safeCountTime,
                 "Pruned に DontDoTwice 制約を合成した、GR1 合成に渡す最終 safety 環境。");
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseStateSpace(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL,
+                "[4. Final] Safety Environment",
+                safetyEnv);
+        UpdatePhaseEvaluator.recordMtsUpdateEventTransitionCounts(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_EVENTS,
+                "[4. Final] Safety Environment",
+                safetyEnv);
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseTransitionAnalysis(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_DETAILS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_FLOW,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_COMPLETION_PATH,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_ACTIONS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NEXT_UPDATE_EVENT_DISTANCE,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PROGRESS_FREE_CYCLES,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_ENABLED_UPDATE_EVENTS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_ORDER_PATTERNS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_RUN_LENGTH,
+                "[4. Final] Safety Environment",
+                safetyEnv,
+                controllableActions);
         // ▲▲▲ 追加ここまで ▲▲▲
 
         output.outln("Environment states after safety: "+ safetyEnv.getStates().size());

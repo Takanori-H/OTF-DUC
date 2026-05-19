@@ -106,6 +106,27 @@ public class UpdatingControllerSafetySynthesizer {
                 prunedTrans,
                 prunedCountTime,
                 "Meta から safety formula に違反する状態を除去した環境。DontDoTwice 制約はまだ未適用。");
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseStateSpace(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL,
+                "[3. Pruned] Safety Env (Before DontDoTwice)",
+                safetyEnv);
+        UpdatePhaseEvaluator.recordMtsUpdateEventTransitionCounts(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_EVENTS,
+                "[3. Pruned] Safety Env (Before DontDoTwice)",
+                safetyEnv);
+        UpdatePhaseEvaluator.recordMtsUpdatePhaseTransitionAnalysis(
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_DETAILS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PHASE_FLOW,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_COMPLETION_PATH,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_ACTIONS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NEXT_UPDATE_EVENT_DISTANCE,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_PROGRESS_FREE_CYCLES,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_ENABLED_UPDATE_EVENTS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_UPDATE_ORDER_PATTERNS,
+                UpdatePhaseEvaluator.SECTION_TRADITIONAL_NORMAL_RUN_LENGTH,
+                "[3. Pruned] Safety Env (Before DontDoTwice)",
+                safetyEnv,
+                controllableActions);
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional Safety pruning 後");
         // ▲▲▲ 追加ここまで ▲▲▲
 

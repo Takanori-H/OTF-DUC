@@ -29,8 +29,10 @@ import MTSTools.ac.ic.doc.mtstools.model.impl.MarkedLTSImpl;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.DirectedControllerSynthesis;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HAction;
 import ltsa.lts.LTSOutput;
+import ltsa.updatingControllers.EvaluationProfiler;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.synthesis.UpdatePhaseEvaluator;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.gr1.Statistics;
 
 public class DirectedControllerSynthesisDUC<State, Action> extends DirectedControllerSynthesis<State, Action> {
@@ -80,6 +82,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
     private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "true"));
+    private boolean nondeterministicActionMergeEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.nondet.merge", "true"));
+    private boolean preUpdateSimpleMergeEnabled = Boolean.parseBoolean(
+            System.getProperty("otfduc.simple.merge",
+                    System.getProperty("otfduc.preupdate.merge", "true")));
     private int beliefRepairAbsoluteMaxStates = Integer.getInteger("otfduc.belief.maxStates", 5000);
     private int beliefRepairMinBeliefNodes = Integer.getInteger("otfduc.belief.maxNodes.min", 64);
     private int beliefRepairBeliefNodesPerNewControllerState =
@@ -146,6 +153,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long stitchingNCTime = 0;
     private int otfPeakStates = 0;
     private int otfPeakTrans = 0;
+    private long strategy1NormalOtfSimpleMergeStartMillis = -1;
+    private long strategy1NormalOtfSimpleMergeTime = -1;
+    private long strategy1NormalOtfSimpleMergeBeforeMemory = -1;
+    private long strategy1NormalOtfSimpleMergePeakMemory = -1;
+    private long strategy1NormalOtfSimpleMergeMemoryIncrease = -1;
+    private long strategy1RepairStartMillis = -1;
+    private long strategy1RepairTime = -1;
+    private long strategy1RepairBeforeMemory = -1;
+    private long strategy1RepairPeakMemory = -1;
+    private long strategy1RepairMemoryIncrease = -1;
 
     private long heuristicSelectionNanos = 0;
     private long heuristicRecomputeNanos = 0;
@@ -237,7 +254,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long beliefLazyExpansionAttempts = 0;
     private long beliefLazyExpansionExpandedActions = 0;
     private long beliefLazyExpansionAddedEdges = 0;
+    private long beliefUnsafeControllableDiscardCount = 0;
+    private long beliefUnexploredUncontrollableWarningPlans = 0;
+    private long beliefUnexploredUncontrollableWarningNodes = 0;
+    private long beliefUnexploredUncontrollableWarningActions = 0;
     private long beliefRepairResourceLimitFallbacks = 0;
+    private long beliefRepairResourceLimitBeliefNodeFallbacks = 0;
+    private long beliefRepairResourceLimitAdditionalConcreteFallbacks = 0;
+    private long beliefRepairResourceLimitAdditionalTransitionFallbacks = 0;
+    private long beliefRepairResourceLimitTimeFallbacks = 0;
     private long beliefRepairMaxObservedBeliefNodes = 0;
     private long beliefRepairMaxObservedAdditionalConcreteStates = 0;
     private long beliefRepairMaxObservedAdditionalTransitions = 0;
@@ -432,15 +457,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         LTS<Long, String> nc = (LTS<Long, String>) newController;
         this.newController = nc;
         this.output = output;
+        UpdatingControllerEvaluationRecorder.setOtfExecutionMode(describeOtfExecutionMode());
 
         if (debugLogEnabled || profileLogEnabled) {
             try {
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
                 if (debugLogEnabled) {
                     log("=== Starting OTF-DUC Synthesis ===");
-                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s]",
+                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], NondetActionMerge[%s], SimpleMerge[%s]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
-                            transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled));
+                            transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled,
+                            nondeterministicActionMergeEnabled, preUpdateSimpleMergeEnabled));
                 }
                 if (profileLogEnabled) {
                     profileLog("=== Starting OTF-DUC Profiling ===");
@@ -461,6 +488,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             this.heuristic = new DUCExplorationHeuristic<>(this, mappingStart, mappingEnd);
             setupInitialState();
 
+            beginStrategy1NormalOtfSimpleMergeMeasurement();
             long searchStart = System.currentTimeMillis();
 
             // isFinished() は初期状態がGOAL/ERRORになればtrue
@@ -557,6 +585,46 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             logWriter.println(message);
             logWriter.flush();
         }
+    }
+
+    private void beginStrategy1NormalOtfSimpleMergeMeasurement() {
+        if (!beliefRepairEnabled) {
+            return;
+        }
+        strategy1NormalOtfSimpleMergeBeforeMemory = EvaluationProfiler.getCurrentMemoryUsage();
+        EvaluationProfiler.checkpointAndResetIntervalPeakMemory();
+        strategy1NormalOtfSimpleMergeStartMillis = System.currentTimeMillis();
+    }
+
+    private void endStrategy1NormalOtfSimpleMergeMeasurement() {
+        if (!beliefRepairEnabled || strategy1NormalOtfSimpleMergeStartMillis < 0
+                || strategy1NormalOtfSimpleMergeTime >= 0) {
+            return;
+        }
+        strategy1NormalOtfSimpleMergeTime =
+                System.currentTimeMillis() - strategy1NormalOtfSimpleMergeStartMillis;
+        strategy1NormalOtfSimpleMergePeakMemory =
+                EvaluationProfiler.getCurrentIntervalPeakMemoryUsage();
+        strategy1NormalOtfSimpleMergeMemoryIncrease =
+                strategy1NormalOtfSimpleMergePeakMemory - strategy1NormalOtfSimpleMergeBeforeMemory;
+    }
+
+    private void beginStrategy1RepairMeasurement() {
+        if (!beliefRepairEnabled) {
+            return;
+        }
+        strategy1RepairBeforeMemory = EvaluationProfiler.getCurrentMemoryUsage();
+        EvaluationProfiler.checkpointAndResetIntervalPeakMemory();
+        strategy1RepairStartMillis = System.currentTimeMillis();
+    }
+
+    private void endStrategy1RepairMeasurement() {
+        if (!beliefRepairEnabled || strategy1RepairStartMillis < 0 || strategy1RepairTime >= 0) {
+            return;
+        }
+        strategy1RepairTime = System.currentTimeMillis() - strategy1RepairStartMillis;
+        strategy1RepairPeakMemory = EvaluationProfiler.getCurrentIntervalPeakMemoryUsage();
+        strategy1RepairMemoryIncrease = strategy1RepairPeakMemory - strategy1RepairBeforeMemory;
     }
 
     private void profileLog(String message) {
@@ -783,6 +851,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         stitchingNCTime = 0;
         otfPeakStates = 0;
         otfPeakTrans = 0;
+        strategy1NormalOtfSimpleMergeStartMillis = -1;
+        strategy1NormalOtfSimpleMergeTime = -1;
+        strategy1NormalOtfSimpleMergeBeforeMemory = -1;
+        strategy1NormalOtfSimpleMergePeakMemory = -1;
+        strategy1NormalOtfSimpleMergeMemoryIncrease = -1;
+        strategy1RepairStartMillis = -1;
+        strategy1RepairTime = -1;
+        strategy1RepairBeforeMemory = -1;
+        strategy1RepairPeakMemory = -1;
+        strategy1RepairMemoryIncrease = -1;
         heuristicSelectionNanos = 0;
         heuristicRecomputeNanos = 0;
         heuristicFrontierNanos = 0;
@@ -872,7 +950,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         beliefLazyExpansionAttempts = 0;
         beliefLazyExpansionExpandedActions = 0;
         beliefLazyExpansionAddedEdges = 0;
+        beliefUnsafeControllableDiscardCount = 0;
+        beliefUnexploredUncontrollableWarningPlans = 0;
+        beliefUnexploredUncontrollableWarningNodes = 0;
+        beliefUnexploredUncontrollableWarningActions = 0;
         beliefRepairResourceLimitFallbacks = 0;
+        beliefRepairResourceLimitBeliefNodeFallbacks = 0;
+        beliefRepairResourceLimitAdditionalConcreteFallbacks = 0;
+        beliefRepairResourceLimitAdditionalTransitionFallbacks = 0;
+        beliefRepairResourceLimitTimeFallbacks = 0;
         beliefRepairMaxObservedBeliefNodes = 0;
         beliefRepairMaxObservedAdditionalConcreteStates = 0;
         beliefRepairMaxObservedAdditionalTransitions = 0;
@@ -2704,6 +2790,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private void recordOtfDetailedEvaluation() {
         recordOtfMarkingAndStatusBreakdown();
+        recordOtfExploredUpdateEventTransitionCounts();
+        recordOtfExploredUpdatePhaseTransitionAnalysis();
+        recordOtfProjectionSplitStats();
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 展開統計", "生成した child 数", generatedChildCount, "個");
@@ -2739,6 +2828,36 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC 出力 pruning 統計", "出力上の旧コントローラ相当状態数（マージ後）", preUpdateOutputClassStates, "状態");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力 pruning 統計", "出力時マージで削減した旧コントローラ相当状態数", preUpdateOutputMergeRemovedStates, "状態");
+        UpdatingControllerEvaluationRecorder.recordStateTransitionReduction(
+                "OTF-DUC 出力 pruning 削減率",
+                "reachable director graph -> emitted update-controller fragment",
+                directorReachableStates,
+                directorCandidateTransitions,
+                directorOutputStatesAssigned,
+                directorOutputTransitions);
+        UpdatingControllerEvaluationRecorder.recordTransitionReduction(
+                "OTF-DUC 出力 pruning 削減率",
+                "candidate transitions -> emitted transitions",
+                directorCandidateTransitions,
+                directorOutputTransitions);
+        UpdatingControllerEvaluationRecorder.recordDecisionRate(
+                "OTF-DUC ブロック・棄却率",
+                "safety violation child / generated child",
+                safetyViolationChildCount,
+                generatedChildCount,
+                "children");
+        UpdatingControllerEvaluationRecorder.recordDecisionRate(
+                "OTF-DUC ブロック・棄却率",
+                "finishUpdate guard block / generated child",
+                finishUpdateGuardBlockedCount,
+                generatedChildCount,
+                "children");
+        UpdatingControllerEvaluationRecorder.recordDecisionRate(
+                "OTF-DUC ブロック・棄却率",
+                "pruned controllable transition / director candidate transition",
+                prunedControllableTransitions,
+                directorCandidateTransitions,
+                "transitions");
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC NC 接続統計", "finishUpdate 遷移数", finishUpdateTransitions, "本");
@@ -2778,35 +2897,192 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC cache 統計","allChildrenGoal cache hit rate", formatRatio(allChildrenGoalCacheHits, allChildrenGoalCacheHits + allChildrenGoalCacheMisses));
     }
 
-    private void recordOtfMarkingAndStatusBreakdown() {
+    private void recordOtfExploredUpdateEventTransitionCounts() {
         long countStart = System.currentTimeMillis();
-        Map<Long, long[]> byMarking = new TreeMap<>();
-        Map<String, Long> statusCounts = new TreeMap<>();
+        UpdatePhaseEvaluator.TransitionCategoryCount counts =
+                new UpdatePhaseEvaluator.TransitionCategoryCount();
 
         if (compostates != null) {
             for (CompostateDUC<State, Action> state : compostates.values()) {
-                long marking = getMarkingState(state);
-                long[] counts = byMarking.computeIfAbsent(marking, k -> new long[2]);
-                counts[0]++;
-                counts[1] += countExploredTransitions(state);
-
-                String statusKey = "m" + marking + ":" + state.getStatus();
-                statusCounts.put(statusKey, statusCounts.getOrDefault(statusKey, 0L) + 1L);
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition
+                        : state.getExploredChildren()) {
+                    counts.add(transition.getFirst().toString());
+                }
             }
         }
 
         long countTime = System.currentTimeMillis() - countStart;
-        boolean first = true;
-        for (Map.Entry<Long, long[]> entry : byMarking.entrySet()) {
-            long[] counts = entry.getValue();
-            UpdatingControllerEvaluationRecorder.recordStateSpace(
-                    "OTF-DUC markingState 別探索規模",
-                    "markingState=" + entry.getKey(),
-                    counts[0],
-                    counts[1],
-                    first ? countTime : 0);
-            first = false;
+        counts.record(
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_UPDATE_EVENTS,
+                "DCS explored graph",
+                countTime);
+    }
+
+    private void recordOtfExploredUpdatePhaseTransitionAnalysis() {
+        long countStart = System.currentTimeMillis();
+        UpdatePhaseEvaluator.PhaseTransitionAnalysis<CompostateDUC<State, Action>> analysis =
+                new UpdatePhaseEvaluator.PhaseTransitionAnalysis<>();
+        analysis.setInitialNode(initial);
+
+        if (compostates != null) {
+            for (CompostateDUC<State, Action> state : compostates.values()) {
+                int fromPhase = UpdatePhaseEvaluator.phaseFromMarkingState(getMarkingState(state));
+                analysis.addState(state, fromPhase);
+                for (Pair<HAction<State, Action>, CompostateDUC<State, Action>> transition
+                        : state.getExploredChildren()) {
+                    CompostateDUC<State, Action> child = transition.getSecond();
+                    int toPhase = UpdatePhaseEvaluator.phaseFromMarkingState(getMarkingState(child));
+                    analysis.addTransition(
+                            state,
+                            fromPhase,
+                            child,
+                            toPhase,
+                            transition.getFirst().toString(),
+                            transition.getFirst().isControllable());
+                }
+            }
         }
+
+        analysis.record(
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_PHASE_DETAILS,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_PHASE_FLOW,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_COMPLETION_PATH,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_NORMAL_ACTIONS,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_NEXT_UPDATE_EVENT_DISTANCE,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_PROGRESS_FREE_CYCLES,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_ENABLED_UPDATE_EVENTS,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_UPDATE_ORDER_PATTERNS,
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED_NORMAL_RUN_LENGTH,
+                "DCS explored graph",
+                System.currentTimeMillis() - countStart);
+    }
+
+    private void recordOtfProjectionSplitStats() {
+        recordProjectionSplitStats("marking", idxMarking, idxMarking);
+        recordProjectionSplitStats("oldController", idxOC, idxOC);
+        recordProjectionSplitStats("mappingEnv", mappingStart, mappingEnd);
+        recordProjectionSplitStats("oldSafety", oldSafeStart, oldSafeEnd);
+        recordProjectionSplitStats("newSafety", newSafeStart, newSafeEnd);
+        recordProjectionSplitStats("transitionRequirements", transReqStart, transReqEnd);
+        recordProjectionSplitStats("synthesisMonitors", synthesisStart, synthesisEnd);
+
+        recordProjectionSplitStatsPerComponent("mappingEnv", mappingStart, mappingEnd);
+        recordProjectionSplitStatsPerComponent("oldSafety", oldSafeStart, oldSafeEnd);
+        recordProjectionSplitStatsPerComponent("newSafety", newSafeStart, newSafeEnd);
+        recordProjectionSplitStatsPerComponent("transitionRequirement", transReqStart, transReqEnd);
+        recordProjectionSplitStatsPerComponent("synthesisMonitor", synthesisStart, synthesisEnd);
+    }
+
+    private void recordProjectionSplitStatsPerComponent(String labelPrefix, int start, int end) {
+        if (!isValidProjectionRange(start, end)) {
+            return;
+        }
+        for (int component = start; component <= end; component++) {
+            recordProjectionSplitStats(
+                    labelPrefix + "[" + (component - start) + "]",
+                    component,
+                    component);
+        }
+    }
+
+    private void recordProjectionSplitStats(String projectionLabel, int start, int end) {
+        if (!isValidProjectionRange(start, end) || compostates == null) {
+            return;
+        }
+
+        long countStart = System.currentTimeMillis();
+        Map<String, Long> statesByProjectionValue = new LinkedHashMap<>();
+        long totalStates = 0;
+        for (CompostateDUC<State, Action> state : compostates.values()) {
+            List<State> vector = state.getStates();
+            if (vector == null || end >= vector.size()) {
+                continue;
+            }
+            String key = projectionSignature(vector, start, end);
+            statesByProjectionValue.put(key, statesByProjectionValue.getOrDefault(key, 0L) + 1L);
+            totalStates++;
+        }
+
+        long splitProjectionValues = 0;
+        long maxStatesPerProjectionValue = 0;
+        for (Long count : statesByProjectionValue.values()) {
+            if (count > 1) {
+                splitProjectionValues++;
+            }
+            maxStatesPerProjectionValue = Math.max(maxStatesPerProjectionValue, count);
+        }
+        long distinctProjectionValues = statesByProjectionValue.size();
+        double averageStatesPerProjectionValue = distinctProjectionValues == 0
+                ? 0.0
+                : ((double) totalStates) / distinctProjectionValues;
+        long countTime = System.currentTimeMillis() - countStart;
+
+        UpdatingControllerEvaluationRecorder.recordProjectionSplitStats(
+                "OTF-DUC projection 別分裂度",
+                "DCS explored graph",
+                projectionLabel,
+                totalStates,
+                distinctProjectionValues,
+                splitProjectionValues,
+                maxStatesPerProjectionValue,
+                averageStatesPerProjectionValue,
+                countTime);
+    }
+
+    private boolean isValidProjectionRange(int start, int end) {
+        return start >= 0 && end >= start;
+    }
+
+    private String projectionSignature(List<State> vector, int start, int end) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = start; i <= end; i++) {
+            if (i > start) {
+                builder.append('|');
+            }
+            builder.append(vector.get(i));
+        }
+        return builder.toString();
+    }
+
+    private void recordOtfMarkingAndStatusBreakdown() {
+        Map<String, Long> statusCounts = new TreeMap<>();
+        long totalPhaseCountTime = 0;
+
+        for (int phase : UpdatePhaseEvaluator.phaseOrder()) {
+            long countStart = System.currentTimeMillis();
+            long states = 0;
+            long transitions = 0;
+
+            if (compostates != null) {
+                for (CompostateDUC<State, Action> state : compostates.values()) {
+                    long marking = getMarkingState(state);
+                    if (UpdatePhaseEvaluator.phaseFromMarkingState(marking) != phase) {
+                        continue;
+                    }
+                    states++;
+                    transitions += countExploredTransitions(state);
+
+                    String statusKey = "phase="
+                            + UpdatePhaseEvaluator.phaseLabelForMarkingState(marking)
+                            + ":" + state.getStatus();
+                    statusCounts.put(statusKey, statusCounts.getOrDefault(statusKey, 0L) + 1L);
+                }
+            }
+
+            long countTime = System.currentTimeMillis() - countStart;
+            totalPhaseCountTime += countTime;
+            UpdatingControllerEvaluationRecorder.recordStateSpace(
+                    UpdatePhaseEvaluator.SECTION_OTF_EXPLORED,
+                    UpdatePhaseEvaluator.labelWithPhase("DCS explored graph", phase),
+                    states,
+                    transitions,
+                    countTime,
+                    UpdatePhaseEvaluator.phaseDescription(phase));
+        }
+        UpdatingControllerEvaluationRecorder.recordUpdatePhaseCountTimeTotal(
+                UpdatePhaseEvaluator.SECTION_OTF_EXPLORED,
+                "DCS explored graph",
+                totalPhaseCountTime);
 
         for (Map.Entry<String, Long> entry : statusCounts.entrySet()) {
             UpdatingControllerEvaluationRecorder.recordCount(
@@ -3108,25 +3384,46 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         // ---------------------------------------------------------
-        // ステップ 3: 出力時のみ、旧コントローラ上の同値状態をマージする。
-        // まず従来の簡単な partition refinement を行い、その後に同じ旧状態が
-        // 複数クラスに分かれて残る箇所だけ belief 再探索で 1 対 1 対応を試みる。
+        // ステップ 3: 出力時マージを準備する。
+        // 非決定性 action target の同一視は先に計算し、簡単マージを切った場合も
+        // 更新パス上の非決定性は従来 DUC に近い形で出力上まとめる。
+        // その後、必要なら旧コントローラ相当状態の簡単マージと belief repair を行う。
         // ---------------------------------------------------------
         long preUpdateMergeStart = profileLogEnabled ? System.nanoTime() : 0L;
-        Map<CompostateDUC<State, Action>, Integer> fallbackPreUpdateClasses =
-                computePreUpdateOutputMergeClasses(reachableOrder, directorEdges);
-        if (profileLogEnabled) {
-            directorPreUpdateMergeNanos += System.nanoTime() - preUpdateMergeStart;
+        Map<CompostateDUC<State, Action>, Integer> nondetTargetClasses;
+        Map<CompostateDUC<State, Action>, Integer> fallbackPreUpdateClasses;
+        try {
+            nondetTargetClasses = computeDirectNondeterministicActionTargetClasses(reachableOrder, directorEdges);
+            if (preUpdateSimpleMergeEnabled) {
+                fallbackPreUpdateClasses = computePreUpdateOutputMergeClasses(
+                        reachableOrder, directorEdges, nondetTargetClasses);
+            } else {
+                fallbackPreUpdateClasses = computeRawPreUpdateOutputClasses(reachableOrder);
+                if (debugLogEnabled) {
+                    log("  [Director-Merge] pre-update simple merge disabled by -Dotfduc.simple.merge=false");
+                }
+            }
+        } finally {
+            if (profileLogEnabled) {
+                directorPreUpdateMergeNanos += System.nanoTime() - preUpdateMergeStart;
+            }
+            endStrategy1NormalOtfSimpleMergeMeasurement();
         }
+        recordSimpleMergeSplitStats(reachableOrder, fallbackPreUpdateClasses);
 
         BeliefRepairResult beliefRepairResult = new BeliefRepairResult();
         if (beliefRepairEnabled) {
             long beliefRepairStart = System.nanoTime();
-            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges =
-                    collectRawDirectorEdges();
-            beliefRepairResult = repairPreUpdateBeliefs(
-                    reachableOrder, directorEdges, fallbackPreUpdateClasses, rawDirectorEdges);
-            directorBeliefRepairNanos += System.nanoTime() - beliefRepairStart;
+            beginStrategy1RepairMeasurement();
+            try {
+                Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges =
+                        collectRawDirectorEdges();
+                beliefRepairResult = repairPreUpdateBeliefs(
+                        reachableOrder, directorEdges, fallbackPreUpdateClasses, rawDirectorEdges);
+            } finally {
+                directorBeliefRepairNanos += System.nanoTime() - beliefRepairStart;
+                endStrategy1RepairMeasurement();
+            }
         } else if (debugLogEnabled) {
             log("  [Belief-Repair] disabled by -Dotfduc.belief.repair=false");
         }
@@ -3136,26 +3433,27 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         reachableOrder, fallbackPreUpdateClasses, beliefRepairResult);
         recordPreUpdateOutputStateOverhead(reachableOrder, preUpdateClasses);
 
+        Map<CompostateDUC<State, Action>, Integer> outputClasses =
+                computeOutputClassesAfterNondeterministicActionMerge(
+                        reachableOrder, directorEdges, preUpdateClasses, beliefRepairResult, nondetTargetClasses);
+
         Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
-        Map<Integer, Long> preUpdateClassIds = new HashMap<>();
+        Map<Integer, Long> outputClassIds = new HashMap<>();
         Map<BeliefNode, Long> beliefIds = new HashMap<>();
         long idAssignmentStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (CompostateDUC<State, Action> state : reachableOrder) {
-            directorOutputStatesAssigned++;
-            if (isPreUpdateOutputState(state)) {
-                Integer classId = preUpdateClasses.get(state);
-                Long id = preUpdateClassIds.get(classId);
-                if (id == null) {
-                    id = nextId++;
-                    preUpdateClassIds.put(classId, id);
-                    result.addState(id);
-                }
-                ids.put(state, id);
-            } else {
-                Long id = nextId++;
-                ids.put(state, id);
-                result.addState(id);
+            Integer classId = outputClasses.get(state);
+            if (classId == null) {
+                throw new IllegalStateException("Missing output class for reached DUC state.");
             }
+            Long id = outputClassIds.get(classId);
+            if (id == null) {
+                id = nextId++;
+                outputClassIds.put(classId, id);
+                result.addState(id);
+                directorOutputStatesAssigned++;
+            }
+            ids.put(state, id);
         }
         for (BeliefRepairPlan plan : beliefRepairResult.successPlans.values()) {
             for (BeliefNode node : plan.nodes) {
@@ -3180,8 +3478,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 continue;
             }
             for (DirectorEdge edge : edges) {
-                if (beliefRepairResult.isRepairedPreUpdateState(source)
-                        && edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+                if (isBeliefRepairReplacedDirectorEdge(source, edge, beliefRepairResult)) {
                     // belief 再探索に成功した旧状態では、具象 m=0 状態ごとの
                     // beginUpdate を出さず、1 本の beginUpdate から belief 状態へ入る。
                     continue;
@@ -3225,6 +3522,82 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     /**
+     * 通常 OTF-DUC の concrete 探索で同一 source・同一 action から複数 target が
+     * 出た場合、従来 DUC のように出力上は同一状態として扱うための基礎クラスを作る。
+     */
+    private Map<CompostateDUC<State, Action>, Integer> computeDirectNondeterministicActionTargetClasses(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges) {
+
+        OutputClassUnionFind unionFind = new OutputClassUnionFind();
+        Map<CompostateDUC<State, Action>, Integer> rawClassByState = new HashMap<>();
+
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                rawClassByState.put(state, unionFind.addClass());
+            }
+        }
+
+        int unionOperations = 0;
+        if (nondeterministicActionMergeEnabled) {
+            for (CompostateDUC<State, Action> source : reachableOrder) {
+                List<DirectorEdge> edges = directorEdges.get(source);
+                if (edges == null) {
+                    continue;
+                }
+
+                Map<Action, Set<Integer>> targetsByAction = new LinkedHashMap<>();
+                for (DirectorEdge edge : edges) {
+                    if (edge.isNewControllerConnection() || isPreUpdateOutputState(edge.child)) {
+                        continue;
+                    }
+                    Integer targetClass = rawClassByState.get(edge.child);
+                    if (targetClass == null) {
+                        continue;
+                    }
+                    targetsByAction
+                            .computeIfAbsent(edge.outputAction, k -> new LinkedHashSet<>())
+                            .add(unionFind.find(targetClass));
+                }
+
+                for (Set<Integer> targetClasses : targetsByAction.values()) {
+                    if (targetClasses.size() <= 1) {
+                        continue;
+                    }
+                    Iterator<Integer> it = targetClasses.iterator();
+                    int representative = it.next();
+                    while (it.hasNext()) {
+                        if (unionFind.union(representative, it.next())) {
+                            unionOperations++;
+                        }
+                    }
+                }
+            }
+        }
+
+        Map<Integer, Integer> compactClassIds = new LinkedHashMap<>();
+        Map<CompostateDUC<State, Action>, Integer> result = new HashMap<>();
+        for (Map.Entry<CompostateDUC<State, Action>, Integer> entry : rawClassByState.entrySet()) {
+            int root = unionFind.find(entry.getValue());
+            Integer compactClassId = compactClassIds.get(root);
+            if (compactClassId == null) {
+                compactClassId = compactClassIds.size();
+                compactClassIds.put(root, compactClassId);
+            }
+            result.put(entry.getKey(), compactClassId);
+        }
+
+        if (debugLogEnabled) {
+            log("  [Nondet-Action-Merge:pre-simple] enabled=" + nondeterministicActionMergeEnabled
+                    + ", rawNonPreStates=" + rawClassByState.size()
+                    + ", classes=" + compactClassIds.size()
+                    + ", removed=" + Math.max(0, rawClassByState.size() - compactClassIds.size())
+                    + ", unionOperations=" + unionOperations);
+        }
+        return result;
+    }
+
+    /**
      * 探索では new safety fluent の履歴を保持するが、出力上で同じ旧コントローラ
      * 状態かつ同じ遷移構造を持つ m=0 状態は同一状態としてまとめる。
      *
@@ -3233,7 +3606,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      */
     private Map<CompostateDUC<State, Action>, Integer> computePreUpdateOutputMergeClasses(
             List<CompostateDUC<State, Action>> reachableOrder,
-            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges) {
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds) {
 
         List<CompostateDUC<State, Action>> preUpdateStates = new ArrayList<>();
         Map<State, Integer> oldControllerClassIds = new HashMap<>();
@@ -3259,14 +3633,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             preUpdateOutputClassStates = 0;
             preUpdateOutputMergeRemovedStates = 0;
             return classOf;
-        }
-
-        Map<CompostateDUC<State, Action>, Integer> nonPreUpdateIds = new HashMap<>();
-        int nextNonPreUpdateId = 0;
-        for (CompostateDUC<State, Action> state : reachableOrder) {
-            if (!isPreUpdateOutputState(state)) {
-                nonPreUpdateIds.put(state, nextNonPreUpdateId++);
-            }
         }
 
         boolean changed;
@@ -3311,6 +3677,24 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     + ", removed=" + preUpdateOutputMergeRemovedStates);
         }
         logPreUpdateOutputMergeProof(preUpdateStates, classOf, directorEdges, nonPreUpdateIds, nextClassId);
+        return classOf;
+    }
+
+    private Map<CompostateDUC<State, Action>, Integer> computeRawPreUpdateOutputClasses(
+            List<CompostateDUC<State, Action>> reachableOrder) {
+
+        Map<CompostateDUC<State, Action>, Integer> classOf = new HashMap<>();
+        int nextClassId = 0;
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                continue;
+            }
+            classOf.put(state, nextClassId++);
+        }
+
+        preUpdateOutputMergedStates = classOf.size();
+        preUpdateOutputClassStates = classOf.size();
+        preUpdateOutputMergeRemovedStates = 0;
         return classOf;
     }
 
@@ -3870,12 +4254,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (context.limitExceeded) {
                 plan.failByResource("belief node 数が上限を超えた: "
                         + describeBeliefRepairResourceUsage(plan));
-                beliefRepairResourceLimitFallbacks++;
+                recordBeliefRepairResourceLimitFallback(BeliefRepairResourceLimitCause.BELIEF_NODES);
                 logBeliefRepairPlan(plan);
                 return plan;
             }
             if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
-                beliefRepairResourceLimitFallbacks++;
                 logBeliefRepairPlan(plan);
                 return plan;
             }
@@ -3883,7 +4266,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             BeliefLazyExpansionResult updateExpansion = expandBeliefControllableFrontier(
                     plan, lazyNoProgressActions, rejectedBeliefActions, lazyRound + 1, true);
             if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
-                beliefRepairResourceLimitFallbacks++;
                 logBeliefRepairPlan(plan);
                 return plan;
             }
@@ -3916,7 +4298,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
 
             if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
-                beliefRepairResourceLimitFallbacks++;
                 logBeliefRepairPlan(plan);
                 return plan;
             }
@@ -3924,7 +4305,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             BeliefLazyExpansionResult lazyResult = expandBeliefControllableFrontier(
                     plan, lazyNoProgressActions, rejectedBeliefActions, lazyRound + 1, false);
             if (checkBeliefRepairResourceLimit(plan, rawDirectorEdges)) {
-                beliefRepairResourceLimitFallbacks++;
                 logBeliefRepairPlan(plan);
                 return plan;
             }
@@ -4007,16 +4387,19 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (plan.maxObservedBeliefNodes > limits.maxBeliefNodes) {
             plan.failByResource("belief node 数が上限を超えた: "
                     + describeBeliefRepairResourceUsage(plan));
+            recordBeliefRepairResourceLimitFallback(BeliefRepairResourceLimitCause.BELIEF_NODES);
             return true;
         }
         if (plan.maxObservedAdditionalConcreteStates > limits.maxAdditionalConcreteStates) {
             plan.failByResource("追加 concrete state 数が上限を超えた: "
                     + describeBeliefRepairResourceUsage(plan));
+            recordBeliefRepairResourceLimitFallback(BeliefRepairResourceLimitCause.ADDITIONAL_CONCRETE_STATES);
             return true;
         }
         if (plan.maxObservedAdditionalTransitions > limits.maxAdditionalTransitions) {
             plan.failByResource("追加 transition 数が上限を超えた: "
                     + describeBeliefRepairResourceUsage(plan));
+            recordBeliefRepairResourceLimitFallback(BeliefRepairResourceLimitCause.ADDITIONAL_TRANSITIONS);
             return true;
         }
         if (limits.maxTimeMs > 0) {
@@ -4024,10 +4407,31 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (elapsedMs > limits.maxTimeMs) {
                 plan.failByResource("belief repair 時間が上限を超えた: elapsedMs=" + elapsedMs
                         + ", " + describeBeliefRepairResourceUsage(plan));
+                recordBeliefRepairResourceLimitFallback(BeliefRepairResourceLimitCause.TIME);
                 return true;
             }
         }
         return false;
+    }
+
+    private void recordBeliefRepairResourceLimitFallback(BeliefRepairResourceLimitCause cause) {
+        beliefRepairResourceLimitFallbacks++;
+        switch (cause) {
+            case BELIEF_NODES:
+                beliefRepairResourceLimitBeliefNodeFallbacks++;
+                break;
+            case ADDITIONAL_CONCRETE_STATES:
+                beliefRepairResourceLimitAdditionalConcreteFallbacks++;
+                break;
+            case ADDITIONAL_TRANSITIONS:
+                beliefRepairResourceLimitAdditionalTransitionFallbacks++;
+                break;
+            case TIME:
+                beliefRepairResourceLimitTimeFallbacks++;
+                break;
+            default:
+                break;
+        }
     }
 
     private String describeBeliefRepairResourceUsage(BeliefRepairPlan plan) {
@@ -4193,6 +4597,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (result.addedEdges > beforeAddedEdges) {
             if (candidate.controllable && !isControllableBeliefCandidateUsable(candidate)) {
                 rejectedBeliefActions.add(beliefActionKey(candidate.node, candidate.actionName));
+                beliefUnsafeControllableDiscardCount++;
                 if (debugLogEnabled) {
                     log("  [Belief-LazyExpansion] discard unsafe controllable candidate: "
                             + "oldControllerState=" + candidate.plan.oldControllerState
@@ -4324,6 +4729,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private void markRemainingUnexploredUncontrollablesBad(BeliefRepairPlan plan) {
         int count = 0;
+        int affectedNodes = 0;
         List<String> samples = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
@@ -4354,7 +4760,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (firstReason != null) {
                 node.markBad("未展開 uncontrollable が残っているため belief 勝ち判定から除外: "
                         + firstReason);
+                affectedNodes++;
             }
+        }
+
+        if (count > 0) {
+            beliefUnexploredUncontrollableWarningPlans++;
+            beliefUnexploredUncontrollableWarningNodes += affectedNodes;
+            beliefUnexploredUncontrollableWarningActions += count;
         }
 
         if (debugLogEnabled && count > 0) {
@@ -5064,6 +5477,170 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 preUpdateOutputClassStates);
     }
 
+    private void recordSimpleMergeSplitStats(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, Integer> simpleMergeClasses) {
+
+        long[] stats = computePreUpdateSplitStats(reachableOrder, simpleMergeClasses);
+        UpdatingControllerEvaluationRecorder.recordOtfSimpleMergeSplitStats(stats[0], stats[1]);
+    }
+
+    private long[] computePreUpdateSplitStats(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, Integer> preUpdateClasses) {
+
+        Map<State, Set<Integer>> classesByOldControllerState = new LinkedHashMap<>();
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (!isPreUpdateOutputState(state)) {
+                continue;
+            }
+            Integer classId = preUpdateClasses.get(state);
+            if (classId == null) {
+                continue;
+            }
+            State oldControllerState = state.getStates().get(idxOC);
+            classesByOldControllerState
+                    .computeIfAbsent(oldControllerState, key -> new LinkedHashSet<>())
+                    .add(classId);
+        }
+
+        long splitOldControllerStates = 0;
+        long maxSplitPerOldControllerState = 0;
+        for (Set<Integer> classes : classesByOldControllerState.values()) {
+            int split = classes.size();
+            if (split > 1) {
+                splitOldControllerStates++;
+            }
+            maxSplitPerOldControllerState = Math.max(maxSplitPerOldControllerState, split);
+        }
+        return new long[] { splitOldControllerStates, maxSplitPerOldControllerState };
+    }
+
+    private Map<CompostateDUC<State, Action>, Integer> computeOutputClassesAfterNondeterministicActionMerge(
+            List<CompostateDUC<State, Action>> reachableOrder,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> preUpdateClasses,
+            BeliefRepairResult beliefRepairResult,
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateBaseClasses) {
+
+        OutputClassUnionFind unionFind = new OutputClassUnionFind();
+        Map<CompostateDUC<State, Action>, Integer> rawClassByState = new HashMap<>();
+        Map<Integer, Integer> preUpdateClassToRawClass = new LinkedHashMap<>();
+        Map<Integer, Integer> nonPreUpdateClassToRawClass = new LinkedHashMap<>();
+
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            if (isPreUpdateOutputState(state)) {
+                Integer preUpdateClass = preUpdateClasses.get(state);
+                if (preUpdateClass == null) {
+                    throw new IllegalStateException("Missing pre-update output class.");
+                }
+                Integer rawClass = preUpdateClassToRawClass.get(preUpdateClass);
+                if (rawClass == null) {
+                    rawClass = unionFind.addClass();
+                    preUpdateClassToRawClass.put(preUpdateClass, rawClass);
+                }
+                rawClassByState.put(state, rawClass);
+            } else {
+                Integer baseClass = nonPreUpdateBaseClasses.get(state);
+                Integer rawClass = baseClass == null ? null : nonPreUpdateClassToRawClass.get(baseClass);
+                if (rawClass == null) {
+                    rawClass = unionFind.addClass();
+                    if (baseClass != null) {
+                        nonPreUpdateClassToRawClass.put(baseClass, rawClass);
+                    }
+                }
+                rawClassByState.put(state, rawClass);
+            }
+        }
+
+        int mergeRounds = 0;
+        int mergedTargetClasses = 0;
+        if (nondeterministicActionMergeEnabled) {
+            boolean changed;
+            do {
+                changed = false;
+                mergeRounds++;
+
+                Map<Integer, Map<Action, Set<Integer>>> targetsByOutputClassAndAction = new LinkedHashMap<>();
+                for (CompostateDUC<State, Action> source : reachableOrder) {
+                    Integer sourceRawClass = rawClassByState.get(source);
+                    if (sourceRawClass == null) {
+                        continue;
+                    }
+                    int sourceClass = unionFind.find(sourceRawClass);
+                    List<DirectorEdge> edges = directorEdges.get(source);
+                    if (edges == null) {
+                        continue;
+                    }
+                    for (DirectorEdge edge : edges) {
+                        if (isBeliefRepairReplacedDirectorEdge(source, edge, beliefRepairResult)
+                                || edge.isNewControllerConnection()
+                                || isPreUpdateOutputState(edge.child)) {
+                            continue;
+                        }
+                        Integer targetRawClass = rawClassByState.get(edge.child);
+                        if (targetRawClass == null) {
+                            continue;
+                        }
+                        int targetClass = unionFind.find(targetRawClass);
+                        targetsByOutputClassAndAction
+                                .computeIfAbsent(sourceClass, k -> new LinkedHashMap<>())
+                                .computeIfAbsent(edge.outputAction, k -> new LinkedHashSet<>())
+                                .add(targetClass);
+                    }
+                }
+
+                for (Map<Action, Set<Integer>> targetsByAction : targetsByOutputClassAndAction.values()) {
+                    for (Set<Integer> targetClasses : targetsByAction.values()) {
+                        if (targetClasses.size() <= 1) {
+                            continue;
+                        }
+                        Iterator<Integer> it = targetClasses.iterator();
+                        int representative = it.next();
+                        while (it.hasNext()) {
+                            if (unionFind.union(representative, it.next())) {
+                                changed = true;
+                                mergedTargetClasses++;
+                            }
+                        }
+                    }
+                }
+            } while (changed);
+        }
+
+        Map<Integer, Integer> compactClassIds = new LinkedHashMap<>();
+        Map<CompostateDUC<State, Action>, Integer> result = new HashMap<>();
+        for (CompostateDUC<State, Action> state : reachableOrder) {
+            int root = unionFind.find(rawClassByState.get(state));
+            Integer compactClassId = compactClassIds.get(root);
+            if (compactClassId == null) {
+                compactClassId = compactClassIds.size();
+                compactClassIds.put(root, compactClassId);
+            }
+            result.put(state, compactClassId);
+        }
+
+        if (debugLogEnabled) {
+            log("  [Nondet-Action-Merge] enabled=" + nondeterministicActionMergeEnabled
+                    + ", rawOutputStates=" + reachableOrder.size()
+                    + ", classes=" + compactClassIds.size()
+                    + ", removed=" + Math.max(0, reachableOrder.size() - compactClassIds.size())
+                    + ", unionOperations=" + mergedTargetClasses
+                    + ", rounds=" + (nondeterministicActionMergeEnabled ? mergeRounds : 0));
+        }
+        return result;
+    }
+
+    private boolean isBeliefRepairReplacedDirectorEdge(
+            CompostateDUC<State, Action> source,
+            DirectorEdge edge,
+            BeliefRepairResult beliefRepairResult) {
+
+        return beliefRepairResult != null
+                && beliefRepairResult.isRepairedPreUpdateState(source)
+                && edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE);
+    }
+
     private void emitBeliefRepairTransitions(
             LTSImpl<Long, Action> result,
             Map<CompostateDUC<State, Action>, Long> concreteIds,
@@ -5290,6 +5867,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
+    private enum BeliefRepairResourceLimitCause {
+        BELIEF_NODES,
+        ADDITIONAL_CONCRETE_STATES,
+        ADDITIONAL_TRANSITIONS,
+        TIME
+    }
+
     private class BeliefSearchContext {
         private final Map<CompostateDUC<State, Action>, Integer> concreteIds;
         private final Map<List<Integer>, BeliefNode> nodesByKey = new LinkedHashMap<>();
@@ -5464,6 +6048,35 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         private boolean hasProgress() {
             return addedEdges > 0;
+        }
+    }
+
+    private static class OutputClassUnionFind {
+        private final List<Integer> parent = new ArrayList<>();
+
+        private int addClass() {
+            int id = parent.size();
+            parent.add(id);
+            return id;
+        }
+
+        private int find(int id) {
+            int p = parent.get(id);
+            if (p != id) {
+                p = find(p);
+                parent.set(id, p);
+            }
+            return p;
+        }
+
+        private boolean union(int left, int right) {
+            int leftRoot = find(left);
+            int rightRoot = find(right);
+            if (leftRoot == rightRoot) {
+                return false;
+            }
+            parent.set(rightRoot, leftRoot);
+            return true;
         }
     }
 
@@ -5753,6 +6366,19 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
+    private String describeOtfExecutionMode() {
+        if (beliefRepairEnabled) {
+            if (preUpdateSimpleMergeEnabled) {
+                return "通常OTF-DUC+簡単マージ+repair";
+            }
+            return "通常OTF-DUC+repair";
+        }
+        if (preUpdateSimpleMergeEnabled) {
+            return "通常OTF-DUC+簡単マージ";
+        }
+        return "通常OTF-DUC";
+    }
+
     private void recordOtfDcsTimingEvaluation() {
         UpdatingControllerEvaluationRecorder.recordTime(
                 "DCS (OTF-DUC)", "synthesizeDUC 実行時間", synthesizeDUCTime);
@@ -5846,6 +6472,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         UpdatingControllerEvaluationRecorder.recordTime(
                 "DCS (OTF-DUC)", "buildDirectorDUC 実行時間", buildDirectorDUCTime);
+        recordStrategy1TimingAndMemoryEvaluation();
         UpdatingControllerEvaluationRecorder.recordNanoTime(
                 "OTF-DUC 出力構築時間内訳", "出力遷移 pruning 判定時間", outputPruningDecisionNanos);
         UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
@@ -5865,6 +6492,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力構築時間内訳", "belief 再探索で資源上限により fallback した旧状態数", beliefRepairResourceLimitFallbacks, "状態");
         UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で belief node 上限により fallback した旧状態数",
+                beliefRepairResourceLimitBeliefNodeFallbacks, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で追加 concrete state 上限により fallback した旧状態数",
+                beliefRepairResourceLimitAdditionalConcreteFallbacks, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で追加 transition 上限により fallback した旧状態数",
+                beliefRepairResourceLimitAdditionalTransitionFallbacks, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で時間上限により fallback した旧状態数",
+                beliefRepairResourceLimitTimeFallbacks, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力構築時間内訳", "belief 再探索で観測した最大 belief node 数", beliefRepairMaxObservedBeliefNodes, "状態");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力構築時間内訳", "belief 再探索で追加生成した最大 concrete state 数", beliefRepairMaxObservedAdditionalConcreteStates, "状態");
@@ -5878,12 +6517,49 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC 出力構築時間内訳", "belief 再探索中に実際に追加展開できた action 数", beliefLazyExpansionExpandedActions, "回");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力構築時間内訳", "belief 再探索の追加展開で増えた遷移数", beliefLazyExpansionAddedEdges, "遷移");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で破棄した unsafe controllable action 数",
+                beliefUnsafeControllableDiscardCount, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で未展開 uncontrollable warning 数",
+                beliefUnexploredUncontrollableWarningPlans, "回");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で未展開 uncontrollable が残った belief node 数",
+                beliefUnexploredUncontrollableWarningNodes, "状態");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "belief 再探索で未展開 uncontrollable action 数",
+                beliefUnexploredUncontrollableWarningActions, "回");
         UpdatingControllerEvaluationRecorder.recordTime(
                 "DCS (OTF-DUC)", "NC 移設時間", transferNCTime);
         UpdatingControllerEvaluationRecorder.recordTime(
                 "DCS (OTF-DUC)", "NC 接続時間", stitchingNCTime);
         UpdatingControllerEvaluationRecorder.recordTime(
                 "DCS (OTF-DUC)", "NC 移設時間 + NC 接続時間", transferNCTime + stitchingNCTime);
+    }
+
+    private void recordStrategy1TimingAndMemoryEvaluation() {
+        if (!beliefRepairEnabled
+                || strategy1NormalOtfSimpleMergeTime < 0
+                || strategy1RepairTime < 0) {
+            return;
+        }
+
+        final String section = "OTF-DUC 方針1 時間・メモリ内訳";
+        UpdatingControllerEvaluationRecorder.recordTime(
+                section, "通常OTF探索+簡単マージ時間", strategy1NormalOtfSimpleMergeTime);
+        UpdatingControllerEvaluationRecorder.recordMemoryInterval(
+                section,
+                "通常OTF探索+簡単マージ",
+                strategy1NormalOtfSimpleMergeBeforeMemory,
+                strategy1NormalOtfSimpleMergePeakMemory);
+
+        UpdatingControllerEvaluationRecorder.recordTime(
+                section, "belief repair時間", strategy1RepairTime);
+        UpdatingControllerEvaluationRecorder.recordMemoryInterval(
+                section,
+                "belief repair",
+                strategy1RepairBeforeMemory,
+                strategy1RepairPeakMemory);
     }
 
     /**

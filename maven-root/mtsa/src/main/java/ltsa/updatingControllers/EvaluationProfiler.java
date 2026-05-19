@@ -9,11 +9,24 @@ import java.lang.management.MemoryType;
  */
 public class EvaluationProfiler {
 
+    private static long retainedPeakMemory = 0;
+
     /**
      * 現在記録されているピークメモリの値をリセットする。
      * 計測区間の直前に呼び出すことで、過去のゴミ記録を消去します。
      */
     public static void resetPeakMemory() {
+        retainedPeakMemory = 0;
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            pool.resetPeakUsage();
+        }
+    }
+
+    /**
+     * 全体ピークを保持したまま、以降の区間ピークだけを測り直す。
+     */
+    public static void checkpointAndResetIntervalPeakMemory() {
+        retainedPeakMemory = Math.max(retainedPeakMemory, getCurrentIntervalPeakMemoryUsage());
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             pool.resetPeakUsage();
         }
@@ -24,6 +37,13 @@ public class EvaluationProfiler {
      * 計測区間の直後に呼び出します。
      */
     public static long getPeakMemoryUsage() {
+        return Math.max(retainedPeakMemory, getCurrentIntervalPeakMemoryUsage());
+    }
+
+    /**
+     * 直近のピークリセット以降に到達したヒープメモリの最大使用量（バイト）を取得する。
+     */
+    public static long getCurrentIntervalPeakMemoryUsage() {
         long peakMemory = 0;
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             if (pool.getType() == MemoryType.HEAP) {
