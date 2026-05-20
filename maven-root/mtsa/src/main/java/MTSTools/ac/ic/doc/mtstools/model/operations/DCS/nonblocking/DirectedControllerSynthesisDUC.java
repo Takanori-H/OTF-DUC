@@ -435,6 +435,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             LTSOutput output) {
         
         long synthesizeDUCStart = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                "DCS (OTF-DUC)",
+                "synthesizeDUC 実行時間");
 
         this.mappingStart = mappingStart;
         this.mappingEnd = mappingEnd;
@@ -547,7 +550,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 log("Goal Reached! Building Director...");
 
                 long buildDirectorDUCStart = System.currentTimeMillis();
-                LTS<Long, Action> result = buildDirectorDUC();
+                UpdatingControllerEvaluationRecorder.beginCountScope(
+                        "DCS (OTF-DUC)",
+                        "buildDirectorDUC 実行時間");
+                LTS<Long, Action> result;
+                try {
+                    result = buildDirectorDUC();
+                } finally {
+                    UpdatingControllerEvaluationRecorder.endCountScope(
+                            "DCS (OTF-DUC)",
+                            "buildDirectorDUC 実行時間");
+                }
                 buildDirectorDUCTime = System.currentTimeMillis() - buildDirectorDUCStart;
                 UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF buildDirectorDUC 後");
 
@@ -576,6 +589,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
             // 合成完了後
             recordOtfDcsTimingEvaluation();
+            UpdatingControllerEvaluationRecorder.endCountScope(
+                    "DCS (OTF-DUC)",
+                    "synthesizeDUC 実行時間");
             recordOtfDetailedEvaluation();
         }
     }

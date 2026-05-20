@@ -33,6 +33,8 @@ public final class UpdatingControllerEvaluationRecorder {
     private static final Map<String, LineRef> lineRefs = new LinkedHashMap<>();
     private static final Map<String, Long> timeMillisByKey = new LinkedHashMap<>();
     private static final Map<String, DataMetric> dataMetrics = new LinkedHashMap<>();
+    private static final Map<String, CountScope> countScopes = new LinkedHashMap<>();
+    private static final List<String> activeCountScopes = new ArrayList<>();
 
     private static String mode = "未記録";
     private static ResultStatus resultStatus = ResultStatus.NOT_RECORDED;
@@ -68,6 +70,8 @@ public final class UpdatingControllerEvaluationRecorder {
         lineRefs.clear();
         timeMillisByKey.clear();
         dataMetrics.clear();
+        countScopes.clear();
+        activeCountScopes.clear();
         mode = "未記録";
         resultStatus = ResultStatus.NOT_RECORDED;
         failureMessage = "";
@@ -168,6 +172,40 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric(section, label, Long.toString(count), unit == null ? "count" : unit);
     }
 
+    public static synchronized void beginCountScope(String section, String label) {
+        String key = timerKey(section, label);
+        CountScope scope = countScopes.get(key);
+        if (scope == null) {
+            scope = new CountScope(section, label, metricKey(section, label));
+            countScopes.put(key, scope);
+        }
+        activeCountScopes.add(key);
+    }
+
+    public static synchronized void endCountScope(String section, String label) {
+        String key = timerKey(section, label);
+        for (int i = activeCountScopes.size() - 1; i >= 0; i--) {
+            if (activeCountScopes.get(i).equals(key)) {
+                activeCountScopes.remove(i);
+                return;
+            }
+        }
+    }
+
+    private static void addStateSpaceCountOverhead(long countTimeMillis) {
+        long safeCountTime = Math.max(0, countTimeMillis);
+        stateSpaceCountOverheadMillis += safeCountTime;
+        if (safeCountTime == 0 || activeCountScopes.isEmpty()) {
+            return;
+        }
+        for (String key : activeCountScopes) {
+            CountScope scope = countScopes.get(key);
+            if (scope != null) {
+                scope.countTimeMillis += safeCountTime;
+            }
+        }
+    }
+
     public static synchronized void recordStateSpace(
             String section, String label, long states, long transitions, long countTimeMillis) {
         recordStateSpace(section, label, states, transitions, countTimeMillis, "");
@@ -175,7 +213,7 @@ public final class UpdatingControllerEvaluationRecorder {
 
     public static synchronized void recordStateSpace(
             String section, String label, long states, long transitions, long countTimeMillis, String description) {
-        stateSpaceCountOverheadMillis += Math.max(0, countTimeMillis);
+        addStateSpaceCountOverhead(countTimeMillis);
         add(section, label + " States: " + states
                 + ", Transitions: " + transitions
                 + ", CountTime: " + countTimeMillis + " ms");
@@ -211,7 +249,7 @@ public final class UpdatingControllerEvaluationRecorder {
             long normalTransitions,
             long countTimeMillis) {
         long safeCountTime = Math.max(0, countTimeMillis);
-        stateSpaceCountOverheadMillis += safeCountTime;
+        addStateSpaceCountOverhead(safeCountTime);
         long updateEventTransitions = beginUpdateTransitions
                 + stopOldSpecTransitions
                 + reconfigureTransitions
@@ -308,7 +346,7 @@ public final class UpdatingControllerEvaluationRecorder {
             String artifactLabel,
             long countTimeMillis) {
         long safeCountTime = Math.max(0, countTimeMillis);
-        stateSpaceCountOverheadMillis += safeCountTime;
+        addStateSpaceCountOverhead(safeCountTime);
         String label = artifactLabel + " / update phase transition detail CountTime";
         add(section, label + " : " + safeCountTime + " ms");
         recordDataMetric(metricKey(section, label), section, label, Long.toString(safeCountTime), "ms");
@@ -679,7 +717,7 @@ public final class UpdatingControllerEvaluationRecorder {
             long countTimeMillis) {
 
         long safeCountTime = Math.max(0, countTimeMillis);
-        stateSpaceCountOverheadMillis += safeCountTime;
+        addStateSpaceCountOverhead(safeCountTime);
         String label = artifactLabel + " / projection=" + projectionLabel;
         add(section, label
                 + ": totalStates=" + totalStates
@@ -790,7 +828,7 @@ public final class UpdatingControllerEvaluationRecorder {
 
     public static synchronized void recordMemory(String section, String label, long bytes) {
         add(section, label + " : " + formatBytes(bytes));
-        recordDataMetric(section, label, bytesToMiBText(bytes), "MB");
+        recordDataMetric(section, label, bytesToByteText(bytes), "B");
     }
 
     public static synchronized void recordMemoryInterval(
@@ -833,14 +871,14 @@ public final class UpdatingControllerEvaluationRecorder {
                         + " 開始時からの増減=" + padLeft(formatSignedMiB(deltaFromBaseline), 9)
                         + " 直前からの増減=" + padLeft(formatSignedMiB(deltaFromPrevious), 9));
         String baseKey = metricKey(normalizedSection, label);
-        recordDataMetric(baseKey + "_current_heap", normalizedSection, label + " / 現在ヒープ", bytesToMiBText(currentBytes), "MB");
-        recordDataMetric(baseKey + "_peak_heap", normalizedSection, label + " / ピークヒープ", bytesToMiBText(peakBytes), "MB");
-        recordDataMetric(baseKey + "_delta_from_start", normalizedSection, label + " / 開始時からの増減", bytesToMiBText(deltaFromBaseline), "MB");
-        recordDataMetric(baseKey + "_delta_from_previous", normalizedSection, label + " / 直前からの増減", bytesToMiBText(deltaFromPrevious), "MB");
+        recordDataMetric(baseKey + "_current_heap", normalizedSection, label + " / 現在ヒープ", bytesToByteText(currentBytes), "B");
+        recordDataMetric(baseKey + "_peak_heap", normalizedSection, label + " / ピークヒープ", bytesToByteText(peakBytes), "B");
+        recordDataMetric(baseKey + "_delta_from_start", normalizedSection, label + " / 開始時からの増減", bytesToByteText(deltaFromBaseline), "B");
+        recordDataMetric(baseKey + "_delta_from_previous", normalizedSection, label + " / 直前からの増減", bytesToByteText(deltaFromPrevious), "B");
     }
 
     public static synchronized void recordOutputController(long states, long transitions, long countTimeMillis) {
-        stateSpaceCountOverheadMillis += Math.max(0, countTimeMillis);
+        addStateSpaceCountOverhead(countTimeMillis);
         add("Output Update Controller", "States: " + states
                 + ", Transitions: " + transitions
                 + ", CountTime: " + countTimeMillis + " ms");
@@ -851,7 +889,7 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void recordBeginUpdateCoverage(long beginUpdateStates, long countTimeMillis) {
-        stateSpaceCountOverheadMillis += Math.max(0, countTimeMillis);
+        addStateSpaceCountOverhead(countTimeMillis);
         long denominator = oldControllerStates >= 0 ? oldControllerStates : beginUpdateReferenceStates;
         if (denominator >= 0 && beginUpdateStates <= denominator) {
             add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
@@ -1017,6 +1055,7 @@ public final class UpdatingControllerEvaluationRecorder {
         evaluationSummaryOutputMillis = System.currentTimeMillis() - summaryOutputStart;
 
         recordEvaluationOutputMetrics(false);
+        recordCountScopeMetrics();
         recordComparisonSummary();
         printDataCsv(output);
     }
@@ -1075,6 +1114,36 @@ public final class UpdatingControllerEvaluationRecorder {
                         : "評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間。CSV出力時間はCSV出力後に別途記録する。");
     }
 
+    private static void recordCountScopeMetrics() {
+        String section = "評価用カウント時間 / 関数スコープ別";
+        for (CountScope scope : countScopes.values()) {
+            long countMillis = Math.max(0, scope.countTimeMillis);
+            String scopeLabel = scope.section + " / " + scope.label;
+            String countKey = scope.baseMetricKey + "_scope_count_overhead_time";
+
+            add(section, scopeLabel + " / 評価用カウント時間 : " + countMillis + " ms");
+            recordDataMetricWithFormula(
+                    countKey,
+                    section,
+                    scopeLabel + " / 評価用カウント時間",
+                    Long.toString(countMillis),
+                    "ms",
+                    "この関数スコープが開いている間に、状態数・遷移数などの評価用カウントとして加算された時間。");
+
+            Long rawMillis = timeMillisByKey.get(timeKey(scope.section, scope.label));
+            if (rawMillis != null) {
+                long withoutCountMillis = Math.max(0, rawMillis - countMillis);
+                recordDataMetricWithFormula(
+                        scope.baseMetricKey + "_time_without_scope_count_overhead",
+                        section,
+                        scopeLabel + " / 評価用カウント時間除外後",
+                        Long.toString(withoutCountMillis),
+                        "ms",
+                        scope.baseMetricKey + " - " + countKey);
+            }
+        }
+    }
+
     private static boolean isFailureStatus(ResultStatus status) {
         return status == ResultStatus.GOAL_NOT_REACHABLE
                 || status == ResultStatus.NOT_CONTROLLABLE
@@ -1106,19 +1175,19 @@ public final class UpdatingControllerEvaluationRecorder {
             return "準備済みモデルから Traditional DUC または OTF-DUC の実際の合成処理を起動する入口。";
         }
         if ("solveControlProblem (Traditional DUC)".equals(section)) {
-            return "Traditional DUC で E_u から safetyEnv を作り、最後に GR1 で update controller を合成する処理。";
+            return "Traditional DUC で更新用環境から安全性制約反映後の環境を作り、最後に update controller を合成する処理。";
         }
         if ("Traditional DUC safetyEnv 構築時間内訳".equals(section)) {
-            return "Traditional DUC の safetyEnv を作る内部処理。Fluent 評価、safety 違反 pruning、DontDoTwice 合成を含む。";
+            return "Traditional DUC の安全性制約反映後の環境を作る内部処理。Fluent 評価、安全性違反 pruning、DontDoTwice 合成を含む。";
         }
         if ("Traditional DUC GR1 時間内訳".equals(section)) {
-            return "Traditional DUC の最終 safety 環境を GR1 合成器に渡し、出力コントローラを得る処理。";
+            return "Traditional DUC の安全性制約反映後の環境を最終コントローラ合成器に渡し、出力コントローラを得る処理。";
         }
         if ("generateDUC (OTF-DUC)".equals(section)) {
-            return "OTF-DUC で on-the-fly 探索用の boxList や対応表を準備し、DCS を実行して update controller を生成する処理。";
+            return "OTF-DUC本体として、探索入力モデルの準備、on-the-fly探索、出力UC構築、MTSA側への反映を行う処理。";
         }
         if ("DCS (OTF-DUC)".equals(section)) {
-            return "OTF-DUC の on-the-fly 探索本体。状態展開、fairness/loop 判定、出力構築を行う。";
+            return "OTF-DUC の探索器内部で、状態展開、fairness/loop 判定、出力UC構築を行う処理。";
         }
         if ("OTF-DUC 探索時間内訳".equals(section)) {
             return "OTF-DUC の探索順序を決めるヒューリスティックと frontier 操作に関する時間内訳。";
@@ -1143,6 +1212,9 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("OTF-DUC projection 別分裂度".equals(section)) {
             return "OTF-DUC の探索終了時 compostate を各構成要素へ射影し、同じ射影値を持つ状態が何個に分裂しているかを記録する。old controller、mapping env、safety、transition requirement など、状態爆発の由来を調べるための値。";
+        }
+        if ("評価用カウント時間 / 関数スコープ別".equals(section)) {
+            return "関数タイマーのスコープごとに、そのスコープ内で発生した状態数・遷移数などの評価用カウント時間を集計した値。各関数の生時間から差し引くために使う。";
         }
         if ("OTF-DUC update phase 別探索規模".equals(section)) {
             return "OTF-DUC の探索終了時グラフを update phase ごとに分けた状態数・遷移数。各 phase の CountTime と合計 CountTime を記録する。";
@@ -1181,7 +1253,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "方針1実行時に、通常の OTF 探索 + 簡単マージと belief repair を分けて測った時間・メモリ内訳。";
         }
         if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
-            return "Traditional DUC の中間状態空間サイズ。E_u、Meta、Pruned、Final の各段階を比較するための値。";
+            return "Traditional DUC の中間状態空間サイズ。更新用環境、安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の各段階を比較するための値。";
         }
         if ("Traditional DUC update phase 別状態空間".equals(section)) {
             return "Traditional DUC の中間状態空間を、beginUpdate 前後、および stopOldSpec・reconfigure・startNewSpec の実行済み組合せごとに分けた状態数・遷移数。";
@@ -1190,7 +1262,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "Traditional DUC の中間状態空間に含まれる beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate と通常遷移の本数。";
         }
         if ("Traditional DUC 状態空間削減率".equals(section)) {
-            return "Traditional DUC の Meta、Pruned Safety、Final Safety の間で、状態数・遷移数がどれだけ削減されたかを示す値。";
+            return "Traditional DUC の安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の間で、状態数・遷移数がどれだけ削減されたかを示す値。";
         }
         if ("Traditional DUC update phase 別遷移詳細".equals(section)) {
             return "Traditional DUC の中間状態空間を update phase ごとに分け、更新事象別遷移数、通常遷移数、通常遷移率、平均/最大分岐数を記録する。";
@@ -1293,34 +1365,36 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("Mapping Environment Component 合成時間: old/new 環境と対応関係から mapping component を作る時間。");
             notes.add("New Controller 合成時間: OTF-DUC で接続先として使う新コントローラを事前合成する時間。");
             notes.add("Safety の tester 変換全体時間: safety / transition requirement を探索用 tester LTS に変換する時間。");
-            notes.add("Traditional DUC grGoal/safetyGoal 生成時間: Traditional DUC 用の GR1 目標と safety 目標を生成する時間。");
+            notes.add("Traditional DUC ゴール条件/安全性ゴール条件生成時間: Traditional DUC 用のゴール条件と安全性ゴール条件を生成する時間。");
         } else if ("入力規模".equals(section)) {
             notes.add("controllable action 数: 入力で controllable として宣言された action 数。");
-            notes.add("uncontrollable action 数（推定）: 既知の action と controllable action の和集合から controllable action を除いた数。");
-            notes.add("全 action 数（controllable + uncontrollable）: 既知の action と controllable action の和集合の大きさ。");
+            notes.add("uncontrollable action 数: 入力 action 全体から controllable action を除いた action 数。beginUpdate は Traditional DUC と OTF-DUC の両方で uncontrollable として数え、finishUpdate は OTF-DUC のみで数える。");
+            notes.add("全 action 数（controllable + uncontrollable）: 入力 action 全体の大きさ。通常 action と更新事象を含む。");
         } else if ("UpdatingControllerSynthesizer".equals(section)) {
             notes.add("generateController の全体実行時間: 手法本体を呼び出して update controller を生成する外側の時間。");
-            notes.add("Traditional solveControlProblem / OTF generateDUC 実行時間: Traditional では GR1 合成処理、OTF では on-the-fly DUC 生成処理の時間。");
-            notes.add("Traditional DUC E_u 構築時間: 旧コントローラと Mapping Environment から更新環境 E_u を構築する時間。");
+            notes.add("手法別の本体呼び出し時間: Traditional では最終コントローラ合成処理、OTF では探索入力準備から出力UC反映までの本体処理時間。");
+            notes.add("Traditional DUC 更新用環境構築時間: 旧コントローラと Mapping Environment から更新中の振る舞いを表す環境を構築する時間。");
         } else if ("solveControlProblem (Traditional DUC)".equals(section)) {
-            notes.add("Fluent とベース環境を並列合成した metaEnv 構築時間: safety 評価用に E_u と Fluent を組み合わせる時間。");
-            notes.add("metaEnv からエラーを枝刈りして safetyEnv を構築する時間: safety formula 違反状態を除去する時間。");
-            notes.add("safetyEnv を GR1 で解く時間: 最終 safety 環境から controller を合成する中核時間。");
+            notes.add("安全性評価用合成環境構築時間: 安全性評価用に更新用環境と Fluent を組み合わせる時間。");
+            notes.add("安全性制約反映後の環境構築時間: 安全性違反状態を除去する時間。");
+            notes.add("最終コントローラ合成時間: 安全性制約反映後の環境から controller を合成する中核時間。");
         } else if ("generateDUC (OTF-DUC)".equals(section)) {
-            notes.add("boxList 準備時間: on-the-fly 探索に渡す Marking LTS、旧コントローラ、MapEnv、安全性などを並べる時間。");
+            notes.add("探索入力モデル準備時間: on-the-fly 探索に渡す Marking LTS、旧コントローラ、MapEnv、安全性などを並べる時間。");
             notes.add("New Controller の接続先の事前計算: finishUpdate 後に新コントローラへ接続する状態対応表を作る時間。");
-            notes.add("DCS で Update Controller を合成する時間: OTF-DUC の探索から出力 controller 構築までの中心時間。");
+            notes.add("探索呼び出しから出力UC反映までの時間: OTF-DUC の探索器呼び出しから、出力UCをMTSA側の表現へ反映するまでの中心時間。");
         } else if ("Traditional DUC GR1 時間内訳".equals(section)) {
-            notes.add("GR goal 構築時間: guarantee / assumption などから GR1 目標を構築する時間。");
-            notes.add("Winning region 計算時間: GR1 game 上で勝ち領域を求める時間。");
-            notes.add("Strategy 構築時間: 勝ち領域から controller strategy を作る時間。");
-            notes.add("Strategy から controller MTS を構築する時間: strategy を出力 controller の MTS に変換する時間。");
+            notes.add("ゴール条件構築時間: guarantee / assumption などから最終コントローラ合成用のゴール条件を構築する時間。");
+            notes.add("勝ち領域計算時間: 最終コントローラ合成ゲーム上で勝ち領域を求める時間。");
+            notes.add("コントローラ戦略構築時間: 勝ち領域から controller strategy を作る時間。");
+            notes.add("コントローラ戦略から出力用モデルを構築する時間: strategy を出力 controller の MTS に変換する時間。");
         } else if ("比較用時間集計".equals(section)) {
             notes.add("除外する共通前処理時間: 両手法に共通する旧コントローラ合成、Goal 準備、Mapping component 生成の合計。");
+            notes.add("大枠比較用時間: 実測総時間から構文解析、評価用カウント、評価出力、GUI描画を除いた時間。");
+            notes.add("厳密比較用時間: 大枠比較用時間からさらに共通前処理時間を除いた時間。");
             notes.add("手法固有時間: OTF-DUC または Traditional DUC に固有の準備・中核・後処理を合計した時間。");
-            notes.add("主比較対象の中核合成時間: OTF では DCS、Traditional では E_u 構築 + solveControlProblem を対象にした時間。");
+            notes.add("内部計測の中核処理時間（参考）: OTF-DUC では on-the-fly探索から出力UC反映まで、Traditional DUC では更新用環境構築から最終コントローラ合成までを対象にした内部タイマー値。評価用カウント時間を含み得るため、主比較には実測時間から評価用オーバーヘッドを差し引いた項目を使う。");
         } else if ("OTF-DUC 方針1 時間・メモリ内訳".equals(section)) {
-            notes.add("通常OTF探索+簡単マージ時間: DCS 探索開始から、belief repair 直前の簡単マージ完了までの時間。");
+            notes.add("通常OTF探索+簡単マージ時間: on-the-fly探索開始から、belief repair 直前の簡単マージ完了までの時間。");
             notes.add("通常OTF探索+簡単マージ中増加メモリ: 同区間のピークメモリ - 同区間直前メモリ。");
             notes.add("belief repair時間: raw graph 収集を含む方針1 repair 区間の時間。");
             notes.add("belief repair中増加メモリ: repair 区間のピークメモリ - repair 直前メモリ。");
@@ -1449,8 +1523,8 @@ public final class UpdatingControllerEvaluationRecorder {
         return String.format(Locale.ROOT, "%.3f", nanos / 1_000_000.0);
     }
 
-    private static String bytesToMiBText(long bytes) {
-        return String.format(Locale.ROOT, "%.2f", bytes / 1024.0 / 1024.0);
+    private static String bytesToByteText(long bytes) {
+        return Long.toString(bytes);
     }
 
     private static String formatBytes(long bytes) {
@@ -1544,6 +1618,7 @@ public final class UpdatingControllerEvaluationRecorder {
                 timeKey("UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間"),
                 timeKey("UpdatingControllersDefinition", "Mapping Environment Component 合成時間"));
 
+        long parseTime = optionalTime("共通 / HPWindow", "構文解析時間");
         long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         long methodSpecificTime = methodSpecificTime();
         long methodCoreTime = methodCoreTime();
@@ -1552,14 +1627,16 @@ public final class UpdatingControllerEvaluationRecorder {
         Long controllerSynthesisTime = hasRecordedTime("共通 / HPWindow", "コントローラ合成時間")
                 ? optionalTime("共通 / HPWindow", "コントローラ合成時間")
                 : null;
-        long adjustedObservedTime = totalTime == null
+        long broadObservedTime = totalTime == null
                 ? -1
-                : Math.max(0, totalTime - commonPreprocessTime - stateSpaceCountOverheadMillis
+                : Math.max(0, totalTime - parseTime - stateSpaceCountOverheadMillis
                         - evaluationOutputTime - drawTime);
+        long strictObservedTime = totalTime == null
+                ? -1
+                : Math.max(0, broadObservedTime - commonPreprocessTime);
         long unclassifiedTime = totalTime == null
                 ? -1
-                : Math.max(0, totalTime - commonPreprocessTime - methodSpecificTime
-                        - stateSpaceCountOverheadMillis - evaluationOutputTime - drawTime);
+                : Math.max(0, strictObservedTime - methodSpecificTime);
 
         if (totalTime == null) {
             addMetricValue(comparisonSection,
@@ -1597,13 +1674,17 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if (totalTime != null) {
             addMetric(comparisonSection,
-                    "共通前処理などを除いた実測時間",
-                    adjustedObservedTime,
-                    "実測総時間 - 除外する共通前処理時間 - 評価用カウント時間 - 評価結果出力時間 - GUI描画時間。");
+                    "大枠比較用時間（構文解析・評価・描画除外）",
+                    broadObservedTime,
+                    "実測総時間 - 構文解析時間 - 評価用カウント時間 - 評価結果出力時間 - GUI描画時間。共通前処理は差し引かない。");
+            addMetric(comparisonSection,
+                    "厳密比較用時間（共通前処理も除外）",
+                    strictObservedTime,
+                    "大枠比較用時間 - 除外する共通前処理時間。");
             addMetric(comparisonSection,
                     "実測総時間ベースの未分類時間（参考）",
                     unclassifiedTime,
-                    "実測総時間 - 除外する共通前処理時間 - 手法固有として個別計測できた時間 - 評価用カウント時間 - 評価結果出力時間 - GUI描画時間。"
+                    "厳密比較用時間 - 手法固有として個別計測できた時間。"
                             + " GUI 周辺なども含むため参考値。");
         }
         addMetric(comparisonSection,
@@ -1632,7 +1713,7 @@ public final class UpdatingControllerEvaluationRecorder {
                     "共通処理を除いたコントローラ合成時間 - 手法固有として個別計測できた時間。");
         }
         addMetric(comparisonSection,
-                "主比較対象の中核合成時間",
+                "内部計測の中核処理時間（参考）",
                 methodCoreTime,
                 methodCoreFormula());
         recordModeSpecificComparisonDetails(comparisonSection);
@@ -1679,20 +1760,17 @@ public final class UpdatingControllerEvaluationRecorder {
                     timeKey("UpdatingControllersDefinition", "New Controller 合成時間"),
                     timeKey("UpdatingControllersDefinition", "Safety の tester 変換全体時間"),
                     timeKey("UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間"),
-                    timeKey("generateDUC (OTF-DUC)", "boxList 準備時間"),
-                    timeKey("generateDUC (OTF-DUC)", "MarkingLTS 生成時間"),
-                    timeKey("generateDUC (OTF-DUC)", "New Controller の接続先の事前計算"),
-                    timeKey("generateDUC (OTF-DUC)", "New Safety と Fluent の対応表の変換作業時間"));
+                    timeKey("generateDUC (OTF-DUC)", "boxList 準備時間"));
             addMetric(comparisonSection,
                     "OTF-DUC 固有準備時間",
                     otfPreparation,
                     "New Controller 合成時間 + Safety の tester 変換全体時間 + New Safety から Fluent を抽出する時間"
-                            + " + boxList 準備時間 + MarkingLTS 生成時間 + New Controller の接続先の事前計算"
-                            + " + New Safety と Fluent の対応表の変換作業時間。");
+                            + " + 探索入力モデル準備時間。MarkingLTS 生成時間、New Controller の接続先の事前計算、"
+                            + "New Safety と Fluent の対応表の変換作業時間は探索入力モデル準備時間に含まれるため個別加算しない。");
             addMetric(comparisonSection,
-                    "OTF-DUC のDCS時間（中核）",
+                    "OTF-DUC の探索呼び出しから出力UC反映までの時間（中核）",
                     optionalTime("generateDUC (OTF-DUC)", "DCS で Update Controller を合成する時間"),
-                    "generateDUC (OTF-DUC) の「DCS で Update Controller を合成する時間」。");
+                    "OTF-DUC本体処理内の、探索器呼び出しから出力UCをMTSA側の表現へ反映するまでの時間。");
         } else if ("Traditional DUC".equals(mode)) {
             long traditionalPreparation = sumRecordedTimes(
                     timeKey("UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間"),
@@ -1701,12 +1779,12 @@ public final class UpdatingControllerEvaluationRecorder {
             addMetric(comparisonSection,
                     "Traditional DUC 固有準備時間",
                     traditionalPreparation,
-                    "Traditional DUC grGoal 生成時間 + Traditional DUC safetyGoal 生成時間"
+                    "Traditional DUC ゴール条件生成時間 + Traditional DUC 安全性ゴール条件生成時間"
                             + " + Traditional DUC Mapping Environment Component 並列合成時間。");
             addMetric(comparisonSection,
-                    "Traditional DUC のE_u構築+GR1合成時間（中核）",
+                    "Traditional DUC の更新用環境構築+最終コントローラ合成時間（中核）",
                     methodCoreTime(),
-                    "Traditional DUC E_u 構築時間 + solveControlProblem 全体時間。");
+                    "Traditional DUC 更新用環境構築時間 + 最終コントローラ合成処理全体時間。");
             addMetric(comparisonSection,
                     "Traditional DUC の.old後処理時間",
                     optionalTime("TransitionSystemDispatcher", "removeOldTransitions 実行時間"),
@@ -1717,10 +1795,10 @@ public final class UpdatingControllerEvaluationRecorder {
     private static String methodSpecificFormula() {
         if ("OTF-DUC".equals(mode)) {
             return "New Controller 合成時間 + Safety の tester 変換全体時間"
-                    + " + New Safety から Fluent を抽出する時間 + generateDUC 全体時間。";
+                    + " + New Safety から Fluent を抽出する時間 + OTF-DUC本体処理全体時間。";
         }
         if ("Traditional DUC".equals(mode)) {
-            return "Traditional DUC grGoal 生成時間 + Traditional DUC safetyGoal 生成時間"
+            return "Traditional DUC ゴール条件生成時間 + Traditional DUC 安全性ゴール条件生成時間"
                     + " + Traditional DUC Mapping Environment Component 並列合成時間"
                     + " + generateController の全体実行時間 + removeOldTransitions 実行時間。";
         }
@@ -1729,10 +1807,10 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static String methodCoreFormula() {
         if ("OTF-DUC".equals(mode)) {
-            return "DCS で Update Controller を合成する時間。";
+            return "探索器呼び出しから出力UC反映までの内部タイマー値。評価用カウント時間を含み得るため参考値。";
         }
         if ("Traditional DUC".equals(mode)) {
-            return "Traditional DUC E_u 構築時間 + solveControlProblem 全体時間。";
+            return "Traditional DUC 更新用環境構築時間 + 最終コントローラ合成処理全体時間の内部タイマー値。評価用カウント時間を含み得るため参考値。";
         }
         return "手法が未記録のため 0。";
     }
@@ -1873,12 +1951,22 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummaryDataMetric(output, "Old Controller 状態数", "old_controller_states", "");
         printSummaryDataMetric(output, "Old Controller 遷移数", "old_controller_transitions", "");
         printSummaryDataMetric(output, "mapping component 数", metricKey("入力規模", "mapping component 数"), "");
+        printSummaryDataMetric(output, "mapping component 状態数合計",
+                metricKey("入力規模", "mapping component 状態数合計"), "");
+        printSummaryDataMetric(output, "mapping component 遷移数合計",
+                metricKey("入力規模", "mapping component 遷移数合計"), "");
+        printSummaryDataMetric(output, "mapping component 最大状態数",
+                metricKey("入力規模", "mapping component 最大状態数"), "");
+        printSummaryDataMetric(output, "mapping component 最大遷移数",
+                metricKey("入力規模", "mapping component 最大遷移数"), "");
         printSummaryDataMetric(output, "old safety 数", metricKey("入力規模", "old safety 数"), "");
         printSummaryDataMetric(output, "new safety 数", metricKey("入力規模", "new safety 数"), "");
+        printSummaryDataMetric(output, "OTF-DUC new safety fluent 数（重複排除後）",
+                "otf_new_safety_fluents", "");
         printSummaryDataMetric(output, "transition requirement 数", metricKey("入力規模", "transition requirement 数"), "");
         printSummaryDataMetric(output, "controllable action 数", metricKey("入力規模", "controllable action 数"), "");
-        printSummaryDataMetric(output, "uncontrollable action 数（推定）",
-                metricKey("入力規模", "uncontrollable action 数（推定）"), "");
+        printSummaryDataMetric(output, "uncontrollable action 数",
+                metricKey("入力規模", "uncontrollable action 数"), "");
         printSummaryDataMetric(output, "全 action 数（controllable + uncontrollable）",
                 metricKey("入力規模", "全 action 数（controllable + uncontrollable）"), "");
     }
@@ -1891,13 +1979,13 @@ public final class UpdatingControllerEvaluationRecorder {
             long methodOtherTime) {
         printSummarySectionHeader(output, "OTF-DUC固有");
         printSummaryMillis(output, "OTF-DUC 固有準備時間", methodPreparationTotal,
-                "New Controller 合成時間 + Safety の tester 変換全体時間 + New Safety から Fluent を抽出する時間 + boxList 準備時間。"
-                        + " MarkingLTS 生成時間などの boxList 内訳は二重計上しない。");
+                "New Controller 合成時間 + Safety の tester 変換全体時間 + New Safety から Fluent を抽出する時間 + 探索入力モデル準備時間。"
+                        + " MarkingLTS 生成時間などの探索入力モデル準備内訳は二重計上しない。");
         printSummaryMillis(output, "OTF-DUC 中核合成時間", actualSynthesisTime,
                 actualSynthesisFormula());
         printSummaryMillis(output, "OTF-DUC 固有内のその他時間", methodOtherTime,
                 "OTF-DUC 固有として個別計測できた時間 - OTF-DUC 固有準備時間 - OTF-DUC 中核合成時間。"
-                        + " 主に generateDUC 内の型変換・出力構築など。");
+                        + " 主にOTF-DUC本体処理内の型変換・出力構築など。");
         printSummaryMillis(output, "OTF-DUC 固有として個別計測できた時間", methodSpecificTotal,
                 "OTF-DUC 固有準備時間 + OTF-DUC 中核合成時間 + OTF-DUC 固有内のその他時間。");
         printSummaryMillis(output, "New Controller 合成時間",
@@ -1911,25 +1999,25 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummaryMillis(output, "New Safety から Fluent を抽出する時間",
                 optionalTime("UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間"),
                 "");
-        printSummaryMillis(output, "boxList 準備時間",
+        printSummaryMillis(output, "探索入力モデル準備時間",
                 optionalTime("generateDUC (OTF-DUC)", "boxList 準備時間"),
-                "MarkingLTS、旧コントローラ、MapEnv、safety、対応表などを DCS に渡す形へ準備する時間。");
-        printSummaryMillis(output, "MarkingLTS 生成時間（boxList 内訳）",
+                "MarkingLTS、旧コントローラ、MapEnv、safety、対応表などを on-the-fly探索に渡す形へ準備する時間。");
+        printSummaryMillis(output, "MarkingLTS 生成時間（探索入力モデル準備内訳）",
                 optionalTime("generateDUC (OTF-DUC)", "MarkingLTS 生成時間"),
-                "boxList 準備時間に含まれるため、OTF-DUC 固有準備合計には個別加算しない。");
-        printSummaryMillis(output, "New Controller 接続先事前計算（boxList 内訳）",
+                "探索入力モデル準備時間に含まれるため、OTF-DUC 固有準備合計には個別加算しない。");
+        printSummaryMillis(output, "New Controller 接続先事前計算（探索入力モデル準備内訳）",
                 optionalTime("generateDUC (OTF-DUC)", "New Controller の接続先の事前計算"),
-                "boxList 準備時間に含まれるため、OTF-DUC 固有準備合計には個別加算しない。");
-        printSummaryMillis(output, "New Safety と Fluent 対応表変換（boxList 内訳）",
+                "探索入力モデル準備時間に含まれるため、OTF-DUC 固有準備合計には個別加算しない。");
+        printSummaryMillis(output, "New Safety と Fluent 対応表変換（探索入力モデル準備内訳）",
                 optionalTime("generateDUC (OTF-DUC)", "New Safety と Fluent の対応表の変換作業時間"),
-                "boxList 準備時間に含まれるため、OTF-DUC 固有準備合計には個別加算しない。");
-        printSummaryMillis(output, "DCS 探索時間",
+                "探索入力モデル準備時間に含まれるため、OTF-DUC 固有準備合計には個別加算しない。");
+        printSummaryMillis(output, "on-the-fly探索時間",
                 optionalTime("DCS (OTF-DUC)", "DCS で探索した時間"),
                 "");
-        printSummaryDataMetric(output, "DCS 探索最大状態数", "otf_dcs_peak_states", "");
-        printSummaryDataMetric(output, "DCS 探索最大遷移数", "otf_dcs_peak_transitions", "");
-        printSummaryDataMetric(output, "expandDUC 呼び出し回数", "otf_expand_duc_calls", "");
-        printSummaryMillis(output, "buildDirectorDUC 実行時間",
+        printSummaryDataMetric(output, "探索終了時グラフの最大状態数", "otf_dcs_peak_states", "");
+        printSummaryDataMetric(output, "探索終了時グラフの最大遷移数", "otf_dcs_peak_transitions", "");
+        printSummaryDataMetric(output, "状態展開呼び出し回数", "otf_expand_duc_calls", "");
+        printSummaryMillis(output, "出力UC構築時間",
                 optionalTime("DCS (OTF-DUC)", "buildDirectorDUC 実行時間"),
                 "");
         printStrategy1Summary(output);
@@ -1947,7 +2035,7 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummarySectionHeader(output, "方針1");
         printSummaryMillis(output, "通常OTF探索+簡単マージ時間",
                 optionalTime(section, "通常OTF探索+簡単マージ時間"),
-                "DCS 探索開始から、belief repair 直前の簡単マージ完了まで。");
+                "on-the-fly探索開始から、belief repair 直前の簡単マージ完了まで。");
         printSummaryDataMetric(output, "通常OTF探索+簡単マージ直前メモリ",
                 metricKey(section, "通常OTF探索+簡単マージ直前メモリ"), "");
         printSummaryDataMetric(output, "通常OTF探索+簡単マージ中ピークメモリ",
@@ -1999,10 +2087,10 @@ public final class UpdatingControllerEvaluationRecorder {
             long methodOtherTime) {
         printSummarySectionHeader(output, "従来DUC固有");
         printSummaryMillis(output, "従来DUC 固有準備時間", methodPreparationTotal,
-                "Traditional DUC grGoal 生成時間 + Traditional DUC safetyGoal 生成時間"
-                        + " + Traditional DUC Mapping Environment Component 並列合成時間 + E_u 構築時間"
-                        + " + Old/New Safety から Fluent を抽出する時間 + metaEnv 構築時間"
-                        + " + safetyEnv 構築時間 + safetyEnv から CompactState への変換時間。");
+                "Traditional DUC ゴール条件生成時間 + Traditional DUC 安全性ゴール条件生成時間"
+                        + " + Traditional DUC Mapping Environment Component 並列合成時間 + 更新用環境構築時間"
+                        + " + Old/New Safety から Fluent を抽出する時間 + 安全性評価用合成環境構築時間"
+                        + " + 安全性制約反映後の環境構築時間 + 安全性制約反映後の環境から出力用モデルへの変換時間。");
         printSummaryMillis(output, "従来DUC 中核合成時間", actualSynthesisTime,
                 actualSynthesisFormula());
         printSummaryMillis(output, "従来DUC 固有内のその他時間", methodOtherTime,
@@ -2010,44 +2098,54 @@ public final class UpdatingControllerEvaluationRecorder {
                         + " 主に controller MTS/CompactState 構築や .old 後処理など。");
         printSummaryMillis(output, "従来DUC 固有として個別計測できた時間", methodSpecificTotal,
                 "従来DUC 固有準備時間 + 従来DUC 中核合成時間 + 従来DUC 固有内のその他時間。");
-        printSummaryMillis(output, "Traditional DUC grGoal 生成時間",
+        printSummaryMillis(output, "Traditional DUC ゴール条件生成時間",
                 optionalTime("UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間"),
                 "");
-        printSummaryMillis(output, "Traditional DUC safetyGoal 生成時間",
+        printSummaryMillis(output, "Traditional DUC 安全性ゴール条件生成時間",
                 optionalTime("UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間"),
                 "");
         printSummaryMillis(output, "Traditional DUC Mapping Environment Component 並列合成時間",
                 optionalTime("UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間"),
                 "");
-        printSummaryMillis(output, "E_u 構築時間",
+        printSummaryMillis(output, "更新用環境構築時間",
                 optionalTime("UpdatingControllerSynthesizer", "Traditional DUC E_u 構築時間"),
                 "");
-        printSummaryMillis(output, "metaEnv 構築時間",
+        printSummaryMillis(output, "安全性評価用合成環境構築時間",
                 optionalTime("solveControlProblem (Traditional DUC)", "Fluent とベース環境を並列合成した metaEnv 構築時間"),
                 "");
-        printSummaryMillis(output, "safetyEnv 構築時間",
+        printSummaryMillis(output, "安全性制約反映後の環境構築時間",
                 optionalTime("solveControlProblem (Traditional DUC)", "metaEnv からエラーを枝刈りして safetyEnv を構築する時間"),
                 "");
-        printSummaryMillis(output, "GR1 で解く時間",
+        printSummaryMillis(output, "最終コントローラ合成時間",
                 optionalTime("solveControlProblem (Traditional DUC)", "safetyEnv を GR1 で解く時間"),
                 "");
-        printSummaryMillis(output, "Winning region 計算時間",
+        printSummaryMillis(output, "勝ち領域計算時間",
                 optionalTime("Traditional DUC GR1 時間内訳", "Winning region 計算時間"),
                 "");
-        printSummaryMillis(output, "Strategy 構築時間",
+        printSummaryMillis(output, "コントローラ戦略構築時間",
                 optionalTime("Traditional DUC GR1 時間内訳", "Strategy 構築時間"),
                 "");
         printSummaryMillis(output, "removeOldTransitions 実行時間",
                 optionalTime("TransitionSystemDispatcher", "removeOldTransitions 実行時間"),
                 "");
-        printSummaryDataMetric(output, "E_u 状態数", "traditional_eu_states", "");
-        printSummaryDataMetric(output, "E_u 遷移数", "traditional_eu_transitions", "");
-        printSummaryDataMetric(output, "Meta 状態数", "traditional_meta_states", "");
-        printSummaryDataMetric(output, "Meta 遷移数", "traditional_meta_transitions", "");
-        printSummaryDataMetric(output, "Pruned 状態数", "traditional_pruned_states", "");
-        printSummaryDataMetric(output, "Pruned 遷移数", "traditional_pruned_transitions", "");
-        printSummaryDataMetric(output, "Final 状態数", "traditional_final_states", "");
-        printSummaryDataMetric(output, "Final 遷移数", "traditional_final_transitions", "");
+        printSummaryDataMetric(output, "Mapping Environment 状態数", "traditional_mapping_environment_states", "");
+        printSummaryDataMetric(output, "Mapping Environment 遷移数", "traditional_mapping_environment_transitions", "");
+        printSummaryDataMetric(output, "old safety fluent 数", "traditional_old_safety_fluents", "");
+        printSummaryDataMetric(output, "new safety fluent 数", "traditional_new_safety_fluents", "");
+        printSummaryDataMetric(output, "old/new safety fluent 数（重複排除後）",
+                "traditional_old_new_safety_fluents_unique", "");
+        printSummaryDataMetric(output, "transition requirement fluent 数",
+                "traditional_transition_requirement_fluents", "");
+        printSummaryDataMetric(output, "meta env fluent 数（重複排除後）",
+                "traditional_meta_environment_fluents", "");
+        printSummaryDataMetric(output, "更新用環境状態数", "traditional_eu_states", "");
+        printSummaryDataMetric(output, "更新用環境遷移数", "traditional_eu_transitions", "");
+        printSummaryDataMetric(output, "安全性評価用合成環境状態数", "traditional_meta_states", "");
+        printSummaryDataMetric(output, "安全性評価用合成環境遷移数", "traditional_meta_transitions", "");
+        printSummaryDataMetric(output, "安全性違反除去後状態数", "traditional_pruned_states", "");
+        printSummaryDataMetric(output, "安全性違反除去後遷移数", "traditional_pruned_transitions", "");
+        printSummaryDataMetric(output, "最終コントローラ合成入力状態数", "traditional_final_states", "");
+        printSummaryDataMetric(output, "最終コントローラ合成入力遷移数", "traditional_final_transitions", "");
     }
 
     private static void printOutputSummary(LTSOutput output) {
@@ -2119,7 +2217,7 @@ public final class UpdatingControllerEvaluationRecorder {
                     "peak_state_space_states_stage",
                     "Evaluation Summary / 全体",
                     "状態数ピークの段階",
-                    "DCS 探索最大状態数",
+                    "on-the-fly探索最大状態数",
                     "text",
                     "中間状態空間ピーク状態数を記録した段階。");
         }
@@ -2135,7 +2233,7 @@ public final class UpdatingControllerEvaluationRecorder {
                     "peak_state_space_transitions_stage",
                     "Evaluation Summary / 全体",
                     "遷移数ピークの段階",
-                    "DCS 探索最大遷移数",
+                    "on-the-fly探索最大遷移数",
                     "text",
                     "中間状態空間ピーク遷移数を記録した段階。");
         }
@@ -2189,11 +2287,11 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static String peakStateSpaceFormula(String target) {
         if ("OTF-DUC".equals(mode)) {
-            return "OTF-DUC: DCS 探索中に観測した最大" + target
+            return "OTF-DUC: on-the-fly探索中に観測した最大" + target
                     + "。出力 update controller 状態数・遷移数とは別に、探索中のピーク状態空間を表す。";
         }
         if ("Traditional DUC".equals(mode)) {
-            return "Traditional DUC: E_u, Meta, Pruned, Final safetyEnv の各段階で計測した"
+            return "Traditional DUC: 更新用環境、安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の各段階で計測した"
                     + target + "の最大値。出力 update controller 状態数・遷移数とは別に、中間状態空間のピークを表す。";
         }
         return "手法が未記録のため未記録。";
@@ -2259,10 +2357,10 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static String actualSynthesisFormula() {
         if ("OTF-DUC".equals(mode)) {
-            return "generateDUC (OTF-DUC) の「DCS で Update Controller を合成する時間」。";
+            return "OTF-DUC本体処理内の、探索器呼び出しから出力UCをMTSA側の表現へ反映するまでの時間。";
         }
         if ("Traditional DUC".equals(mode)) {
-            return "solveControlProblem (Traditional DUC) の「safetyEnv を GR1 で解く時間」。";
+            return "Traditional DUC の「最終コントローラ合成時間」。";
         }
         return "手法が未記録のため 0。";
     }
@@ -2270,13 +2368,14 @@ public final class UpdatingControllerEvaluationRecorder {
     private static String methodPreparationFormula() {
         if ("OTF-DUC".equals(mode)) {
             return "New Controller 合成時間 + Safety の tester 変換全体時間"
-                    + " + New Safety から Fluent を抽出する時間 + boxList 準備時間。";
+                    + " + New Safety から Fluent を抽出する時間 + 探索入力モデル準備時間。";
         }
         if ("Traditional DUC".equals(mode)) {
-            return "Traditional DUC grGoal 生成時間 + Traditional DUC safetyGoal 生成時間"
+            return "Traditional DUC ゴール条件生成時間 + Traditional DUC 安全性ゴール条件生成時間"
                     + " + Traditional DUC Mapping Environment Component 並列合成時間"
-                    + " + E_u 構築時間 + Old/New Safety から Fluent を抽出する時間"
-                    + " + metaEnv 構築時間 + safetyEnv 構築時間 + safetyEnv から CompactState への変換時間。";
+                    + " + 更新用環境構築時間 + Old/New Safety から Fluent を抽出する時間"
+                    + " + 安全性評価用合成環境構築時間 + 安全性制約反映後の環境構築時間"
+                    + " + 安全性制約反映後の環境から出力用モデルへの変換時間。";
         }
         return "手法が未記録のため 0。";
     }
@@ -2348,6 +2447,9 @@ public final class UpdatingControllerEvaluationRecorder {
         outputDataRow(output, new DataMetric("result", "Run", "result", resultStatus.toString(), "text"));
         outputDataRow(output, new DataMetric("failure_reason", "Run", "failure reason", failureMessage, "text"));
         for (DataMetric metric : dataMetrics.values()) {
+            if (isRecomputedAfterDataCsvMetric(metric.key)) {
+                continue;
+            }
             outputDataRow(output, metric);
         }
         evaluationDataCsvOutputMillis = System.currentTimeMillis() - csvOutputStart;
@@ -2367,9 +2469,23 @@ public final class UpdatingControllerEvaluationRecorder {
                 Long.toString(totalEvaluationOutputIncludingCsv),
                 "ms",
                 "評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間 + 評価CSV出力時間。"));
+        outputDataRow(output, new DataMetric(
+                "comparison_evaluation_output_time",
+                "比較用時間集計",
+                "評価結果出力時間（比較から除外）",
+                Long.toString(totalEvaluationOutputIncludingCsv),
+                "ms",
+                "評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間 + 評価CSV出力時間。"));
         outputStrictComparisonRows(output, totalEvaluationOutputIncludingCsv);
         output.outln("=====================================================");
         output.outln("");
+    }
+
+    private static boolean isRecomputedAfterDataCsvMetric(String metricKey) {
+        return "comparison_evaluation_output_time".equals(metricKey)
+                || "comparison_observed_time_without_parse_count_evaluation_output_and_draw".equals(metricKey)
+                || "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw".equals(metricKey)
+                || "comparison_observed_total_based_unclassified_time".equals(metricKey);
     }
 
     private static void outputStrictComparisonRows(LTSOutput output, long evaluationOutputMillis) {
@@ -2384,27 +2500,35 @@ public final class UpdatingControllerEvaluationRecorder {
                 timeKey("UpdatingControllersDefinition", "Old Controller 合成時間"),
                 timeKey("UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間"),
                 timeKey("UpdatingControllersDefinition", "Mapping Environment Component 合成時間"));
+        long parseTime = optionalTime("共通 / HPWindow", "構文解析時間");
         long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         long methodSpecificTime = methodSpecificTime();
-        long strictObservedTime = Math.max(0, totalTime - commonPreprocessTime
+        long observedWithoutParseCountOutputAndDraw = Math.max(0, totalTime - parseTime
                 - stateSpaceCountOverheadMillis - evaluationOutputMillis - drawTime);
-        long strictUnclassifiedTime = Math.max(0, totalTime - commonPreprocessTime
-                - methodSpecificTime - stateSpaceCountOverheadMillis - evaluationOutputMillis - drawTime);
+        long strictObservedTime = Math.max(0, observedWithoutParseCountOutputAndDraw - commonPreprocessTime);
+        long strictUnclassifiedTime = Math.max(0, strictObservedTime - methodSpecificTime);
 
         outputDataRow(output, new DataMetric(
-                "comparison_observed_time_without_common_preprocess_count_and_evaluation_output",
+                "comparison_observed_time_without_parse_count_evaluation_output_and_draw",
                 "比較用時間集計",
-                "共通前処理・評価用カウント・評価出力を除いた実測時間",
+                "大枠比較用時間（構文解析・評価・描画除外）",
+                Long.toString(observedWithoutParseCountOutputAndDraw),
+                "ms",
+                "実測総時間 - 構文解析時間 - 評価用カウント時間 - 評価出力時間合計（CSV含む） - GUI描画時間。共通前処理は差し引かない。"));
+        outputDataRow(output, new DataMetric(
+                "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw",
+                "比較用時間集計",
+                "厳密比較用時間（共通前処理も除外）",
                 Long.toString(strictObservedTime),
                 "ms",
-                "実測総時間 - 除外する共通前処理時間 - 評価用カウント時間 - 評価出力時間合計（CSV含む） - GUI描画時間。"));
+                "大枠比較用時間 - 除外する共通前処理時間。"));
         outputDataRow(output, new DataMetric(
-                "comparison_observed_total_based_unclassified_time_without_evaluation_output",
+                "comparison_observed_total_based_unclassified_time",
                 "比較用時間集計",
-                "実測総時間ベースの未分類時間（評価出力除外後・参考）",
+                "実測総時間ベースの未分類時間（参考）",
                 Long.toString(strictUnclassifiedTime),
                 "ms",
-                "実測総時間 - 除外する共通前処理時間 - 手法固有として個別計測できた時間 - 評価用カウント時間 - 評価出力時間合計（CSV含む） - GUI描画時間。"));
+                "厳密比較用時間 - 手法固有として個別計測できた時間。"));
     }
 
     private static void outputDataRow(LTSOutput output, DataMetric metric) {
@@ -2499,16 +2623,16 @@ public final class UpdatingControllerEvaluationRecorder {
             return "Traditional DUC: 合成本体";
         }
         if ("Traditional DUC safetyEnv 構築時間内訳".equals(section)) {
-            return "Traditional DUC: Safety環境構築時間";
+            return "Traditional DUC: 安全性制約反映後の環境構築時間";
         }
         if ("Traditional DUC GR1 時間内訳".equals(section)) {
-            return "Traditional DUC: GR(1)合成時間";
+            return "Traditional DUC: 最終コントローラ合成時間";
         }
         if ("generateDUC (OTF-DUC)".equals(section)) {
-            return "OTF-DUC: 探索準備";
+            return "OTF-DUC: 本体処理";
         }
         if ("DCS (OTF-DUC)".equals(section)) {
-            return "OTF-DUC: On-the-fly探索本体";
+            return "OTF-DUC: On-the-fly探索と出力UC構築";
         }
         if (section.contains("探索時間内訳")) {
             return "OTF-DUC: 探索ヒューリスティック時間";
@@ -2658,16 +2782,16 @@ public final class UpdatingControllerEvaluationRecorder {
     private static String extractArtifact(String section, String label) {
         String text = (section == null ? "" : section) + " " + (label == null ? "" : label);
         if (text.contains("[1. E_u]")) {
-            return "Traditional DUC: 基本更新環境 E_u";
+            return "Traditional DUC: 更新用環境";
         }
         if (text.contains("[2. Meta]")) {
-            return "Traditional DUC: safety評価用Meta環境";
+            return "Traditional DUC: 安全性評価用合成環境";
         }
         if (text.contains("[3. Pruned]")) {
-            return "Traditional DUC: safety違反枝刈り後";
+            return "Traditional DUC: 安全性違反除去後";
         }
         if (text.contains("[4. Final]")) {
-            return "Traditional DUC: GR(1)入力の最終Safety環境";
+            return "Traditional DUC: 最終コントローラ合成入力";
         }
         if (text.contains("DCS explored graph") || text.contains("DCS で探索した")) {
             return "OTF-DUC探索グラフ";
@@ -2761,7 +2885,10 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static String readableStat(String label, String key, String unit) {
         String text = lower(label + " " + key);
-        if (text.contains("counttime")) {
+        if (text.contains("評価用カウント時間除外後")) {
+            return "時間";
+        }
+        if (text.contains("counttime") || text.contains("評価用カウント時間")) {
             return "評価用カウント時間";
         }
         if (text.contains("states/value")
@@ -3061,6 +3188,73 @@ public final class UpdatingControllerEvaluationRecorder {
             return "";
         }
         return text
+                .replace("Traditional solveControlProblem / OTF generateDUC 実行時間", "手法別の本体呼び出し時間")
+                .replace("Traditional DUC grGoal 生成時間", "Traditional DUC ゴール条件生成時間")
+                .replace("Traditional DUC safetyGoal 生成時間", "Traditional DUC 安全性ゴール条件生成時間")
+                .replace("Traditional DUC: Safety環境構築時間", "Traditional DUC: 安全性制約反映後の環境構築時間")
+                .replace("Safety環境構築時間", "安全性制約反映後の環境構築時間")
+                .replace("Traditional DUC: 基本更新環境 E_u", "Traditional DUC: 更新用環境")
+                .replace("Traditional DUC: 基本更新環境 更新用環境", "Traditional DUC: 更新用環境")
+                .replace("基本更新環境 更新用環境", "更新用環境")
+                .replace("Traditional DUC: safety評価用Meta環境", "Traditional DUC: 安全性評価用合成環境")
+                .replace("safety評価用Meta環境", "安全性評価用合成環境")
+                .replace("Traditional DUC: safety違反枝刈り後", "Traditional DUC: 安全性違反除去後")
+                .replace("safety違反枝刈り後", "安全性違反除去後")
+                .replace("Traditional DUC: 最終コントローラ合成入力の最終Safety環境", "Traditional DUC: 最終コントローラ合成入力")
+                .replace("最終Safety環境", "最終コントローラ合成入力")
+                .replace("最終コントローラ合成入力の最終コントローラ合成入力", "最終コントローラ合成入力")
+                .replace("[1. E_u]", "[1. 更新用環境]")
+                .replace("[2. Meta]", "[2. 安全性評価用合成環境]")
+                .replace("[3. Pruned]", "[3. 安全性違反除去後]")
+                .replace("[4. Final] Safety Environment", "[4. 最終コントローラ合成入力]")
+                .replace("Safety Env (Before DontDoTwice)", "安全性違反除去後")
+                .replace("Meta Environment (PEAK)", "安全性評価用合成環境")
+                .replace("DontDoTwice goal 合成時間", "更新事象の重複禁止条件合成時間")
+                .replace("DontDoTwice", "更新事象の重複禁止条件")
+                .replace("Safety formula", "安全性条件")
+                .replace("Safety 違反", "安全性違反")
+                .replace("エラーを枝刈りして", "エラー状態を除去して")
+                .replace("pruning", "除去")
+                .replace("Goal/controllable action", "ゴール条件/controllable action")
+                .replace("Goal 定義", "ゴール条件定義")
+                .replace("Goal準備", "ゴール条件準備")
+                .replace("Traditional DUC のE_u構築+GR1合成時間（中核）", "Traditional DUC の更新用環境構築+最終コントローラ合成時間（中核）")
+                .replace("Traditional DUC E_u 構築時間", "Traditional DUC 更新用環境構築時間")
+                .replace("Fluent とベース環境を並列合成した metaEnv 構築時間", "安全性評価用合成環境構築時間")
+                .replace("metaEnv からエラーを枝刈りして safetyEnv を構築する時間", "安全性制約反映後の環境構築時間")
+                .replace("safetyEnv から CompactState への変換時間", "安全性制約反映後の環境から出力用モデルへの変換時間")
+                .replace("safetyEnv を GR1 で解く時間", "最終コントローラ合成時間")
+                .replace("solveControlProblem 全体時間", "最終コントローラ合成処理全体時間")
+                .replace("solveControlProblem", "Traditional DUC合成本体処理")
+                .replace("E_u 構築時間", "更新用環境構築時間")
+                .replace("E_u 状態数", "更新用環境状態数")
+                .replace("E_u 遷移数", "更新用環境遷移数")
+                .replace("E_u", "更新用環境")
+                .replace("metaEnv 構築時間", "安全性評価用合成環境構築時間")
+                .replace("metaEnv", "安全性評価用合成環境")
+                .replace("safetyEnv 構築時間", "安全性制約反映後の環境構築時間")
+                .replace("safetyEnv", "安全性制約反映後の環境")
+                .replace("GR1 で解く時間", "最終コントローラ合成時間")
+                .replace("GR1合成時間", "最終コントローラ合成時間")
+                .replace("GR(1)合成処理全体時間", "最終コントローラ合成処理全体時間")
+                .replace("GR(1)合成処理その他時間", "最終コントローラ合成処理内のその他時間")
+                .replace("GR(1)求解時間", "最終コントローラ合成時間")
+                .replace("GR(1)合成時間", "最終コントローラ合成時間")
+                .replace("GR(1)入力", "最終コントローラ合成入力")
+                .replace("GR(1)", "最終コントローラ合成")
+                .replace("Winning region", "勝ち領域")
+                .replace("Strategy から controller MTS を構築する時間", "コントローラ戦略から出力用モデルを構築する時間")
+                .replace("Strategy 構築時間", "コントローラ戦略構築時間")
+                .replace("generateDUC 全体時間", "OTF-DUC本体処理全体時間")
+                .replace("synthesizeDUC 実行時間", "on-the-fly探索と出力UC構築時間")
+                .replace("DCS で Update Controller を合成する時間", "探索呼び出しから出力UC反映までの時間")
+                .replace("DCS 実行時間", "探索器呼び出し全体時間")
+                .replace("DCS で探索した時間", "on-the-fly探索時間")
+                .replace("buildDirectorDUC 実行時間", "出力UC構築時間")
+                .replace("expandDUC 呼び出し回数", "状態展開呼び出し回数")
+                .replace("boxList 準備時間", "探索入力モデル準備時間")
+                .replace("boxList 内訳", "探索入力モデル準備内訳")
+                .replace("boxList", "探索入力モデル群")
                 .replace("States", "状態数")
                 .replace("Transitions", "遷移数")
                 .replace("CountTime", "評価用カウント時間")
@@ -3366,8 +3560,17 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("評価用カウント時間（状態数・遷移数）".equals(label)) {
                 return "comparison_count_overhead_time";
             }
+            if ("大枠比較用時間（構文解析・評価・描画除外）".equals(label)) {
+                return "comparison_observed_time_without_parse_count_evaluation_output_and_draw";
+            }
+            if ("厳密比較用時間（共通前処理も除外）".equals(label)) {
+                return "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw";
+            }
             if ("共通前処理などを除いた実測時間".equals(label)) {
                 return "comparison_observed_time_without_common_preprocess";
+            }
+            if ("共通前処理・評価用カウント・評価出力を除いた実測時間".equals(label)) {
+                return "comparison_observed_time_without_common_preprocess_count_and_evaluation_output";
             }
             if ("実測総時間ベースの未分類時間（参考）".equals(label)) {
                 return "comparison_observed_total_based_unclassified_time";
@@ -3384,6 +3587,12 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("未分類の非共通時間".equals(label)) {
                 return "comparison_unclassified_non_common_time";
             }
+            if ("内部計測の中核処理時間（参考）".equals(label)) {
+                return "comparison_core_synthesis_time";
+            }
+            if ("手法本体の中核合成時間".equals(label)) {
+                return "comparison_core_synthesis_time";
+            }
             if ("主比較対象の中核合成時間".equals(label)) {
                 return "comparison_core_synthesis_time";
             }
@@ -3393,10 +3602,14 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("OTF-DUC のDCS時間（中核）".equals(label)) {
                 return "comparison_otf_dcs_core_time";
             }
+            if ("OTF-DUC の探索呼び出しから出力UC反映までの時間（中核）".equals(label)) {
+                return "comparison_otf_dcs_core_time";
+            }
             if ("Traditional DUC 固有準備時間".equals(label)) {
                 return "comparison_traditional_specific_preparation_time";
             }
-            if ("Traditional DUC のE_u構築+GR1合成時間（中核）".equals(label)) {
+            if ("Traditional DUC のE_u構築+GR1合成時間（中核）".equals(label)
+                    || "Traditional DUC の更新用環境構築+最終コントローラ合成時間（中核）".equals(label)) {
                 return "comparison_traditional_eu_and_gr1_core_time";
             }
             if ("Traditional DUC の.old後処理時間".equals(label)) {
@@ -3416,17 +3629,50 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("mapping component 数".equals(label)) {
                 return "input_mapping_components";
             }
+            if ("mapping component 状態数合計".equals(label)) {
+                return "input_mapping_component_states_total";
+            }
+            if ("mapping component 遷移数合計".equals(label)) {
+                return "input_mapping_component_transitions_total";
+            }
+            if ("mapping component 最大状態数".equals(label)) {
+                return "input_mapping_component_states_max";
+            }
+            if ("mapping component 最大遷移数".equals(label)) {
+                return "input_mapping_component_transitions_max";
+            }
             if ("old safety 数".equals(label)) {
                 return "input_old_safety";
             }
             if ("new safety 数".equals(label)) {
                 return "input_new_safety";
             }
+            if ("Traditional DUC old safety fluent 数".equals(label)) {
+                return "traditional_old_safety_fluents";
+            }
+            if ("Traditional DUC new safety fluent 数".equals(label)) {
+                return "traditional_new_safety_fluents";
+            }
+            if ("Traditional DUC old/new safety fluent 数（重複排除後）".equals(label)) {
+                return "traditional_old_new_safety_fluents_unique";
+            }
+            if ("Traditional DUC transition requirement fluent 数".equals(label)) {
+                return "traditional_transition_requirement_fluents";
+            }
+            if ("Traditional DUC meta env fluent 数（重複排除後）".equals(label)) {
+                return "traditional_meta_environment_fluents";
+            }
+            if ("OTF-DUC new safety fluent 数（重複排除後）".equals(label)) {
+                return "otf_new_safety_fluents";
+            }
             if ("transition requirement 数".equals(label)) {
                 return "input_transition_requirements";
             }
             if ("controllable action 数".equals(label)) {
                 return "input_controllable_actions";
+            }
+            if ("uncontrollable action 数".equals(label)) {
+                return "input_uncontrollable_actions";
             }
             if ("uncontrollable action 数（推定）".equals(label)) {
                 return "input_uncontrollable_actions_estimated";
@@ -3440,6 +3686,37 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("入力規模 / 事前合成".equals(section) && "New Controller".equals(label)) {
             return "new_controller";
+        }
+        if ("入力規模 / Mapping Environment Component".equals(section)
+                && label != null
+                && label.startsWith("Mapping Environment Component[")) {
+            int start = label.indexOf('[');
+            int end = label.indexOf(']', start + 1);
+            if (start >= 0 && end > start + 1) {
+                return "input_mapping_component_" + label.substring(start + 1, end);
+            }
+        }
+        if ("入力規模 / Old Environment Component".equals(section)
+                && label != null
+                && label.startsWith("Old Environment Component[")) {
+            int start = label.indexOf('[');
+            int end = label.indexOf(']', start + 1);
+            if (start >= 0 && end > start + 1) {
+                return "input_old_env_component_" + label.substring(start + 1, end);
+            }
+        }
+        if ("入力規模 / New Environment Component".equals(section)
+                && label != null
+                && label.startsWith("New Environment Component[")) {
+            int start = label.indexOf('[');
+            int end = label.indexOf(']', start + 1);
+            if (start >= 0 && end > start + 1) {
+                return "input_new_env_component_" + label.substring(start + 1, end);
+            }
+        }
+        if ("入力規模 / Traditional Mapping Environment".equals(section)
+                && "Traditional Mapping Environment".equals(label)) {
+            return "traditional_mapping_environment";
         }
         if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
             if (label.startsWith("[1. E_u]")) {
@@ -3517,6 +3794,19 @@ public final class UpdatingControllerEvaluationRecorder {
             this.section = section;
             this.label = label;
             this.startMillis = startMillis;
+        }
+    }
+
+    private static final class CountScope {
+        private final String section;
+        private final String label;
+        private final String baseMetricKey;
+        private long countTimeMillis;
+
+        private CountScope(String section, String label, String baseMetricKey) {
+            this.section = section;
+            this.label = label;
+            this.baseMetricKey = baseMetricKey;
         }
     }
 

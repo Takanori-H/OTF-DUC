@@ -78,9 +78,18 @@ public class UpdatingControllerSynthesizer {
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "UpdatingControllerSynthesizer",
                     "Traditional solveControlProblem / OTF generateDUC 実行時間");
+            UpdatingControllerEvaluationRecorder.beginCountScope(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
 
             // OTF-DUCの実行メインロジック呼び出し
-            generateDUC(uccs, output);
+            try {
+                generateDUC(uccs, output);
+            } finally {
+                UpdatingControllerEvaluationRecorder.endCountScope(
+                        "UpdatingControllerSynthesizer",
+                        "Traditional solveControlProblem / OTF generateDUC 実行時間");
+            }
 
             //評価実験用
             DUCTime = System.currentTimeMillis() - DUCStart;
@@ -120,8 +129,17 @@ public class UpdatingControllerSynthesizer {
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "UpdatingControllerSynthesizer",
                     "Traditional solveControlProblem / OTF generateDUC 実行時間");
+            UpdatingControllerEvaluationRecorder.beginCountScope(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
 
-            solveControlProblem(uccs, updEnvGenerator.getUpdEnv(), output);
+            try {
+                solveControlProblem(uccs, updEnvGenerator.getUpdEnv(), output);
+            } finally {
+                UpdatingControllerEvaluationRecorder.endCountScope(
+                        "UpdatingControllerSynthesizer",
+                        "Traditional solveControlProblem / OTF generateDUC 実行時間");
+            }
 
             //評価実験用
             DUCTime = System.currentTimeMillis() - DUCStart;
@@ -153,6 +171,9 @@ public class UpdatingControllerSynthesizer {
     private static void solveControlProblem(
             UpdatingControllerCompositeState uccs, UpdatingEnvironment updEnv, LTSOutput output) {
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "solveControlProblem (Traditional DUC)",
+                "solveControlProblem 全体時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
                 "solveControlProblem (Traditional DUC)",
                 "solveControlProblem 全体時間");
         Set<String> controllableActions = uccs.getControllableActions();
@@ -191,17 +212,44 @@ public class UpdatingControllerSynthesizer {
                 "Old Safety と New Safety から Fluent を抽出する時間");
 
         //GoalからFluentを抽出
-        Pair<List<Formula>,Set<Fluent>> safetyFormulasAndFluents = getSafetyFormulas(uccs.getUpdateSafetyGoals(), output); // plain safety(G_u)
-        List<Formula> safetyFormulas = safetyFormulasAndFluents.getFirst();
-        Set<Fluent> goalFluents = safetyFormulasAndFluents.getSecond();
+        SafetyFormulaExtractionResult safetyFormulasAndFluents =
+                getSafetyFormulas(uccs.getUpdateSafetyGoals(), output); // plain safety(G_u)
+        List<Formula> safetyFormulas = safetyFormulasAndFluents.formulas;
+        Set<Fluent> goalFluents = safetyFormulasAndFluents.fluents;
 
         fillTerminatingActions(E_u.getActions(), goalFluents); // set the action events fluents terminating with any action
+        int metaEnvironmentFluentCount = goalFluents.size();
 
         //評価実験用
         long extractFluentTime = System.currentTimeMillis() - extractFluentStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "Old Safety と New Safety から Fluent を抽出する時間");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模",
+                "Traditional DUC old safety fluent 数",
+                safetyFormulasAndFluents.oldSafetyFluentCount,
+                "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模",
+                "Traditional DUC new safety fluent 数",
+                safetyFormulasAndFluents.newSafetyFluentCount,
+                "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模",
+                "Traditional DUC old/new safety fluent 数（重複排除後）",
+                safetyFormulasAndFluents.oldNewSafetyFluentCount,
+                "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模",
+                "Traditional DUC transition requirement fluent 数",
+                safetyFormulasAndFluents.transitionRequirementFluentCount,
+                "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模",
+                "Traditional DUC meta env fluent 数（重複排除後）",
+                metaEnvironmentFluentCount,
+                "個");
         long buildMetaEnvStart = System.currentTimeMillis();
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
@@ -293,9 +341,19 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                "solveControlProblem (Traditional DUC)",
+                "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
 
         //論理式（Formula）の評価による状態空間の前処理（Safety違反状態の無効化）
-        MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions(), output);
+        MTS<Long, String> safetyEnv;
+        try {
+            safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions(), output);
+        } finally {
+            UpdatingControllerEvaluationRecorder.endCountScope(
+                    "solveControlProblem (Traditional DUC)",
+                    "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
+        }
 
         //評価実験用
         long buildSafetyEnvTime = System.currentTimeMillis() - buildSafetyEnvStart;
@@ -416,6 +474,9 @@ public class UpdatingControllerSynthesizer {
                 "solveControlProblem (Traditional DUC)",
                 "safetyEnv を GR1 で解く時間",
                 synthesizeGRTime);
+        UpdatingControllerEvaluationRecorder.endCountScope(
+                "solveControlProblem (Traditional DUC)",
+                "solveControlProblem 全体時間");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "solveControlProblem 全体時間");
@@ -428,8 +489,13 @@ public class UpdatingControllerSynthesizer {
      * @param output
      * @return
      */
-    private static Pair<List<Formula>, Set<Fluent>> getSafetyFormulas(ControllerGoalDefinition newGoalDef, LTSOutput output) {
+    private static SafetyFormulaExtractionResult getSafetyFormulas(
+            ControllerGoalDefinition newGoalDef,
+            LTSOutput output) {
         Set<Fluent> safetyFluents = new HashSet<Fluent>();
+        Set<Fluent> oldSafetyFluents = new HashSet<Fluent>();
+        Set<Fluent> newSafetyFluents = new HashSet<Fluent>();
+        Set<Fluent> transitionRequirementFluents = new HashSet<Fluent>();
         List<Formula> safetyFormulas = new ArrayList<Formula>();
         for (Symbol safetyDefinition : newGoalDef.getSafetyDefinitions()) {
 
@@ -437,13 +503,64 @@ public class UpdatingControllerSynthesizer {
             AssertDefinition def = AssertDefinition.getConstraint(safetyDefinition.getName());
 
             if (def != null) {
-                safetyFormulas.add(FormulaUtils.adaptFormulaAndCreateFluents(def.getFormula(false), safetyFluents));
+                Set<Fluent> formulaFluents = new HashSet<Fluent>();
+                safetyFormulas.add(FormulaUtils.adaptFormulaAndCreateFluents(def.getFormula(false), formulaFluents));
+                safetyFluents.addAll(formulaFluents);
+                String safetyName = safetyDefinition.getName();
+                if (safetyName.endsWith(UpdateConstants.OLD_SUFFIX)) {
+                    oldSafetyFluents.addAll(formulaFluents);
+                } else if (safetyName.endsWith(UpdateConstants.NEW_SUFFIX)) {
+                    newSafetyFluents.addAll(formulaFluents);
+                } else {
+                    transitionRequirementFluents.addAll(formulaFluents);
+                }
 
             } else {
                 Diagnostics.fatal("Assertion not defined ["	+ safetyDefinition.getName() + "].");
             }
         }
-        return new Pair<List<Formula>,Set<Fluent>>(safetyFormulas,safetyFluents);
+        return new SafetyFormulaExtractionResult(
+                safetyFormulas,
+                safetyFluents,
+                oldSafetyFluents.size(),
+                newSafetyFluents.size(),
+                unionSize(oldSafetyFluents, newSafetyFluents),
+                transitionRequirementFluents.size());
+    }
+
+    private static int unionSize(Set<Fluent> left, Set<Fluent> right) {
+        Set<Fluent> union = new HashSet<Fluent>();
+        if (left != null) {
+            union.addAll(left);
+        }
+        if (right != null) {
+            union.addAll(right);
+        }
+        return union.size();
+    }
+
+    private static final class SafetyFormulaExtractionResult {
+        private final List<Formula> formulas;
+        private final Set<Fluent> fluents;
+        private final int oldSafetyFluentCount;
+        private final int newSafetyFluentCount;
+        private final int oldNewSafetyFluentCount;
+        private final int transitionRequirementFluentCount;
+
+        private SafetyFormulaExtractionResult(
+                List<Formula> formulas,
+                Set<Fluent> fluents,
+                int oldSafetyFluentCount,
+                int newSafetyFluentCount,
+                int oldNewSafetyFluentCount,
+                int transitionRequirementFluentCount) {
+            this.formulas = formulas;
+            this.fluents = fluents;
+            this.oldSafetyFluentCount = oldSafetyFluentCount;
+            this.newSafetyFluentCount = newSafetyFluentCount;
+            this.oldNewSafetyFluentCount = oldNewSafetyFluentCount;
+            this.transitionRequirementFluentCount = transitionRequirementFluentCount;
+        }
     }
 
     /**
@@ -494,6 +611,9 @@ public class UpdatingControllerSynthesizer {
     {
         output.outln("Starting On-The-Fly Controller Synthesis (Box List & Mapping Table Strategy)...");
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "generateDUC 全体時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
                 "generateDUC (OTF-DUC)",
                 "generateDUC 全体時間");
 
@@ -891,27 +1011,40 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "DCS で Update Controller を合成する時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                "generateDUC (OTF-DUC)",
+                "DCS で Update Controller を合成する時間");
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "generateDUC (OTF-DUC)",
+                "DCS 実行時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
                 "generateDUC (OTF-DUC)",
                 "DCS 実行時間");
 
         DirectedControllerSynthesisDUC<Long, String> ducSynthesis = new DirectedControllerSynthesisDUC<>();
 
-        LTS<Long, String> result = ducSynthesis.synthesizeDUC(
-            boxList,
-            uccs.getControllableActions(),
-            mappingStartIndex, mappingEndIndex,
-            oldSafeStartIndex, oldSafeEndIndex,
-            newSafeStartIndex, newSafeEndIndex,
-            transReqStartIndex, transReqEndIndex,
-            synthesisStartIndex, synthesisEndIndex,
-            uccs.getMappingMapEnvToNewEnv(),
-            newControllerConnectionMap,
-            realNewContLTS,
-            safetyComponentIndicesMap,  // ★追加: LTSベースのコンポーネントマップ
-            safetyStateLookupMap,    // ★追加: LTSベースの状態追跡マップ
-            output
-        );
+        LTS<Long, String> result;
+        try {
+            result = ducSynthesis.synthesizeDUC(
+                boxList,
+                uccs.getControllableActions(),
+                mappingStartIndex, mappingEndIndex,
+                oldSafeStartIndex, oldSafeEndIndex,
+                newSafeStartIndex, newSafeEndIndex,
+                transReqStartIndex, transReqEndIndex,
+                synthesisStartIndex, synthesisEndIndex,
+                uccs.getMappingMapEnvToNewEnv(),
+                newControllerConnectionMap,
+                realNewContLTS,
+                safetyComponentIndicesMap,  // ★追加: LTSベースのコンポーネントマップ
+                safetyStateLookupMap,    // ★追加: LTSベースの状態追跡マップ
+                output
+            );
+        } finally {
+            UpdatingControllerEvaluationRecorder.endCountScope(
+                    "generateDUC (OTF-DUC)",
+                    "DCS 実行時間");
+        }
 
         long dcsTmp = System.currentTimeMillis() - dcsStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
@@ -933,6 +1066,9 @@ public class UpdatingControllerSynthesizer {
         }
 
         long dcsTime = System.currentTimeMillis() - dcsStart;
+        UpdatingControllerEvaluationRecorder.endCountScope(
+                "generateDUC (OTF-DUC)",
+                "DCS で Update Controller を合成する時間");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "DCS で Update Controller を合成する時間");
@@ -949,6 +1085,9 @@ public class UpdatingControllerSynthesizer {
                 "generateDUC (OTF-DUC)", "DCS で Update Controller を合成する時間", dcsTime);
         UpdatingControllerEvaluationRecorder.recordTime(
                 "generateDUC (OTF-DUC)", "DCS 実行時間", dcsTmp);
+        UpdatingControllerEvaluationRecorder.endCountScope(
+                "generateDUC (OTF-DUC)",
+                "generateDUC 全体時間");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "generateDUC 全体時間");

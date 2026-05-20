@@ -72,6 +72,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         long UCDefStart = System.currentTimeMillis();
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "UpdatingControllersDefinition", "compose の全体実行時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                "UpdatingControllersDefinition", "compose の全体実行時間");
 
         // ---------------------------------------------------------
         // 1. Old Controller のコンパイル (Monolithic)
@@ -264,7 +266,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             output.outln("Mode: On-The-Fly Updating Controller Synthesis");
 
             // OTF固有の設定
-            controllableSet.add(UpdateConstants.BEGIN_UPDATE);
+            // beginUpdate は従来 DUC の hotSwap と同様に、更新開始を制限しない
+            // 事象として扱うため controllable 集合から外す。
+            controllableSet.remove(UpdateConstants.BEGIN_UPDATE);
             controllableSet.add(UpdateConstants.FINISH_UPDATE);
 
             // =========================================================
@@ -627,6 +631,11 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             newSafetyToFluentTime = System.currentTimeMillis() - newSafetyToFluentStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     "UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間");
+            UpdatingControllerEvaluationRecorder.recordCount(
+                    "入力規模",
+                    "OTF-DUC new safety fluent 数（重複排除後）",
+                    globalFluentCache.size(),
+                    "個");
             UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("New Safety Fluent 抽出後");
 
             ucce = new UpdatingControllerCompositeState(oldC, newC, mappingComponents, newEnvComponents, mappingMapEnvToNewEnv,
@@ -676,6 +685,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             mapETime = System.currentTimeMillis() - mapEStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間");
+            recordTraditionalMappingEnvironmentStateSpace(mappingComposite);
             UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional Mapping Environment 並列合成後");
 
             // ▼▼▼ 評価実験用: 従来DUCの Mapping Environment ピーク状態数・遷移数 ▼▼▼
@@ -705,13 +715,22 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         }
 
         //評価実験用：UpdatingControllersDefinition.compose測定終了
+        UpdatingControllerEvaluationRecorder.endCountScope(
+                "UpdatingControllersDefinition", "compose の全体実行時間");
         long UCDefTime = System.currentTimeMillis() - UCDefStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "UpdatingControllersDefinition", "compose の全体実行時間");
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "UpdatingControllersDefinition", "入力規模集計時間");
         long inputScaleStart = System.currentTimeMillis();
-        recordInputScale(oldGoalDef, newGoalDef, controllableSet, mappingComponents, ucce, oldC);
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                "UpdatingControllersDefinition", "入力規模集計時間");
+        try {
+            recordInputScale(oldGoalDef, newGoalDef, controllableSet, mappingComponents, ucce, oldC);
+        } finally {
+            UpdatingControllerEvaluationRecorder.endCountScope(
+                    "UpdatingControllersDefinition", "入力規模集計時間");
+        }
         long inputScaleTime = System.currentTimeMillis() - inputScaleStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "UpdatingControllersDefinition", "入力規模集計時間");
@@ -764,6 +783,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 "入力規模", "map relation 数", safeSize(mapRelationList), "個");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "入力規模", "mapping component 数", safeSize(mappingComponents), "個");
+        recordEnvironmentComponentStateSpaces("Old", oldEnvironmentList);
+        recordEnvironmentComponentStateSpaces("New", newEnvironmentList);
+        recordMappingComponentStateSpaces(mappingComponents);
         UpdatingControllerEvaluationRecorder.recordCount(
                 "入力規模", "old safety 数", safeSize(oldGoalDef.getSafetyDefinitions()), "個");
         UpdatingControllerEvaluationRecorder.recordCount(
@@ -801,6 +823,13 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             if (ucce.getSynthesisMachines() != null) addAlphabet(knownActions, ucce.getSynthesisMachines());
         }
         addAlphabet(knownActions, mappingComponents);
+        knownActions.add(UpdateConstants.BEGIN_UPDATE);
+        knownActions.add(UpdateConstants.STOP_OLD_SPEC);
+        knownActions.add(UpdateConstants.RECONFIGURE);
+        knownActions.add(UpdateConstants.START_NEW_SPEC);
+        if (ucce != null && ucce.isOTF()) {
+            knownActions.add(UpdateConstants.FINISH_UPDATE);
+        }
         knownActions.remove("tau");
 
         Set<String> normalizedControllableActions = new HashSet<>();
@@ -816,7 +845,105 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         UpdatingControllerEvaluationRecorder.recordCount(
                 "入力規模", "全 action 数（controllable + uncontrollable）", allActions.size(), "個");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "uncontrollable action 数（推定）", uncontrollableCount, "個");
+                "入力規模", "uncontrollable action 数", uncontrollableCount, "個");
+    }
+
+    private void recordEnvironmentComponentStateSpaces(String kind, List<Symbol> environmentList) {
+        if (environmentList == null) {
+            return;
+        }
+
+        Hashtable<String, ProcessSpec> processes = LTSCompiler.getProcesses();
+        Hashtable<String, CompactState> compiledProcesses = LTSCompiler.getCompiled();
+        String section = "入力規模 / " + kind + " Environment Component";
+
+        for (int i = 0; i < environmentList.size(); i++) {
+            Symbol symbol = environmentList.get(i);
+            String name = symbol == null ? "" : symbol.toString();
+            CompactState component = null;
+            if (name != null && !name.isEmpty() && !"unknown".equals(name)) {
+                ensureCompiled(name, processes);
+                component = compiledProcesses.get(name);
+            }
+
+            long countStart = System.currentTimeMillis();
+            long states = compactStateCount(component);
+            long transitions = countTransitions(component);
+            long countTime = System.currentTimeMillis() - countStart;
+
+            UpdatingControllerEvaluationRecorder.recordStateSpace(
+                    section,
+                    kind + " Environment Component[" + i + "] " + componentDisplayName(name, component),
+                    states,
+                    transitions,
+                    countTime,
+                    kind + " Environment を構成する個別 component の状態数・遷移数。"
+                            + "同じ index の Mapping Environment Component と対応する。");
+        }
+    }
+
+    private static void recordMappingComponentStateSpaces(Vector<CompactState> mappingComponents) {
+        long totalStates = 0;
+        long totalTransitions = 0;
+        long maxStates = 0;
+        long maxTransitions = 0;
+
+        if (mappingComponents != null) {
+            for (int i = 0; i < mappingComponents.size(); i++) {
+                CompactState component = mappingComponents.get(i);
+                long countStart = System.currentTimeMillis();
+                long states = compactStateCount(component);
+                long transitions = countTransitions(component);
+                long countTime = System.currentTimeMillis() - countStart;
+
+                totalStates += states;
+                totalTransitions += transitions;
+                maxStates = Math.max(maxStates, states);
+                maxTransitions = Math.max(maxTransitions, transitions);
+
+                UpdatingControllerEvaluationRecorder.recordStateSpace(
+                        "入力規模 / Mapping Environment Component",
+                        "Mapping Environment Component[" + i + "] " + compactStateName(component),
+                        states,
+                        transitions,
+                        countTime,
+                        "Mapping Environment を構成する個別 component の状態数・遷移数。");
+            }
+        }
+
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "mapping component 状態数合計", totalStates, "states");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "mapping component 遷移数合計", totalTransitions, "transitions");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "mapping component 最大状態数", maxStates, "states");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "入力規模", "mapping component 最大遷移数", maxTransitions, "transitions");
+    }
+
+    private static String componentDisplayName(String declaredName, CompactState component) {
+        if (declaredName != null && !declaredName.isEmpty() && !"unknown".equals(declaredName)) {
+            return declaredName;
+        }
+        return compactStateName(component);
+    }
+
+    private static void recordTraditionalMappingEnvironmentStateSpace(CompositeState mappingComposite) {
+        if (mappingComposite == null || mappingComposite.composition == null) {
+            return;
+        }
+
+        long countStart = System.currentTimeMillis();
+        long states = compactStateCount(mappingComposite.composition);
+        long transitions = countTransitions(mappingComposite.composition);
+        long countTime = System.currentTimeMillis() - countStart;
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "入力規模 / Traditional Mapping Environment",
+                "Traditional Mapping Environment",
+                states,
+                transitions,
+                countTime,
+                "Traditional DUC で Mapping Environment Component 群を並列合成した Mapping Environment。旧コントローラとはまだ合成していない。");
     }
 
     private static int countTransitions(MTS<Long, String> mts) {
@@ -828,6 +955,24 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             transitions += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
         }
         return transitions;
+    }
+
+    private static long compactStateCount(CompactState machine) {
+        return machine == null ? 0 : Math.max(0, machine.maxStates);
+    }
+
+    private static long countTransitions(CompactState machine) {
+        if (machine == null || machine.states == null) {
+            return 0;
+        }
+        return machine.ntransitions();
+    }
+
+    private static String compactStateName(CompactState machine) {
+        if (machine == null || machine.name == null || machine.name.isEmpty()) {
+            return "(unnamed)";
+        }
+        return machine.name;
     }
 
     private static int safeSize(Collection<?> values) {
