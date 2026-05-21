@@ -17,8 +17,7 @@ public class PrintTransitions {
   }
 
   public void print(LTSOutput output) {
-    // ISSUE
-    print(output, 9000);
+    print(output, Integer.MAX_VALUE);
   }
 
   public void print(LTSOutput output, int MAXPRINT) {
@@ -77,7 +76,7 @@ public class PrintTransitions {
         EventState nextList = current;
         while (current != null) {
           linecount++;
-          if (linecount > 9000) {
+          if (linecount > k) {
             fsp.append("EXCEEDED MAXPRINT SETTING\n");
             return fsp.toString();
           }

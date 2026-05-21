@@ -83,7 +83,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
     private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "true"));
     private boolean nondeterministicActionMergeEnabled =
-            Boolean.parseBoolean(System.getProperty("otfduc.nondet.merge", "true"));
+            Boolean.parseBoolean(System.getProperty("otfduc.nondet.merge", "false"));
     private boolean preUpdateSimpleMergeEnabled = Boolean.parseBoolean(
             System.getProperty("otfduc.simple.merge",
                     System.getProperty("otfduc.preupdate.merge", "true")));
@@ -2495,6 +2495,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         statistics.incFindNewErrorsCalls();
 
         boolean hasEscapeHatch = false;
+        boolean hasUnexploredControllableEscape = false;
 
         boolean hasUncontrollableWait = false;
         boolean hasUnexploredUncontrollable = false;
@@ -2530,6 +2531,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                     if (children == null || children.isEmpty()) {
                         hasEscapeHatch = true;
+                        hasUnexploredControllableEscape = true;
                     }
                     else{
                         // controllable action は、探索済みの非決定分岐がすべて
@@ -2611,6 +2613,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
 
+        // safe uncontrollable loop が残っている場合でも、未探索の controllable
+        // escape があるなら、現時点では負けと断定せず先にその手を展開する。
+        // 探索済み controllable escape は fairness の進行根拠にはしない。
+        if (hasUnexploredControllableEscape) {
+            if (debugLogEnabled) {
+                log("  [Loop-Wait] Loop has unexplored Controllable escape hatches. Postponing ERROR marking.");
+            }
+            return;
+        }
+
         // controllable 脱出口だけを持つループは、さらに探索する余地を残す。
         // ただし安全な uncontrollable ループも残っている場合、通常 controllable
         // 脱出口だけでは fairness の根拠にしない。
@@ -2634,6 +2646,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (debugLogEnabled) {
             lastLoopErrorSummary = buildLoopErrorSummary(
                 hasEscapeHatch,
+                hasUnexploredControllableEscape,
                 hasUncontrollableWait,
                 hasUnexploredUncontrollable,
                 hasOpenUncontrollableExit);
@@ -2670,6 +2683,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private String buildLoopErrorSummary(
             boolean hasEscapeHatch,
+            boolean hasUnexploredControllableEscape,
             boolean hasUncontrollableWait,
             boolean hasUnexploredUncontrollable,
             boolean hasOpenUncontrollableExit) {
@@ -2677,6 +2691,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         StringBuilder sb = new StringBuilder();
         sb.append("loopSize=").append(loop == null ? 0 : loop.size());
         sb.append(", hasControllableEscape=").append(hasEscapeHatch);
+        sb.append(", hasUnexploredControllableEscape=").append(hasUnexploredControllableEscape);
         sb.append(", hasSafeUncontrollable=").append(hasUncontrollableWait);
         sb.append(", hasUnexploredUncontrollable=").append(hasUnexploredUncontrollable);
         sb.append(", hasOpenUncontrollableExit=").append(hasOpenUncontrollableExit);
