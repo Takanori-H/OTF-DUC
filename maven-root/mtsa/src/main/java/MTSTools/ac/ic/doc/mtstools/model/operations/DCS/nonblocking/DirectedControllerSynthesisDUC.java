@@ -88,10 +88,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean preUpdateSimpleMergeEnabled = Boolean.parseBoolean(
             System.getProperty("otfduc.simple.merge",
                     System.getProperty("otfduc.preupdate.merge", "false")));
-    private boolean gr1LoopJudgementEnabled =
-            Boolean.parseBoolean(System.getProperty("otfduc.gr1.loop", "false"));
-    private boolean gr1FinishUpdateRequired =
-            Boolean.parseBoolean(System.getProperty("otfduc.gr1.finish.required", "false"));
     private int beliefRepairAbsoluteMaxStates = Integer.getInteger("otfduc.belief.maxStates", 5000);
     private int beliefRepairMinBeliefNodes = Integer.getInteger("otfduc.belief.maxNodes.min", 64);
     private int beliefRepairBeliefNodesPerNewControllerState =
@@ -486,11 +482,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
                 if (debugLogEnabled) {
                     log("=== Starting OTF-DUC Synthesis ===");
-                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], NondetActionMerge[%s], SimpleMerge[%s], GR1Loop[%s], GR1FinishUpdateRequired[%s]",
+                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], NondetActionMerge[%s], SimpleMerge[%s]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
                             transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled,
-                            nondeterministicActionMergeEnabled, preUpdateSimpleMergeEnabled,
-                            useGr1AssumptionGuaranteeLoopJudgement(), gr1FinishUpdateRequired));
+                            nondeterministicActionMergeEnabled, preUpdateSimpleMergeEnabled));
                 }
                 if (profileLogEnabled) {
                     profileLog("=== Starting OTF-DUC Profiling ===");
@@ -1360,6 +1355,27 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return -1;
     }
 
+    private boolean isFairnessEligibleState(CompostateDUC<State, Action> compostate) {
+        return getMarkingState(compostate) == 8;
+    }
+
+    private boolean isFairnessEligibleLoop(Set<CompostateDUC<State, Action>> states) {
+        if (states == null || states.isEmpty()) {
+            return false;
+        }
+        for (CompostateDUC<State, Action> state : states) {
+            if (!isFairnessEligibleState(state)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isUpdateProgressState(CompostateDUC<State, Action> compostate) {
+        long markingState = getMarkingState(compostate);
+        return markingState >= 1 && markingState <= 7;
+    }
+
     private boolean checkErrorWithEnforce(CompostateDUC<State, Action> compostate) {
         long markingState = getMarkingState(compostate);
         List<State> currentStates = compostate.getStates();
@@ -1760,7 +1776,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     // 旧コントローラ上のループは ERROR にせず、勝ち状態の固定点計算を進める。
                     propagateGoal(new HashSet<>(), singleton(parent));
                 } else {
-                    // 更新中のループは fairness の方針に従って判定する。
+                    // 更新中のループは、marking state 8 だけ fairness で扱う。
                     long fairnessStart = System.nanoTime();
                     fairnessAnalysisCalls++;
                     if (probablyWinningStates.size() > 0)
@@ -1788,18 +1804,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         propagateGoalPhase1Queue(queue, winners);
         propagateGoalPhase1Nanos += System.nanoTime() - phase1Start;
 
-        // Phase 2: fairness/GR(1) 進行のもとで勝ちとなる SCC を固定点計算する。
-        // GR(1) loop 判定は beginUpdate 後の更新進行だけに適用する。
-        // beginUpdate 前の旧コントローラ循環は、従来の fairness 伝播で扱わないと
-        // 環境が beginUpdate を遅らせるだけで初期状態へ GOAL が戻らなくなる。
+        // Phase 2: marking state 8 の SCC だけを fairness のもとで固定点計算する。
         long phase2Start = System.nanoTime();
-        if (useGr1AssumptionGuaranteeLoopJudgement()) {
-            propagateGoalPhase2Fair(winners, queue, true);
-            propagateGoalPhase2Gr1(winners, queue);
-        } else {
-            propagateGoalPhase2Fair(winners, queue, false);
-        }
+        propagateGoalPhase2Fair(winners, queue);
         propagateGoalPhase2Nanos += System.nanoTime() - phase2Start;
+
+        // Phase 3: beginUpdate 前の旧コントローラ通常運転を GOAL 側へ閉包する。
+        // これは fairness ではなく、m0 で beginUpdate 可能な旧状態集合を戻す処理である。
+        propagateGoalPreUpdateClosure(winners, queue);
+
         if (!winners.isEmpty()) {
             updateDistances(goals, winners, winners.size());
         }
@@ -1809,13 +1822,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private void propagateGoalPhase2Fair(
             Set<CompostateDUC<State, Action>> winners,
             Deque<CompostateDUC<State, Action>> queue) {
-        propagateGoalPhase2Fair(winners, queue, false);
-    }
-
-    private void propagateGoalPhase2Fair(
-            Set<CompostateDUC<State, Action>> winners,
-            Deque<CompostateDUC<State, Action>> queue,
-            boolean preBeginOnly) {
         boolean changed;
         do {
             changed = false;
@@ -1828,7 +1834,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             for (CompostateDUC<State, Action> s : compostates.values()) {
                 if (s.isStatus(Status.NONE)
                         && s.isLive()
-                        && (!preBeginOnly || getMarkingState(s) == 0)) {
+                        && isFairnessEligibleState(s)) {
                     candidates.add(s);
                 }
             }
@@ -2089,460 +2095,122 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         } while (changed);
     }
 
-    private void propagateGoalPhase2Gr1(
+    private void propagateGoalPreUpdateClosure(
             Set<CompostateDUC<State, Action>> winners,
             Deque<CompostateDUC<State, Action>> queue) {
+
         boolean changed;
         do {
             changed = false;
-            if (profileLogEnabled) {
-                phase2OuterIterations++;
-            }
 
-            long candidateBuildStart = profileLogEnabled ? System.nanoTime() : 0L;
-            Set<CompostateDUC<State, Action>> candidates = buildGr1Phase2Candidates();
-            totalFairnessCandidatesProcessed += candidates.size();
-            if (profileLogEnabled) {
-                phase2CandidateBuildNanos += System.nanoTime() - candidateBuildStart;
-                phase2CandidateBuildCalls++;
-                phase2CandidatesBuiltTotal += candidates.size();
-                phase2MaxCandidatesBuilt = Math.max(phase2MaxCandidatesBuilt, candidates.size());
+            Set<CompostateDUC<State, Action>> candidates = new HashSet<>();
+            Map<CompostateDUC<State, Action>, HAction<State, Action>> beginUpdateActions =
+                    new HashMap<>();
+
+            for (CompostateDUC<State, Action> state : compostates.values()) {
+                if (!state.isStatus(Status.NONE) || !state.isLive() || getMarkingState(state) != 0) {
+                    continue;
+                }
+                HAction<State, Action> beginUpdateAction = findWinningBeginUpdateAction(state);
+                if (beginUpdateAction != null) {
+                    candidates.add(state);
+                    beginUpdateActions.put(state, beginUpdateAction);
+                }
             }
 
             if (candidates.isEmpty()) {
-                break;
+                return;
             }
 
-            Set<CompostateDUC<State, Action>> gr1ProgressWinning =
-                    computeGr1ProgressWinningStates(candidates);
-
-            Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors =
-                    buildGr1Phase2Successors(candidates);
-            List<Set<CompostateDUC<State, Action>>> components =
-                    collectGr1Phase2Sccs(candidates, successors);
-
-            for (Set<CompostateDUC<State, Action>> component : components) {
-                if (!isCyclicGr1Component(component, successors) || !isPostBeginUpdateLoop(component)) {
-                    continue;
-                }
-
-                if (allStatesSatisfyUpdateGuarantees(component)) {
-                    Map<CompostateDUC<State, Action>, HAction<State, Action>> finishActions =
-                            computeGr1FinishUpdateActions(component);
-                    Map<CompostateDUC<State, Action>, HAction<State, Action>> handoffActions =
-                            computeGr1CompletedHandoffActions(component);
-                    Map<CompostateDUC<State, Action>, HAction<State, Action>> traditionalGr1Actions =
-                            computeTraditionalGr1SatisfiedActions(component);
-                    boolean promotedByHandoff = !handoffActions.isEmpty();
-                    boolean promotedByTraditionalGr1 = !promotedByHandoff && !traditionalGr1Actions.isEmpty();
-                    Map<CompostateDUC<State, Action>, HAction<State, Action>> goalActions =
-                            promotedByHandoff ? handoffActions
-                                    : (promotedByTraditionalGr1 ? traditionalGr1Actions : finishActions);
-                    boolean promotedByFinishUpdate =
-                            !promotedByHandoff && !promotedByTraditionalGr1 && !finishActions.isEmpty();
-                    if (!goalActions.isEmpty()) {
-                        if (debugLogEnabled) {
-                            if (promotedByHandoff) {
-                                log("  [GR1-Phase2] Promoting SCC as GOAL because all update guarantees"
-                                        + " are satisfied and a safe handoff to the new controller is reachable: "
-                                        + summarizeGr1Phase2Component(component));
-                            } else if (promotedByTraditionalGr1) {
-                                log("  [GR1-Phase2] Promoting SCC as GOAL under traditional GR(1)"
-                                        + " semantics; finishUpdate is not required by GR(1): "
-                                        + summarizeGr1Phase2Component(component));
-                            } else {
-                                log("  [GR1-Phase2] Promoting SCC as GOAL because all update guarantees"
-                                        + " are satisfied and finishUpdate is recurrently reachable: "
-                                        + summarizeGr1Phase2Component(component));
-                            }
-                        }
-                        for (Map.Entry<CompostateDUC<State, Action>, HAction<State, Action>> entry
-                                : goalActions.entrySet()) {
-                            applyGoalStatus(entry.getKey(), entry.getValue(), winners, queue);
-                        }
-                        propagateGoalPhase1Queue(queue, winners);
-                        changed = true;
-                        break;
+            boolean pruned;
+            do {
+                pruned = false;
+                Iterator<CompostateDUC<State, Action>> it = candidates.iterator();
+                while (it.hasNext()) {
+                    CompostateDUC<State, Action> state = it.next();
+                    if (!isPreUpdateClosureSafe(state, candidates)) {
+                        it.remove();
+                        pruned = true;
                     }
-
-                    if (isGr1EnvironmentTrap(component)) {
-                        if (isGr1UpdateCompletionBlocked(finishActions, handoffActions)) {
-                            markGr1Phase2ComponentAsError(component,
-                                    "all update guarantees are satisfied, but update completion cannot be reached: "
-                                            + gr1SatisfiedPromotionBlockedReason(finishActions, handoffActions));
-                            changed = true;
-                            break;
-                        }
-                        if (debugLogEnabled) {
-                            log("  [GR1-Phase2] SCC satisfies the traditional GR(1) update guarantees"
-                                    + " but is not promoted because "
-                                    + gr1SatisfiedPromotionBlockedReason(finishActions, handoffActions)
-                                    + ": "
-                                    + summarizeGr1Phase2Component(component));
-                        }
-                    }
-                } else if (!componentCanForceGr1Progress(component, gr1ProgressWinning)
-                        && !componentHasUpdateGuaranteeProgressEscape(component, gr1ProgressWinning)
-                        && isGr1EnvironmentTrap(component)) {
-                    markGr1Phase2ComponentAsError(component,
-                            "traditional GR(1) progress fixed point is losing; update guarantees are missing: "
-                                    + missingUpdateGuarantees(component));
-                    changed = true;
-                    break;
                 }
+            } while (pruned);
+
+            if (candidates.isEmpty()) {
+                return;
             }
-        } while (changed);
-    }
 
-    private Set<CompostateDUC<State, Action>> buildGr1Phase2Candidates() {
-        Set<CompostateDUC<State, Action>> candidates = new HashSet<>();
-        for (CompostateDUC<State, Action> state : compostates.values()) {
-            if (state.isStatus(Status.NONE) && state.isLive() && getMarkingState(state) > 0) {
-                candidates.add(state);
+            if (debugLogEnabled) {
+                log("  [PreUpdate-Closure] Promoting marking state 0 states as GOAL: "
+                        + candidates.size());
             }
-        }
-        return candidates;
-    }
 
-    private Set<CompostateDUC<State, Action>> computeGr1ProgressWinningStates(
-            Set<CompostateDUC<State, Action>> candidates) {
-        Set<CompostateDUC<State, Action>> winning = new HashSet<>();
-
-        for (CompostateDUC<State, Action> state : candidates) {
-            if (isGr1ProgressTarget(state)) {
-                winning.add(state);
-            }
-        }
-
-        boolean changed;
-        do {
-            changed = false;
             for (CompostateDUC<State, Action> state : candidates) {
-                if (winning.contains(state)) {
-                    continue;
+                HAction<State, Action> beginUpdateAction = beginUpdateActions.get(state);
+                if (beginUpdateAction == null) {
+                    beginUpdateAction = findWinningBeginUpdateAction(state);
                 }
-                if (selectGr1ProgressAction(state, winning) != null) {
-                    winning.add(state);
+                if (beginUpdateAction != null && !isGoal(state)) {
+                    applyGoalStatus(state, beginUpdateAction, winners, queue);
                     changed = true;
                 }
             }
-        } while (changed);
 
-        return winning;
+            if (changed) {
+                propagateGoalPhase1Queue(queue, winners);
+            }
+        } while (changed);
     }
 
-    private boolean componentCanForceGr1Progress(
-            Set<CompostateDUC<State, Action>> component,
-            Set<CompostateDUC<State, Action>> gr1ProgressWinning) {
-        for (CompostateDUC<State, Action> state : component) {
-            if (!isGr1ProgressTarget(state) && !gr1ProgressWinning.contains(state)) {
-                return false;
+    private HAction<State, Action> findWinningBeginUpdateAction(
+            CompostateDUC<State, Action> state) {
+
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (!isBeginUpdateAction(action)) {
+                continue;
+            }
+            Set<CompostateDUC<State, Action>> children =
+                    state.getExploredChildren().getImage(action);
+            if (children != null
+                    && !children.isEmpty()
+                    && areAllExploredChildrenGoal(state, action, children)) {
+                return action;
             }
         }
-        return true;
+        return null;
     }
 
-    private boolean loopCanForceGr1Progress(Set<CompostateDUC<State, Action>> loopSnapshot) {
-        if (loopSnapshot == null || loopSnapshot.isEmpty() || !isPostBeginUpdateLoop(loopSnapshot)) {
-            return false;
-        }
-
-        Set<CompostateDUC<State, Action>> candidates = buildGr1Phase2Candidates();
-        candidates.addAll(loopSnapshot);
-        Set<CompostateDUC<State, Action>> gr1ProgressWinning =
-                computeGr1ProgressWinningStates(candidates);
-        return componentCanForceGr1Progress(loopSnapshot, gr1ProgressWinning)
-                || componentHasUpdateGuaranteeProgressEscape(loopSnapshot, gr1ProgressWinning);
-    }
-
-    private boolean isGr1ProgressTarget(CompostateDUC<State, Action> state) {
-        return !isError(state)
-                && (isGoal(state) || getMarkingState(state) == 9 || satisfiesAllUpdateGuarantees(state));
-    }
-
-    private HAction<State, Action> selectGr1ProgressAction(
+    private boolean isPreUpdateClosureSafe(
             CompostateDUC<State, Action> state,
-            Set<CompostateDUC<State, Action>> gr1ProgressWinning) {
-        if (isGr1ProgressTarget(state)) {
-            return null;
-        }
+            Set<CompostateDUC<State, Action>> candidates) {
 
-        HAction<State, Action> uncontrollableWitness = null;
-        boolean hasUncontrollable = false;
         for (HAction<State, Action> action : state.getTransitions()) {
             if (action.isControllable()) {
                 continue;
             }
-            hasUncontrollable = true;
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+
+            Set<CompostateDUC<State, Action>> children =
+                    state.getExploredChildren().getImage(action);
             if (children == null || children.isEmpty()) {
-                return null;
-            }
-            if (!allChildrenHaveGr1Progress(children, gr1ProgressWinning)) {
-                return null;
-            }
-            if (uncontrollableWitness == null) {
-                uncontrollableWitness = action;
-            }
-        }
-
-        if (hasUncontrollable) {
-            return uncontrollableWitness;
-        }
-
-        HAction<State, Action> bestControllable = null;
-        for (HAction<State, Action> action : state.getTransitions()) {
-            if (!action.isControllable()) {
-                continue;
-            }
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-            if (children == null || children.isEmpty()) {
-                continue;
-            }
-            if (allChildrenHaveGr1Progress(children, gr1ProgressWinning)) {
-                bestControllable = action;
-                break;
-            }
-        }
-        return bestControllable;
-    }
-
-    private boolean allChildrenHaveGr1Progress(
-            Set<CompostateDUC<State, Action>> children,
-            Set<CompostateDUC<State, Action>> gr1ProgressWinning) {
-        for (CompostateDUC<State, Action> child : children) {
-            if (isError(child)) {
                 return false;
             }
-            if (!isGr1ProgressTarget(child) && !gr1ProgressWinning.contains(child)) {
-                return false;
-            }
-        }
-        return true;
-    }
 
-    private boolean componentHasUpdateGuaranteeProgressEscape(
-            Set<CompostateDUC<State, Action>> component,
-            Set<CompostateDUC<State, Action>> gr1ProgressWinning) {
-        for (CompostateDUC<State, Action> state : component) {
-            for (HAction<State, Action> action : state.getTransitions()) {
-                if (!action.isControllable() || !isUpdateGuaranteeAction(action)) {
-                    continue;
-                }
-                Set<CompostateDUC<State, Action>> children =
-                        state.getExploredChildren().getImage(action);
-                if (children == null || children.isEmpty()) {
-                    return true;
-                }
-                if (allChildrenMakeUpdateGuaranteeProgress(
-                        state, children, component, gr1ProgressWinning)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean allChildrenMakeUpdateGuaranteeProgress(
-            CompostateDUC<State, Action> source,
-            Set<CompostateDUC<State, Action>> children,
-            Set<CompostateDUC<State, Action>> component,
-            Set<CompostateDUC<State, Action>> gr1ProgressWinning) {
-        int sourceMask = updateGuaranteeMask(source);
-        for (CompostateDUC<State, Action> child : children) {
-            if (isError(child)) {
-                return false;
-            }
-            if (isGr1ProgressTarget(child) || gr1ProgressWinning.contains(child)) {
-                continue;
-            }
-            int childMask = updateGuaranteeMask(child);
-            boolean progressed = childMask != sourceMask && (childMask | sourceMask) == childMask;
-            if (!progressed && !component.contains(child)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean isUpdateGuaranteeAction(HAction<State, Action> action) {
-        String actionName = action.toString();
-        return actionName.equals(UpdateConstants.STOP_OLD_SPEC)
-                || actionName.equals(UpdateConstants.RECONFIGURE)
-                || actionName.equals(UpdateConstants.START_NEW_SPEC);
-    }
-
-    private Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> buildGr1Phase2Successors(
-            Set<CompostateDUC<State, Action>> candidates) {
-        Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors = new HashMap<>();
-        for (CompostateDUC<State, Action> state : candidates) {
-            Set<CompostateDUC<State, Action>> stateSuccessors = new HashSet<>();
-            for (HAction<State, Action> action : state.getTransitions()) {
-                Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-                if (children == null || children.isEmpty()) {
-                    continue;
-                }
-                for (CompostateDUC<State, Action> child : children) {
-                    if (!isError(child) && candidates.contains(child)) {
-                        stateSuccessors.add(child);
-                    }
-                }
-            }
-            successors.put(state, stateSuccessors);
-        }
-        return successors;
-    }
-
-    private List<Set<CompostateDUC<State, Action>>> collectGr1Phase2Sccs(
-            Set<CompostateDUC<State, Action>> candidates,
-            Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors) {
-        List<Set<CompostateDUC<State, Action>>> components = new ArrayList<>();
-        Map<CompostateDUC<State, Action>, Integer> index = new HashMap<>();
-        Map<CompostateDUC<State, Action>, Integer> lowlink = new HashMap<>();
-        Deque<CompostateDUC<State, Action>> stack = new ArrayDeque<>();
-        Set<CompostateDUC<State, Action>> onStack = new HashSet<>();
-        int[] nextIndex = new int[] {0};
-
-        for (CompostateDUC<State, Action> state : candidates) {
-            if (!index.containsKey(state)) {
-                collectGr1Phase2Scc(state, successors, index, lowlink, stack, onStack, components, nextIndex);
-            }
-        }
-        return components;
-    }
-
-    private void collectGr1Phase2Scc(
-            CompostateDUC<State, Action> state,
-            Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors,
-            Map<CompostateDUC<State, Action>, Integer> index,
-            Map<CompostateDUC<State, Action>, Integer> lowlink,
-            Deque<CompostateDUC<State, Action>> stack,
-            Set<CompostateDUC<State, Action>> onStack,
-            List<Set<CompostateDUC<State, Action>>> components,
-            int[] nextIndex) {
-        index.put(state, nextIndex[0]);
-        lowlink.put(state, nextIndex[0]);
-        nextIndex[0]++;
-        stack.push(state);
-        onStack.add(state);
-
-        for (CompostateDUC<State, Action> successor : successors.get(state)) {
-            if (!index.containsKey(successor)) {
-                collectGr1Phase2Scc(successor, successors, index, lowlink, stack, onStack, components, nextIndex);
-                lowlink.put(state, Math.min(lowlink.get(state), lowlink.get(successor)));
-            } else if (onStack.contains(successor)) {
-                lowlink.put(state, Math.min(lowlink.get(state), index.get(successor)));
-            }
-        }
-
-        if (!lowlink.get(state).equals(index.get(state))) {
-            return;
-        }
-
-        Set<CompostateDUC<State, Action>> component = new HashSet<>();
-        CompostateDUC<State, Action> current;
-        do {
-            current = stack.pop();
-            onStack.remove(current);
-            component.add(current);
-        } while (current != state);
-        components.add(component);
-    }
-
-    private boolean isCyclicGr1Component(
-            Set<CompostateDUC<State, Action>> component,
-            Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors) {
-        if (component.size() > 1) {
-            return true;
-        }
-        CompostateDUC<State, Action> only = component.iterator().next();
-        Set<CompostateDUC<State, Action>> onlySuccessors = successors.get(only);
-        return onlySuccessors != null && onlySuccessors.contains(only);
-    }
-
-    private boolean isGr1EnvironmentTrap(Set<CompostateDUC<State, Action>> component) {
-        boolean hasRecurrentChoice = false;
-        for (CompostateDUC<State, Action> state : component) {
-            boolean hasInternalUncontrollable = false;
-            boolean hasInternalControllable = false;
-            boolean hasSafeControllableEscape = false;
-
-            for (HAction<State, Action> action : state.getTransitions()) {
-                Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-                if (children == null || children.isEmpty()) {
-                    if (action.toString().equals(UpdateConstants.FINISH_UPDATE)
-                            && state.isFinishUpdateBlocked()) {
-                        continue;
-                    }
+            if (isBeginUpdateAction(action)) {
+                if (!areAllExploredChildrenGoal(state, action, children)) {
                     return false;
                 }
-
-                boolean hasChildInComponent = false;
-                boolean allChildrenSafe = true;
-                boolean allChildrenEscape = true;
-                for (CompostateDUC<State, Action> child : children) {
-                    if (isError(child)) {
-                        allChildrenSafe = false;
-                        break;
-                    }
-                    if (component.contains(child)) {
-                        hasChildInComponent = true;
-                        allChildrenEscape = false;
-                    }
-                }
-                if (!allChildrenSafe) {
-                    continue;
-                }
-
-                if (action.isControllable()) {
-                    if (hasChildInComponent) {
-                        hasInternalControllable = true;
-                    } else if (allChildrenEscape) {
-                        hasSafeControllableEscape = true;
-                    }
-                } else if (hasChildInComponent) {
-                    hasInternalUncontrollable = true;
-                }
-            }
-
-            if (hasInternalUncontrollable) {
-                hasRecurrentChoice = true;
                 continue;
             }
-            if (hasSafeControllableEscape) {
-                return false;
-            }
-            if (hasInternalControllable) {
-                hasRecurrentChoice = true;
-                continue;
-            }
-            return false;
-        }
-        return hasRecurrentChoice;
-    }
 
-    private void markGr1Phase2ComponentAsError(
-            Set<CompostateDUC<State, Action>> component,
-            String reason) {
-        if (debugLogEnabled) {
-            log("  [GR1-Phase2] Marking SCC as ERROR because " + reason
-                    + ": " + summarizeGr1Phase2Component(component));
-            lastLoopErrorSummary = "GR1 Phase2 SCC error: " + reason
-                    + ", " + summarizeGr1Phase2Component(component);
+            for (CompostateDUC<State, Action> child : children) {
+                if (isError(child)) {
+                    return false;
+                }
+                if (!isGoal(child) && !candidates.contains(child)) {
+                    return false;
+                }
+            }
         }
-        loopErrorCount++;
-        for (CompostateDUC<State, Action> state : component) {
-            setError(state);
-        }
-        if (!isError(initial)) {
-            propagateError(component, null);
-        }
-    }
-
-    private String summarizeGr1Phase2Component(Set<CompostateDUC<State, Action>> component) {
-        return "size=" + component.size()
-                + ", markings=" + summarizeMarkingHistogram(component)
-                + ", missingGuarantees=" + missingUpdateGuarantees(component);
+        return true;
     }
 
     private void propagateGoalPhase1Queue(
@@ -2704,16 +2372,20 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             || actionName.equals(UpdateConstants.FINISH_UPDATE);
     }
 
-    private boolean isUnexploredControllableEscapeRelevantForFairness(
+    private boolean isBeginUpdateAction(HAction<State, Action> action) {
+        return action.toString().equals(UpdateConstants.BEGIN_UPDATE);
+    }
+
+    private boolean isUnexploredControllableEscapeRelevantForLoop(
             CompostateDUC<State, Action> state,
             HAction<State, Action> action,
             Set<CompostateDUC<State, Action>> loopSnapshot) {
 
-        if (getMarkingState(state) == 0 && action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+        if (getMarkingState(state) == 0 && isBeginUpdateAction(action)) {
             return true;
         }
 
-        if (isUpdateProtocolAction(action)) {
+        if (isFairnessEligibleLoop(loopSnapshot) && isUpdateProtocolAction(action)) {
             return true;
         }
 
@@ -2775,6 +2447,41 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 hasUncontrollableSuccessorInNanos += System.nanoTime() - start;
             }
         }
+    }
+
+    private Set<CompostateDUC<State, Action>> collectUpdatePathUncontrollableLoopContinuationStates(
+            Set<CompostateDUC<State, Action>> loopSnapshot) {
+
+        Set<CompostateDUC<State, Action>> badContinuationStates = new HashSet<>();
+        if (loopSnapshot == null || loopSnapshot.isEmpty()) {
+            return badContinuationStates;
+        }
+
+        for (CompostateDUC<State, Action> state : loopSnapshot) {
+            if (!isUpdateProgressState(state)) {
+                continue;
+            }
+            for (HAction<State, Action> action : state.getTransitions()) {
+                if (action.isControllable()) {
+                    continue;
+                }
+                Set<CompostateDUC<State, Action>> children =
+                        state.getExploredChildren().getImage(action);
+                if (children == null || children.isEmpty()) {
+                    continue;
+                }
+                for (CompostateDUC<State, Action> child : children) {
+                    if (loopSnapshot.contains(child) && isUpdateProgressState(child) && !isError(child)) {
+                        badContinuationStates.add(state);
+                        break;
+                    }
+                }
+                if (badContinuationStates.contains(state)) {
+                    break;
+                }
+            }
+        }
+        return badContinuationStates;
     }
 
     /**
@@ -2937,12 +2644,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         if (!hasPotentialWinningMove && hasSafeUncontrollable && debugLogEnabled) {
-            log("  [Fairness-Hypothesis-Check] State " + state.getStates() + " has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist.");
+            log("  [Uncontrollable-Pending] State " + state.getStates()
+                    + " has no safe Controllable action yet, but non-error Uncontrollable actions remain.");
         }
 
         // Cアクションでの勝ち筋がなくても、安全なUアクションがあるなら待機（エラーにしない）
         if (!hasPotentialWinningMove && hasSafeUncontrollable) {
-            if (debugLogEnabled) log("  [Optimistic-Wait] State " + state.getStates() + " relies on safe Uncontrollable actions.");
+            if (debugLogEnabled) log("  [Uncontrollable-Pending] State " + state.getStates()
+                    + " remains undecided while Uncontrollable successors are unresolved.");
             return false;
         }
 
@@ -3016,14 +2725,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         auxiliarListStates.clear();
 
-        // ループ内の全状態を fair winning 固定点計算の候補にする。
-        probablyWinningStates.addAll(loop);
+        // fairness は、更新三事象が完了して finishUpdate 待ちになった
+        // marking state 8 のループにだけ適用する。
+        if (isFairnessEligibleLoop(loop)) {
+            probablyWinningStates.addAll(loop);
+        }
     }
 
     /**
-     * OTF-DUC は到達性問題だが、更新中の進行は環境 fairness のもとで判定する。
-     * beginUpdate 後のループは、固定点計算で finishUpdate への fair 経路を
-     * 証明できる場合だけ勝ちとし、それ以外は ERROR 候補として解析する。
+     * OTF-DUC は到達性問題だが、marking state 8 の finishUpdate 待ちだけは
+     * 環境 fairness のもとで判定する。marking state 1-7 の更新パス探索では
+     * fairness による救済を行わず、閉じた uncontrollable ループを ERROR 候補として解析する。
      */
     private void findNewGoals() {
         statistics.incFindNewGoalsCalls();
@@ -3038,17 +2750,38 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private void findNewErrors() {
         statistics.incFindNewErrorsCalls();
 
+        boolean fairnessEligibleLoop = isFairnessEligibleLoop(loop);
+        Set<CompostateDUC<State, Action>> updatePathUncontrollableContinuationStates =
+                fairnessEligibleLoop ? new HashSet<>()
+                        : collectUpdatePathUncontrollableLoopContinuationStates(loop);
+        if (!updatePathUncontrollableContinuationStates.isEmpty()) {
+            loopErrorCount++;
+            if (debugLogEnabled) {
+                lastLoopErrorSummary = "reason=updatePathUncontrollableLoopContinuation"
+                        + ", badContinuationStates=" + updatePathUncontrollableContinuationStates.size()
+                        + ", badContinuationMarkings="
+                        + summarizeMarkingHistogram(updatePathUncontrollableContinuationStates)
+                        + ", detectedLoopMarkings=" + summarizeMarkingHistogram(loop);
+                log("  [Update-Path-U-Loop] Uncontrollable loop-continuation action detected in marking state 1-7."
+                        + " Marking the source state(s) as ERROR: " + lastLoopErrorSummary);
+            }
+            for (CompostateDUC<State, Action> state : updatePathUncontrollableContinuationStates) {
+                setError(state);
+            }
+            if (!isError(initial)) {
+                propagateError(updatePathUncontrollableContinuationStates, null);
+            }
+            return;
+        }
+
         boolean hasEscapeHatch = false;
         boolean hasUnexploredControllableEscape = false;
         boolean hasExploredControllableEscape = false;
+        boolean hasUpdateProtocolEscape = false;
 
         boolean hasUncontrollableWait = false;
         boolean hasUnexploredUncontrollable = false;
         boolean hasOpenUncontrollableExit = false;
-        boolean useGr1LoopJudgement = useGr1AssumptionGuaranteeLoopJudgement()
-                && loop != null
-                && isPostBeginUpdateLoop(loop);
-        boolean restrictGr1ProgressLoopEscape = useGr1LoopJudgement;
 
         if (debugLogEnabled) {
             log("  [Loop-Analysis] Analyzing detected loop for escape hatches (Unexplored C-actions)...");
@@ -3067,13 +2800,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 if (a.isControllable()) {
                     if (children == null || children.isEmpty()) {
                         hasEscapeHatch = true;
-                        boolean relevantEscape = isUnexploredControllableEscapeRelevantForFairness(s, a, loop);
+                        boolean relevantEscape = isUnexploredControllableEscapeRelevantForLoop(s, a, loop);
                         if (relevantEscape) {
                             hasUnexploredControllableEscape = true;
                         }
                         if (debugLogEnabled) {
                             if (relevantEscape) {
-                                log("      -> Controllable [" + a + "]: UNEXPLORED (Fair-relevant escape hatch found)");
+                                log("      -> Controllable [" + a + "]: UNEXPLORED (progress-relevant escape hatch found)");
                             } else {
                                 log("      -> Controllable [" + a + "]: UNEXPLORED"
                                         + " (ordinary controllable ignored while safe Uncontrollable wait remains)");
@@ -3092,17 +2825,21 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         // controllable action は、探索済みの非決定分岐がすべて
                         // ERROR を避ける場合に限り、まだ有効な脱出口候補である。
                         boolean leadsToError = false;
+                        boolean exitsLoop = false;
                         for (CompostateDUC<State, Action> child : children) {
                             if (isError(child)) {
                                 leadsToError = true;
                                 break;
                             }
+                            if (!loop.contains(child) || isGoal(child)) {
+                                exitsLoop = true;
+                            }
                         }
                         if (!leadsToError) {
-                            if (!restrictGr1ProgressLoopEscape
-                                    || isGr1ControllableEscapeFromProgressLoop(s, children)) {
-                                hasEscapeHatch = true;
-                                hasExploredControllableEscape = true;
+                            hasEscapeHatch = true;
+                            hasExploredControllableEscape = true;
+                            if (fairnessEligibleLoop && isUpdateProtocolAction(a) && exitsLoop) {
+                                hasUpdateProtocolEscape = true;
                             }
                         }
                     }
@@ -3147,7 +2884,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // 判定するにはまだ情報が足りない。
         if (hasUnexploredUncontrollable) {
             if (debugLogEnabled) {
-                log("  [Fairness-Wait] Loop has an unexplored Uncontrollable action. Postponing ERROR marking.");
+                log("  [Loop-Wait] Loop has an unexplored Uncontrollable action. Postponing ERROR marking.");
             }
             return;
         }
@@ -3156,23 +2893,31 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // まだ閉じた負けループとは扱わない。
         if (hasOpenUncontrollableExit) {
             if (debugLogEnabled) {
-                log("  [Fairness-Wait] Loop has a safe Uncontrollable exit to a NONE state. Postponing ERROR marking.");
+                log("  [Loop-Wait] Loop has a safe Uncontrollable exit to a NONE state. Postponing ERROR marking.");
             }
             return;
         }
 
-        // 未探索 controllable が残っているループは、fairness 上の進捗に使える
+        // 未探索 controllable が残っているループは、更新進行に使える
         // 可能性がある場合だけ、現時点では負けと断定しない。通常 controllable は、
         // 同じ状態から safe uncontrollable wait が残るなら fair 到達性の根拠にしない。
         if (hasUnexploredControllableEscape) {
             if (debugLogEnabled) {
-                log("  [Loop-Wait] Loop has unexplored fair-relevant Controllable escape hatches. Postponing ERROR marking.");
+                log("  [Loop-Wait] Loop has unexplored progress-relevant Controllable escape hatches. Postponing ERROR marking.");
             }
             return;
         }
 
-        // 閉じた安全な uncontrollable ループは、fair 固定点計算で
-        // finishUpdate への経路を証明できる場合だけ受理する。
+        if (!fairnessEligibleLoop && (hasEscapeHatch || hasUncontrollableWait)) {
+            if (debugLogEnabled) {
+                log("  [Loop-Wait] No uncontrollable cycle was found in marking state 1-7."
+                        + " Leaving the loop unresolved for further exploration/output pruning.");
+            }
+            return;
+        }
+
+        // marking state 8 の閉じた安全な uncontrollable ループだけは、
+        // fair 固定点計算で finishUpdate への経路を証明できる場合に受理する。
         if (hasUncontrollableWait) {
             if (tryPromoteFairLoopToGoal()) {
                 if (debugLogEnabled) {
@@ -3180,16 +2925,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 }
                 return;
             }
-        }
-
-        if (useGr1LoopJudgement && !allStatesSatisfyUpdateGuarantees(loop)
-                && loopCanForceGr1Progress(loop)) {
-            if (debugLogEnabled) {
-                log("  [GR1-Loop] Loop is not marked ERROR because the traditional GR(1)"
-                        + " progress fixed point can force all update guarantees."
-                        + " finishUpdate remains an OTF completion condition, not a GR(1) guarantee.");
-            }
-            return;
         }
 
         // controllable 脱出口だけを持つループは、さらに探索する余地を残す。
@@ -3203,15 +2938,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         if (hasUncontrollableWait && debugLogEnabled) {
-            if (useGr1LoopJudgement) {
-                log("  [GR1-Loop] Loop has a safe uncontrollable wait but cannot prove GR1/update completion progress."
-                        + " missingGuarantees=" + missingUpdateGuarantees(loop)
-                        + ", finishUpdateReachable=" + hasGr1FinishUpdateReachability(loop)
-                        + ". Marking as ERROR.");
-            } else {
-                log("  [Fairness-Hypothesis-Check] Loop has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist!");
-                log("  [Fairness-Hypothesis-Check] Fair propagation could not prove a path to finishUpdate. Marking as ERROR.");
-            }
+            log("  [Fairness-Loop-Check] Loop has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist!");
+            log("  [Fairness-Loop-Check] Fair propagation could not prove a path to finishUpdate. Marking as ERROR.");
         }
 
         if (debugLogEnabled) {
@@ -3224,6 +2952,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 hasEscapeHatch,
                 hasUnexploredControllableEscape,
                 hasExploredControllableEscape,
+                hasUpdateProtocolEscape,
                 hasUncontrollableWait,
                 hasUnexploredUncontrollable,
                 hasOpenUncontrollableExit);
@@ -3239,11 +2968,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private boolean tryPromoteFairLoopToGoal() {
-        if (useGr1AssumptionGuaranteeLoopJudgement()) {
-            return tryPromoteGr1LoopToGoal();
-        }
-
-        if (loop == null || loop.isEmpty()) {
+        if (!isFairnessEligibleLoop(loop)) {
             return false;
         }
 
@@ -3262,580 +2987,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return false;
     }
 
-    private boolean tryPromoteGr1LoopToGoal() {
-        if (loop == null || loop.isEmpty()) {
-            return false;
-        }
-        if (!isPostBeginUpdateLoop(loop)) {
-            return false;
-        }
-        if (!allStatesSatisfyUpdateGuarantees(loop)) {
-            if (debugLogEnabled) {
-                log("  [GR1-Loop] Loop is not promoted because guarantees are missing: "
-                        + missingUpdateGuarantees(loop));
-            }
-            return false;
-        }
-
-        long promotionStart = System.nanoTime();
-        Set<CompostateDUC<State, Action>> loopSnapshot = new HashSet<>(loop);
-        Map<CompostateDUC<State, Action>, HAction<State, Action>> finishActions =
-                computeGr1FinishUpdateActions(loopSnapshot);
-        Map<CompostateDUC<State, Action>, HAction<State, Action>> handoffActions =
-                computeGr1CompletedHandoffActions(loopSnapshot);
-        Map<CompostateDUC<State, Action>, HAction<State, Action>> traditionalGr1Actions =
-                computeTraditionalGr1SatisfiedActions(loopSnapshot);
-        boolean promotedByHandoff = !handoffActions.isEmpty();
-        boolean promotedByTraditionalGr1 = !promotedByHandoff && !traditionalGr1Actions.isEmpty();
-        Map<CompostateDUC<State, Action>, HAction<State, Action>> goalActions =
-                promotedByHandoff ? handoffActions
-                        : (promotedByTraditionalGr1 ? traditionalGr1Actions : finishActions);
-        boolean promotedByFinishUpdate =
-                !promotedByHandoff && !promotedByTraditionalGr1 && !finishActions.isEmpty();
-        if (goalActions.isEmpty()) {
-            if (debugLogEnabled) {
-                log("  [GR1-Loop] Loop is not promoted because "
-                        + gr1SatisfiedPromotionBlockedReason(finishActions, handoffActions) + ".");
-            }
-            fairPromotionNanos += System.nanoTime() - promotionStart;
-            return false;
-        }
-
-        Set<CompostateDUC<State, Action>> winners = new HashSet<>();
-        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
-
-        for (Map.Entry<CompostateDUC<State, Action>, HAction<State, Action>> entry : goalActions.entrySet()) {
-            CompostateDUC<State, Action> state = entry.getKey();
-            HAction<State, Action> action = entry.getValue();
-            applyGoalStatus(state, action, winners, queue);
-        }
-        propagateGoalPhase1Queue(queue, winners);
-
-        if (!winners.isEmpty()) {
-            updateDistances(new HashSet<>(), winners, winners.size());
-            fairPromotedLoopCount++;
-            fairPromotionNanos += System.nanoTime() - promotionStart;
-            if (debugLogEnabled) {
-                if (promotedByHandoff) {
-                    log("  [GR1-Loop] Promoted loop as GOAL because a safe handoff to the new"
-                            + " controller is reachable from the all-guarantee loop.");
-                } else if (promotedByTraditionalGr1) {
-                    log("  [GR1-Loop] Promoted loop as GOAL under traditional GR(1) semantics;"
-                            + " finishUpdate is not required by GR(1).");
-                } else {
-                    log("  [GR1-Loop] Promoted loop as GOAL because all update guarantees are satisfied"
-                            + " and a recurrent loop state can fire finishUpdate.");
-                }
-            }
-            return true;
-        }
-
-        fairPromotionNanos += System.nanoTime() - promotionStart;
-        return false;
-    }
-
-    private Map<CompostateDUC<State, Action>, HAction<State, Action>> computeGr1FinishUpdateActions(
-            Set<CompostateDUC<State, Action>> loopSnapshot) {
-        Set<CompostateDUC<State, Action>> finishSeeds = recurrentFinishUpdateStates(loopSnapshot);
-        if (finishSeeds.isEmpty()) {
-            return new HashMap<>();
-        }
-        return computeGr1FinishProgressActions(loopSnapshot, finishSeeds);
-    }
-
-    private Map<CompostateDUC<State, Action>, HAction<State, Action>> computeGr1FinishProgressActions(
-            Set<CompostateDUC<State, Action>> loopSnapshot,
-            Set<CompostateDUC<State, Action>> finishSeeds) {
-        if (finishSeeds.isEmpty()) {
-            return new HashMap<>();
-        }
-
-        Map<CompostateDUC<State, Action>, Integer> distances = new HashMap<>();
-        boolean changed;
-        do {
-            changed = false;
-            for (CompostateDUC<State, Action> state : loopSnapshot) {
-                if (distances.containsKey(state)) {
-                    continue;
-                }
-                int distance = bestGr1FinishProgressDistance(state, loopSnapshot, finishSeeds, distances);
-                if (distance >= 0) {
-                    distances.put(state, distance);
-                    changed = true;
-                }
-            }
-        } while (changed);
-
-        Map<CompostateDUC<State, Action>, HAction<State, Action>> actions = new HashMap<>();
-        for (CompostateDUC<State, Action> state : distances.keySet()) {
-            HAction<State, Action> action =
-                    selectGr1FinishProgressAction(state, loopSnapshot, finishSeeds, distances);
-            if (action == null) {
-                continue;
-            }
-            actions.put(state, action);
-        }
-        return actions;
-    }
-
-    private Map<CompostateDUC<State, Action>, HAction<State, Action>> computeGr1CompletedHandoffActions(
-            Set<CompostateDUC<State, Action>> component) {
-        Set<CompostateDUC<State, Action>> handoffSeeds = new HashSet<>();
-        for (CompostateDUC<State, Action> state : component) {
-            HAction<State, Action> finishAction = ensureFinishUpdateHandoffAction(state);
-            if (finishAction != null) {
-                handoffSeeds.add(state);
-            }
-        }
-        return computeGr1FinishProgressActions(component, handoffSeeds);
-    }
-
-    private HAction<State, Action> ensureFinishUpdateHandoffAction(
-            CompostateDUC<State, Action> state) {
-        HAction<State, Action> finishAction = findFinishUpdateAction(state);
-        if (finishAction == null || state.isFinishUpdateBlocked()) {
-            return null;
-        }
-
-        Set<CompostateDUC<State, Action>> existingChildren =
-                state.getExploredChildren().getImage(finishAction);
-        if (existingChildren != null && !existingChildren.isEmpty()) {
-            return finishUpdateChildrenReachPostUpdate(existingChildren) ? finishAction : null;
-        }
-
-        long guardStart = System.nanoTime();
-        finishUpdateGuardChecks++;
-        boolean hotswapEndAllowed = checkHotswapEndCondition(state);
-        finishUpdateGuardNanos += System.nanoTime() - guardStart;
-        if (!hotswapEndAllowed) {
-            state.setFinishUpdateBlocked(true);
-            return null;
-        }
-
-        long successorStart = System.nanoTime();
-        successorGenerationCalls++;
-        List<List<State>> allNextStates = getChildStatesDUC_Nondet(state, finishAction);
-        successorGenerationNanos += System.nanoTime() - successorStart;
-        if (allNextStates == null || allNextStates.isEmpty()) {
-            return null;
-        }
-
-        List<CompostateDUC<State, Action>> children = new ArrayList<>();
-        generatedChildCount += allNextStates.size();
-        for (List<State> nextStates : allNextStates) {
-            CompostateDUC<State, Action> child = buildCompostate(nextStates, state);
-            if (isError(child) || getMarkingState(child) != 9) {
-                return null;
-            }
-            children.add(child);
-        }
-
-        for (CompostateDUC<State, Action> child : children) {
-            long childRegistrationStart = System.nanoTime();
-            childRegistrationCalls++;
-            state.addChild(finishAction, child);
-            invalidateAllChildrenGoalCache(state, finishAction);
-            child.addParent(finishAction, state);
-            childRegistrationNanos += System.nanoTime() - childRegistrationStart;
-        }
-        if (debugLogEnabled) {
-            log("  [GR1-Handoff] Added finishUpdate handoff edge(s) from "
-                    + summarizeStateForDiagnostics(state));
-        }
-        return finishAction;
-    }
-
-    private HAction<State, Action> findFinishUpdateAction(CompostateDUC<State, Action> state) {
-        for (HAction<State, Action> action : state.getTransitions()) {
-            if (action.toString().equals(UpdateConstants.FINISH_UPDATE)) {
-                return action;
-            }
-        }
-        return null;
-    }
-
-    private boolean finishUpdateChildrenReachPostUpdate(
-            Set<CompostateDUC<State, Action>> children) {
-        for (CompostateDUC<State, Action> child : children) {
-            if (isError(child) || (!isGoal(child) && getMarkingState(child) != 9)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private Map<CompostateDUC<State, Action>, HAction<State, Action>> computeTraditionalGr1SatisfiedActions(
-            Set<CompostateDUC<State, Action>> component) {
-        if (gr1FinishUpdateRequired) {
-            return new HashMap<>();
-        }
-
-        Map<CompostateDUC<State, Action>, HAction<State, Action>> actions = new HashMap<>();
-        for (CompostateDUC<State, Action> state : component) {
-            HAction<State, Action> action = selectTraditionalGr1SatisfiedAction(state, component);
-            if (action == null) {
-                return new HashMap<>();
-            }
-            actions.put(state, action);
-        }
-        return actions;
-    }
-
-    private HAction<State, Action> selectTraditionalGr1SatisfiedAction(
-            CompostateDUC<State, Action> state,
-            Set<CompostateDUC<State, Action>> component) {
-        HAction<State, Action> safeUncontrollable = null;
-
-        for (HAction<State, Action> action : state.getTransitions()) {
-            if (action.isControllable()) {
-                continue;
-            }
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-            if (children == null || children.isEmpty()
-                    || !allChildrenStayWithinTraditionalGr1Goal(children, component)) {
-                return null;
-            }
-            if (safeUncontrollable == null) {
-                safeUncontrollable = action;
-            }
-        }
-
-        HAction<State, Action> safeControllable = null;
-        HAction<State, Action> safeFinishUpdate = null;
-        for (HAction<State, Action> action : state.getTransitions()) {
-            if (!action.isControllable()) {
-                continue;
-            }
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-            if (children == null || children.isEmpty()
-                    || !allChildrenStayWithinTraditionalGr1Goal(children, component)) {
-                continue;
-            }
-            if (action.toString().equals(UpdateConstants.FINISH_UPDATE)) {
-                safeFinishUpdate = action;
-            } else if (safeControllable == null) {
-                safeControllable = action;
-            }
-        }
-
-        if (safeFinishUpdate != null) {
-            return safeFinishUpdate;
-        }
-        if (safeControllable != null) {
-            return safeControllable;
-        }
-        return safeUncontrollable;
-    }
-
-    private boolean allChildrenStayWithinTraditionalGr1Goal(
-            Set<CompostateDUC<State, Action>> children,
-            Set<CompostateDUC<State, Action>> component) {
-        for (CompostateDUC<State, Action> child : children) {
-            if (isError(child)) {
-                return false;
-            }
-            if (!component.contains(child) && !isGoal(child) && getMarkingState(child) != 9) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private String gr1SatisfiedPromotionBlockedReason(
-            Map<CompostateDUC<State, Action>, HAction<State, Action>> finishActions,
-            Map<CompostateDUC<State, Action>, HAction<State, Action>> handoffActions) {
-        if (isGr1UpdateCompletionBlocked(finishActions, handoffActions)) {
-            return "finishUpdate is required but neither recurrent finishUpdate nor reachable safe handoff is available";
-        }
-        return "no closed traditional-GR(1) action was found";
-    }
-
-    private boolean isGr1UpdateCompletionBlocked(
-            Map<CompostateDUC<State, Action>, HAction<State, Action>> finishActions,
-            Map<CompostateDUC<State, Action>, HAction<State, Action>> handoffActions) {
-        return gr1FinishUpdateRequired && finishActions.isEmpty() && handoffActions.isEmpty();
-    }
-
-    private Set<CompostateDUC<State, Action>> recurrentFinishUpdateStates(
-            Set<CompostateDUC<State, Action>> loopSnapshot) {
-        Set<CompostateDUC<State, Action>> recurrentStates = recurrentStatesInLoop(loopSnapshot);
-        Set<CompostateDUC<State, Action>> result = new HashSet<>();
-        for (CompostateDUC<State, Action> state : recurrentStates) {
-            if (canFireFinishUpdateToGoal(state)) {
-                result.add(state);
-            }
-        }
-        return result;
-    }
-
-    private boolean canFireFinishUpdateToGoal(CompostateDUC<State, Action> state) {
-        for (HAction<State, Action> action : state.getTransitions()) {
-            if (!action.toString().equals(UpdateConstants.FINISH_UPDATE)) {
-                continue;
-            }
-            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-            if (children == null || children.isEmpty()) {
-                continue;
-            }
-            if (finishUpdateChildrenReachPostUpdate(children)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Set<CompostateDUC<State, Action>> recurrentStatesInLoop(
-            Set<CompostateDUC<State, Action>> loopSnapshot) {
-        Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors =
-                buildGr1LoopSuccessors(loopSnapshot);
-        Map<CompostateDUC<State, Action>, Integer> index = new HashMap<>();
-        Map<CompostateDUC<State, Action>, Integer> lowlink = new HashMap<>();
-        Deque<CompostateDUC<State, Action>> stack = new ArrayDeque<>();
-        Set<CompostateDUC<State, Action>> onStack = new HashSet<>();
-        Set<CompostateDUC<State, Action>> recurrent = new HashSet<>();
-        int[] nextIndex = new int[] {0};
-
-        for (CompostateDUC<State, Action> state : loopSnapshot) {
-            if (!index.containsKey(state)) {
-                collectGr1LoopScc(state, successors, index, lowlink, stack, onStack, recurrent, nextIndex);
-            }
-        }
-        return recurrent;
-    }
-
-    private Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> buildGr1LoopSuccessors(
-            Set<CompostateDUC<State, Action>> loopSnapshot) {
-        Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors = new HashMap<>();
-        for (CompostateDUC<State, Action> state : loopSnapshot) {
-            Set<CompostateDUC<State, Action>> stateSuccessors = new HashSet<>();
-            for (HAction<State, Action> action : state.getTransitions()) {
-                Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-                if (children == null || children.isEmpty()) {
-                    continue;
-                }
-                for (CompostateDUC<State, Action> child : children) {
-                    if (!isError(child) && loopSnapshot.contains(child)) {
-                        stateSuccessors.add(child);
-                    }
-                }
-            }
-            successors.put(state, stateSuccessors);
-        }
-        return successors;
-    }
-
-    private void collectGr1LoopScc(
-            CompostateDUC<State, Action> state,
-            Map<CompostateDUC<State, Action>, Set<CompostateDUC<State, Action>>> successors,
-            Map<CompostateDUC<State, Action>, Integer> index,
-            Map<CompostateDUC<State, Action>, Integer> lowlink,
-            Deque<CompostateDUC<State, Action>> stack,
-            Set<CompostateDUC<State, Action>> onStack,
-            Set<CompostateDUC<State, Action>> recurrent,
-            int[] nextIndex) {
-        index.put(state, nextIndex[0]);
-        lowlink.put(state, nextIndex[0]);
-        nextIndex[0]++;
-        stack.push(state);
-        onStack.add(state);
-
-        for (CompostateDUC<State, Action> successor : successors.get(state)) {
-            if (!index.containsKey(successor)) {
-                collectGr1LoopScc(successor, successors, index, lowlink, stack, onStack, recurrent, nextIndex);
-                lowlink.put(state, Math.min(lowlink.get(state), lowlink.get(successor)));
-            } else if (onStack.contains(successor)) {
-                lowlink.put(state, Math.min(lowlink.get(state), index.get(successor)));
-            }
-        }
-
-        if (!lowlink.get(state).equals(index.get(state))) {
-            return;
-        }
-
-        Set<CompostateDUC<State, Action>> component = new HashSet<>();
-        CompostateDUC<State, Action> current;
-        do {
-            current = stack.pop();
-            onStack.remove(current);
-            component.add(current);
-        } while (current != state);
-
-        boolean cyclic = component.size() > 1;
-        if (!cyclic) {
-            CompostateDUC<State, Action> only = component.iterator().next();
-            Set<CompostateDUC<State, Action>> onlySuccessors = successors.get(only);
-            cyclic = onlySuccessors != null && onlySuccessors.contains(only);
-        }
-        if (cyclic) {
-            recurrent.addAll(component);
-        }
-    }
-
-    private int bestGr1FinishProgressDistance(
-            CompostateDUC<State, Action> state,
-            Set<CompostateDUC<State, Action>> loopSnapshot,
-            Set<CompostateDUC<State, Action>> finishSeeds,
-            Map<CompostateDUC<State, Action>, Integer> distances) {
-        HAction<State, Action> action =
-                selectGr1FinishProgressAction(state, loopSnapshot, finishSeeds, distances);
-        if (action == null) {
-            return -1;
-        }
-        return gr1FinishProgressDistance(state, action, loopSnapshot, finishSeeds, distances);
-    }
-
-    private HAction<State, Action> selectGr1FinishProgressAction(
-            CompostateDUC<State, Action> state,
-            Set<CompostateDUC<State, Action>> loopSnapshot,
-            Set<CompostateDUC<State, Action>> finishSeeds,
-            Map<CompostateDUC<State, Action>, Integer> distances) {
-        HAction<State, Action> bestControllable = null;
-        HAction<State, Action> bestUncontrollable = null;
-        int bestControllableDistance = INF;
-        int bestUncontrollableDistance = INF;
-
-        for (HAction<State, Action> action : state.getTransitions()) {
-            int distance = gr1FinishProgressDistance(state, action, loopSnapshot, finishSeeds, distances);
-            if (distance < 0) {
-                continue;
-            }
-            if (action.isControllable()) {
-                if (distance < bestControllableDistance) {
-                    bestControllableDistance = distance;
-                    bestControllable = action;
-                }
-            } else if (distance < bestUncontrollableDistance) {
-                bestUncontrollableDistance = distance;
-                bestUncontrollable = action;
-            }
-        }
-        return bestControllable != null ? bestControllable : bestUncontrollable;
-    }
-
-    private int gr1FinishProgressDistance(
-            CompostateDUC<State, Action> state,
-            HAction<State, Action> action,
-            Set<CompostateDUC<State, Action>> loopSnapshot,
-            Set<CompostateDUC<State, Action>> finishSeeds,
-            Map<CompostateDUC<State, Action>, Integer> distances) {
-        if (action.toString().equals(UpdateConstants.FINISH_UPDATE) && !finishSeeds.contains(state)) {
-            return -1;
-        }
-
-        Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
-        if (children == null || children.isEmpty()) {
-            return -1;
-        }
-
-        int maxChildDistance = 0;
-        for (CompostateDUC<State, Action> child : children) {
-            int childDistance = gr1FinishChildDistance(child, loopSnapshot, distances);
-            if (childDistance < 0) {
-                return -1;
-            }
-            maxChildDistance = Math.max(maxChildDistance, childDistance);
-        }
-        return maxChildDistance + 1;
-    }
-
-    private int gr1FinishChildDistance(
-            CompostateDUC<State, Action> child,
-            Set<CompostateDUC<State, Action>> loopSnapshot,
-            Map<CompostateDUC<State, Action>, Integer> distances) {
-        if (isError(child)) {
-            return -1;
-        }
-        if (isGoal(child) || getMarkingState(child) == 9) {
-            return 0;
-        }
-        if (loopSnapshot.contains(child) && distances.containsKey(child)) {
-            return distances.get(child);
-        }
-        return -1;
-    }
-
-    private boolean hasGr1FinishUpdateReachability(Set<CompostateDUC<State, Action>> states) {
-        return !computeGr1FinishUpdateActions(new HashSet<>(states)).isEmpty();
-    }
-
-    private boolean isGr1ControllableEscapeFromProgressLoop(
-            CompostateDUC<State, Action> source,
-            Set<CompostateDUC<State, Action>> children) {
-        int sourceMask = updateGuaranteeMask(source);
-        for (CompostateDUC<State, Action> child : children) {
-            if (isGoal(child)) {
-                return true;
-            }
-            if (loop == null || !loop.contains(child)) {
-                return true;
-            }
-            if (updateGuaranteeMask(child) != sourceMask) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean useGr1AssumptionGuaranteeLoopJudgement() {
-        return gr1LoopJudgementEnabled && !preUpdateSimpleMergeEnabled && !beliefRepairEnabled;
-    }
-
-    private boolean isPostBeginUpdateLoop(Set<CompostateDUC<State, Action>> states) {
-        for (CompostateDUC<State, Action> state : states) {
-            if (getMarkingState(state) <= 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean allStatesSatisfyUpdateGuarantees(Set<CompostateDUC<State, Action>> states) {
-        for (CompostateDUC<State, Action> state : states) {
-            if (!satisfiesAllUpdateGuarantees(state)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean satisfiesAllUpdateGuarantees(CompostateDUC<State, Action> state) {
-        return updateGuaranteeMask(state) == 7;
-    }
-
-    private int updateGuaranteeMask(CompostateDUC<State, Action> state) {
-        long markingState = getMarkingState(state);
-        if (markingState == 9) {
-            return 7;
-        }
-        if (markingState >= 1 && markingState <= 8) {
-            return (int) markingState - 1;
-        }
-        return 0;
-    }
-
-    private String missingUpdateGuarantees(Set<CompostateDUC<State, Action>> states) {
-        int commonMask = 7;
-        for (CompostateDUC<State, Action> state : states) {
-            commonMask &= updateGuaranteeMask(state);
-        }
-
-        List<String> missing = new ArrayList<>();
-        if ((commonMask & 1) == 0) {
-            missing.add(UpdateConstants.STOP_OLD_SPEC);
-        }
-        if ((commonMask & 2) == 0) {
-            missing.add(UpdateConstants.RECONFIGURE);
-        }
-        if ((commonMask & 4) == 0) {
-            missing.add(UpdateConstants.START_NEW_SPEC);
-        }
-        return missing.toString();
-    }
-
     private String buildLoopErrorSummary(
             boolean hasEscapeHatch,
             boolean hasUnexploredControllableEscape,
             boolean hasExploredControllableEscape,
+            boolean hasUpdateProtocolEscape,
             boolean hasUncontrollableWait,
             boolean hasUnexploredUncontrollable,
             boolean hasOpenUncontrollableExit) {
@@ -3845,6 +3001,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         sb.append(", hasControllableEscape=").append(hasEscapeHatch);
         sb.append(", hasUnexploredControllableEscape=").append(hasUnexploredControllableEscape);
         sb.append(", hasExploredControllableEscape=").append(hasExploredControllableEscape);
+        sb.append(", hasUpdateProtocolEscape=").append(hasUpdateProtocolEscape);
         sb.append(", hasSafeUncontrollable=").append(hasUncontrollableWait);
         sb.append(", hasUnexploredUncontrollable=").append(hasUnexploredUncontrollable);
         sb.append(", hasOpenUncontrollableExit=").append(hasOpenUncontrollableExit);
