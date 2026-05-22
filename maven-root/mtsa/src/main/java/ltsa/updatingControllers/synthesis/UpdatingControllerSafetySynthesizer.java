@@ -15,6 +15,7 @@ import ltsa.lts.CompositeState;
 import ltsa.lts.LTSOutput;
 import ltsa.ui.StandardOutput;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 
 import java.util.*;
@@ -151,12 +152,17 @@ public class UpdatingControllerSafetySynthesizer {
     private static FluentStateValuation<Long> buildValuations(MTS<Long, String> metaEnv, Set<Fluent> fluents) {
 
         FluentStateValuation<Long> fsv = new FluentStateValuation<Long>(metaEnv.getStates());
+        DUCHeartbeat.beginPhase("TRADITIONAL_SAFETY_VALUATION");
+        DUCHeartbeat.setCounter("metaStates", metaEnv.getStates().size());
+        DUCHeartbeat.setCounter("fluents", fluents.size());
 
         // BFS
         Queue<Long> toVisit = new LinkedList<Long>();
         Long firstState = new Long(metaEnv.getInitialState());
         toVisit.add(firstState);
         ArrayList<Long> discovered = new ArrayList<Long>();
+        long visitedStates = 0L;
+        long visitedTransitions = 0L;
 
         // add initially true fluents to the initial state
         for (Fluent fl : fluents){
@@ -170,8 +176,17 @@ public class UpdatingControllerSafetySynthesizer {
             Long actualInMetaEnv = toVisit.remove();
             if (!discovered.contains(actualInMetaEnv)) {
                 discovered.add(actualInMetaEnv);
+                visitedStates++;
+                if ((visitedStates & 0x3fffL) == 0L) {
+                    DUCHeartbeat.setCounter("valuationStates", visitedStates);
+                    DUCHeartbeat.setCounter("valuationQueue", toVisit.size());
+                }
 
                 for (Pair<String, Long> action_toStateInMetaEnv : metaEnv.getTransitions(actualInMetaEnv,MTS.TransitionType.REQUIRED)) {
+                    visitedTransitions++;
+                    if ((visitedTransitions & 0x3fffL) == 0L) {
+                        DUCHeartbeat.setCounter("valuationTransitions", visitedTransitions);
+                    }
 
                     String action = action_toStateInMetaEnv.getFirst();
                     Long toState = action_toStateInMetaEnv.getSecond();
@@ -201,6 +216,9 @@ public class UpdatingControllerSafetySynthesizer {
             }
         }
 
+        DUCHeartbeat.setCounter("valuationStates", visitedStates);
+        DUCHeartbeat.setCounter("valuationTransitions", visitedTransitions);
+        DUCHeartbeat.setCounter("valuationQueue", toVisit.size());
         return fsv;
     }
 
@@ -237,14 +255,28 @@ public class UpdatingControllerSafetySynthesizer {
 
     private static void formulaToStateSet(Set<Long> toBuild, Set<Long> allStates, List<Formula> formulas, FluentStateValuation<Long> valuation) {
 
+        DUCHeartbeat.beginPhase("TRADITIONAL_SAFETY_FORMULA_EVAL");
+        DUCHeartbeat.setCounter("metaStates", allStates.size());
+        DUCHeartbeat.setCounter("safetyFormulas", formulas.size());
+        long evaluations = 0L;
+        int formulaIndex = 0;
         for (Formula formula : formulas) {
+            formulaIndex++;
+            DUCHeartbeat.setCounter("formulaIndex", formulaIndex);
             for (Long state : allStates) {
                 formulaToStateSet(toBuild, formula, state, valuation);
+                evaluations++;
+                if ((evaluations & 0x3fffL) == 0L) {
+                    DUCHeartbeat.setCounter("formulaEvaluations", evaluations);
+                    DUCHeartbeat.setCounter("formulaSatisfiedStates", toBuild.size());
+                }
             }
             if (toBuild.isEmpty()) {
                 Logger.getAnonymousLogger().log(Level.WARNING, "No state satisfies formula: " + formula);
             }
         }
+        DUCHeartbeat.setCounter("formulaEvaluations", evaluations);
+        DUCHeartbeat.setCounter("formulaSatisfiedStates", toBuild.size());
     }
 
     private static void formulaToStateSet(Set<Long> toBuild, Formula formula, Long state, FluentStateValuation<Long> valuation) {
@@ -257,22 +289,41 @@ public class UpdatingControllerSafetySynthesizer {
 
     private static MTS<Long, String> applySafetyInEnvironment(MTS<Long, String> metaEnvironment, HashSet<Long> toBuild) {
 
+        DUCHeartbeat.beginPhase("TRADITIONAL_SAFETY_APPLY_PRUNING");
+        DUCHeartbeat.setCounter("metaStates", metaEnvironment.getStates().size());
+        DUCHeartbeat.setCounter("prunedStateCandidates", toBuild.size());
         MTS<Long, String> result = new MTSImpl<Long, String>(metaEnvironment.getInitialState());
+        long checkedStates = 0L;
+        long copiedTransitions = 0L;
+        long prunedStates = 0L;
 
         for (Long state : metaEnvironment.getStates()) {
+            checkedStates++;
             result.addState(state);
             if (!toBuild.contains(state)){
                 for (Pair<String, Long> transition : metaEnvironment.getTransitions(state, MTS.TransitionType.REQUIRED)) {
+                    copiedTransitions++;
 
                     result.addState(transition.getSecond());
                     result.addAction(transition.getFirst());
 
                     result.addRequired(state, transition.getFirst(), transition.getSecond());
                 }
+            } else {
+                prunedStates++;
+            }
+            if ((checkedStates & 0x3fffL) == 0L) {
+                DUCHeartbeat.setCounter("checkedStates", checkedStates);
+                DUCHeartbeat.setCounter("copiedTransitions", copiedTransitions);
+                DUCHeartbeat.setCounter("prunedStates", prunedStates);
             }
 
         }
         result.removeUnreachableStates();
+        DUCHeartbeat.setCounter("checkedStates", checkedStates);
+        DUCHeartbeat.setCounter("copiedTransitions", copiedTransitions);
+        DUCHeartbeat.setCounter("prunedStates", prunedStates);
+        DUCHeartbeat.setCounter("createdSafetyStates", result.getStates().size());
         return result;
 
     }

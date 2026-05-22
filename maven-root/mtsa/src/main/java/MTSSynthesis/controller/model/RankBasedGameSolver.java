@@ -2,6 +2,7 @@ package MTSSynthesis.controller.model;
 
 import MTSSynthesis.ar.dc.uba.util.ConcurrentSetQueue;
 import MTSSynthesis.controller.gr.StrategyState;
+import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.MultiCore.ComputerOptions;
 
 import java.util.*;
@@ -70,6 +71,8 @@ public abstract class RankBasedGameSolver<S, M> implements GameSolver<S, M> {
 
 
         this.initialise(pending);
+        DUCHeartbeat.setCounter("grInitialPending", pending.size());
+        DUCHeartbeat.setCounter("grGameStates", getGameStates().size());
 
         synthesis(nThreads, pending);
 
@@ -133,14 +136,20 @@ public abstract class RankBasedGameSolver<S, M> implements GameSolver<S, M> {
         while (!pending.isEmpty()) {
             sequentialWorker.consume();
         }
+        sequentialWorker.flushHeartbeatProgress();
 
         gameSolved = true;
     }
 
-
     private long log(long time) {
             Logger.getAnonymousLogger().log(Level.FINER, "Synthesis time: " + time + " milliseconds.");
             return time;
+    }
+
+    void addHeartbeatProgress(long processedDelta, long rankUpdatesDelta, int pendingSize) {
+        DUCHeartbeat.addCounter("grProcessed", processedDelta);
+        DUCHeartbeat.addCounter("grRankUpdates", rankUpdatesDelta);
+        DUCHeartbeat.setCounter("grPending", pendingSize);
     }
 
     /* (non-Javadoc)

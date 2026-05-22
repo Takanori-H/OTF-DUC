@@ -14,6 +14,8 @@ public class RankBasedGameSolverWorker<S, M> implements Runnable {
     private RankBasedGameSolver<S, M> rankBasedGameSolver;
     private AtomicBoolean waitingElement;
     private Phaser allFinish;
+    private long localProcessed;
+    private long localRankUpdates;
 
 
     public RankBasedGameSolverWorker(Queue<StrategyState<S, M>> q, RankBasedGameSolver<S, M> rb, AtomicInteger r, AtomicBoolean we, Phaser af) {
@@ -30,9 +32,11 @@ public class RankBasedGameSolverWorker<S, M> implements Runnable {
     }
 
     public void run() {
+        try {
         while (waitingElement.get()) {
 
             if (pendingQueue.isEmpty()) {
+                flushHeartbeatProgress();
                 allFinish.arriveAndDeregister();
                 try {
                     synchronized (waitingElement) {
@@ -51,6 +55,9 @@ public class RankBasedGameSolverWorker<S, M> implements Runnable {
                 }
             }
 
+        }
+        } finally {
+            flushHeartbeatProgress();
         }
         allFinish.arriveAndDeregister();
 
@@ -72,6 +79,7 @@ public class RankBasedGameSolverWorker<S, M> implements Runnable {
         Rank rank = rankBasedGameSolver.getRank(state);
 
         if (rank.isInfinity()) {
+            recordHeartbeatProgress(false);
             return;
         }
 
@@ -89,6 +97,7 @@ public class RankBasedGameSolverWorker<S, M> implements Runnable {
 
 
         if (bestRank.compareTo(rankBasedGameSolver.getRank(state)) <= 0) {
+            recordHeartbeatProgress(false);
             return;
         }
 
@@ -98,8 +107,28 @@ public class RankBasedGameSolverWorker<S, M> implements Runnable {
         rankBasedGameSolver.updateRank(state, bestRank);
 
         rankBasedGameSolver.addPredecessorsTo(pendingQueue, state, bestRank);
+        recordHeartbeatProgress(true);
 
 
+    }
+
+    public void flushHeartbeatProgress() {
+        if (localProcessed == 0L && localRankUpdates == 0L) {
+            return;
+        }
+        rankBasedGameSolver.addHeartbeatProgress(localProcessed, localRankUpdates, pendingQueue.size());
+        localProcessed = 0L;
+        localRankUpdates = 0L;
+    }
+
+    private void recordHeartbeatProgress(boolean rankUpdated) {
+        localProcessed++;
+        if (rankUpdated) {
+            localRankUpdates++;
+        }
+        if ((localProcessed & 0x3fffL) == 0L) {
+            flushHeartbeatProgress();
+        }
     }
 
 }

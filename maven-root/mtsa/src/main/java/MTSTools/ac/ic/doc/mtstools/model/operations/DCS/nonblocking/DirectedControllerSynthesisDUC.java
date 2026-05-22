@@ -29,6 +29,7 @@ import MTSTools.ac.ic.doc.mtstools.model.impl.MarkedLTSImpl;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.DirectedControllerSynthesis;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HAction;
 import ltsa.lts.LTSOutput;
+import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.EvaluationProfiler;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdateConstants;
@@ -81,16 +82,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
     private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
-    private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "true"));
+    private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "false"));
     private boolean nondeterministicActionMergeEnabled =
             Boolean.parseBoolean(System.getProperty("otfduc.nondet.merge", "false"));
     private boolean preUpdateSimpleMergeEnabled = Boolean.parseBoolean(
             System.getProperty("otfduc.simple.merge",
-                    System.getProperty("otfduc.preupdate.merge", "true")));
+                    System.getProperty("otfduc.preupdate.merge", "false")));
     private boolean gr1LoopJudgementEnabled =
-            Boolean.parseBoolean(System.getProperty("otfduc.gr1.loop", "true"));
+            Boolean.parseBoolean(System.getProperty("otfduc.gr1.loop", "false"));
     private boolean gr1FinishUpdateRequired =
-            Boolean.parseBoolean(System.getProperty("otfduc.gr1.finish.required", "true"));
+            Boolean.parseBoolean(System.getProperty("otfduc.gr1.finish.required", "false"));
     private int beliefRepairAbsoluteMaxStates = Integer.getInteger("otfduc.belief.maxStates", 5000);
     private int beliefRepairMinBeliefNodes = Integer.getInteger("otfduc.belief.maxNodes.min", 64);
     private int beliefRepairBeliefNodesPerNewControllerState =
@@ -423,6 +424,20 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return statistics;
     }
 
+    private void publishOtfHeartbeat() {
+        DUCHeartbeat.setCounter("expandedStates", statistics.getExpandedStates());
+        DUCHeartbeat.setCounter("expandedTransitions", statistics.getExpandedTransitions());
+        DUCHeartbeat.setCounter("knownStates", compostates == null ? 0 : compostates.size());
+        DUCHeartbeat.setCounter("frontierStates", heuristic == null ? 0 : heuristic.frontierSize());
+        DUCHeartbeat.setCounter("newStates", newCompostateCount);
+        DUCHeartbeat.setCounter("generatedChildren", generatedChildCount);
+        DUCHeartbeat.setCounter("errorStates", errorMarkCount);
+        DUCHeartbeat.setCounter("loopErrors", loopErrorCount);
+        DUCHeartbeat.setCounter("detectedLoops", detectedLoopCount);
+        DUCHeartbeat.setCounter("fairPromotedLoops", fairPromotedLoopCount);
+        DUCHeartbeat.setCounter("finishUpdateBlocked", finishUpdateGuardBlockedCount);
+    }
+
     public LTS<Long, Action> synthesizeDUC(
             List<LTS<State, Action>> ltss,
             Set<Action> controllable,
@@ -497,6 +512,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             setupInitialState();
 
             beginStrategy1NormalOtfSimpleMergeMeasurement();
+            DUCHeartbeat.beginPhase("OTF_DCS_SEARCH");
+            publishOtfHeartbeat();
             long searchStart = System.currentTimeMillis();
 
             // isFinished() は初期状態がGOAL/ERRORになればtrue
@@ -538,8 +555,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 long expansionStart = System.nanoTime();
                 expandDUC(state, action);
                 stateExpansionNanos += System.nanoTime() - expansionStart;
+                if ((totalLtsExpansions & 0x3ffL) == 0L) {
+                    publishOtfHeartbeat();
+                }
 
             }
+            publishOtfHeartbeat();
 
             statistics.end();
 
@@ -2683,6 +2704,45 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             || actionName.equals(UpdateConstants.FINISH_UPDATE);
     }
 
+    private boolean isUnexploredControllableEscapeRelevantForFairness(
+            CompostateDUC<State, Action> state,
+            HAction<State, Action> action,
+            Set<CompostateDUC<State, Action>> loopSnapshot) {
+
+        if (getMarkingState(state) == 0 && action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
+            return true;
+        }
+
+        if (isUpdateProtocolAction(action)) {
+            return true;
+        }
+
+        return !hasSafeUncontrollableSuccessorInLoop(state, loopSnapshot);
+    }
+
+    private boolean hasSafeUncontrollableSuccessorInLoop(
+            CompostateDUC<State, Action> state,
+            Set<CompostateDUC<State, Action>> loopSnapshot) {
+
+        for (HAction<State, Action> action : state.getTransitions()) {
+            if (action.isControllable()) {
+                continue;
+            }
+
+            Set<CompostateDUC<State, Action>> children = state.getExploredChildren().getImage(action);
+            if (children == null || children.isEmpty()) {
+                continue;
+            }
+
+            for (CompostateDUC<State, Action> child : children) {
+                if (loopSnapshot.contains(child) && !isError(child)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private boolean hasUncontrollableSuccessorIn(
             CompostateDUC<State, Action> state,
             Set<CompostateDUC<State, Action>> candidates) {
@@ -3005,24 +3065,30 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 Set<CompostateDUC<State, Action>> children = s.getExploredChildren().getImage(a);
 
                 if (a.isControllable()) {
-                    if (debugLogEnabled) {
-                        if (children != null && !children.isEmpty()) {
+                    if (children == null || children.isEmpty()) {
+                        hasEscapeHatch = true;
+                        boolean relevantEscape = isUnexploredControllableEscapeRelevantForFairness(s, a, loop);
+                        if (relevantEscape) {
+                            hasUnexploredControllableEscape = true;
+                        }
+                        if (debugLogEnabled) {
+                            if (relevantEscape) {
+                                log("      -> Controllable [" + a + "]: UNEXPLORED (Fair-relevant escape hatch found)");
+                            } else {
+                                log("      -> Controllable [" + a + "]: UNEXPLORED"
+                                        + " (ordinary controllable ignored while safe Uncontrollable wait remains)");
+                            }
+                        }
+                    }
+                    else{
+                        if (debugLogEnabled) {
                             StringBuilder sb = new StringBuilder();
                             sb.append("      -> Controllable [").append(a).append("]: Explored. Children: ");
                             for (CompostateDUC<State, Action> child : children) {
                                 sb.append(child.getStates()).append(" (Status: ").append(child.getStatus()).append("), ");
                             }
                             log(sb.toString());
-                        } else {
-                            log("      -> Controllable [" + a + "]: UNEXPLORED (Escape Hatch Found!)");
                         }
-                    }
-
-                    if (children == null || children.isEmpty()) {
-                        hasEscapeHatch = true;
-                        hasUnexploredControllableEscape = true;
-                    }
-                    else{
                         // controllable action は、探索済みの非決定分岐がすべて
                         // ERROR を避ける場合に限り、まだ有効な脱出口候補である。
                         boolean leadsToError = false;
@@ -3095,12 +3161,12 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return;
         }
 
-        // 未探索 controllable が残っているループは、safe uncontrollable wait が
-        // 併存していても、現時点では負けと断定しない。探索済み controllable
-        // escape は fairness/GR1 の進捗証明には使わないが、未探索分はまず展開する。
+        // 未探索 controllable が残っているループは、fairness 上の進捗に使える
+        // 可能性がある場合だけ、現時点では負けと断定しない。通常 controllable は、
+        // 同じ状態から safe uncontrollable wait が残るなら fair 到達性の根拠にしない。
         if (hasUnexploredControllableEscape) {
             if (debugLogEnabled) {
-                log("  [Loop-Wait] Loop has unexplored Controllable escape hatches. Postponing ERROR marking.");
+                log("  [Loop-Wait] Loop has unexplored fair-relevant Controllable escape hatches. Postponing ERROR marking.");
             }
             return;
         }

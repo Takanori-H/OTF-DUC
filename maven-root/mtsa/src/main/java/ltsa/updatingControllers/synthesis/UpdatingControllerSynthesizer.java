@@ -27,6 +27,7 @@ import ltsa.lts.Symbol;
 import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.lts.ltl.AssertDefinition;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
@@ -63,10 +64,14 @@ public class UpdatingControllerSynthesizer {
 
 		// set environment
 		MTS<Long, String> oldC = uccs.getOldController();
+        DUCHeartbeat.start(uccs.isOTF() ? "OTF-DUC" : "Traditional-DUC", uccs.getName());
+        String heartbeatStatus = "completed";
 
+        try {
         if(uccs.isOTF())
         {
             UpdatingControllerEvaluationRecorder.setMode("OTF-DUC");
+            DUCHeartbeat.beginPhase("OTF_GENERATE_DUC");
             // ★確認用ログ出力
             // --- OTF-DUC (提案手法) の実行 ---
             output.outln("=========================================");
@@ -100,6 +105,7 @@ public class UpdatingControllerSynthesizer {
         else
         {
             UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
+            DUCHeartbeat.beginPhase("TRADITIONAL_BUILD_UPDATE_ENV");
             // --- 従来手法 (DUCS) の実行 ---
             // 環境モデル全体(UpdatingEnvironment)を構築してから合成を行う
             output.outln("=========================================");
@@ -165,6 +171,12 @@ public class UpdatingControllerSynthesizer {
                 "UpdatingControllerSynthesizer",
                 "Traditional DUC E_u 構築時間",
                 UpdatingEnvironmentGenerateTime);
+        } catch (RuntimeException | Error e) {
+            heartbeatStatus = "failed:" + e.getClass().getSimpleName();
+            throw e;
+        } finally {
+            DUCHeartbeat.stop(heartbeatStatus);
+        }
 
 	}
 
@@ -179,6 +191,7 @@ public class UpdatingControllerSynthesizer {
         Set<String> controllableActions = uccs.getControllableActions();
 
         //UpdatingEnvironmentからMTSへ変換
+        DUCHeartbeat.beginPhase("TRADITIONAL_CONVERT_EU_MTS");
         long convertEuStart = System.currentTimeMillis();
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
@@ -251,6 +264,9 @@ public class UpdatingControllerSynthesizer {
                 metaEnvironmentFluentCount,
                 "個");
         long buildMetaEnvStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_BUILD_META_ENV");
+        DUCHeartbeat.setCounter("euStates", E_u.getStates().size());
+        DUCHeartbeat.setCounter("metaFluents", metaEnvironmentFluentCount);
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "Fluent とベース環境を並列合成した metaEnv 構築時間");
@@ -338,6 +354,9 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long buildSafetyEnvStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_SAFETY_ENV_BUILD");
+        DUCHeartbeat.setCounter("metaStates", metaEnvironment.getStates().size());
+        DUCHeartbeat.setCounter("safetyFormulas", safetyFormulas.size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
@@ -431,6 +450,9 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long synthesizeGRStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_SYNTHESIS");
+        DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
+        DUCHeartbeat.setCounter("safetyTransitions", safeTrans);
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "safetyEnv を GR1 で解く時間");
@@ -619,6 +641,7 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long boxListStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("OTF_BOXLIST_PREPARE");
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "boxList 準備時間");
@@ -820,6 +843,8 @@ public class UpdatingControllerSynthesizer {
 
         //評価実験用
         long stateMappingStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("OTF_STATE_MAPPING");
+        DUCHeartbeat.setCounter("boxListComponents", boxList.size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "New Controller の接続先の事前計算");
@@ -909,6 +934,8 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF New Controller 接続先事前計算後");
 
         long translateFluentMapStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("OTF_SAFETY_MAP_CONVERSION");
+        DUCHeartbeat.setCounter("newControllerConnectionEntries", newControllerConnectionMap.size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "New Safety と Fluent の対応表の変換作業時間");
@@ -1008,6 +1035,9 @@ public class UpdatingControllerSynthesizer {
         output.outln("Initializing DCS...");
 
         long dcsStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("OTF_DCS_INITIALIZE");
+        DUCHeartbeat.setCounter("boxListComponents", boxList.size());
+        DUCHeartbeat.setCounter("newControllerConnectionEntries", newControllerConnectionMap.size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "DCS で Update Controller を合成する時間");
@@ -1053,6 +1083,8 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("OTF DCS 実行後");
 
         if (result != null) {
+            DUCHeartbeat.beginPhase("OTF_OUTPUT_CONTROLLER_BUILD");
+            DUCHeartbeat.setCounter("resultStates", result.getStates().size());
             output.outln("DUC Generated Successfully! States: " + result.getStates().size());
             CompactState res = MTSToAutomataConverter.getInstance().convert(new MTSAdapter<Long, String>(result), uccs.getName(), false);
             res.reachable();

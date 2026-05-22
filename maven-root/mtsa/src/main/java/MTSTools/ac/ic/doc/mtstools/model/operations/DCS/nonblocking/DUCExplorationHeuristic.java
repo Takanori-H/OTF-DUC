@@ -166,6 +166,10 @@ public class DUCExplorationHeuristic<State, Action> {
         return !frontier.isEmpty();
     }
 
+    public int frontierSize() {
+        return frontier.size();
+    }
+
     public void setInitialState(CompostateDUC<State, Action> state) {
         newState(state, null);
         maybeAddToFrontier(state);

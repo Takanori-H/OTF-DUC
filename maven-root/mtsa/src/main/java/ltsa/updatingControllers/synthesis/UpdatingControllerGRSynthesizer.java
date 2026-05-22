@@ -23,6 +23,7 @@ import MTSTools.ac.ic.doc.mtstools.utils.GenericMTSToLongStringMTSConverter;
 import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
 import ltsa.lts.CompactState;
 import ltsa.lts.LTSOutput;
+import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 
@@ -67,6 +68,8 @@ public class UpdatingControllerGRSynthesizer {
         FluentUtils fluentUtils = FluentUtils.getInstance();
 
         long subsetStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_SUBSET_CONSTRUCTION");
+        DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "非決定環境の subset construction 時間");
@@ -82,6 +85,8 @@ public class UpdatingControllerGRSynthesizer {
 
         FluentStateValuation<Set<Long>> valuation = fluentUtils.buildValuation(perfectInfoGame, uccs.getUpdateGRGoal().getFluents());
         long goalBuildStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_GOAL_BUILD");
+        DUCHeartbeat.setCounter("perfectInfoStates", perfectInfoGame.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "GR goal 構築時間");
@@ -103,6 +108,8 @@ public class UpdatingControllerGRSynthesizer {
         initialStates.add(initialState);
 
         long gameBuildStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_GAME_BUILD");
+        DUCHeartbeat.setCounter("perfectInfoStates", perfectInfoGame.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "Knowledge GR game 構築時間");
@@ -116,6 +123,8 @@ public class UpdatingControllerGRSynthesizer {
                 System.currentTimeMillis() - gameBuildStart);
 
         long rankSystemStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_RANK_SYSTEM_BUILD");
+        DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "Rank system 構築時間");
@@ -130,6 +139,8 @@ public class UpdatingControllerGRSynthesizer {
 
         KnowledgeGRGameSolver<Long, String> solver = new KnowledgeGRGameSolver<Long, String>(game, system);
         long solveStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_WINNING_REGION");
+        DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "Winning region 計算時間");
@@ -144,6 +155,7 @@ public class UpdatingControllerGRSynthesizer {
 
         if (solver.isWinning(perfectInfoGame.getInitialState())) {
             long strategyBuildStart = System.currentTimeMillis();
+            DUCHeartbeat.beginPhase("TRADITIONAL_GR1_STRATEGY_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "Traditional DUC GR1 時間内訳",
                     "Strategy 構築時間");
@@ -158,6 +170,7 @@ public class UpdatingControllerGRSynthesizer {
 
             Set<Pair<StrategyState<Set<Long>, Integer>, StrategyState<Set<Long>, Integer>>> worseRank = solver.getWorseRank();
             long strategyToMtsStart = System.currentTimeMillis();
+            DUCHeartbeat.beginPhase("TRADITIONAL_GR1_CONTROLLER_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "Traditional DUC GR1 時間内訳",
                     "Strategy から controller MTS を構築する時間");
@@ -251,6 +264,8 @@ public class UpdatingControllerGRSynthesizer {
         GRGame<Long> game;
 
         long gameBuildStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_GAME_BUILD");
+        DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "GR game 構築時間");
@@ -263,6 +278,8 @@ public class UpdatingControllerGRSynthesizer {
                 "GR game 構築時間",
                 System.currentTimeMillis() - gameBuildStart);
         long rankSystemStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_RANK_SYSTEM_BUILD");
+        DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "Rank system 構築時間");
@@ -277,6 +294,8 @@ public class UpdatingControllerGRSynthesizer {
                 System.currentTimeMillis() - rankSystemStart);
         PerfectInfoGRGameSolver<Long> solver = new PerfectInfoGRGameSolver<Long>(game, system);
         long solveStart = System.currentTimeMillis();
+        DUCHeartbeat.beginPhase("TRADITIONAL_GR1_WINNING_REGION");
+        DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC GR1 時間内訳",
                 "Winning region 計算時間");
@@ -291,6 +310,7 @@ public class UpdatingControllerGRSynthesizer {
 
         if (solver.isWinning(safetyEnv.getInitialState())) {
             long strategyBuildStart = System.currentTimeMillis();
+            DUCHeartbeat.beginPhase("TRADITIONAL_GR1_STRATEGY_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "Traditional DUC GR1 時間内訳",
                     "Strategy 構築時間");
@@ -305,6 +325,7 @@ public class UpdatingControllerGRSynthesizer {
             GRGameSolver<Long> grSolver = (GRGameSolver<Long>) solver;
             Set<Pair<StrategyState<Long, Integer>, StrategyState<Long, Integer>>> worseRank = grSolver.getWorseRank();
             long strategyToMtsStart = System.currentTimeMillis();
+            DUCHeartbeat.beginPhase("TRADITIONAL_GR1_CONTROLLER_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "Traditional DUC GR1 時間内訳",
                     "Strategy から controller MTS を構築する時間");
