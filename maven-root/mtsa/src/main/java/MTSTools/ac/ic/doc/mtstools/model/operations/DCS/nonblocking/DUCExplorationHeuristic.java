@@ -79,8 +79,8 @@ public class DUCExplorationHeuristic<State, Action> {
             long mState = (mStateObj instanceof Long) ? (Long)mStateObj : ((Integer)mStateObj).longValue();
 
             if (mState == 0) return 0; // 初期
-            if (mState == 1) return 1; // beginUpdate
-            if (mState == 9) return 5; // Goal (finishUpdate)
+            if (mState == 1) return 1; // hotSwapIn
+            if (mState == 9) return 5; // Goal (hotSwapOut)
             
             // 2,3,5(1つ完了) -> Depth 2
             // 4,6,7(2つ完了) -> Depth 3

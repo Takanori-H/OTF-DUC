@@ -2,7 +2,10 @@ package ltsa.updatingControllers.synthesis;
 
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.ar.dc.uba.model.condition.FluentImpl;
+import MTSSynthesis.ar.dc.uba.model.condition.FluentPropositionalVariable;
 import MTSSynthesis.ar.dc.uba.model.condition.Formula;
+import MTSSynthesis.ar.dc.uba.model.condition.AndFormula;
+import MTSSynthesis.ar.dc.uba.model.condition.NotFormula;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.controller.util.FluentStateValuation;
 import MTSTools.ac.ic.doc.commons.relations.Pair;
@@ -26,6 +29,8 @@ import ltsa.lts.LTSOutput;
 import ltsa.lts.Symbol;
 import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.lts.ltl.AssertDefinition;
+import ltsa.lts.ltl.FormulaFactory;
+import ltsa.lts.ltl.FormulaSyntax;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
@@ -522,24 +527,25 @@ public class UpdatingControllerSynthesizer {
         for (Symbol safetyDefinition : newGoalDef.getSafetyDefinitions()) {
 
             output.outln("Processing formula for update: " + safetyDefinition.getName());
-            AssertDefinition def = AssertDefinition.getConstraint(safetyDefinition.getName());
-
-            if (def != null) {
-                Set<Fluent> formulaFluents = new HashSet<Fluent>();
-                safetyFormulas.add(FormulaUtils.adaptFormulaAndCreateFluents(def.getFormula(false), formulaFluents));
-                safetyFluents.addAll(formulaFluents);
-                String safetyName = safetyDefinition.getName();
-                if (safetyName.endsWith(UpdateConstants.OLD_SUFFIX)) {
-                    oldSafetyFluents.addAll(formulaFluents);
-                } else if (safetyName.endsWith(UpdateConstants.NEW_SUFFIX)) {
-                    newSafetyFluents.addAll(formulaFluents);
-                } else {
-                    transitionRequirementFluents.addAll(formulaFluents);
-                }
-
+            String safetyName = safetyDefinition.getName();
+            Set<Fluent> formulaFluents = new HashSet<Fluent>();
+            Formula safetyFormula;
+            if (safetyName.endsWith(UpdateConstants.OLD_SUFFIX)) {
+                safetyFormula = buildInternalOldSafetyFormula(safetyName, formulaFluents);
+                oldSafetyFluents.addAll(formulaFluents);
+            } else if (safetyName.endsWith(UpdateConstants.NEW_SUFFIX)) {
+                safetyFormula = buildInternalNewSafetyFormula(safetyName, formulaFluents);
+                newSafetyFluents.addAll(formulaFluents);
             } else {
-                Diagnostics.fatal("Assertion not defined ["	+ safetyDefinition.getName() + "].");
+                AssertDefinition def = AssertDefinition.getConstraint(safetyName);
+                if (def == null) {
+                    Diagnostics.fatal("Assertion not defined ["	+ safetyDefinition.getName() + "].");
+                }
+                safetyFormula = FormulaUtils.adaptFormulaAndCreateFluents(def.getFormula(false), formulaFluents);
+                transitionRequirementFluents.addAll(formulaFluents);
             }
+            safetyFormulas.add(safetyFormula);
+            safetyFluents.addAll(formulaFluents);
         }
         return new SafetyFormulaExtractionResult(
                 safetyFormulas,
@@ -548,6 +554,42 @@ public class UpdatingControllerSynthesizer {
                 newSafetyFluents.size(),
                 unionSize(oldSafetyFluents, newSafetyFluents),
                 transitionRequirementFluents.size());
+    }
+
+    private static Formula buildInternalOldSafetyFormula(String generatedSafetyName, Set<Fluent> formulaFluents) {
+        Formula originalViolationFormula = adaptOriginalSafetyFormula(
+                stripSuffix(generatedSafetyName, UpdateConstants.OLD_SUFFIX),
+                formulaFluents);
+        formulaFluents.add(UpdatingControllersUtils.stopFluent);
+        return new AndFormula(
+                new NotFormula(new FluentPropositionalVariable(UpdatingControllersUtils.stopFluent)),
+                originalViolationFormula);
+    }
+
+    private static Formula buildInternalNewSafetyFormula(String generatedSafetyName, Set<Fluent> formulaFluents) {
+        Formula originalViolationFormula = adaptOriginalSafetyFormula(
+                stripSuffix(generatedSafetyName, UpdateConstants.NEW_SUFFIX),
+                formulaFluents);
+        formulaFluents.add(UpdatingControllersUtils.startFluent);
+        return new AndFormula(
+                new FluentPropositionalVariable(UpdatingControllersUtils.startFluent),
+                originalViolationFormula);
+    }
+
+    private static Formula adaptOriginalSafetyFormula(String originalSafetyName, Set<Fluent> formulaFluents) {
+        AssertDefinition originalDef = AssertDefinition.getConstraint(originalSafetyName);
+        if (originalDef == null) {
+            Diagnostics.fatal("Assertion not defined [" + originalSafetyName + "].");
+        }
+        FormulaSyntax strippedSyntax = originalDef.getLTLFormula().removeLeftTemporalOperators();
+        FormulaFactory factory = new FormulaFactory();
+        Hashtable initParams = originalDef.getInitParams() != null ? originalDef.getInitParams() : new Hashtable();
+        factory.setFormula(strippedSyntax.expand(factory, new Hashtable(), initParams));
+        return FormulaUtils.adaptFormulaAndCreateFluents(factory.getFormula(), formulaFluents);
+    }
+
+    private static String stripSuffix(String value, String suffix) {
+        return value.substring(0, value.length() - suffix.length());
     }
 
     private static int unionSize(Set<Fluent> left, Set<Fluent> right) {
@@ -692,7 +734,7 @@ public class UpdatingControllerSynthesizer {
         allActions.remove("tau");
         
         // 10状態の Marking LTS を作成
-        // 0:Pre ->(beginUpdate)-> 1-8:In ->(finishUpdate)-> 9:Post
+        // 0:Pre ->(hotSwapIn)-> 1-8:In ->(hotSwapOut)-> 9:Post
         // OTF用の進捗管理Marking LTSを作成 (createOTFMarkingLTS使用)
         MTS<Long, String> markingMTS = createOTFMarkingLTS(
             UpdateConstants.BEGIN_UPDATE, 
@@ -1127,18 +1169,18 @@ public class UpdatingControllerSynthesizer {
 
     /**
      * OTF探索用の進捗管理機能付き Marking LTS を作成する。
-     * 4つの更新事象が全て完了するまで finishUpdate を許可しないロジックをLTS構造として埋め込む。
+     * 4つの更新事象が全て完了するまで hotSwapOut を許可しないロジックをLTS構造として埋め込む。
      * * ■ 状態定義 (States):
-     * - State 0: Pre-Update (beginUpdate 前)
+     * - State 0: Pre-Update (hotSwapIn 前)
      * - State 1..8: In-Update (更新中。3つの事象の完了状況をビットマスクで管理)
      * - Base Offset = 1
      * - State ID = 1 + mask (mask: 0..7)
      * - Bit 0 (1): stopOldSpec 完了
      * - Bit 1 (2): reconfigure 完了
      * - Bit 2 (4): startNewSpec 完了
-     * - State 9: Post-Update (Goal。finishUpdate 後)
-     * * @param startAction 更新開始アクション (例: beginUpdate)
-     * @param endAction   更新終了アクション (例: finishUpdate)
+     * - State 9: Post-Update (Goal。hotSwapOut 後)
+     * * @param startAction 更新開始アクション (例: hotSwapIn)
+     * @param endAction   更新終了アクション (例: hotSwapOut)
      * @param alphabet    システム全体のアルファベット集合
      * @return 進捗管理ロジックを含むMTS
      */
@@ -1159,8 +1201,8 @@ public class UpdatingControllerSynthesizer {
 
         // --- 2. アルファベットの設定 ---
         Set<String> fullAlphabet = new HashSet<>(alphabet);
-        fullAlphabet.add(startAction);       // beginUpdate
-        fullAlphabet.add(endAction);         // finishUpdate
+        fullAlphabet.add(startAction);       // hotSwapIn
+        fullAlphabet.add(endAction);         // hotSwapOut
         fullAlphabet.add(UpdateConstants.STOP_OLD_SPEC);
         fullAlphabet.add(UpdateConstants.RECONFIGURE);
         fullAlphabet.add(UpdateConstants.START_NEW_SPEC);

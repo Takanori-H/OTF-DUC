@@ -23,8 +23,8 @@ import java.util.TreeMap;
  * Counts update-controller state spaces by update progress phase.
  *
  * Phases are represented by the three completion bits for stopOldSpec,
- * reconfigure, and startNewSpec after beginUpdate. PRE is before beginUpdate;
- * POST is after finishUpdate, which only exists in OTF-DUC outputs.
+ * reconfigure, and startNewSpec after hotSwapIn. PRE is before hotSwapIn;
+ * POST is after hotSwapOut, which only exists in OTF-DUC outputs.
  */
 public final class UpdatePhaseEvaluator {
 
@@ -42,9 +42,9 @@ public final class UpdatePhaseEvaluator {
     public static final String SECTION_TRADITIONAL_PHASE_FLOW = "Traditional DUC update phase 間遷移数";
     public static final String SECTION_OTF_EXPLORED_PHASE_FLOW = "OTF-DUC update phase 間探索遷移数";
     public static final String SECTION_OUTPUT_PHASE_FLOW = "Output Update Controller update phase 間遷移数";
-    public static final String SECTION_TRADITIONAL_COMPLETION_PATH = "Traditional DUC beginUpdate から更新完了までの距離";
-    public static final String SECTION_OTF_EXPLORED_COMPLETION_PATH = "OTF-DUC beginUpdate から更新完了までの探索距離";
-    public static final String SECTION_OUTPUT_COMPLETION_PATH = "Output Update Controller beginUpdate から更新完了までの距離";
+    public static final String SECTION_TRADITIONAL_COMPLETION_PATH = "Traditional DUC hotSwapIn から更新完了までの距離";
+    public static final String SECTION_OTF_EXPLORED_COMPLETION_PATH = "OTF-DUC hotSwapIn から更新完了までの探索距離";
+    public static final String SECTION_OUTPUT_COMPLETION_PATH = "Output Update Controller hotSwapIn から更新完了までの距離";
     public static final String SECTION_TRADITIONAL_NORMAL_ACTIONS = "Traditional DUC update phase 別通常 action 遷移数";
     public static final String SECTION_OTF_EXPLORED_NORMAL_ACTIONS = "OTF-DUC update phase 別通常 action 探索遷移数";
     public static final String SECTION_OUTPUT_NORMAL_ACTIONS = "Output Update Controller update phase 別通常 action 遷移数";
@@ -152,25 +152,25 @@ public final class UpdatePhaseEvaluator {
     public static String phaseDescription(int phase) {
         switch (phase) {
             case PHASE_PRE:
-                return "beginUpdate 前。";
+                return "hotSwapIn 前。";
             case PHASE_000:
-                return "beginUpdate 後、stopOldSpec/reconfigure/startNewSpec は全て未完了。";
+                return "hotSwapIn 後、stopOldSpec/reconfigure/startNewSpec は全て未完了。";
             case PHASE_100:
-                return "beginUpdate 後、stopOldSpec のみ完了。";
+                return "hotSwapIn 後、stopOldSpec のみ完了。";
             case PHASE_010:
-                return "beginUpdate 後、reconfigure のみ完了。";
+                return "hotSwapIn 後、reconfigure のみ完了。";
             case PHASE_110:
-                return "beginUpdate 後、stopOldSpec と reconfigure が完了。";
+                return "hotSwapIn 後、stopOldSpec と reconfigure が完了。";
             case PHASE_001:
-                return "beginUpdate 後、startNewSpec のみ完了。";
+                return "hotSwapIn 後、startNewSpec のみ完了。";
             case PHASE_101:
-                return "beginUpdate 後、stopOldSpec と startNewSpec が完了。";
+                return "hotSwapIn 後、stopOldSpec と startNewSpec が完了。";
             case PHASE_011:
-                return "beginUpdate 後、reconfigure と startNewSpec が完了。";
+                return "hotSwapIn 後、reconfigure と startNewSpec が完了。";
             case PHASE_111:
-                return "beginUpdate 後、stopOldSpec/reconfigure/startNewSpec が全て完了。";
+                return "hotSwapIn 後、stopOldSpec/reconfigure/startNewSpec が全て完了。";
             case PHASE_POST:
-                return "finishUpdate 後。Traditional DUC には通常存在しない。";
+                return "hotSwapOut 後。Traditional DUC には通常存在しない。";
             default:
                 return "";
         }

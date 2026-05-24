@@ -13,6 +13,7 @@ import MTSTools.ac.ic.doc.commons.relations.BinaryRelationImpl;
 import MTSTools.ac.ic.doc.commons.relations.Pair;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HAction;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.abstraction.HEstimate;
+import ltsa.updatingControllers.UpdateConstants;
 
 public class CompostateDUC<State, Action> {
 
@@ -54,7 +55,7 @@ public class CompostateDUC<State, Action> {
     HashMap<HAction<State, Action>, HEstimate<State, Action>> estimates;
     public final Integer uncontrollablesCount;
 
-    // finishUpdateがこの状態で発火可能かどうかのフラグ
+    // hotSwapOutがこの状態で発火可能かどうかのフラグ
     private boolean finishUpdateBlocked = false;
 
     public CompostateDUC(DirectedControllerSynthesisDUC<State, Action> dcs, List<State> states) {
@@ -107,7 +108,7 @@ public class CompostateDUC<State, Action> {
         // 旧コントローラの action は "<action>_old" として公開し、OTF 探索上は
         // uncontrollable として扱う。これにより、1 回の on-the-fly 探索で
         // 旧コントローラ全状態からの更新パスを調べられる。
-        // beginUpdate などの hotswap action は元の名前のまま扱う。
+        // hotSwapIn/hotSwapOut などの hotswap action は元の名前のまま扱う。
         // ---------------------------------------------------------
         if (markingState == 0) {
             Set<String> candidates = new HashSet<>();
@@ -122,7 +123,8 @@ public class CompostateDUC<State, Action> {
             for (String cand : candidates) {
                 String baseName = cand.replace("_old", "");
                 String ocName = baseName + "_old"; 
-                boolean isHotswap = cand.endsWith("Update");
+                boolean isHotswap = UpdateConstants.BEGIN_UPDATE.equals(cand)
+                        || UpdateConstants.FINISH_UPDATE.equals(cand);
                 if (isHotswap) ocName = cand; 
 
                 boolean allAgreed = true;

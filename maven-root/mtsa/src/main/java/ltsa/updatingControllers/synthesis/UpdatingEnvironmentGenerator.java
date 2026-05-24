@@ -36,7 +36,7 @@ public class UpdatingEnvironmentGenerator {
 
     /**
      * pre: updEnv is E||C
-     * post: updEnv is E||C plus some states of E (only the one that has an incoming beginUpdate transition)
+     * post: updEnv is E||C plus some states of E (only the one that has an incoming hotSwapIn transition)
      * states from E has a stopOldSpec, startNewSpec actions
      */
     private void linkWithBeginUpdate() {
@@ -103,7 +103,7 @@ public class UpdatingEnvironmentGenerator {
     }
 
     /**
-     * pre: updEnv is E||C plus some states of E (only the one that has an incoming beginUpdate transition)
+     * pre: updEnv is E||C plus some states of E (only the one that has an incoming hotSwapIn transition)
      * post: updEnv is E||C -> E -> E'
      * states from E and E' has a stopOldSpec, startNewSpec actions.
      */

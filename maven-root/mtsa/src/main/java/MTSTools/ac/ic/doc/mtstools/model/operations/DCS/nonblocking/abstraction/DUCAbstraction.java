@@ -113,11 +113,11 @@ public class DUCAbstraction<State, Action> {
     // ★追加: Marking State ID を更新プロセスの深さ (0-5) に変換するヘルパーメソッド
     private int getMarkingDepth(long markingState) {
         if (markingState == 0) return 0; // 初期状態
-        if (markingState == 1) return 1; // beginUpdate 完了
+        if (markingState == 1) return 1; // hotSwapIn 完了
         if (markingState == 2 || markingState == 3 || markingState == 5) return 2; // 更新イベントのいずれか1つ完了 (stopOld, reconfig, startNew)
         if (markingState == 4 || markingState == 6 || markingState == 7) return 3; // いずれか2つ完了
-        if (markingState == 8) return 4; // 3つ全て完了 (Ready for finishUpdate)
-        if (markingState == 9) return 5; // finishUpdate 完了 (Goal)
+        if (markingState == 8) return 4; // 3つ全て完了 (Ready for hotSwapOut)
+        if (markingState == 9) return 5; // hotSwapOut 完了 (Goal)
         return 0; // Fallback
     }
 
@@ -205,7 +205,7 @@ public class DUCAbstraction<State, Action> {
     private HEstimate<State, Action> calculateEstimate(CompostateDUC<State, Action> compostate, HAction<State, Action> action) {
 
         // === 追加：先行ブロックフラグの反映 ===
-        // 状態生成時に「不可」と判定された finishUpdate は、評価値を与えず null を返す
+        // 状態生成時に「不可」と判定された hotSwapOut は、評価値を与えず null を返す
         if (action.toString().equals(UpdateConstants.FINISH_UPDATE) && compostate.isFinishUpdateBlocked()) {
             return null; 
         }

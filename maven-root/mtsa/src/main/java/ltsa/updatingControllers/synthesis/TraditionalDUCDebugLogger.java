@@ -43,7 +43,7 @@ public final class TraditionalDUCDebugLogger {
         output.outln("旧コントローラ遷移数: " + countTransitions(oldController));
         output.outln("旧コントローラ該当状態数の数え方:");
         output.outln("  E_u: 旧コントローラの元状態IDと一致する状態数も併記する。");
-        output.outln("  metaEnv/safetyEnv/出力UC: BeginUpdate fluent が false の状態を beginUpdate 前の旧コントローラ相当状態として数える。");
+        output.outln("  metaEnv/safetyEnv/出力UC: 内部 BeginUpdate fluent（hotSwapIn で true）が false の状態を hotSwapIn 前の旧コントローラ相当状態として数える。");
         output.outln("================================================================");
     }
 
@@ -68,10 +68,10 @@ public final class TraditionalDUCDebugLogger {
         if (stats.oldIdMatchedStates >= 0) {
             output.outln("  旧コントローラ状態IDと一致する状態数: " + stats.oldIdMatchedStates);
         }
-        output.outln("  旧コントローラ該当状態数（BeginUpdate=false）: " + stats.preBeginStates);
-        output.outln("  beginUpdate が出ている状態数: " + stats.beginUpdateSourceStates);
-        output.outln("  beginUpdate 遷移数: " + stats.beginUpdateTransitions);
-        output.outln("  beginUpdate 前状態から出る beginUpdate 遷移数: " + stats.preBeginBeginUpdateTransitions);
+        output.outln("  旧コントローラ該当状態数（内部BeginUpdate=false / hotSwapIn前）: " + stats.preBeginStates);
+        output.outln("  hotSwapIn が出ている状態数: " + stats.beginUpdateSourceStates);
+        output.outln("  hotSwapIn 遷移数: " + stats.beginUpdateTransitions);
+        output.outln("  hotSwapIn 前状態から出る hotSwapIn 遷移数: " + stats.preBeginBeginUpdateTransitions);
     }
 
     public static void logCompactState(LTSOutput output, String stageName, CompactState compactState) {

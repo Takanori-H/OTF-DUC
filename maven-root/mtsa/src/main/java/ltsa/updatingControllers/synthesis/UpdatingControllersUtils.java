@@ -30,6 +30,10 @@ import ltsa.lts.util.MTSUtils; // 追加
 public class UpdatingControllersUtils {
 
 	public static final Set<Fluent> UPDATE_FLUENTS = new HashSet<Fluent>();
+	public static final String INTERNAL_BEGIN_UPDATE_FLUENT = "__DUC_BeginUpdate";
+	public static final String INTERNAL_STOP_OLD_SPEC_FLUENT = "__DUC_StopOldSpec";
+	public static final String INTERNAL_RECONFIGURE_FLUENT = "__DUC_Reconfigure";
+	public static final String INTERNAL_START_NEW_SPEC_FLUENT = "__DUC_StartNewSpec";
 	public static final Fluent beginFluent;
 	public static final Fluent stopFluent;
 	public static final Fluent reconFluent;
@@ -41,19 +45,17 @@ public class UpdatingControllersUtils {
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> stopAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> reconfigureAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
 		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> startAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
-		//beginUpdateからhotswap_beginに変更
-		// beginAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
+		HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol> resetAction = new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
 		beginAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
 		stopAction.add(new SingleSymbol(UpdateConstants.STOP_OLD_SPEC));
 		reconfigureAction.add(new SingleSymbol(UpdateConstants.RECONFIGURE));
 		startAction.add(new SingleSymbol(UpdateConstants.START_NEW_SPEC));
+		resetAction.add(new SingleSymbol(UpdateConstants.BEGIN_UPDATE));
 
-		//beginUpdateからhotswap_beginに変更
-		beginFluent = new FluentImpl("BeginUpdate", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
-		//beginFluent = new FluentImpl("HotswapBegin", beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
-		stopFluent = new FluentImpl("StopOldSpec", stopAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
-		reconFluent = new FluentImpl("Reconfigure", reconfigureAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
-		startFluent = new FluentImpl("StartNewSpec", startAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
+		beginFluent = new FluentImpl(INTERNAL_BEGIN_UPDATE_FLUENT, beginAction, new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>(), false);
+		stopFluent = new FluentImpl(INTERNAL_STOP_OLD_SPEC_FLUENT, stopAction, resetAction, false);
+		reconFluent = new FluentImpl(INTERNAL_RECONFIGURE_FLUENT, reconfigureAction, resetAction, false);
+		startFluent = new FluentImpl(INTERNAL_START_NEW_SPEC_FLUENT, startAction, resetAction, false);
 		
 		UpdatingControllersUtils.UPDATE_FLUENTS.add(beginFluent);
 		UpdatingControllersUtils.UPDATE_FLUENTS.add(stopFluent);
@@ -89,9 +91,7 @@ public class UpdatingControllersUtils {
 		grcg.addAllControllableActions(controllableSet);
 		Set<Fluent> involvedFluents = new HashSet<Fluent>();
 
-		//beginUpdateからhotswap_beginに変更
 		addFluentAndAssumption(grcg, involvedFluents, BEGIN_UPDATE);
-		// addFluentAndAssumption(grcg, involvedFluents, HOTSWAP_BEGIN);
 		addFluentAndGuarantee(grcg, involvedFluents, STOP_OLD_SPEC);
 		addFluentAndGuarantee(grcg, involvedFluents, START_NEW_SPEC);
 		addFluentAndGuarantee(grcg, involvedFluents, RECONFIGURE);
@@ -108,7 +108,6 @@ public class UpdatingControllersUtils {
 																 LTSOutput output) {
 		ControllerGoalDefinition cgd = new ControllerGoalDefinition(updContDef.getName());
 		cgd.addAssumeDefinition(new Symbol(123, "BeginUpdate")); //is this useless?we use the assumption in GR not here
-		// cgd.addAssumeDefinition(new Symbol(123, "HotswapBegin"));
 		cgd.addGuaranteeDefinition(new Symbol(123, "StopOldSpec")); //is this useless? we use Guarantee in GR not here
 		cgd.addGuaranteeDefinition(new Symbol(123, "StartNewSpec")); //besides the symbol redirects to nothing.
 		cgd.addGuaranteeDefinition(new Symbol(123, "Reconfigure"));
@@ -202,7 +201,9 @@ public class UpdatingControllersUtils {
 	}
 
 	/**
-	 * Changes the safety goals of each controller to (!StopOldSpec -> OLD) and (StartNewSpec -> NEW). Adds T too.
+	 * Registers the generated update safety goal names. Traditional DUC later
+	 * rebuilds the old/new wrappers with internal update fluents to avoid
+	 * depending on user-defined FSP fluents of the same names.
 	 *
 	 * @param oldGoalDef
 	 * @param newGoalDef

@@ -14,11 +14,11 @@ import java.util.Set;
  * BFSAbstractionを継承せず、独自のアクション優先順位に基づいて推奨遷移(Recommendation)を作成する。
  * 更新プロセスを迅速に完了させるため、更新事象およびゴール到達を最優先する。
  * * Priority Order:
- * 0: hotswap_end (Goal)
+ * 0: hotSwapOut (Goal)
  * 1: stopOldSpec
  * 2: reconfigure
  * 3: startNewSpec
- * 4: hotswap_begin
+ * 4: hotSwapIn
  * 10: Others
  */
 public class OTFDFSAbstraction<State, Action> extends Abstraction<State, Action> {

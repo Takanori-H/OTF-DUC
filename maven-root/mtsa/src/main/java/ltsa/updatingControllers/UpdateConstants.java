@@ -5,15 +5,15 @@ package ltsa.updatingControllers;
  */
 public class UpdateConstants {
 	public static final String RECONFIGURE = "reconfigure";
-	public static final String BEGIN_UPDATE = "beginUpdate";
+	public static final String BEGIN_UPDATE = "hotSwapIn";
 	public static final String START_NEW_SPEC = "startNewSpec";
 	public static final String STOP_OLD_SPEC = "stopOldSpec";
 	public static final String OLD_LABEL = ".old";
 	public static final String OLD_SUFFIX = "_UPD_OLD";
 	public static final String NEW_SUFFIX = "_UPD_NEW";
+	public static final String FINISH_UPDATE = "hotSwapOut";
 
 	//ON-THE-FLY UPDATING CONTROLLER SYNTHESIS
-	public static final String HOTSWAP_BEGIN = "hotswap_begin";
-	public static final String HOTSWAP_END = "hotswap_end";
-	public static final String FINISH_UPDATE = "finishUpdate";
+	public static final String HOTSWAP_BEGIN = BEGIN_UPDATE;
+	public static final String HOTSWAP_END = FINISH_UPDATE;
 }

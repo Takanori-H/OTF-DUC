@@ -266,7 +266,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             output.outln("Mode: On-The-Fly Updating Controller Synthesis");
 
             // OTF固有の設定
-            // beginUpdate は従来 DUC の hotSwap と同様に、更新開始を制限しない
+            // hotSwapIn は従来 DUC の hotSwap と同様に、更新開始を制限しない
             // 事象として扱うため controllable 集合から外す。
             controllableSet.remove(UpdateConstants.BEGIN_UPDATE);
             controllableSet.add(UpdateConstants.FINISH_UPDATE);
@@ -458,10 +458,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             }
 
             // (B) 更新プロセス固有のイベントを追加
-            // これらをFluentが参照している場合(例: fluent UpdateMode = <beginUpdate, finishUpdate>)
+            // これらをFluentが参照している場合(例: fluent UpdateMode = <hotSwapIn, hotSwapOut>)
             // アルファベットに含まれていないと遷移が生成されないため、明示的に追加します。
-            alphaSet.add(UpdateConstants.BEGIN_UPDATE); // "beginUpdate"
-            alphaSet.add(UpdateConstants.FINISH_UPDATE); // "finishUpdate"
+            alphaSet.add(UpdateConstants.BEGIN_UPDATE); // "hotSwapIn"
+            alphaSet.add(UpdateConstants.FINISH_UPDATE); // "hotSwapOut"
             alphaSet.add(UpdateConstants.STOP_OLD_SPEC); // "stopOldSpec"
             alphaSet.add(UpdateConstants.START_NEW_SPEC);// "startNewSpec"
 

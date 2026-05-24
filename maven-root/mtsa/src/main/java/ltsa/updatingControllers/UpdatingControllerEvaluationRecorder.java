@@ -258,25 +258,25 @@ public final class UpdatingControllerEvaluationRecorder {
         long totalTransitions = updateEventTransitions + normalTransitions;
 
         add(section, artifactLabel
-                + " transitions by update event: beginUpdate=" + beginUpdateTransitions
+                + " transitions by update event: hotSwapIn=" + beginUpdateTransitions
                 + ", stopOldSpec=" + stopOldSpecTransitions
                 + ", reconfigure=" + reconfigureTransitions
                 + ", startNewSpec=" + startNewSpecTransitions
-                + ", finishUpdate=" + finishUpdateTransitions
+                + ", hotSwapOut=" + finishUpdateTransitions
                 + ", normal=" + normalTransitions
                 + ", CountTime: " + safeCountTime + " ms");
 
         String baseKey = metricKey(section, artifactLabel + " / update event transitions");
-        recordDataMetric(baseKey + "_begin_update", section,
-                artifactLabel + " / beginUpdate transitions", Long.toString(beginUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_hot_swap_in", section,
+                artifactLabel + " / hotSwapIn transitions", Long.toString(beginUpdateTransitions), "transitions");
         recordDataMetric(baseKey + "_stop_old_spec", section,
                 artifactLabel + " / stopOldSpec transitions", Long.toString(stopOldSpecTransitions), "transitions");
         recordDataMetric(baseKey + "_reconfigure", section,
                 artifactLabel + " / reconfigure transitions", Long.toString(reconfigureTransitions), "transitions");
         recordDataMetric(baseKey + "_start_new_spec", section,
                 artifactLabel + " / startNewSpec transitions", Long.toString(startNewSpecTransitions), "transitions");
-        recordDataMetric(baseKey + "_finish_update", section,
-                artifactLabel + " / finishUpdate transitions", Long.toString(finishUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_hot_swap_out", section,
+                artifactLabel + " / hotSwapOut transitions", Long.toString(finishUpdateTransitions), "transitions");
         recordDataMetric(baseKey + "_normal", section,
                 artifactLabel + " / normal transitions", Long.toString(normalTransitions), "transitions");
         recordDataMetric(baseKey + "_update_event_total", section,
@@ -313,11 +313,11 @@ public final class UpdatingControllerEvaluationRecorder {
 
         add(section, label
                 + ": states=" + states
-                + ", beginUpdate=" + beginUpdateTransitions
+                + ", hotSwapIn=" + beginUpdateTransitions
                 + ", stopOldSpec=" + stopOldSpecTransitions
                 + ", reconfigure=" + reconfigureTransitions
                 + ", startNewSpec=" + startNewSpecTransitions
-                + ", finishUpdate=" + finishUpdateTransitions
+                + ", hotSwapOut=" + finishUpdateTransitions
                 + ", normal=" + normalTransitions
                 + ", samePhaseNormal=" + samePhaseNormalTransitions
                 + ", total=" + totalTransitions
@@ -327,11 +327,11 @@ public final class UpdatingControllerEvaluationRecorder {
 
         String baseKey = metricKey(section, label + " / transition detail");
         recordDataMetric(baseKey + "_states", section, label + " / States", Long.toString(states), "states");
-        recordDataMetric(baseKey + "_begin_update", section, label + " / beginUpdate transitions", Long.toString(beginUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_hot_swap_in", section, label + " / hotSwapIn transitions", Long.toString(beginUpdateTransitions), "transitions");
         recordDataMetric(baseKey + "_stop_old_spec", section, label + " / stopOldSpec transitions", Long.toString(stopOldSpecTransitions), "transitions");
         recordDataMetric(baseKey + "_reconfigure", section, label + " / reconfigure transitions", Long.toString(reconfigureTransitions), "transitions");
         recordDataMetric(baseKey + "_start_new_spec", section, label + " / startNewSpec transitions", Long.toString(startNewSpecTransitions), "transitions");
-        recordDataMetric(baseKey + "_finish_update", section, label + " / finishUpdate transitions", Long.toString(finishUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_hot_swap_out", section, label + " / hotSwapOut transitions", Long.toString(finishUpdateTransitions), "transitions");
         recordDataMetric(baseKey + "_normal", section, label + " / normal transitions", Long.toString(normalTransitions), "transitions");
         recordDataMetric(baseKey + "_same_phase_normal", section, label + " / same-phase normal transitions", Long.toString(samePhaseNormalTransitions), "transitions");
         recordDataMetric(baseKey + "_update_event_total", section, label + " / update event transitions total", Long.toString(updateEventTransitions), "transitions");
@@ -387,10 +387,10 @@ public final class UpdatingControllerEvaluationRecorder {
 
         long safeMin = reachableBeginUpdateTransitions > 0 ? minPathLength : -1;
         long safeMax = reachableBeginUpdateTransitions > 0 ? maxShortestPathLength : -1;
-        String label = artifactLabel + " / beginUpdate-to-completion";
+        String label = artifactLabel + " / hotSwapIn-to-completion";
         add(section, label
                 + ": completionPhase=" + completionPhase
-                + ", beginUpdateTransitions=" + beginUpdateTransitions
+                + ", hotSwapInTransitions=" + beginUpdateTransitions
                 + ", reachable=" + reachableBeginUpdateTransitions
                 + ", unreachable=" + unreachableBeginUpdateTransitions
                 + ", minLength=" + safeMin
@@ -400,9 +400,9 @@ public final class UpdatingControllerEvaluationRecorder {
 
         String baseKey = metricKey(section, label);
         recordDataMetric(baseKey + "_completion_phase", section, label + " / completion phase", completionPhase, "phase");
-        recordDataMetric(baseKey + "_begin_update_transitions", section, label + " / beginUpdate transitions", Long.toString(beginUpdateTransitions), "transitions");
-        recordDataMetric(baseKey + "_reachable_begin_update_transitions", section, label + " / reachable beginUpdate transitions", Long.toString(reachableBeginUpdateTransitions), "transitions");
-        recordDataMetric(baseKey + "_unreachable_begin_update_transitions", section, label + " / unreachable beginUpdate transitions", Long.toString(unreachableBeginUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_hot_swap_in_transitions", section, label + " / hotSwapIn transitions", Long.toString(beginUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_reachable_hot_swap_in_transitions", section, label + " / reachable hotSwapIn transitions", Long.toString(reachableBeginUpdateTransitions), "transitions");
+        recordDataMetric(baseKey + "_unreachable_hot_swap_in_transitions", section, label + " / unreachable hotSwapIn transitions", Long.toString(unreachableBeginUpdateTransitions), "transitions");
         recordDataMetric(baseKey + "_min_length", section, label + " / min path length", Long.toString(safeMin), "transitions");
         recordDataMetric(baseKey + "_max_shortest_length", section, label + " / max shortest path length", Long.toString(safeMax), "transitions");
         recordDataMetric(baseKey + "_avg_shortest_length", section, label + " / average shortest path length", formatDouble(averageShortestPathLength), "transitions");
@@ -413,7 +413,7 @@ public final class UpdatingControllerEvaluationRecorder {
             String section,
             String artifactLabel,
             Map<Long, Long> lengthDistribution) {
-        String baseLabel = artifactLabel + " / beginUpdate-to-completion shortest length distribution";
+        String baseLabel = artifactLabel + " / hotSwapIn-to-completion shortest length distribution";
         if (lengthDistribution == null || lengthDistribution.isEmpty()) {
             add(section, baseLabel + " : empty");
             recordDataMetric(metricKey(section, baseLabel), section, baseLabel, "empty", "text");
@@ -422,7 +422,7 @@ public final class UpdatingControllerEvaluationRecorder {
 
         for (Map.Entry<Long, Long> entry : lengthDistribution.entrySet()) {
             String label = baseLabel + " / length=" + entry.getKey();
-            add(section, label + " : " + entry.getValue() + " beginUpdate transitions");
+            add(section, label + " : " + entry.getValue() + " hotSwapIn transitions");
             recordDataMetric(metricKey(section, label), section, label,
                     Long.toString(entry.getValue()), "transitions");
         }
@@ -580,25 +580,25 @@ public final class UpdatingControllerEvaluationRecorder {
                 + " / enabled update event states";
         add(section, label
                 + ": any=" + anyUpdateEventStates
-                + ", beginUpdate=" + beginUpdateStates
+                + ", hotSwapIn=" + beginUpdateStates
                 + ", stopOldSpec=" + stopOldSpecStates
                 + ", reconfigure=" + reconfigureStates
                 + ", startNewSpec=" + startNewSpecStates
-                + ", finishUpdate=" + finishUpdateStates);
+                + ", hotSwapOut=" + finishUpdateStates);
 
         String baseKey = metricKey(section, label);
         recordDataMetric(baseKey + "_any", section,
                 label + " / any update event states", Long.toString(anyUpdateEventStates), "states");
-        recordDataMetric(baseKey + "_begin_update", section,
-                label + " / beginUpdate-enabled states", Long.toString(beginUpdateStates), "states");
+        recordDataMetric(baseKey + "_hot_swap_in", section,
+                label + " / hotSwapIn-enabled states", Long.toString(beginUpdateStates), "states");
         recordDataMetric(baseKey + "_stop_old_spec", section,
                 label + " / stopOldSpec-enabled states", Long.toString(stopOldSpecStates), "states");
         recordDataMetric(baseKey + "_reconfigure", section,
                 label + " / reconfigure-enabled states", Long.toString(reconfigureStates), "states");
         recordDataMetric(baseKey + "_start_new_spec", section,
                 label + " / startNewSpec-enabled states", Long.toString(startNewSpecStates), "states");
-        recordDataMetric(baseKey + "_finish_update", section,
-                label + " / finishUpdate-enabled states", Long.toString(finishUpdateStates), "states");
+        recordDataMetric(baseKey + "_hot_swap_out", section,
+                label + " / hotSwapOut-enabled states", Long.toString(finishUpdateStates), "states");
     }
 
     public static synchronized void recordSharedDiagnosticCountTime(
@@ -892,23 +892,23 @@ public final class UpdatingControllerEvaluationRecorder {
         addStateSpaceCountOverhead(countTimeMillis);
         long denominator = oldControllerStates >= 0 ? oldControllerStates : beginUpdateReferenceStates;
         if (denominator >= 0 && beginUpdateStates <= denominator) {
-            add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
+            add("要件確認", "hotSwapIn が出ている状態数 : " + beginUpdateStates
                     + " / 旧コントローラ状態数 " + denominator
                     + " 状態, CountTime: " + countTimeMillis + " ms");
         } else if (denominator >= 0) {
-            add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
+            add("要件確認", "hotSwapIn が出ている状態数 : " + beginUpdateStates
                     + " 状態, 旧コントローラ状態数 : " + denominator
                     + ", CountTime: " + countTimeMillis + " ms");
         } else {
-            add("要件確認", "beginUpdate が出ている状態数 : " + beginUpdateStates
+            add("要件確認", "hotSwapIn が出ている状態数 : " + beginUpdateStates
                     + ", CountTime: " + countTimeMillis + " ms");
         }
-        recordDataMetric("begin_update_outgoing_states", "要件確認", "beginUpdate outgoing states", Long.toString(beginUpdateStates), "states");
+        recordDataMetric("hot_swap_in_outgoing_states", "要件確認", "hotSwapIn outgoing states", Long.toString(beginUpdateStates), "states");
         if (denominator >= 0) {
-            recordDataMetric("begin_update_reference_states", "要件確認", "beginUpdate reference states", Long.toString(denominator), "states");
-            recordDataMetric("old_controller_states_for_begin_update", "要件確認", "旧コントローラ状態数", Long.toString(denominator), "states");
+            recordDataMetric("hot_swap_in_reference_states", "要件確認", "hotSwapIn reference states", Long.toString(denominator), "states");
+            recordDataMetric("old_controller_states_for_hot_swap_in", "要件確認", "旧コントローラ状態数", Long.toString(denominator), "states");
         }
-        recordDataMetric("begin_update_coverage_count_time", "要件確認", "beginUpdate coverage CountTime", Long.toString(countTimeMillis), "ms");
+        recordDataMetric("hot_swap_in_coverage_count_time", "要件確認", "hotSwapIn coverage CountTime", Long.toString(countTimeMillis), "ms");
     }
 
     public static synchronized void recordOtfPreUpdateStateOverhead(
@@ -929,7 +929,7 @@ public final class UpdatingControllerEvaluationRecorder {
 
         if (effectiveOldControllerStates >= 0) {
             add("要件確認", "旧コントローラ状態数 : " + effectiveOldControllerStates + " 状態");
-            recordDataMetric("old_controller_states_for_begin_update", "要件確認",
+            recordDataMetric("old_controller_states_for_hot_swap_in", "要件確認",
                     "旧コントローラ状態数", Long.toString(effectiveOldControllerStates), "states");
         }
 
@@ -1208,7 +1208,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "OTF-DUC の探索済み director 候補から、pruning・merge・belief repair 後に実際に出力される update-controller 断片への削減率。";
         }
         if ("OTF-DUC ブロック・棄却率".equals(section)) {
-            return "OTF-DUC 探索・出力構築中に safety violation、finishUpdate guard、出力 pruning によって候補が棄却された割合。";
+            return "OTF-DUC 探索・出力構築中に safety violation、hotSwapOut guard、出力 pruning によって候補が棄却された割合。";
         }
         if ("OTF-DUC projection 別分裂度".equals(section)) {
             return "OTF-DUC の探索終了時 compostate を各構成要素へ射影し、同じ射影値を持つ状態が何個に分裂しているかを記録する。old controller、mapping env、safety、transition requirement など、状態爆発の由来を調べるための値。";
@@ -1220,7 +1220,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "OTF-DUC の探索終了時グラフを update phase ごとに分けた状態数・遷移数。各 phase の CountTime と合計 CountTime を記録する。";
         }
         if ("OTF-DUC update event 別探索遷移数".equals(section)) {
-            return "OTF-DUC の探索終了時グラフに含まれる beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate と通常遷移の本数。";
+            return "OTF-DUC の探索終了時グラフに含まれる hotSwapIn/stopOldSpec/reconfigure/startNewSpec/hotSwapOut と通常遷移の本数。";
         }
         if ("OTF-DUC update phase 別探索遷移詳細".equals(section)) {
             return "OTF-DUC の探索終了時グラフを update phase ごとに分け、更新事象別遷移数、通常遷移数、通常遷移率、平均/最大分岐数を記録する。";
@@ -1228,8 +1228,8 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("OTF-DUC update phase 間探索遷移数".equals(section)) {
             return "OTF-DUC の探索終了時グラフで、どの update phase からどの update phase へ遷移しているかを数えた値。";
         }
-        if ("OTF-DUC beginUpdate から更新完了までの探索距離".equals(section)) {
-            return "OTF-DUC の探索終了時グラフで、beginUpdate 遷移から更新完了 phase までの最短距離を数えた値。finishUpdate 後の phase が存在する場合はそこを、存在しない場合は stopOldSpec・reconfigure・startNewSpec が全て実行済みの phase を完了 phase とする。";
+        if ("OTF-DUC hotSwapIn から更新完了までの探索距離".equals(section)) {
+            return "OTF-DUC の探索終了時グラフで、hotSwapIn 遷移から更新完了 phase までの最短距離を数えた値。hotSwapOut 後の phase が存在する場合はそこを、存在しない場合は stopOldSpec・reconfigure・startNewSpec が全て実行済みの phase を完了 phase とする。";
         }
         if ("OTF-DUC update phase 別通常 action 探索遷移数".equals(section)) {
             return "OTF-DUC の探索終了時グラフで、update phase ごとに通常 action 名別の遷移数と controllable/uncontrollable 内訳を記録する。";
@@ -1241,10 +1241,10 @@ public final class UpdatingControllerEvaluationRecorder {
             return "OTF-DUC の探索終了時グラフで、更新事象を含まない通常遷移のみの SCC/cycle を update phase ごとに数える。controllable-only cycle も併記する。";
         }
         if ("OTF-DUC update phase 別 enabled update event 状態数".equals(section)) {
-            return "OTF-DUC の探索終了時グラフで、各 update phase において beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate が enabled な状態数を記録する。";
+            return "OTF-DUC の探索終了時グラフで、各 update phase において hotSwapIn/stopOldSpec/reconfigure/startNewSpec/hotSwapOut が enabled な状態数を記録する。";
         }
         if ("OTF-DUC 更新順序パターン別探索規模".equals(section)) {
-            return "OTF-DUC の探索終了時グラフを beginUpdate 後の更新事象順序パターンごとに分け、状態出現数・ユニーク状態数・遷移数を記録する。";
+            return "OTF-DUC の探索終了時グラフを hotSwapIn 後の更新事象順序パターンごとに分け、状態出現数・ユニーク状態数・遷移数を記録する。";
         }
         if ("OTF-DUC 更新事象間の通常遷移連続長".equals(section)) {
             return "OTF-DUC の探索終了時グラフで、各更新事象の直後から次の更新事象が enabled になるまでに必要な通常遷移の最短連続長を記録する。";
@@ -1256,10 +1256,10 @@ public final class UpdatingControllerEvaluationRecorder {
             return "Traditional DUC の中間状態空間サイズ。更新用環境、安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の各段階を比較するための値。";
         }
         if ("Traditional DUC update phase 別状態空間".equals(section)) {
-            return "Traditional DUC の中間状態空間を、beginUpdate 前後、および stopOldSpec・reconfigure・startNewSpec の実行済み組合せごとに分けた状態数・遷移数。";
+            return "Traditional DUC の中間状態空間を、hotSwapIn 前後、および stopOldSpec・reconfigure・startNewSpec の実行済み組合せごとに分けた状態数・遷移数。";
         }
         if ("Traditional DUC update event 別遷移数".equals(section)) {
-            return "Traditional DUC の中間状態空間に含まれる beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate と通常遷移の本数。";
+            return "Traditional DUC の中間状態空間に含まれる hotSwapIn/stopOldSpec/reconfigure/startNewSpec/hotSwapOut と通常遷移の本数。";
         }
         if ("Traditional DUC 状態空間削減率".equals(section)) {
             return "Traditional DUC の安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の間で、状態数・遷移数がどれだけ削減されたかを示す値。";
@@ -1270,8 +1270,8 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Traditional DUC update phase 間遷移数".equals(section)) {
             return "Traditional DUC の中間状態空間で、どの update phase からどの update phase へ遷移しているかを数えた値。";
         }
-        if ("Traditional DUC beginUpdate から更新完了までの距離".equals(section)) {
-            return "Traditional DUC の中間状態空間で、beginUpdate 遷移から更新完了 phase までの最短距離を数えた値。finishUpdate がない場合は stopOldSpec・reconfigure・startNewSpec が全て実行済みの phase を完了 phase とする。";
+        if ("Traditional DUC hotSwapIn から更新完了までの距離".equals(section)) {
+            return "Traditional DUC の中間状態空間で、hotSwapIn 遷移から更新完了 phase までの最短距離を数えた値。hotSwapOut がない場合は stopOldSpec・reconfigure・startNewSpec が全て実行済みの phase を完了 phase とする。";
         }
         if ("Traditional DUC update phase 別通常 action 遷移数".equals(section)) {
             return "Traditional DUC の中間状態空間で、update phase ごとに通常 action 名別の遷移数と controllable/uncontrollable 内訳を記録する。";
@@ -1283,10 +1283,10 @@ public final class UpdatingControllerEvaluationRecorder {
             return "Traditional DUC の中間状態空間で、更新事象を含まない通常遷移のみの SCC/cycle を update phase ごとに数える。controllable action 集合から controllable-only cycle も併記する。";
         }
         if ("Traditional DUC update phase 別 enabled update event 状態数".equals(section)) {
-            return "Traditional DUC の中間状態空間で、各 update phase において beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate が enabled な状態数を記録する。";
+            return "Traditional DUC の中間状態空間で、各 update phase において hotSwapIn/stopOldSpec/reconfigure/startNewSpec/hotSwapOut が enabled な状態数を記録する。";
         }
         if ("Traditional DUC 更新順序パターン別状態空間".equals(section)) {
-            return "Traditional DUC の中間状態空間を beginUpdate 後の更新事象順序パターンごとに分け、状態出現数・ユニーク状態数・遷移数を記録する。";
+            return "Traditional DUC の中間状態空間を hotSwapIn 後の更新事象順序パターンごとに分け、状態出現数・ユニーク状態数・遷移数を記録する。";
         }
         if ("Traditional DUC 更新事象間の通常遷移連続長".equals(section)) {
             return "Traditional DUC の中間状態空間で、各更新事象の直後から次の更新事象が enabled になるまでに必要な通常遷移の最短連続長を記録する。";
@@ -1313,7 +1313,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "最終的に出力された update controller を update phase ごとに分けた状態数・遷移数。";
         }
         if ("Output Update Controller update event 別遷移数".equals(section)) {
-            return "最終的に出力された update controller に含まれる beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate と通常遷移の本数。";
+            return "最終的に出力された update controller に含まれる hotSwapIn/stopOldSpec/reconfigure/startNewSpec/hotSwapOut と通常遷移の本数。";
         }
         if ("Output Update Controller 削減率".equals(section)) {
             return "手法ごとの主要な出力前状態空間から、最終的な Output Update Controller への状態数・遷移数の削減率。";
@@ -1324,8 +1324,8 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Output Update Controller update phase 間遷移数".equals(section)) {
             return "最終的に出力された update controller で、どの update phase からどの update phase へ遷移しているかを数えた値。";
         }
-        if ("Output Update Controller beginUpdate から更新完了までの距離".equals(section)) {
-            return "最終的に出力された update controller で、beginUpdate 遷移から更新完了 phase までの最短距離を数えた値。finishUpdate 後の phase が存在する場合はそこを、存在しない場合は stopOldSpec・reconfigure・startNewSpec が全て実行済みの phase を完了 phase とする。";
+        if ("Output Update Controller hotSwapIn から更新完了までの距離".equals(section)) {
+            return "最終的に出力された update controller で、hotSwapIn 遷移から更新完了 phase までの最短距離を数えた値。hotSwapOut 後の phase が存在する場合はそこを、存在しない場合は stopOldSpec・reconfigure・startNewSpec が全て実行済みの phase を完了 phase とする。";
         }
         if ("Output Update Controller update phase 別通常 action 遷移数".equals(section)) {
             return "最終的に出力された update controller で、update phase ごとに通常 action 名別の遷移数を記録する。CompactState から controllability が取れない場合、その内訳は unknown として記録する。";
@@ -1337,16 +1337,16 @@ public final class UpdatingControllerEvaluationRecorder {
             return "最終的に出力された update controller で、更新事象を含まない通常遷移のみの SCC/cycle を update phase ごとに数える。CompactState では controllable-only cycle が unknown の場合 -1 になる。";
         }
         if ("Output Update Controller update phase 別 enabled update event 状態数".equals(section)) {
-            return "最終的に出力された update controller で、各 update phase において beginUpdate/stopOldSpec/reconfigure/startNewSpec/finishUpdate が enabled な状態数を記録する。";
+            return "最終的に出力された update controller で、各 update phase において hotSwapIn/stopOldSpec/reconfigure/startNewSpec/hotSwapOut が enabled な状態数を記録する。";
         }
         if ("Output Update Controller 更新順序パターン別状態空間".equals(section)) {
-            return "最終的に出力された update controller を beginUpdate 後の更新事象順序パターンごとに分け、状態出現数・ユニーク状態数・遷移数を記録する。";
+            return "最終的に出力された update controller を hotSwapIn 後の更新事象順序パターンごとに分け、状態出現数・ユニーク状態数・遷移数を記録する。";
         }
         if ("Output Update Controller 更新事象間の通常遷移連続長".equals(section)) {
             return "最終的に出力された update controller で、各更新事象の直後から次の更新事象が enabled になるまでに必要な通常遷移の最短連続長を記録する。";
         }
         if ("要件確認".equals(section)) {
-            return "update controller の要件に関する簡易チェック。例: beginUpdate が旧コントローラの何状態から出ているか。";
+            return "update controller の要件に関する簡易チェック。例: hotSwapIn が旧コントローラの何状態から出ているか。";
         }
         if ("比較用時間集計".equals(section)) {
             return "OTF-DUC と Traditional DUC を比較しやすいように、共通前処理や評価用オーバーヘッドを差し引いた集計。";
@@ -1368,7 +1368,7 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("Traditional DUC ゴール条件/安全性ゴール条件生成時間: Traditional DUC 用のゴール条件と安全性ゴール条件を生成する時間。");
         } else if ("入力規模".equals(section)) {
             notes.add("controllable action 数: 入力で controllable として宣言された action 数。");
-            notes.add("uncontrollable action 数: 入力 action 全体から controllable action を除いた action 数。beginUpdate は Traditional DUC と OTF-DUC の両方で uncontrollable として数え、finishUpdate は OTF-DUC のみで数える。");
+            notes.add("uncontrollable action 数: 入力 action 全体から controllable action を除いた action 数。hotSwapIn は Traditional DUC と OTF-DUC の両方で uncontrollable として数え、hotSwapOut は OTF-DUC のみで数える。");
             notes.add("全 action 数（controllable + uncontrollable）: 入力 action 全体の大きさ。通常 action と更新事象を含む。");
         } else if ("UpdatingControllerSynthesizer".equals(section)) {
             notes.add("generateController の全体実行時間: 手法本体を呼び出して update controller を生成する外側の時間。");
@@ -1380,7 +1380,7 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("最終コントローラ合成時間: 安全性制約反映後の環境から controller を合成する中核時間。");
         } else if ("generateDUC (OTF-DUC)".equals(section)) {
             notes.add("探索入力モデル準備時間: on-the-fly 探索に渡す Marking LTS、旧コントローラ、MapEnv、安全性などを並べる時間。");
-            notes.add("New Controller の接続先の事前計算: finishUpdate 後に新コントローラへ接続する状態対応表を作る時間。");
+            notes.add("New Controller の接続先の事前計算: hotSwapOut 後に新コントローラへ接続する状態対応表を作る時間。");
             notes.add("探索呼び出しから出力UC反映までの時間: OTF-DUC の探索器呼び出しから、出力UCをMTSA側の表現へ反映するまでの中心時間。");
         } else if ("Traditional DUC GR1 時間内訳".equals(section)) {
             notes.add("ゴール条件構築時間: guarantee / assumption などから最終コントローラ合成用のゴール条件を構築する時間。");
@@ -2153,9 +2153,9 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummaryDataMetric(output, "update controller 状態数", "output_update_controller_states", "");
         printSummaryDataMetric(output, "update controller 遷移数", "output_update_controller_transitions", "");
         printSummaryDataMetric(output, "出力状態数・遷移数 CountTime", "output_update_controller_count_time", "");
-        printSummaryDataMetric(output, "beginUpdate が出ている状態数", "begin_update_outgoing_states", "");
-        printSummaryDataMetric(output, "旧コントローラ状態数", "old_controller_states_for_begin_update",
-                "beginUpdate が出るべき基準状態数。");
+        printSummaryDataMetric(output, "hotSwapIn が出ている状態数", "hot_swap_in_outgoing_states", "");
+        printSummaryDataMetric(output, "旧コントローラ状態数", "old_controller_states_for_hot_swap_in",
+                "hotSwapIn が出るべき基準状態数。");
         if ("OTF-DUC".equals(mode)) {
             printSummaryDataMetric(output, "探索上の旧コントローラ相当状態数（マージ前）",
                     "otf_pre_update_raw_states",
@@ -2173,7 +2173,7 @@ public final class UpdatingControllerEvaluationRecorder {
                     "otf_simple_merge_max_split_per_old_controller_state",
                     "簡単マージ後、1 つの旧コントローラ状態に対応して残った出力クラス数の最大値。");
         }
-        printSummaryDataMetric(output, "beginUpdate coverage CountTime", "begin_update_coverage_count_time", "");
+        printSummaryDataMetric(output, "hotSwapIn coverage CountTime", "hot_swap_in_coverage_count_time", "");
     }
 
     private static void printMemorySummary(LTSOutput output) {
@@ -2679,7 +2679,7 @@ public final class UpdatingControllerEvaluationRecorder {
         if (section.contains("update event 別")) {
             return methodPrefix(section) + ": 更新事象別の遷移数";
         }
-        if (section.contains("beginUpdate から更新完了まで")) {
+        if (section.contains("hotSwapIn から更新完了まで")) {
             return methodPrefix(section) + ": 更新開始から完了までの距離";
         }
         if (section.contains("通常 action")) {
@@ -2816,34 +2816,34 @@ public final class UpdatingControllerEvaluationRecorder {
             return "";
         }
         if ("PRE".equals(phase)) {
-            return "beginUpdate前";
+            return "hotSwapIn前";
         }
         if ("000".equals(phase)) {
-            return "beginUpdate後、stopOldSpec・reconfigure・startNewSpecは未実行";
+            return "hotSwapIn後、stopOldSpec・reconfigure・startNewSpecは未実行";
         }
         if ("100".equals(phase)) {
-            return "beginUpdate後、stopOldSpec実行済み";
+            return "hotSwapIn後、stopOldSpec実行済み";
         }
         if ("010".equals(phase)) {
-            return "beginUpdate後、reconfigure実行済み";
+            return "hotSwapIn後、reconfigure実行済み";
         }
         if ("001".equals(phase)) {
-            return "beginUpdate後、startNewSpec実行済み";
+            return "hotSwapIn後、startNewSpec実行済み";
         }
         if ("110".equals(phase)) {
-            return "beginUpdate後、stopOldSpec・reconfigure実行済み";
+            return "hotSwapIn後、stopOldSpec・reconfigure実行済み";
         }
         if ("101".equals(phase)) {
-            return "beginUpdate後、stopOldSpec・startNewSpec実行済み";
+            return "hotSwapIn後、stopOldSpec・startNewSpec実行済み";
         }
         if ("011".equals(phase)) {
-            return "beginUpdate後、reconfigure・startNewSpec実行済み";
+            return "hotSwapIn後、reconfigure・startNewSpec実行済み";
         }
         if ("111".equals(phase)) {
-            return "beginUpdate後、stopOldSpec・reconfigure・startNewSpec全て実行済み";
+            return "hotSwapIn後、stopOldSpec・reconfigure・startNewSpec全て実行済み";
         }
         if ("POST".equals(phase)) {
-            return "finishUpdate後";
+            return "hotSwapOut後";
         }
         return phase;
     }
@@ -3159,11 +3159,11 @@ public final class UpdatingControllerEvaluationRecorder {
     private static String extractUpdateEventFromLabel(String label) {
         String text = label == null ? "" : label;
         String[] events = {
-                "beginUpdate",
+                "hotSwapIn",
                 "stopOldSpec",
                 "reconfigure",
                 "startNewSpec",
-                "finishUpdate"
+                "hotSwapOut"
         };
         for (String event : events) {
             if (text.contains(event)) {
@@ -3258,7 +3258,7 @@ public final class UpdatingControllerEvaluationRecorder {
                 .replace("States", "状態数")
                 .replace("Transitions", "遷移数")
                 .replace("CountTime", "評価用カウント時間")
-                .replace("beginUpdate-to-completion", "beginUpdateから更新完了まで")
+                .replace("hotSwapIn-to-completion", "hotSwapInから更新完了まで")
                 .replace("distance-to-completion", "更新完了までの距離")
                 .replace("distance-to-next-update-event", "次更新事象までの距離")
                 .replace("normal-run-before-next-update-event", "次更新事象までの通常遷移連続長")

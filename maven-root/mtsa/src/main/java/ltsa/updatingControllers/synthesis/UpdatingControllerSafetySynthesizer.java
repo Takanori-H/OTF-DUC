@@ -53,14 +53,14 @@ public class UpdatingControllerSafetySynthesizer {
         long makeOldActionsStart = System.currentTimeMillis();
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC safetyEnv 構築時間内訳",
-                "beginUpdate 前の旧 action を uncontrollable 化する時間");
+                "hotSwapIn 前の旧 action を uncontrollable 化する時間");
         makeOldActionsUncontrollable(controllableActions, metaEnvironment);
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "Traditional DUC safetyEnv 構築時間内訳",
-                "beginUpdate 前の旧 action を uncontrollable 化する時間");
+                "hotSwapIn 前の旧 action を uncontrollable 化する時間");
         UpdatingControllerEvaluationRecorder.recordTime(
                 "Traditional DUC safetyEnv 構築時間内訳",
-                "beginUpdate 前の旧 action を uncontrollable 化する時間",
+                "hotSwapIn 前の旧 action を uncontrollable 化する時間",
                 System.currentTimeMillis() - makeOldActionsStart);
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional 旧 action uncontrollable 化後");
 

@@ -431,7 +431,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         DUCHeartbeat.setCounter("loopErrors", loopErrorCount);
         DUCHeartbeat.setCounter("detectedLoops", detectedLoopCount);
         DUCHeartbeat.setCounter("fairPromotedLoops", fairPromotedLoopCount);
-        DUCHeartbeat.setCounter("finishUpdateBlocked", finishUpdateGuardBlockedCount);
+        DUCHeartbeat.setCounter("hotSwapOutBlocked", finishUpdateGuardBlockedCount);
     }
 
     public LTS<Long, Action> synthesizeDUC(
@@ -676,7 +676,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 + ", hits=" + componentStepCacheHits
                 + ", misses=" + componentStepCacheMisses
                 + ", invalidHits=" + componentStepCacheInvalidHits);
-        log("  [Cache-Stats] finishUpdateGuard entries=" + safeSize(finishUpdateGuardCache)
+        log("  [Cache-Stats] hotSwapOutGuard entries=" + safeSize(finishUpdateGuardCache)
                 + ", hits=" + finishUpdateGuardCacheHits
                 + ", misses=" + finishUpdateGuardCacheMisses);
         log("  [Cache-Stats] allChildrenGoal entries=" + safeSize(allChildrenGoalCache)
@@ -714,7 +714,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 componentStepCacheInvalidHits,
                 formatRatio(componentStepCacheHits, componentStepCacheHits + componentStepCacheMisses)));
         profileLog(String.format(Locale.ROOT,
-                "[Profile-Cache] finishUpdateGuard entries=%d, hits=%d, misses=%d, hitRate=%s",
+                "[Profile-Cache] hotSwapOutGuard entries=%d, hits=%d, misses=%d, hitRate=%s",
                 safeSize(finishUpdateGuardCache), finishUpdateGuardCacheHits, finishUpdateGuardCacheMisses,
                 formatRatio(finishUpdateGuardCacheHits, finishUpdateGuardCacheHits + finishUpdateGuardCacheMisses)));
         profileLog(String.format(Locale.ROOT,
@@ -738,7 +738,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         profileTime("state lookup", stateLookupNanos, stateLookupCalls, effectiveSearchNanos);
         profileTime("new state registration", newStateRegistrationNanos, newCompostateCount, effectiveSearchNanos);
         profileTime("enforce safety check", enforceSafetyCheckNanos, enforceSafetyCheckCalls, effectiveSearchNanos);
-        profileTime("finishUpdate guard", finishUpdateGuardNanos, finishUpdateGuardChecks, effectiveSearchNanos);
+        profileTime("hotSwapOut guard", finishUpdateGuardNanos, finishUpdateGuardChecks, effectiveSearchNanos);
         profileTime("child registration", childRegistrationNanos, childRegistrationCalls, effectiveSearchNanos);
         profileTime("explore total", exploreNanos, exploreCalls, effectiveSearchNanos);
         profileTime("isError checks", isErrorCheckNanos, isErrorChecks, effectiveSearchNanos);
@@ -785,7 +785,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 directorOutputTransitions,
                 prunedControllableTransitions));
         profileLog(String.format(Locale.ROOT,
-                "[Profile-Director] ncStates=%d, ncTransitions=%d, finishUpdateAttempts=%d, ncConnectionSuccess=%d, ncConnectionMiss=%d, preUpdateRaw=%d, preUpdateClasses=%d, preUpdateRemoved=%d",
+                "[Profile-Director] ncStates=%d, ncTransitions=%d, hotSwapOutAttempts=%d, ncConnectionSuccess=%d, ncConnectionMiss=%d, preUpdateRaw=%d, preUpdateClasses=%d, preUpdateRemoved=%d",
                 directorNcStatesTransferred,
                 directorNcTransitionsTransferred,
                 directorNcConnectionAttempts,
@@ -1050,7 +1050,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         componentStepCache.clear();
         finishUpdateGuardCache.clear();
         allChildrenGoalCache.clear();
-        log("  [Cache-Config] componentStepCache=true, finishUpdateGuardCache=true, allChildrenGoalCache=true");
+        log("  [Cache-Config] componentStepCache=true, hotSwapOutGuardCache=true, allChildrenGoalCache=true");
         compostates = new HashMap<>();
         setupLookupOptimizations();
         transitions = new ArrayDeque<>(ltss.size());
@@ -1172,7 +1172,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             result = new CompostateDUC<>(this, persistentList);
             compostates.put(permanentKey, result);
 
-            // Marking 8 では finishUpdate ガードを先に評価する。
+            // Marking 8 では hotSwapOut ガードを先に評価する。
             // 状態生成時にあらかじめチェックすることで、ヒューリスティックがこの手を選ばないようにする
             if (mState == 8) {
                 long guardStart = System.nanoTime();
@@ -1235,7 +1235,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 3. フェーズ依存
         if (markingState == 0) {
-            // --- Pre-beginUpdate (State 0) ---
+            // --- Pre-hotSwapIn (State 0) ---
             if (ltsIndex == idxOC)
                 return true;
             if (isInRange(ltsIndex, oldSafeStart, oldSafeEnd))
@@ -1244,7 +1244,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // Mapping, New Safety は False (ここで return false されるため)
             return false;
         } else if (markingState >= 1 && markingState <= 9) {
-            // --- Post-beginUpdate (State 1-9) ---
+            // --- Post-hotSwapIn (State 1-9) ---
             if (ltsIndex == idxOC)
                 return false;
             if (isInRange(ltsIndex, mappingStart, mappingEnd))
@@ -1276,7 +1276,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // 3. フェーズ依存
         if (markingState == 0) {
-            // --- Pre-beginUpdate (State 0) ---
+            // --- Pre-hotSwapIn (State 0) ---
             if (ltsIndex == idxOC)
                 return true;
             if (isInRange(ltsIndex, oldSafeStart, oldSafeEnd))
@@ -1285,7 +1285,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // Mapping, New Safety は False
             return false;
         } else if (markingState >= 1 && markingState <= 9) {
-            // --- Post-beginUpdate (State 1-9) ---
+            // --- Post-hotSwapIn (State 1-9) ---
             if (ltsIndex == idxOC)
                 return false;
 
@@ -1309,7 +1309,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     public boolean isTrace(int ltsIndex, long markingState) {
 
         // 1. Old Controller (OC)
-        // beginUpdate 発火後（State 1 以上）は旧コントローラを trace から外す。
+        // hotSwapIn 発火後（State 1 以上）は旧コントローラを trace から外す。
         if (ltsIndex == idxOC) {
             return (markingState == 0);
         }
@@ -1470,7 +1470,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // 失敗・ブロック時の早期リターン
         if (blocked || allNextStates == null || allNextStates.isEmpty()) {
             if(debugLogEnabled){
-                if (blocked) log("[BLOCKED] Transition blocked by finishUpdate condition: " + action);
+                if (blocked) log("[BLOCKED] Transition blocked by hotSwapOut condition: " + action);
                 else log("[DEADLOCK/INVALID] No valid next states for action: " + action);
             }
             heuristic.expansionDone(state, action, null);
@@ -1679,7 +1679,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     /**
-     * finishUpdate の実行可否を判定するガード条件
+     * hotSwapOut の実行可否を判定するガード条件
      * 1. 環境状態が新環境へ翻訳可能であること
      * 2. 翻訳後の環境と現在の安全性状態の組み合わせが、新コントローラ(NC)に存在すること
      */
@@ -1697,7 +1697,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         
         // 翻訳に失敗した（環境状態がマップにない）場合は null が返る想定
         if (signature == null) {
-            log("  [finishUpdate Guard] BLOCKED: Environment state translation failed.");
+            log("  [hotSwapOut Guard] BLOCKED: Environment state translation failed.");
             finishUpdateGuardCache.put(cacheKey, false);
             return false;
         }
@@ -1707,7 +1707,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         if (!isSafeInNC && debugLogEnabled) {
             // 不整合発見を検証するためのログ
-            log("  [finishUpdate Guard] BLOCKED: MapSignature '(MapEnv) " + cacheKey + " (New Safety)' = Signature '(NewEnv) " + signature + " (New Safety)' is NOT found in New Controller's safe states.");
+            log("  [hotSwapOut Guard] BLOCKED: MapSignature '(MapEnv) " + cacheKey + " (New Safety)' = Signature '(NewEnv) " + signature + " (New Safety)' is NOT found in New Controller's safe states.");
         }
 
         finishUpdateGuardCache.put(cacheKey, isSafeInNC);
@@ -1762,7 +1762,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 detectedLoopCount++;
                 // 更新前のループは、旧コントローラを環境化して探索しているために現れる。
                 // これは更新進行の失敗ではなく、旧コントローラ上の別状態からも
-                // beginUpdate への経路を確認する必要があることを意味する。
+                // hotSwapIn への経路を確認する必要があることを意味する。
                 boolean isPreUpdateLoop = true;
                 for (CompostateDUC<State, Action> s : loop) {
                     if (getMarkingState(s) != 0) {
@@ -1809,8 +1809,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         propagateGoalPhase2Fair(winners, queue);
         propagateGoalPhase2Nanos += System.nanoTime() - phase2Start;
 
-        // Phase 3: beginUpdate 前の旧コントローラ通常運転を GOAL 側へ閉包する。
-        // これは fairness ではなく、m0 で beginUpdate 可能な旧状態集合を戻す処理である。
+        // Phase 3: hotSwapIn 前の旧コントローラ通常運転を GOAL 側へ閉包する。
+        // これは fairness ではなく、m0 で hotSwapIn 可能な旧状態集合を戻す処理である。
         propagateGoalPreUpdateClosure(winners, queue);
 
         if (!winners.isEmpty()) {
@@ -1972,7 +1972,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     phase2DistancePropagatedStates += propagatedStatesThisRound;
                 }
 
-                // finishUpdate への fair 経路を持たない閉じた成分を候補から外す。
+                // hotSwapOut への fair 経路を持たない閉じた成分を候補から外す。
                 long distancePruneStart = profileLogEnabled ? System.nanoTime() : 0L;
                 it = candidates.iterator();
                 while (it.hasNext()) {
@@ -2326,7 +2326,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
             // 更新前状態は、更新中に仮定する fairness の対象外である。
             // 旧コントローラ上の action が uncontrollable loop を作っていても、
-            // beginUpdate は旧コントローラ状態空間からの有効な進行辺として残す。
+            // hotSwapIn は旧コントローラ状態空間からの有効な進行辺として残す。
             if (getMarkingState(state) == 0 && action.toString().equals(UpdateConstants.BEGIN_UPDATE)) {
                 return true;
             }
@@ -2341,7 +2341,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
             // 環境 fairness は controllable 脱出口の発火を強制できない。
             // uncontrollable 遷移で fair SCC 内に留まり続けられる場合、
-            // 同じ状態の通常 controllable 脱出口は finishUpdate への進行根拠にしない。
+            // 同じ状態の通常 controllable 脱出口は hotSwapOut への進行根拠にしない。
             boolean rejected = hasUncontrollableSuccessorIn(state, candidates);
             if (rejected) {
                 fairControllableExitRejectedCount++;
@@ -2725,7 +2725,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         auxiliarListStates.clear();
 
-        // fairness は、更新三事象が完了して finishUpdate 待ちになった
+        // fairness は、更新三事象が完了して hotSwapOut 待ちになった
         // marking state 8 のループにだけ適用する。
         if (isFairnessEligibleLoop(loop)) {
             probablyWinningStates.addAll(loop);
@@ -2733,7 +2733,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     /**
-     * OTF-DUC は到達性問題だが、marking state 8 の finishUpdate 待ちだけは
+     * OTF-DUC は到達性問題だが、marking state 8 の hotSwapOut 待ちだけは
      * 環境 fairness のもとで判定する。marking state 1-7 の更新パス探索では
      * fairness による救済を行わず、閉じた uncontrollable ループを ERROR 候補として解析する。
      */
@@ -2917,7 +2917,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         // marking state 8 の閉じた安全な uncontrollable ループだけは、
-        // fair 固定点計算で finishUpdate への経路を証明できる場合に受理する。
+        // fair 固定点計算で hotSwapOut への経路を証明できる場合に受理する。
         if (hasUncontrollableWait) {
             if (tryPromoteFairLoopToGoal()) {
                 if (debugLogEnabled) {
@@ -2939,7 +2939,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         if (hasUncontrollableWait && debugLogEnabled) {
             log("  [Fairness-Loop-Check] Loop has NO Controllable escape hatch, but SAFE UNCONTROLLABLE actions exist!");
-            log("  [Fairness-Loop-Check] Fair propagation could not prove a path to finishUpdate. Marking as ERROR.");
+            log("  [Fairness-Loop-Check] Fair propagation could not prove a path to hotSwapOut. Marking as ERROR.");
         }
 
         if (debugLogEnabled) {
@@ -3144,7 +3144,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 展開統計", "ERROR child 到達数", safetyViolationChildCount, "個");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC 展開統計", "finishUpdate guard block 回数", finishUpdateGuardBlockedCount, "回");
+                "OTF-DUC 展開統計", "hotSwapOut guard block 回数", finishUpdateGuardBlockedCount, "回");
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC fairness / loop 統計", "検出した loop 数", detectedLoopCount, "個");
@@ -3189,7 +3189,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "children");
         UpdatingControllerEvaluationRecorder.recordDecisionRate(
                 "OTF-DUC ブロック・棄却率",
-                "finishUpdate guard block / generated child",
+                "hotSwapOut guard block / generated child",
                 finishUpdateGuardBlockedCount,
                 generatedChildCount,
                 "children");
@@ -3201,7 +3201,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "transitions");
 
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC NC 接続統計", "finishUpdate 遷移数", finishUpdateTransitions, "本");
+                "OTF-DUC NC 接続統計", "hotSwapOut 遷移数", finishUpdateTransitions, "本");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC NC 接続統計", "NC 接続成功数", ncConnectionSuccessCount, "本");
         UpdatingControllerEvaluationRecorder.recordCount(
@@ -3220,11 +3220,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC cache 統計", "component successor invalid cache hits", componentStepCacheInvalidHits, "回");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC cache 統計", "finishUpdate guard cache entries", safeSize(finishUpdateGuardCache), "件");
+                "OTF-DUC cache 統計", "hotSwapOut guard cache entries", safeSize(finishUpdateGuardCache), "件");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC cache 統計", "finishUpdate guard cache hits", finishUpdateGuardCacheHits, "回");
+                "OTF-DUC cache 統計", "hotSwapOut guard cache hits", finishUpdateGuardCacheHits, "回");
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC cache 統計", "finishUpdate guard cache misses", finishUpdateGuardCacheMisses, "回");
+                "OTF-DUC cache 統計", "hotSwapOut guard cache misses", finishUpdateGuardCacheMisses, "回");
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC cache 統計", "allChildrenGoal cache entries", safeSize(allChildrenGoalCache), "件");
@@ -3622,7 +3622,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 outputPruningDecisionCalls++;
 
                 if (toAdd) {
-                    // finishUpdate の場合は NC への接続を試みる
+                    // hotSwapOut の場合は NC への接続を試みる
                     if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
                         finishUpdateTransitions++;
                         directorNcConnectionAttempts++;
@@ -3668,7 +3668,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
                         // ---------------------------------------------------------
                         // ここから下は通常合成に必要な処理
-                        // finishUpdate の接続先 NC 状態を求める本体
+                        // hotSwapOut の接続先 NC 状態を求める本体
                         // ---------------------------------------------------------
                         long signatureStart = profileLogEnabled ? System.nanoTime() : 0L;
                         
@@ -3685,7 +3685,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                             ncConnectionSuccessCount++;
                             
                             if (debugLogEnabled) {
-                                log("  [Stitch] Connecting " + current.getStates() + " --(finishUpdate)--> NC State " + ncStateId);
+                                log("  [Stitch] Connecting " + current.getStates() + " --(hotSwapOut)--> NC State " + ncStateId);
                             }
                             
                             directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(new DirectorEdge(toOutputAction(hAction), child, ncStateId));
@@ -3821,7 +3821,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             for (DirectorEdge edge : edges) {
                 if (isBeliefRepairReplacedDirectorEdge(source, edge, beliefRepairResult)) {
                     // belief 再探索に成功した旧状態では、具象 m=0 状態ごとの
-                    // beginUpdate を出さず、1 本の beginUpdate から belief 状態へ入る。
+                    // hotSwapIn を出さず、1 本の hotSwapIn から belief 状態へ入る。
                     continue;
                 }
                 Long targetId = edge.isNewControllerConnection()
@@ -3942,7 +3942,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      * 探索では new safety fluent の履歴を保持するが、出力上で同じ旧コントローラ
      * 状態かつ同じ遷移構造を持つ m=0 状態は同一状態としてまとめる。
      *
-     * 初期分割は旧コントローラ成分で行い、beginUpdate と旧コントローラ遷移を含む
+     * 初期分割は旧コントローラ成分で行い、hotSwapIn と旧コントローラ遷移を含む
      * 出力遷移の行き先が同じ同値クラスになるまで partition refinement する。
      */
     private Map<CompostateDUC<State, Action>, Integer> computePreUpdateOutputMergeClasses(
@@ -4105,7 +4105,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 log("    [PreUpdate-MergeProof-Class] class=" + classId
                         + ", members=" + members.size()
                         + ", outputActions=" + describeOutputActions(members, directorEdges)
-                        + ", beginUpdateTargets=" + describeActionTargets(
+                        + ", hotSwapInTargets=" + describeActionTargets(
                                 members, UpdateConstants.BEGIN_UPDATE, directorEdges, finalClassOf, nonPreUpdateIds));
                 log("      representative=" + summarizeStateForDiagnostics(representative));
                 log("      signature=" + signature);
@@ -4578,7 +4578,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         if (missingBeginUpdateState != null) {
-            plan.fail("beginUpdate で到達できる GOAL 子がない pre-update 状態がある: "
+            plan.fail("hotSwapIn で到達できる GOAL 子がない pre-update 状態がある: "
                     + summarizeStateForDiagnostics(missingBeginUpdateState));
             logBeliefRepairPlan(plan);
             return plan;
@@ -4633,7 +4633,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             solveBeliefReachability(plan);
             if (plan.root != null && plan.root.winning) {
                 plan.success = true;
-                plan.reason = "belief graph 上で finishUpdate まで到達可能";
+                plan.reason = "belief graph 上で hotSwapOut まで到達可能";
                 logBeliefRepairPlan(plan);
                 return plan;
             }
@@ -5371,7 +5371,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             node.finishNcTargetId = ncTargets.iterator().next();
             node.finishAction = finishAction;
         } else if (debugLogEnabled) {
-            log("    [Belief-Repair] finishUpdate postponed at " + node.name()
+            log("    [Belief-Repair] hotSwapOut postponed at " + node.name()
                     + " because NC targets differ: " + ncTargets);
         }
     }
@@ -5995,7 +5995,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Long sourceId = concreteIds.get(plan.preUpdateStates.get(0));
             Long rootId = beliefIds.get(plan.root);
             if (sourceId == null || rootId == null) {
-                throw new IllegalStateException("Missing output id for belief repair beginUpdate.");
+                throw new IllegalStateException("Missing output id for belief repair hotSwapIn.");
             }
 
             directorTransitionEmissionAttempts++;
@@ -6444,7 +6444,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
      * OTF-DUC の 2 フェーズ構造に従って出力 controller の遷移を選ぶ。
      *
      * - uncontrollable 遷移は合法性のため常に残す。
-     * - 更新前の beginUpdate は、勝ち更新パスを持つ旧コントローラ状態から残す。
+     * - 更新前の hotSwapIn は、勝ち更新パスを持つ旧コントローラ状態から残す。
      * - 更新中の通常 controllable 遷移は、controllable livelock を出力しないように
      *   選択済みの進行 action だけに pruning する。
      * - 旧コントローラ部分と移設済み新コントローラ部分は、事前合成済み controller
@@ -6464,13 +6464,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         // anytime hotswap 要件: 勝ち更新パスを持つ旧コントローラ状態からは
-        // beginUpdate を出力に残す。
+        // hotSwapIn を出力に残す。
         if (getMarkingState(current) == 0
                 && hAction.toString().equals(UpdateConstants.BEGIN_UPDATE)
                 && isGoal(child)) {
             if(debugLogEnabled){
                 logDirectorPruningDecision(current, hAction, child, true,
-                        "beginUpdate from a winning pre-update state");
+                        "hotSwapIn from a winning pre-update state");
             }
             return true;
         }
@@ -6775,9 +6775,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         UpdatingControllerEvaluationRecorder.recordNanoTime(
                 "OTF-DUC 展開時間内訳", "Safety / requirement 違反判定時間", enforceSafetyCheckNanos);
         UpdatingControllerEvaluationRecorder.recordNanoTime(
-                "OTF-DUC 展開時間内訳", "finishUpdate guard 判定時間", finishUpdateGuardNanos);
+                "OTF-DUC 展開時間内訳", "hotSwapOut guard 判定時間", finishUpdateGuardNanos);
         UpdatingControllerEvaluationRecorder.recordCount(
-                "OTF-DUC 展開時間内訳", "finishUpdate guard 判定回数", finishUpdateGuardChecks, "回");
+                "OTF-DUC 展開時間内訳", "hotSwapOut guard 判定回数", finishUpdateGuardChecks, "回");
         UpdatingControllerEvaluationRecorder.recordNanoTime(
                 "OTF-DUC 展開時間内訳", "子状態と探索木の接続時間", childRegistrationNanos);
         UpdatingControllerEvaluationRecorder.recordNanoTime(
