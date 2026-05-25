@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -83,11 +84,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
     private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "false"));
-    private boolean nondeterministicActionMergeEnabled =
-            Boolean.parseBoolean(System.getProperty("otfduc.nondet.merge", "false"));
-    private boolean preUpdateSimpleMergeEnabled = Boolean.parseBoolean(
-            System.getProperty("otfduc.simple.merge",
-                    System.getProperty("otfduc.preupdate.merge", "false")));
+    private boolean nondeterministicActionBeliefRepairEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.nondet.belief.repair", "true"));
+    private boolean preUpdateSimpleMergeEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.simple.merge", "false"));
     private int beliefRepairAbsoluteMaxStates = Integer.getInteger("otfduc.belief.maxStates", 5000);
     private int beliefRepairMinBeliefNodes = Integer.getInteger("otfduc.belief.maxNodes.min", 64);
     private int beliefRepairBeliefNodesPerNewControllerState =
@@ -214,6 +214,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long directorNcConnectionSignatureNanos = 0;
     private long directorPreUpdateMergeNanos = 0;
     private long directorBeliefRepairNanos = 0;
+    private long directorNondetBeliefRepairNanos = 0;
     private long directorIdAssignmentNanos = 0;
     private long directorTransitionEmissionNanos = 0;
 
@@ -267,6 +268,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     private long beliefRepairMaxObservedBeliefNodes = 0;
     private long beliefRepairMaxObservedAdditionalConcreteStates = 0;
     private long beliefRepairMaxObservedAdditionalTransitions = 0;
+    private long nondetBeliefRepairCandidateGroups = 0;
+    private long nondetBeliefRepairSuccessGroups = 0;
+    private long nondetBeliefRepairFallbackGroups = 0;
+    private long nondetBeliefRepairReplacedTransitions = 0;
     private long totalFairnessCandidatesProcessed = 0;
     private long phase2OuterIterations = 0;
     private long phase2InnerIterations = 0;
@@ -482,10 +487,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
                 if (debugLogEnabled) {
                     log("=== Starting OTF-DUC Synthesis ===");
-                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], NondetActionMerge[%s], SimpleMerge[%s]",
+                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], NondetActionBeliefRepair[%s], SimpleMerge[%s]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
                             transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled,
-                            nondeterministicActionMergeEnabled, preUpdateSimpleMergeEnabled));
+                            nondeterministicActionBeliefRepairEnabled, preUpdateSimpleMergeEnabled));
                 }
                 if (profileLogEnabled) {
                     profileLog("=== Starting OTF-DUC Profiling ===");
@@ -947,6 +952,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         directorNcConnectionSignatureNanos = 0;
         directorPreUpdateMergeNanos = 0;
         directorBeliefRepairNanos = 0;
+        directorNondetBeliefRepairNanos = 0;
         directorIdAssignmentNanos = 0;
         directorTransitionEmissionNanos = 0;
         heuristicSelectionCalls = 0;
@@ -999,6 +1005,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         beliefRepairMaxObservedBeliefNodes = 0;
         beliefRepairMaxObservedAdditionalConcreteStates = 0;
         beliefRepairMaxObservedAdditionalTransitions = 0;
+        nondetBeliefRepairCandidateGroups = 0;
+        nondetBeliefRepairSuccessGroups = 0;
+        nondetBeliefRepairFallbackGroups = 0;
+        nondetBeliefRepairReplacedTransitions = 0;
         totalFairnessCandidatesProcessed = 0;
         phase2OuterIterations = 0;
         phase2InnerIterations = 0;
@@ -3600,6 +3610,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // ステップ 2: pruning 後の更新コントローラグラフを一度収集する
         // ---------------------------------------------------------
         Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges = new LinkedHashMap<>();
+        Map<RawNondetActionKey, CompostateDUC<State, Action>> rawNondetActionFirstTargets =
+                new LinkedHashMap<>();
+        Set<RawNondetActionKey> rawNondetActionCandidateKeys = new LinkedHashSet<>();
         List<CompostateDUC<State, Action>> reachableOrder = new ArrayList<>();
         Set<CompostateDUC<State, Action>> reached = new HashSet<>();
         Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
@@ -3687,8 +3700,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                             if (debugLogEnabled) {
                                 log("  [Stitch] Connecting " + current.getStates() + " --(hotSwapOut)--> NC State " + ncStateId);
                             }
-                            
-                            directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(new DirectorEdge(toOutputAction(hAction), child, ncStateId));
+
+                            DirectorEdge edge = new DirectorEdge(toOutputAction(hAction), child, ncStateId);
+                            directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(edge);
                             directorEdgesCollected++;
                         } else {
                             ncConnectionMissCount++;
@@ -3705,7 +3719,13 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         }
                     } else {
                         // 通常の遷移
-                        directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(new DirectorEdge(toOutputAction(hAction), child, null));
+                        DirectorEdge edge = new DirectorEdge(toOutputAction(hAction), child, null);
+                        directorEdges.computeIfAbsent(current, k -> new ArrayList<>()).add(edge);
+                        recordRawNondetActionCandidate(
+                                rawNondetActionFirstTargets,
+                                rawNondetActionCandidateKeys,
+                                current,
+                                edge);
                         
                         directorEdgesCollected++;
                         
@@ -3726,18 +3746,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // ---------------------------------------------------------
         // ステップ 3: 出力時マージを準備する。
-        // 非決定性 action target の同一視は先に計算し、簡単マージを切った場合も
-        // 更新パス上の非決定性は従来 DUC に近い形で出力上まとめる。
-        // その後、必要なら旧コントローラ相当状態の簡単マージと belief repair を行う。
+        // non-pre-update 側は raw concrete state 単位に保ち、必要なら
+        // 旧コントローラ相当状態の簡単マージと belief repair を行う。
         // ---------------------------------------------------------
         long preUpdateMergeStart = profileLogEnabled ? System.nanoTime() : 0L;
-        Map<CompostateDUC<State, Action>, Integer> nondetTargetClasses;
+        Map<CompostateDUC<State, Action>, Integer> nonPreUpdateClasses;
         Map<CompostateDUC<State, Action>, Integer> fallbackPreUpdateClasses;
         try {
-            nondetTargetClasses = computeDirectNondeterministicActionTargetClasses(reachableOrder, directorEdges);
+            nonPreUpdateClasses = computeRawNonPreUpdateOutputClasses(reachableOrder);
             if (preUpdateSimpleMergeEnabled) {
                 fallbackPreUpdateClasses = computePreUpdateOutputMergeClasses(
-                        reachableOrder, directorEdges, nondetTargetClasses);
+                        reachableOrder, directorEdges, nonPreUpdateClasses);
             } else {
                 fallbackPreUpdateClasses = computeRawPreUpdateOutputClasses(reachableOrder);
                 if (debugLogEnabled) {
@@ -3775,12 +3794,56 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         recordPreUpdateOutputStateOverhead(reachableOrder, preUpdateClasses);
 
         Map<CompostateDUC<State, Action>, Integer> outputClasses =
-                computeOutputClassesAfterNondeterministicActionMerge(
-                        reachableOrder, directorEdges, preUpdateClasses, beliefRepairResult, nondetTargetClasses);
+                buildOutputClasses(reachableOrder, preUpdateClasses, nonPreUpdateClasses);
+        Set<CompostateDUC<State, Action>> concreteReachableAfterPreUpdateBeliefRepair = null;
+        if (beliefRepairEnabled) {
+            concreteReachableAfterPreUpdateBeliefRepair =
+                    computeConcreteReachableAfterBeliefRepair(initial, directorEdges, beliefRepairResult);
+            if (debugLogEnabled) {
+                log("  [Nondet-Belief-Repair] concrete reachable filter after pre-update repair: "
+                        + concreteReachableAfterPreUpdateBeliefRepair.size()
+                        + "/" + reachableOrder.size());
+            }
+        }
+
+        NondetActionBeliefRepairResult nondetBeliefRepairResult = new NondetActionBeliefRepairResult();
+        if (nondeterministicActionBeliefRepairEnabled) {
+            long nondetRepairStart = System.nanoTime();
+            try {
+                if (rawNondetActionCandidateKeys.isEmpty()) {
+                    if (debugLogEnabled) {
+                        log("  [Nondet-Belief-Repair] skipped: no raw nondeterministic action candidates");
+                    }
+                } else {
+                    Map<NondetActionRepairKey, NondetActionBeliefRepairPlan> nondetCandidates =
+                            collectNondetActionBeliefRepairCandidates(
+                                    rawNondetActionCandidateKeys,
+                                    directorEdges,
+                                    outputClasses,
+                                    concreteReachableAfterPreUpdateBeliefRepair);
+                    if (nondetCandidates.isEmpty()) {
+                        if (debugLogEnabled) {
+                            log("  [Nondet-Belief-Repair] skipped: rawCandidates="
+                                    + rawNondetActionCandidateKeys.size()
+                                    + ", exactCandidates=0 after output-class verification");
+                        }
+                    } else {
+                        Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges =
+                                collectRawDirectorEdges(false);
+                        nondetBeliefRepairResult = repairNondeterministicActionBeliefs(
+                                nondetCandidates, rawDirectorEdges);
+                    }
+                }
+            } finally {
+                directorNondetBeliefRepairNanos += System.nanoTime() - nondetRepairStart;
+            }
+        } else if (debugLogEnabled) {
+            log("  [Nondet-Belief-Repair] disabled by -Dotfduc.nondet.belief.repair=false");
+        }
 
         Map<CompostateDUC<State, Action>, Long> ids = new HashMap<>();
         Map<Integer, Long> outputClassIds = new HashMap<>();
-        Map<BeliefNode, Long> beliefIds = new HashMap<>();
+        Map<BeliefNode, Long> beliefIds = new IdentityHashMap<>();
         long idAssignmentStart = profileLogEnabled ? System.nanoTime() : 0L;
         for (CompostateDUC<State, Action> state : reachableOrder) {
             Integer classId = outputClasses.get(state);
@@ -3798,6 +3861,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
         for (BeliefRepairPlan plan : beliefRepairResult.successPlans.values()) {
             for (BeliefNode node : plan.nodes) {
+                if (!beliefIds.containsKey(node)) {
+                    Long id = nextId++;
+                    beliefIds.put(node, id);
+                    result.addState(id);
+                    directorOutputStatesAssigned++;
+                }
+            }
+        }
+        for (NondetActionBeliefRepairPlan plan : nondetBeliefRepairResult.successPlans) {
+            for (BeliefNode node : plan.beliefPlan.nodes) {
                 if (!beliefIds.containsKey(node)) {
                     Long id = nextId++;
                     beliefIds.put(node, id);
@@ -3824,6 +3897,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     // hotSwapIn を出さず、1 本の hotSwapIn から belief 状態へ入る。
                     continue;
                 }
+                if (isNondetActionBeliefRepairReplacedDirectorEdge(
+                        source, edge, outputClasses, nondetBeliefRepairResult)) {
+                    continue;
+                }
                 Long targetId = edge.isNewControllerConnection()
                         ? edge.ncTargetId
                         : ids.get(edge.child);
@@ -3837,6 +3914,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
         emitBeliefRepairTransitions(result, ids, beliefIds, beliefRepairResult);
+        emitNondetActionBeliefRepairTransitions(
+                result, ids, beliefIds, outputClasses, nondetBeliefRepairResult);
         if (profileLogEnabled) {
             directorTransitionEmissionNanos += System.nanoTime() - transitionEmissionStart;
             directorTraversalNanos += System.nanoTime() - directorBuildStart;
@@ -3862,80 +3941,41 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return (Action) hAction.toString().replace("_old", "");
     }
 
-    /**
-     * 通常 OTF-DUC の concrete 探索で同一 source・同一 action から複数 target が
-     * 出た場合、従来 DUC のように出力上は同一状態として扱うための基礎クラスを作る。
-     */
-    private Map<CompostateDUC<State, Action>, Integer> computeDirectNondeterministicActionTargetClasses(
-            List<CompostateDUC<State, Action>> reachableOrder,
-            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges) {
+    private void recordRawNondetActionCandidate(
+            Map<RawNondetActionKey, CompostateDUC<State, Action>> firstTargets,
+            Set<RawNondetActionKey> candidateKeys,
+            CompostateDUC<State, Action> source,
+            DirectorEdge edge) {
 
-        OutputClassUnionFind unionFind = new OutputClassUnionFind();
-        Map<CompostateDUC<State, Action>, Integer> rawClassByState = new HashMap<>();
+        if (isPreUpdateOutputState(source) || edge.isNewControllerConnection() || edge.child == null) {
+            return;
+        }
+        String actionName = edge.outputAction.toString();
+        if (actionName.equals(UpdateConstants.BEGIN_UPDATE)
+                || actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+            return;
+        }
 
+        RawNondetActionKey key = new RawNondetActionKey(source, actionName);
+        CompostateDUC<State, Action> firstTarget = firstTargets.get(key);
+        if (firstTarget == null) {
+            firstTargets.put(key, edge.child);
+        } else if (firstTarget != edge.child) {
+            candidateKeys.add(key);
+        }
+    }
+
+    private Map<CompostateDUC<State, Action>, Integer> computeRawNonPreUpdateOutputClasses(
+            List<CompostateDUC<State, Action>> reachableOrder) {
+
+        Map<CompostateDUC<State, Action>, Integer> classOf = new HashMap<>();
+        int nextClassId = 0;
         for (CompostateDUC<State, Action> state : reachableOrder) {
             if (!isPreUpdateOutputState(state)) {
-                rawClassByState.put(state, unionFind.addClass());
+                classOf.put(state, nextClassId++);
             }
         }
-
-        int unionOperations = 0;
-        if (nondeterministicActionMergeEnabled) {
-            for (CompostateDUC<State, Action> source : reachableOrder) {
-                List<DirectorEdge> edges = directorEdges.get(source);
-                if (edges == null) {
-                    continue;
-                }
-
-                Map<Action, Set<Integer>> targetsByAction = new LinkedHashMap<>();
-                for (DirectorEdge edge : edges) {
-                    if (edge.isNewControllerConnection() || isPreUpdateOutputState(edge.child)) {
-                        continue;
-                    }
-                    Integer targetClass = rawClassByState.get(edge.child);
-                    if (targetClass == null) {
-                        continue;
-                    }
-                    targetsByAction
-                            .computeIfAbsent(edge.outputAction, k -> new LinkedHashSet<>())
-                            .add(unionFind.find(targetClass));
-                }
-
-                for (Set<Integer> targetClasses : targetsByAction.values()) {
-                    if (targetClasses.size() <= 1) {
-                        continue;
-                    }
-                    Iterator<Integer> it = targetClasses.iterator();
-                    int representative = it.next();
-                    while (it.hasNext()) {
-                        if (unionFind.union(representative, it.next())) {
-                            unionOperations++;
-                        }
-                    }
-                }
-            }
-        }
-
-        Map<Integer, Integer> compactClassIds = new LinkedHashMap<>();
-        Map<CompostateDUC<State, Action>, Integer> result = new HashMap<>();
-        for (Map.Entry<CompostateDUC<State, Action>, Integer> entry : rawClassByState.entrySet()) {
-            int root = unionFind.find(entry.getValue());
-            Integer compactClassId = compactClassIds.get(root);
-            if (compactClassId == null) {
-                compactClassId = compactClassIds.size();
-                compactClassIds.put(root, compactClassId);
-            }
-            result.put(entry.getKey(), compactClassId);
-        }
-
-        if (debugLogEnabled) {
-            log("  [Nondet-Action-Merge:pre-simple] enabled=" + nondeterministicActionMergeEnabled
-                    + ", rawNonPreStates=" + rawClassByState.size()
-                    + ", classes=" + compactClassIds.size()
-                    + ", removed=" + Math.max(0, rawClassByState.size() - compactClassIds.size())
-                    + ", unionOperations=" + unionOperations);
-        }
-        return result;
+        return classOf;
     }
 
     /**
@@ -4584,12 +4624,213 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             return plan;
         }
 
+        return runBeliefRepairLoop(
+                plan,
+                preUpdateStates,
+                beginTargets,
+                rawDirectorEdges,
+                "belief graph 上で hotSwapOut まで到達可能",
+                "belief graph 上で全候補に共通する勝ち更新戦略を証明できない"
+                        + "（追加展開しても新しい遷移を発見できない）");
+    }
+
+    private NondetActionBeliefRepairResult repairNondeterministicActionBeliefs(
+            Map<NondetActionRepairKey, NondetActionBeliefRepairPlan> candidates,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        NondetActionBeliefRepairResult result = new NondetActionBeliefRepairResult();
+        if (debugLogEnabled) {
+            log("  [Nondet-Belief-Repair] start: candidates=" + candidates.size());
+        }
+
+        for (NondetActionBeliefRepairPlan candidate : candidates.values()) {
+            if (candidate.targetClasses.size() <= 1) {
+                continue;
+            }
+
+            nondetBeliefRepairCandidateGroups++;
+            runNondetActionBeliefRepairPlan(candidate, rawDirectorEdges);
+            if (candidate.beliefPlan.success) {
+                nondetBeliefRepairSuccessGroups++;
+                result.addSuccess(candidate);
+            } else {
+                nondetBeliefRepairFallbackGroups++;
+                result.addFallback(candidate);
+            }
+        }
+
+        if (debugLogEnabled) {
+            log("  [Nondet-Belief-Repair] finished: candidates="
+                    + nondetBeliefRepairCandidateGroups
+                    + ", success=" + nondetBeliefRepairSuccessGroups
+                    + ", fallback=" + nondetBeliefRepairFallbackGroups);
+        }
+        return result;
+    }
+
+    private Set<CompostateDUC<State, Action>> computeConcreteReachableAfterBeliefRepair(
+            CompostateDUC<State, Action> initialState,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            BeliefRepairResult beliefRepairResult) {
+
+        Set<CompostateDUC<State, Action>> reached = new HashSet<>();
+        Deque<CompostateDUC<State, Action>> queue = new ArrayDeque<>();
+        reached.add(initialState);
+        queue.add(initialState);
+
+        while (!queue.isEmpty()) {
+            CompostateDUC<State, Action> current = queue.remove();
+            List<DirectorEdge> edges = directorEdges.get(current);
+            if (edges == null) {
+                continue;
+            }
+
+            for (DirectorEdge edge : edges) {
+                if (isBeliefRepairReplacedDirectorEdge(current, edge, beliefRepairResult)
+                        || edge.isNewControllerConnection()
+                        || edge.child == null) {
+                    continue;
+                }
+                if (reached.add(edge.child)) {
+                    queue.add(edge.child);
+                }
+            }
+        }
+
+        return reached;
+    }
+
+    private Map<NondetActionRepairKey, NondetActionBeliefRepairPlan> collectNondetActionBeliefRepairCandidates(
+            Set<RawNondetActionKey> rawNondetCandidateKeys,
+            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
+            Map<CompostateDUC<State, Action>, Integer> outputClasses,
+            Set<CompostateDUC<State, Action>> concreteReachableFilter) {
+
+        Map<NondetActionRepairKey, NondetActionBeliefRepairPlan> candidates = new LinkedHashMap<>();
+        for (RawNondetActionKey rawKey : rawNondetCandidateKeys) {
+            CompostateDUC<State, Action> source = rawKey.source;
+            if (isPreUpdateOutputState(source)) {
+                continue;
+            }
+            if (concreteReachableFilter != null && !concreteReachableFilter.contains(source)) {
+                continue;
+            }
+            Integer sourceClass = outputClasses.get(source);
+            if (sourceClass == null) {
+                continue;
+            }
+
+            List<DirectorEdge> edges = directorEdges.get(source);
+            if (edges == null) {
+                continue;
+            }
+
+            for (DirectorEdge edge : edges) {
+                if (edge.isNewControllerConnection() || edge.child == null) {
+                    continue;
+                }
+                String actionName = edge.outputAction.toString();
+                if (!actionName.equals(rawKey.actionName)) {
+                    continue;
+                }
+                if (actionName.equals(UpdateConstants.BEGIN_UPDATE)
+                        || actionName.equals(UpdateConstants.FINISH_UPDATE)) {
+                    continue;
+                }
+
+                Integer targetClass = outputClasses.get(edge.child);
+                if (targetClass == null) {
+                    continue;
+                }
+                if (concreteReachableFilter != null && !concreteReachableFilter.contains(edge.child)) {
+                    continue;
+                }
+
+                NondetActionRepairKey key = new NondetActionRepairKey(sourceClass, actionName);
+                NondetActionBeliefRepairPlan candidate = candidates.get(key);
+                if (candidate == null) {
+                    candidate = new NondetActionBeliefRepairPlan(sourceClass, edge.outputAction, actionName);
+                    candidates.put(key, candidate);
+                }
+                candidate.sourceStates.add(source);
+                candidate.rootMembers.add(edge.child);
+                candidate.targetClasses.add(targetClass);
+            }
+        }
+
+        Iterator<Map.Entry<NondetActionRepairKey, NondetActionBeliefRepairPlan>> it =
+                candidates.entrySet().iterator();
+        while (it.hasNext()) {
+            NondetActionBeliefRepairPlan candidate = it.next().getValue();
+            if (candidate.targetClasses.size() <= 1) {
+                it.remove();
+            }
+        }
+        return candidates;
+    }
+
+    private void runNondetActionBeliefRepairPlan(
+            NondetActionBeliefRepairPlan candidate,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges) {
+
+        List<CompostateDUC<State, Action>> seedStates = new ArrayList<>(candidate.rootMembers);
+        List<Integer> fallbackClasses = new ArrayList<>(candidate.targetClasses);
+        Collections.sort(fallbackClasses);
+
+        BeliefRepairPlan plan = new BeliefRepairPlan(null, seedStates, fallbackClasses);
+        plan.label = "nondetAction sourceClass=" + candidate.sourceClass
+                + ", action=" + candidate.actionName;
+        plan.initialConcreteStateCount = compostates == null ? 0 : compostates.size();
+        plan.initialRawTransitionCount = countRawDirectorTransitions(rawDirectorEdges);
+        plan.repairStartNanos = System.nanoTime();
+        plan.beginUpdateAction = candidate.outputAction;
+        candidate.beliefPlan = plan;
+
+        for (CompostateDUC<State, Action> rootMember : candidate.rootMembers) {
+            if (!isSafeWinningBeliefChild(rootMember)) {
+                plan.fail("非決定 action の target に GOAL でない子が含まれる: "
+                        + summarizeStateForDiagnostics(rootMember));
+                logBeliefRepairPlan(plan);
+                return;
+            }
+        }
+
+        refreshBeliefRepairResourceLimits(plan, candidate.rootMembers, rawDirectorEdges);
+
+        if (debugLogEnabled) {
+            log("  [Nondet-Belief-Repair] candidate "
+                    + plan.label()
+                    + ", sourceStates=" + candidate.sourceStates.size()
+                    + ", rootMembers=" + candidate.rootMembers.size()
+                    + ", targetClasses=" + candidate.targetClasses
+                    + ", reachableMapValuations=" + plan.reachableMapValuations
+                    + ", limits=" + plan.resourceLimits);
+        }
+
+        runBeliefRepairLoop(
+                plan,
+                seedStates,
+                candidate.rootMembers,
+                rawDirectorEdges,
+                "非決定 action の belief graph 上で hotSwapOut まで到達可能",
+                "非決定 action の belief graph 上で共通する勝ち更新戦略を証明できない"
+                        + "（追加展開しても新しい遷移を発見できない）");
+    }
+
+    private BeliefRepairPlan runBeliefRepairLoop(
+            BeliefRepairPlan plan,
+            List<CompostateDUC<State, Action>> seedStates,
+            Set<CompostateDUC<State, Action>> rootMembers,
+            Map<CompostateDUC<State, Action>, List<RawDirectorEdge>> rawDirectorEdges,
+            String successReason,
+            String failureReason) {
+
         Set<String> lazyNoProgressActions = new HashSet<>();
         Set<String> rejectedBeliefActions = new HashSet<>();
         int lazyRound = 0;
         while (true) {
             BeliefSearchContext context = buildBeliefGraphForPlan(
-                    plan, preUpdateStates, beginTargets, rawDirectorEdges);
+                    plan, seedStates, rootMembers, rawDirectorEdges);
             updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
 
             if (context.limitExceeded) {
@@ -4613,7 +4854,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (updateExpansion.hasProgress()) {
                 rawDirectorEdges.clear();
                 rawDirectorEdges.putAll(collectRawDirectorEdges(false));
-                refreshBeliefRepairResourceLimits(plan, beginTargets, rawDirectorEdges);
+                refreshBeliefRepairResourceLimits(plan, rootMembers, rawDirectorEdges);
                 updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
                 lazyRound++;
                 continue;
@@ -4624,7 +4865,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (uncontrollableExpansion.hasProgress()) {
                 rawDirectorEdges.clear();
                 rawDirectorEdges.putAll(collectRawDirectorEdges(false));
-                refreshBeliefRepairResourceLimits(plan, beginTargets, rawDirectorEdges);
+                refreshBeliefRepairResourceLimits(plan, rootMembers, rawDirectorEdges);
                 updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
                 continue;
             }
@@ -4633,7 +4874,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             solveBeliefReachability(plan);
             if (plan.root != null && plan.root.winning) {
                 plan.success = true;
-                plan.reason = "belief graph 上で hotSwapOut まで到達可能";
+                plan.reason = successReason;
                 logBeliefRepairPlan(plan);
                 return plan;
             }
@@ -4650,15 +4891,14 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 return plan;
             }
             if (!lazyResult.hasProgress()) {
-                plan.fail("belief graph 上で全候補に共通する勝ち更新戦略を証明できない"
-                        + "（追加展開しても新しい遷移を発見できない）");
+                plan.fail(failureReason);
                 logBeliefRepairPlan(plan);
                 return plan;
             }
 
             rawDirectorEdges.clear();
             rawDirectorEdges.putAll(collectRawDirectorEdges(false));
-            refreshBeliefRepairResourceLimits(plan, beginTargets, rawDirectorEdges);
+            refreshBeliefRepairResourceLimits(plan, rootMembers, rawDirectorEdges);
             updateBeliefRepairResourceUsage(plan, rawDirectorEdges);
             lazyRound++;
         }
@@ -4838,7 +5078,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         if (debugLogEnabled && (result.attemptedActions > 0 || result.addedEdges > 0)) {
-            log("  [Belief-LazyExpansion] oldControllerState=" + plan.oldControllerState
+            log("  [Belief-LazyExpansion] " + plan.label()
                     + ", round=" + result.round
                     + ", mode=C-one-action"
                     + ", attemptedActions=" + result.attemptedActions
@@ -4941,7 +5181,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 beliefUnsafeControllableDiscardCount++;
                 if (debugLogEnabled) {
                     log("  [Belief-LazyExpansion] discard unsafe controllable candidate: "
-                            + "oldControllerState=" + candidate.plan.oldControllerState
+                            + candidate.plan.label()
                             + ", node=" + candidate.node.name()
                             + ", action=" + candidate.actionName
                             + ", reason=ERROR child を持つため共通 controllable 戦略として使えない");
@@ -4953,7 +5193,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 return false;
             }
             if (debugLogEnabled) {
-                log("  [Belief-LazyExpansion] oldControllerState=" + candidate.plan.oldControllerState
+                log("  [Belief-LazyExpansion] " + candidate.plan.label()
                         + ", round=" + result.round
                         + ", mode=" + (candidate.controllable ? "C-frontier" : "U-closure")
                         + ", selectedNode=" + candidate.node.name()
@@ -5112,7 +5352,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         if (debugLogEnabled && count > 0) {
-            log("  [Belief-Warning] oldControllerState=" + plan.oldControllerState
+            log("  [Belief-Warning] " + plan.label()
                     + " has unexplored uncontrollable actions inside belief graph: count=" + count
                     + ", samples=" + samples
                     + ". 未展開 uncontrollable を持つ belief node は勝ち判定から除外します。");
@@ -5126,6 +5366,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Set<String> names = new LinkedHashSet<>();
             for (HAction<State, Action> action : member.getTransitions()) {
                 if (!action.isControllable()) {
+                    continue;
+                }
+                if (isBlockedFinishUpdateAction(member, action)) {
                     continue;
                 }
                 String actionName = toOutputAction(action).toString();
@@ -5206,6 +5449,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             if (controllableOnly && !action.isControllable()) {
                 continue;
             }
+            if (isBlockedFinishUpdateAction(state, action)) {
+                continue;
+            }
             if (toOutputAction(action).toString().equals(outputActionName)) {
                 return action;
             }
@@ -5226,6 +5472,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             }
         }
         return null;
+    }
+
+    private boolean isBlockedFinishUpdateAction(
+            CompostateDUC<State, Action> state,
+            HAction<State, Action> action) {
+
+        return action != null
+                && action.toString().equals(UpdateConstants.FINISH_UPDATE)
+                && state.isFinishUpdateBlocked();
     }
 
     private void expandConcreteActionForBelief(
@@ -5458,7 +5713,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     winningNodes++;
                 }
             }
-            log("  [Belief-Repair] fixed point oldControllerState=" + plan.oldControllerState
+            log("  [Belief-Repair] fixed point " + plan.label()
                     + ": winningBeliefNodes=" + winningNodes + "/" + plan.nodes.size());
         }
     }
@@ -5582,7 +5837,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         if (debugLogEnabled && promoted > 0) {
-            log("  [Belief-Fairness] oldControllerState=" + plan.oldControllerState
+            log("  [Belief-Fairness] " + plan.label()
                     + " promoted belief nodes by fair SCC: " + promoted);
         }
         return promoted > 0;
@@ -5857,17 +6112,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return new long[] { splitOldControllerStates, maxSplitPerOldControllerState };
     }
 
-    private Map<CompostateDUC<State, Action>, Integer> computeOutputClassesAfterNondeterministicActionMerge(
+    private Map<CompostateDUC<State, Action>, Integer> buildOutputClasses(
             List<CompostateDUC<State, Action>> reachableOrder,
-            Map<CompostateDUC<State, Action>, List<DirectorEdge>> directorEdges,
             Map<CompostateDUC<State, Action>, Integer> preUpdateClasses,
-            BeliefRepairResult beliefRepairResult,
-            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateBaseClasses) {
+            Map<CompostateDUC<State, Action>, Integer> nonPreUpdateClasses) {
 
-        OutputClassUnionFind unionFind = new OutputClassUnionFind();
-        Map<CompostateDUC<State, Action>, Integer> rawClassByState = new HashMap<>();
-        Map<Integer, Integer> preUpdateClassToRawClass = new LinkedHashMap<>();
-        Map<Integer, Integer> nonPreUpdateClassToRawClass = new LinkedHashMap<>();
+        Map<Integer, Integer> preUpdateClassToOutputClass = new LinkedHashMap<>();
+        Map<Integer, Integer> nonPreUpdateClassToOutputClass = new LinkedHashMap<>();
+        Map<CompostateDUC<State, Action>, Integer> result = new HashMap<>();
+        int nextClassId = 0;
 
         for (CompostateDUC<State, Action> state : reachableOrder) {
             if (isPreUpdateOutputState(state)) {
@@ -5875,99 +6128,30 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 if (preUpdateClass == null) {
                     throw new IllegalStateException("Missing pre-update output class.");
                 }
-                Integer rawClass = preUpdateClassToRawClass.get(preUpdateClass);
-                if (rawClass == null) {
-                    rawClass = unionFind.addClass();
-                    preUpdateClassToRawClass.put(preUpdateClass, rawClass);
+                Integer outputClass = preUpdateClassToOutputClass.get(preUpdateClass);
+                if (outputClass == null) {
+                    outputClass = nextClassId++;
+                    preUpdateClassToOutputClass.put(preUpdateClass, outputClass);
                 }
-                rawClassByState.put(state, rawClass);
+                result.put(state, outputClass);
             } else {
-                Integer baseClass = nonPreUpdateBaseClasses.get(state);
-                Integer rawClass = baseClass == null ? null : nonPreUpdateClassToRawClass.get(baseClass);
-                if (rawClass == null) {
-                    rawClass = unionFind.addClass();
-                    if (baseClass != null) {
-                        nonPreUpdateClassToRawClass.put(baseClass, rawClass);
-                    }
+                Integer nonPreUpdateClass = nonPreUpdateClasses.get(state);
+                if (nonPreUpdateClass == null) {
+                    throw new IllegalStateException("Missing non-pre-update output class.");
                 }
-                rawClassByState.put(state, rawClass);
+                Integer outputClass = nonPreUpdateClassToOutputClass.get(nonPreUpdateClass);
+                if (outputClass == null) {
+                    outputClass = nextClassId++;
+                    nonPreUpdateClassToOutputClass.put(nonPreUpdateClass, outputClass);
+                }
+                result.put(state, outputClass);
             }
-        }
-
-        int mergeRounds = 0;
-        int mergedTargetClasses = 0;
-        if (nondeterministicActionMergeEnabled) {
-            boolean changed;
-            do {
-                changed = false;
-                mergeRounds++;
-
-                Map<Integer, Map<Action, Set<Integer>>> targetsByOutputClassAndAction = new LinkedHashMap<>();
-                for (CompostateDUC<State, Action> source : reachableOrder) {
-                    Integer sourceRawClass = rawClassByState.get(source);
-                    if (sourceRawClass == null) {
-                        continue;
-                    }
-                    int sourceClass = unionFind.find(sourceRawClass);
-                    List<DirectorEdge> edges = directorEdges.get(source);
-                    if (edges == null) {
-                        continue;
-                    }
-                    for (DirectorEdge edge : edges) {
-                        if (isBeliefRepairReplacedDirectorEdge(source, edge, beliefRepairResult)
-                                || edge.isNewControllerConnection()
-                                || isPreUpdateOutputState(edge.child)) {
-                            continue;
-                        }
-                        Integer targetRawClass = rawClassByState.get(edge.child);
-                        if (targetRawClass == null) {
-                            continue;
-                        }
-                        int targetClass = unionFind.find(targetRawClass);
-                        targetsByOutputClassAndAction
-                                .computeIfAbsent(sourceClass, k -> new LinkedHashMap<>())
-                                .computeIfAbsent(edge.outputAction, k -> new LinkedHashSet<>())
-                                .add(targetClass);
-                    }
-                }
-
-                for (Map<Action, Set<Integer>> targetsByAction : targetsByOutputClassAndAction.values()) {
-                    for (Set<Integer> targetClasses : targetsByAction.values()) {
-                        if (targetClasses.size() <= 1) {
-                            continue;
-                        }
-                        Iterator<Integer> it = targetClasses.iterator();
-                        int representative = it.next();
-                        while (it.hasNext()) {
-                            if (unionFind.union(representative, it.next())) {
-                                changed = true;
-                                mergedTargetClasses++;
-                            }
-                        }
-                    }
-                }
-            } while (changed);
-        }
-
-        Map<Integer, Integer> compactClassIds = new LinkedHashMap<>();
-        Map<CompostateDUC<State, Action>, Integer> result = new HashMap<>();
-        for (CompostateDUC<State, Action> state : reachableOrder) {
-            int root = unionFind.find(rawClassByState.get(state));
-            Integer compactClassId = compactClassIds.get(root);
-            if (compactClassId == null) {
-                compactClassId = compactClassIds.size();
-                compactClassIds.put(root, compactClassId);
-            }
-            result.put(state, compactClassId);
         }
 
         if (debugLogEnabled) {
-            log("  [Nondet-Action-Merge] enabled=" + nondeterministicActionMergeEnabled
-                    + ", rawOutputStates=" + reachableOrder.size()
-                    + ", classes=" + compactClassIds.size()
-                    + ", removed=" + Math.max(0, reachableOrder.size() - compactClassIds.size())
-                    + ", unionOperations=" + mergedTargetClasses
-                    + ", rounds=" + (nondeterministicActionMergeEnabled ? mergeRounds : 0));
+            log("  [Director-Output-Classes] rawOutputStates=" + reachableOrder.size()
+                    + ", classes=" + nextClassId
+                    + ", removed=" + Math.max(0, reachableOrder.size() - nextClassId));
         }
         return result;
     }
@@ -5980,6 +6164,27 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return beliefRepairResult != null
                 && beliefRepairResult.isRepairedPreUpdateState(source)
                 && edge.outputAction.toString().equals(UpdateConstants.BEGIN_UPDATE);
+    }
+
+    private boolean isNondetActionBeliefRepairReplacedDirectorEdge(
+            CompostateDUC<State, Action> source,
+            DirectorEdge edge,
+            Map<CompostateDUC<State, Action>, Integer> outputClasses,
+            NondetActionBeliefRepairResult repairResult) {
+
+        if (repairResult == null || edge.isNewControllerConnection() || edge.child == null) {
+            return false;
+        }
+        Integer sourceClass = outputClasses.get(source);
+        if (sourceClass == null) {
+            return false;
+        }
+        NondetActionBeliefRepairPlan plan = repairResult.find(sourceClass, edge.outputAction);
+        if (plan == null) {
+            return false;
+        }
+        Integer targetClass = outputClasses.get(edge.child);
+        return targetClass != null && plan.targetClasses.contains(targetClass);
     }
 
     private void emitBeliefRepairTransitions(
@@ -6003,43 +6208,82 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 directorOutputTransitions++;
             }
 
-            for (BeliefNode node : plan.nodes) {
-                if (!node.winning) {
+            emitBeliefPlanInternalTransitions(result, beliefIds, plan);
+        }
+    }
+
+    private void emitNondetActionBeliefRepairTransitions(
+            LTSImpl<Long, Action> result,
+            Map<CompostateDUC<State, Action>, Long> concreteIds,
+            Map<BeliefNode, Long> beliefIds,
+            Map<CompostateDUC<State, Action>, Integer> outputClasses,
+            NondetActionBeliefRepairResult repairResult) {
+
+        for (NondetActionBeliefRepairPlan repairPlan : repairResult.successPlans) {
+            Long sourceId = null;
+            for (CompostateDUC<State, Action> source : repairPlan.sourceStates) {
+                Integer sourceClass = outputClasses.get(source);
+                if (sourceClass != null && sourceClass == repairPlan.sourceClass) {
+                    sourceId = concreteIds.get(source);
+                    break;
+                }
+            }
+            Long rootId = beliefIds.get(repairPlan.beliefPlan.root);
+            if (sourceId == null || rootId == null) {
+                throw new IllegalStateException("Missing output id for nondeterministic action belief repair.");
+            }
+
+            directorTransitionEmissionAttempts++;
+            if (result.addTransition(sourceId, repairPlan.outputAction, rootId)) {
+                directorOutputTransitions++;
+                nondetBeliefRepairReplacedTransitions++;
+            }
+
+            emitBeliefPlanInternalTransitions(result, beliefIds, repairPlan.beliefPlan);
+        }
+    }
+
+    private void emitBeliefPlanInternalTransitions(
+            LTSImpl<Long, Action> result,
+            Map<BeliefNode, Long> beliefIds,
+            BeliefRepairPlan plan) {
+
+        for (BeliefNode node : plan.nodes) {
+            if (!node.winning) {
+                continue;
+            }
+            Long nodeId = beliefIds.get(node);
+            if (nodeId == null) {
+                throw new IllegalStateException("Missing output id for belief state.");
+            }
+
+            for (BeliefTransition edge : node.uncontrollableEdges) {
+                if (!edge.target.winning) {
                     continue;
                 }
-                Long nodeId = beliefIds.get(node);
-                if (nodeId == null) {
-                    throw new IllegalStateException("Missing output id for belief state.");
+                Long targetId = beliefIds.get(edge.target);
+                if (targetId == null) {
+                    throw new IllegalStateException("Missing output id for belief uncontrollable target.");
                 }
-
-                for (BeliefTransition edge : node.uncontrollableEdges) {
-                    if (!edge.target.winning) {
-                        continue;
-                    }
-                    Long targetId = beliefIds.get(edge.target);
-                    if (targetId == null) {
-                        throw new IllegalStateException("Missing output id for belief uncontrollable target.");
-                    }
-                    directorTransitionEmissionAttempts++;
-                    if (result.addTransition(nodeId, edge.outputAction, targetId)) {
-                        directorOutputTransitions++;
-                    }
+                directorTransitionEmissionAttempts++;
+                if (result.addTransition(nodeId, edge.outputAction, targetId)) {
+                    directorOutputTransitions++;
                 }
+            }
 
-                if (node.selectedFinish) {
-                    directorTransitionEmissionAttempts++;
-                    if (result.addTransition(nodeId, node.finishAction, node.finishNcTargetId)) {
-                        directorOutputTransitions++;
-                    }
-                } else if (node.selectedControllableEdge != null) {
-                    Long targetId = beliefIds.get(node.selectedControllableEdge.target);
-                    if (targetId == null) {
-                        throw new IllegalStateException("Missing output id for belief controllable target.");
-                    }
-                    directorTransitionEmissionAttempts++;
-                    if (result.addTransition(nodeId, node.selectedControllableEdge.outputAction, targetId)) {
-                        directorOutputTransitions++;
-                    }
+            if (node.selectedFinish) {
+                directorTransitionEmissionAttempts++;
+                if (result.addTransition(nodeId, node.finishAction, node.finishNcTargetId)) {
+                    directorOutputTransitions++;
+                }
+            } else if (node.selectedControllableEdge != null) {
+                Long targetId = beliefIds.get(node.selectedControllableEdge.target);
+                if (targetId == null) {
+                    throw new IllegalStateException("Missing output id for belief controllable target.");
+                }
+                directorTransitionEmissionAttempts++;
+                if (result.addTransition(nodeId, node.selectedControllableEdge.outputAction, targetId)) {
+                    directorOutputTransitions++;
                 }
             }
         }
@@ -6055,7 +6299,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
 
         log("  [Belief-Repair] " + (plan.success ? "SUCCESS" : "FALLBACK")
-                + " oldControllerState=" + plan.oldControllerState
+                + " " + plan.label()
                 + ", rawPreStates=" + plan.preUpdateStates.size()
                 + ", fallbackClasses=" + plan.fallbackClasses
                 + ", beliefNodes=" + plan.nodes.size()
@@ -6120,6 +6364,96 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
+    private class RawNondetActionKey {
+        private final CompostateDUC<State, Action> source;
+        private final String actionName;
+
+        private RawNondetActionKey(CompostateDUC<State, Action> source, String actionName) {
+            this.source = source;
+            this.actionName = actionName;
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * System.identityHashCode(source) + Objects.hashCode(actionName);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof DirectedControllerSynthesisDUC.RawNondetActionKey)) {
+                return false;
+            }
+            RawNondetActionKey other = (RawNondetActionKey) obj;
+            return source == other.source && Objects.equals(actionName, other.actionName);
+        }
+    }
+
+    private class NondetActionRepairKey {
+        private final int sourceClass;
+        private final String actionName;
+
+        private NondetActionRepairKey(int sourceClass, String actionName) {
+            this.sourceClass = sourceClass;
+            this.actionName = actionName;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(sourceClass, actionName);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof DirectedControllerSynthesisDUC.NondetActionRepairKey)) {
+                return false;
+            }
+            NondetActionRepairKey other = (NondetActionRepairKey) obj;
+            return sourceClass == other.sourceClass && Objects.equals(actionName, other.actionName);
+        }
+    }
+
+    private class NondetActionBeliefRepairPlan {
+        private final int sourceClass;
+        private final Action outputAction;
+        private final String actionName;
+        private final Set<CompostateDUC<State, Action>> sourceStates = new LinkedHashSet<>();
+        private final Set<CompostateDUC<State, Action>> rootMembers = new LinkedHashSet<>();
+        private final Set<Integer> targetClasses = new LinkedHashSet<>();
+        private BeliefRepairPlan beliefPlan;
+
+        private NondetActionBeliefRepairPlan(int sourceClass, Action outputAction, String actionName) {
+            this.sourceClass = sourceClass;
+            this.outputAction = outputAction;
+            this.actionName = actionName;
+        }
+    }
+
+    private class NondetActionBeliefRepairResult {
+        private final List<NondetActionBeliefRepairPlan> successPlans = new ArrayList<>();
+        private final List<NondetActionBeliefRepairPlan> fallbackPlans = new ArrayList<>();
+        private final Map<NondetActionRepairKey, NondetActionBeliefRepairPlan> successByKey =
+                new LinkedHashMap<>();
+
+        private void addSuccess(NondetActionBeliefRepairPlan plan) {
+            successPlans.add(plan);
+            successByKey.put(new NondetActionRepairKey(plan.sourceClass, plan.actionName), plan);
+        }
+
+        private void addFallback(NondetActionBeliefRepairPlan plan) {
+            fallbackPlans.add(plan);
+        }
+
+        private NondetActionBeliefRepairPlan find(int sourceClass, Action outputAction) {
+            return successByKey.get(new NondetActionRepairKey(sourceClass, outputAction.toString()));
+        }
+    }
+
     private class BeliefRepairResult {
         private final Map<State, BeliefRepairPlan> successPlans = new LinkedHashMap<>();
         private final Map<State, BeliefRepairPlan> fallbackPlans = new LinkedHashMap<>();
@@ -6157,6 +6491,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         private boolean success;
         private boolean failedByResourceLimit;
         private String reason = "not evaluated";
+        private String label;
 
         private BeliefRepairPlan(
                 State oldControllerState,
@@ -6165,6 +6500,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             this.oldControllerState = oldControllerState;
             this.preUpdateStates = preUpdateStates;
             this.fallbackClasses = fallbackClasses;
+            this.label = "oldControllerState=" + oldControllerState;
+        }
+
+        private String label() {
+            return label;
         }
 
         private void fail(String reason) {
@@ -6389,35 +6729,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         private boolean hasProgress() {
             return addedEdges > 0;
-        }
-    }
-
-    private static class OutputClassUnionFind {
-        private final List<Integer> parent = new ArrayList<>();
-
-        private int addClass() {
-            int id = parent.size();
-            parent.add(id);
-            return id;
-        }
-
-        private int find(int id) {
-            int p = parent.get(id);
-            if (p != id) {
-                p = find(p);
-                parent.set(id, p);
-            }
-            return p;
-        }
-
-        private boolean union(int left, int right) {
-            int leftRoot = find(left);
-            int rightRoot = find(right);
-            if (leftRoot == rightRoot) {
-                return false;
-            }
-            parent.set(rightRoot, leftRoot);
-            return true;
         }
     }
 
@@ -6708,16 +7019,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private String describeOtfExecutionMode() {
+        String nondetRepair = nondeterministicActionBeliefRepairEnabled ? "+非決定action repair" : "";
         if (beliefRepairEnabled) {
             if (preUpdateSimpleMergeEnabled) {
-                return "通常OTF-DUC+簡単マージ+repair";
+                return "通常OTF-DUC+簡単マージ+repair" + nondetRepair;
             }
-            return "通常OTF-DUC+repair";
+            return "通常OTF-DUC+repair" + nondetRepair;
         }
         if (preUpdateSimpleMergeEnabled) {
-            return "通常OTF-DUC+簡単マージ";
+            return "通常OTF-DUC+簡単マージ" + nondetRepair;
         }
-        return "通常OTF-DUC";
+        return "通常OTF-DUC" + nondetRepair;
     }
 
     private void recordOtfDcsTimingEvaluation() {
@@ -6822,6 +7134,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC 出力構築時間内訳", "director グラフ走査・遷移構築時間", directorTraversalNanos);
         UpdatingControllerEvaluationRecorder.recordNanoTime(
                 "OTF-DUC 出力構築時間内訳", "旧コントローラ相当状態の belief 再探索時間", directorBeliefRepairNanos);
+        UpdatingControllerEvaluationRecorder.recordNanoTime(
+                "OTF-DUC 出力構築時間内訳", "非決定 action belief repair 時間", directorNondetBeliefRepairNanos);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "非決定 action belief repair 対象数", nondetBeliefRepairCandidateGroups, "箇所");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "非決定 action belief repair 成功数", nondetBeliefRepairSuccessGroups, "箇所");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "非決定 action belief repair fallback 数", nondetBeliefRepairFallbackGroups, "箇所");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC 出力構築時間内訳", "非決定 action belief repair 置換遷移数", nondetBeliefRepairReplacedTransitions, "本");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC 出力構築時間内訳", "belief 再探索の対象旧状態数", beliefRepairCandidateGroups, "状態");
         UpdatingControllerEvaluationRecorder.recordCount(
