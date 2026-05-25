@@ -629,6 +629,18 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
+    private void outln(String message) {
+        if (output != null) {
+            output.outln(message);
+        }
+        log("[LTSOutput] " + message);
+    }
+
+    private void errln(String message) {
+        System.err.println(message);
+        log("[Stderr] " + message);
+    }
+
     private void beginStrategy1NormalOtfSimpleMergeMeasurement() {
         if (!beliefRepairEnabled) {
             return;
@@ -2502,7 +2514,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (isGoal(node))
             return;
 
-        if(debugLogEnabled) System.out.println("  [Debug-Success] State " + node.getStates() + " is now marked as GOAL!");
+        if(debugLogEnabled) log("  [Debug-Success] State " + node.getStates() + " is now marked as GOAL!");
         node.setStatus(Status.GOAL);
 
         // GOAL 証明済みの action と、GOAL 子を見た暫定情報を分けて保持する。
@@ -3036,25 +3048,25 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private void emitFailureDiagnostics() {
-        if (!debugLogEnabled || output == null) {
+        if (!debugLogEnabled) {
             return;
         }
 
-        output.outln("================ OTF-DUC FAILURE DIAGNOSTICS ================");
-        output.outln("Initial: " + summarizeStateForDiagnostics(initial));
-        output.outln("Compostates: " + (compostates == null ? 0 : compostates.size())
+        outln("================ OTF-DUC FAILURE DIAGNOSTICS ================");
+        outln("Initial: " + summarizeStateForDiagnostics(initial));
+        outln("Compostates: " + (compostates == null ? 0 : compostates.size())
                 + ", exploredTransitions: " + countOTFTransitions());
-        output.outln("StatusByMarking: " + summarizeStatusByMarking());
-        output.outln("OpenNoneStates: " + countOpenNoneStates());
-        output.outln("ErrorMarks: " + errorMarkCount + ", LoopErrors: " + loopErrorCount);
-        output.outln("LastError: " + lastErrorSummary);
-        output.outln("LastLoopError: " + lastLoopErrorSummary);
-        output.outln("RejectedOrdinaryControllableFairExits: " + fairControllableExitRejectedCount);
+        outln("StatusByMarking: " + summarizeStatusByMarking());
+        outln("OpenNoneStates: " + countOpenNoneStates());
+        outln("ErrorMarks: " + errorMarkCount + ", LoopErrors: " + loopErrorCount);
+        outln("LastError: " + lastErrorSummary);
+        outln("LastLoopError: " + lastLoopErrorSummary);
+        outln("RejectedOrdinaryControllableFairExits: " + fairControllableExitRejectedCount);
         if (fairControllableExitRejectedCount > 0) {
-            output.outln("LastRejectedOrdinaryControllableFairExit: " + lastFairControllableExitRejectedSummary);
+            outln("LastRejectedOrdinaryControllableFairExit: " + lastFairControllableExitRejectedSummary);
         }
-        output.outln("Debug trace file: " + LOG_FILE_PATH);
-        output.outln("=============================================================");
+        outln("Debug trace file: " + LOG_FILE_PATH);
+        outln("=============================================================");
     }
 
     private String summarizeStatusByMarking() {
@@ -3707,8 +3719,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                         } else {
                             ncConnectionMissCount++;
                             // これは単なるdebugではなく、出力controller構築不能な異常なので残す
-                            System.err.println("!!! [Stitch-Error] No NC state mapping found for signature: " + signature);
-                            System.err.println("    Target child vector: " + child.getStates());
+                            errln("!!! [Stitch-Error] No NC state mapping found for signature: " + signature);
+                            errln("    Target child vector: " + child.getStates());
                             
                             throw new IllegalStateException("Missing NC mapping for reached state during stitching.");
                         }

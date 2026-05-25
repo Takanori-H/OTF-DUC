@@ -36,6 +36,7 @@ import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
+import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisBeliefDUC;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC;
 import ltsa.lts.EventState;
 
@@ -660,6 +661,13 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllersUtils.ACTION_FLUENTS_FOR_UPDATE.addAll(resultantFluents);
     }
 
+    private static boolean isBeliefOtfMode() {
+        String mode = System.getProperty("otfduc.mode", "");
+        return "belief".equalsIgnoreCase(mode)
+                || "belief-otf".equalsIgnoreCase(mode)
+                || Boolean.getBoolean("otfduc.belief.otf");
+    }
+
     /**
      * OTF-DUC (提案手法) のコアロジック。
      * 必要なLTSリスト(Box List)を構築し、DCSを実行します。
@@ -673,7 +681,11 @@ public class UpdatingControllerSynthesizer {
      */
     private static void generateDUC(UpdatingControllerCompositeState uccs, LTSOutput output)
     {
+        boolean beliefOtfMode = isBeliefOtfMode();
         output.outln("Starting On-The-Fly Controller Synthesis (Box List & Mapping Table Strategy)...");
+        if (beliefOtfMode) {
+            output.outln(" - Belief OTF-DUC mode enabled (-Dotfduc.mode=belief or -Dotfduc.belief.otf=true)");
+        }
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "generateDUC (OTF-DUC)",
                 "generateDUC 全体時間");
@@ -763,9 +775,14 @@ public class UpdatingControllerSynthesizer {
         // これにより、環境アクション(a)と区別し、Uncontrollableとして扱う
         oldContIndex = boxList.size();
         LTS<Long, String> originalOldContLTS = new LTSAdapter<>(uccs.getOldController(), TransitionType.REQUIRED);
-        LTS<Long, String> renamedOldCont = new RenamedActionLTS<>(originalOldContLTS, "_old");
-        boxList.add(renamedOldCont);
-        output.outln(" - Added Old Controller (Index " + oldContIndex + ") [Renamed with _old]");
+        if (beliefOtfMode) {
+            boxList.add(originalOldContLTS);
+            output.outln(" - Added Old Controller (Index " + oldContIndex + ") [Belief OTF mode: no _old rename]");
+        } else {
+            LTS<Long, String> renamedOldCont = new RenamedActionLTS<>(originalOldContLTS, "_old");
+            boxList.add(renamedOldCont);
+            output.outln(" - Added Old Controller (Index " + oldContIndex + ") [Renamed with _old]");
+        }
 
         // ★デバッグ出力: Old Controller (Renamed)
         // 期待値: アクションがすべて "_old" 付きになっていること
@@ -1093,25 +1110,44 @@ public class UpdatingControllerSynthesizer {
                 "generateDUC (OTF-DUC)",
                 "DCS 実行時間");
 
-        DirectedControllerSynthesisDUC<Long, String> ducSynthesis = new DirectedControllerSynthesisDUC<>();
-
         LTS<Long, String> result;
         try {
-            result = ducSynthesis.synthesizeDUC(
-                boxList,
-                uccs.getControllableActions(),
-                mappingStartIndex, mappingEndIndex,
-                oldSafeStartIndex, oldSafeEndIndex,
-                newSafeStartIndex, newSafeEndIndex,
-                transReqStartIndex, transReqEndIndex,
-                synthesisStartIndex, synthesisEndIndex,
-                uccs.getMappingMapEnvToNewEnv(),
-                newControllerConnectionMap,
-                realNewContLTS,
-                safetyComponentIndicesMap,  // ★追加: LTSベースのコンポーネントマップ
-                safetyStateLookupMap,    // ★追加: LTSベースの状態追跡マップ
-                output
-            );
+            if (beliefOtfMode) {
+                DirectedControllerSynthesisBeliefDUC<Long, String> beliefDucSynthesis =
+                        new DirectedControllerSynthesisBeliefDUC<>();
+                result = beliefDucSynthesis.synthesizeDUC(
+                    boxList,
+                    uccs.getControllableActions(),
+                    mappingStartIndex, mappingEndIndex,
+                    oldSafeStartIndex, oldSafeEndIndex,
+                    newSafeStartIndex, newSafeEndIndex,
+                    transReqStartIndex, transReqEndIndex,
+                    synthesisStartIndex, synthesisEndIndex,
+                    uccs.getMappingMapEnvToNewEnv(),
+                    newControllerConnectionMap,
+                    realNewContLTS,
+                    safetyComponentIndicesMap,
+                    safetyStateLookupMap,
+                    output
+                );
+            } else {
+                DirectedControllerSynthesisDUC<Long, String> ducSynthesis = new DirectedControllerSynthesisDUC<>();
+                result = ducSynthesis.synthesizeDUC(
+                    boxList,
+                    uccs.getControllableActions(),
+                    mappingStartIndex, mappingEndIndex,
+                    oldSafeStartIndex, oldSafeEndIndex,
+                    newSafeStartIndex, newSafeEndIndex,
+                    transReqStartIndex, transReqEndIndex,
+                    synthesisStartIndex, synthesisEndIndex,
+                    uccs.getMappingMapEnvToNewEnv(),
+                    newControllerConnectionMap,
+                    realNewContLTS,
+                    safetyComponentIndicesMap,  // ★追加: LTSベースのコンポーネントマップ
+                    safetyStateLookupMap,    // ★追加: LTSベースの状態追跡マップ
+                    output
+                );
+            }
         } finally {
             UpdatingControllerEvaluationRecorder.endCountScope(
                     "generateDUC (OTF-DUC)",
