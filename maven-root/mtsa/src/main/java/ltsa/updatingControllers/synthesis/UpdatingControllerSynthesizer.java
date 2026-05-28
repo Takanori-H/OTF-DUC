@@ -212,10 +212,16 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional E_u MTS 変換後");
 
         // ▼▼▼ 評価実験用: [1] Updating Environment 生成直後 ▼▼▼
-        long euCountStart = System.currentTimeMillis();
-        int euStates = E_u.getStates().size();
-        int euTrans = countTransitions(E_u);
-        long euCountTime = System.currentTimeMillis() - euCountStart;
+        long euCountStart = 0;
+        int euStates = 0;
+        int euTrans = 0;
+        long euCountTime = 0;
+        if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+            euCountStart = System.currentTimeMillis();
+            euStates = E_u.getStates().size();
+            euTrans = countTransitions(E_u);
+            euCountTime = System.currentTimeMillis() - euCountStart;
+        }
         TraditionalDUCDebugLogger.logStage(
                 output,
                 "[1. E_u] Updating Environment",
@@ -287,10 +293,16 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional metaEnv 構築後");
 
         // ▼▼▼ 評価実験用: [2] Meta Environment 生成直後 (★最大ピーク★) ▼▼▼
-        long metaCountStart = System.currentTimeMillis();
-        int metaStates = metaEnvironment.getStates().size();
-        int metaTrans = countTransitions(metaEnvironment);
-        long metaCountTime = System.currentTimeMillis() - metaCountStart;
+        long metaCountStart = 0;
+        int metaStates = 0;
+        int metaTrans = 0;
+        long metaCountTime = 0;
+        if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+            metaCountStart = System.currentTimeMillis();
+            metaStates = metaEnvironment.getStates().size();
+            metaTrans = countTransitions(metaEnvironment);
+            metaCountTime = System.currentTimeMillis() - metaCountStart;
+        }
         TraditionalDUCDebugLogger.logStage(
                 output,
                 "[2. Meta] E_u || Safety Fluents",
@@ -387,10 +399,16 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional safetyEnv 構築後");
 
         // ▼▼▼ 評価実験用: [4] 最終 Safety Environment 生成直後 ▼▼▼
-        long safeCountStart = System.currentTimeMillis();
-        int safeStates = safetyEnv.getStates().size();
-        int safeTrans = countTransitions(safetyEnv);
-        long safeCountTime = System.currentTimeMillis() - safeCountStart;
+        long safeCountStart = 0;
+        int safeStates = 0;
+        int safeTrans = 0;
+        long safeCountTime = 0;
+        if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+            safeCountStart = System.currentTimeMillis();
+            safeStates = safetyEnv.getStates().size();
+            safeTrans = countTransitions(safetyEnv);
+            safeCountTime = System.currentTimeMillis() - safeCountStart;
+        }
         TraditionalDUCDebugLogger.logStage(
                 output,
                 "[4. Final] Safety Environment",
@@ -457,7 +475,9 @@ public class UpdatingControllerSynthesizer {
         long synthesizeGRStart = System.currentTimeMillis();
         DUCHeartbeat.beginPhase("TRADITIONAL_GR1_SYNTHESIS");
         DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
-        DUCHeartbeat.setCounter("safetyTransitions", safeTrans);
+        if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+            DUCHeartbeat.setCounter("safetyTransitions", safeTrans);
+        }
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "solveControlProblem (Traditional DUC)",
                 "safetyEnv を GR1 で解く時間");

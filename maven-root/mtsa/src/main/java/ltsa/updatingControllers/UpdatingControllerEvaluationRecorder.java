@@ -15,6 +15,8 @@ import ltsa.lts.LTSOutput;
  */
 public final class UpdatingControllerEvaluationRecorder {
 
+    private static final String EVALUATION_ENABLED_PROPERTY = "mtsa.evaluation.enabled";
+    private static final String LEGACY_EVALUATION_ENABLED_PROPERTY = "updating.controller.evaluation.enabled";
     private static final String PRINT_DETAILED_REPORT_PROPERTY = "updating.controller.evaluation.printDetailedReport";
     private static final String METRIC_SCHEMA_VERSION = "2026-05-19";
 
@@ -64,6 +66,14 @@ public final class UpdatingControllerEvaluationRecorder {
     private UpdatingControllerEvaluationRecorder() {
     }
 
+    public static boolean isEnabled() {
+        String value = System.getProperty(EVALUATION_ENABLED_PROPERTY);
+        if (value == null) {
+            value = System.getProperty(LEGACY_EVALUATION_ENABLED_PROPERTY);
+        }
+        return value == null || Boolean.parseBoolean(value);
+    }
+
     public static synchronized void reset() {
         sections.clear();
         activeTimers.clear();
@@ -99,18 +109,27 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void setMode(String value) {
+        if (!isEnabled()) {
+            return;
+        }
         if (value != null && !value.isEmpty()) {
             mode = value;
         }
     }
 
     public static synchronized void setOtfExecutionMode(String value) {
+        if (!isEnabled()) {
+            return;
+        }
         if (value != null && !value.isEmpty()) {
             otfExecutionMode = value;
         }
     }
 
     public static synchronized void markSuccess() {
+        if (!isEnabled()) {
+            return;
+        }
         if (!isFailureStatus(resultStatus)) {
             resultStatus = ResultStatus.SUCCESS;
             failureMessage = "";
@@ -118,6 +137,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void recordFailure(ResultStatus status, String message) {
+        if (!isEnabled()) {
+            return;
+        }
         if (status == null) {
             status = ResultStatus.UNKNOWN_FAILURE;
         }
@@ -126,21 +148,33 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void recordFailureIfAbsent(ResultStatus status, String message) {
+        if (!isEnabled()) {
+            return;
+        }
         if (!isFailureStatus(resultStatus)) {
             recordFailure(status, message);
         }
     }
 
     public static synchronized void recordTime(String section, String label, long millis) {
+        if (!isEnabled()) {
+            return;
+        }
         putOrReplaceTime(section, label, millis, "");
     }
 
     public static synchronized void beginFailureTimer(String section, String label) {
+        if (!isEnabled()) {
+            return;
+        }
         activeTimers.put(timerKey(section, label), new ActiveTimer(section, label, System.currentTimeMillis()));
         putOrReplace(section, label, label + " : 計測中");
     }
 
     public static synchronized void endFailureTimer(String section, String label) {
+        if (!isEnabled()) {
+            return;
+        }
         ActiveTimer timer = activeTimers.remove(timerKey(section, label));
         if (timer != null) {
             putOrReplaceTime(timer.section, timer.label,
@@ -150,11 +184,17 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void recordNanoTime(String section, String label, long nanos) {
+        if (!isEnabled()) {
+            return;
+        }
         add(section, label + " : " + formatNanos(nanos));
         recordDataMetric(section, label, nanosToMillisText(nanos), "ms");
     }
 
     public static synchronized void recordAverageNanoTime(String section, String label, long nanos, long count) {
+        if (!isEnabled()) {
+            return;
+        }
         if (count <= 0) {
             add(section, label + " : 0.000 ms / call (0 calls)");
             recordDataMetric(section, label, "0.000", "ms/call");
@@ -168,11 +208,17 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void recordCount(String section, String label, long count, String unit) {
+        if (!isEnabled()) {
+            return;
+        }
         add(section, label + " : " + count + " " + unit);
         recordDataMetric(section, label, Long.toString(count), unit == null ? "count" : unit);
     }
 
     public static synchronized void beginCountScope(String section, String label) {
+        if (!isEnabled()) {
+            return;
+        }
         String key = timerKey(section, label);
         CountScope scope = countScopes.get(key);
         if (scope == null) {
@@ -183,6 +229,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void endCountScope(String section, String label) {
+        if (!isEnabled()) {
+            return;
+        }
         String key = timerKey(section, label);
         for (int i = activeCountScopes.size() - 1; i >= 0; i--) {
             if (activeCountScopes.get(i).equals(key)) {
@@ -193,6 +242,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void addStateSpaceCountOverhead(long countTimeMillis) {
+        if (!isEnabled()) {
+            return;
+        }
         long safeCountTime = Math.max(0, countTimeMillis);
         stateSpaceCountOverheadMillis += safeCountTime;
         if (safeCountTime == 0 || activeCountScopes.isEmpty()) {
@@ -213,6 +265,9 @@ public final class UpdatingControllerEvaluationRecorder {
 
     public static synchronized void recordStateSpace(
             String section, String label, long states, long transitions, long countTimeMillis, String description) {
+        if (!isEnabled()) {
+            return;
+        }
         addStateSpaceCountOverhead(countTimeMillis);
         add(section, label + " States: " + states
                 + ", Transitions: " + transitions
@@ -822,11 +877,17 @@ public final class UpdatingControllerEvaluationRecorder {
 
     public static synchronized void recordOldControllerStateSpace(
             long states, long transitions, long countTimeMillis) {
+        if (!isEnabled()) {
+            return;
+        }
         oldControllerStates = states;
         recordStateSpace("入力規模 / 事前合成", "Old Controller", states, transitions, countTimeMillis);
     }
 
     public static synchronized void recordMemory(String section, String label, long bytes) {
+        if (!isEnabled()) {
+            return;
+        }
         add(section, label + " : " + formatBytes(bytes));
         recordDataMetric(section, label, bytesToByteText(bytes), "B");
     }
@@ -836,6 +897,9 @@ public final class UpdatingControllerEvaluationRecorder {
             String labelPrefix,
             long beforeBytes,
             long peakBytes) {
+        if (!isEnabled()) {
+            return;
+        }
 
         long increaseBytes = peakBytes - beforeBytes;
         recordMemory(section, labelPrefix + "直前メモリ", beforeBytes);
@@ -848,6 +912,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void recordMemoryCheckpoint(String section, String label) {
+        if (!isEnabled()) {
+            return;
+        }
         String normalizedSection = section == null || section.isEmpty()
                 ? "メモリ使用量チェックポイント"
                 : section;
@@ -915,6 +982,9 @@ public final class UpdatingControllerEvaluationRecorder {
             long oldControllerStateCount,
             long preUpdateRawStateCount,
             long preUpdateOutputStateCount) {
+        if (!isEnabled()) {
+            return;
+        }
 
         long effectiveOldControllerStates = oldControllerStates >= 0
                 ? oldControllerStates
@@ -973,29 +1043,41 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized boolean hasOldControllerStateSpace() {
-        return oldControllerStates >= 0;
+        return isEnabled() && oldControllerStates >= 0;
     }
 
     public static synchronized boolean isUpdatingControllerMode() {
-        return "OTF-DUC".equals(mode) || "Traditional DUC".equals(mode);
+        return isEnabled() && ("OTF-DUC".equals(mode) || "Traditional DUC".equals(mode));
     }
 
     public static synchronized void recordBeginUpdateReferenceStates(long states) {
+        if (!isEnabled()) {
+            return;
+        }
         if (states >= 0) {
             beginUpdateReferenceStates = states;
         }
     }
 
     public static synchronized void recordValue(String section, String label, String value) {
+        if (!isEnabled()) {
+            return;
+        }
         add(section, label + " : " + value);
         recordDataMetric(section, label, value == null ? "" : value, "text");
     }
 
     public static synchronized long getRecordedTimeMillis(String section, String label) {
+        if (!isEnabled()) {
+            return 0;
+        }
         return optionalTime(section, label);
     }
 
     public static synchronized void recordMemorySnapshot(String section) {
+        if (!isEnabled()) {
+            return;
+        }
         Runtime runtime = Runtime.getRuntime();
         recordMemory(section, "現在のヒープ使用量", EvaluationProfiler.getCurrentMemoryUsage());
         recordMemory(section, "ピークヒープ使用量", EvaluationProfiler.getPeakMemoryUsage());
@@ -1005,7 +1087,7 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized void printSummary(LTSOutput output) {
-        if (output == null || printed) {
+        if (!isEnabled() || output == null || printed) {
             return;
         }
         printed = true;
@@ -1403,6 +1485,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void add(String section, String line) {
+        if (!isEnabled()) {
+            return;
+        }
         String normalizedSection = section == null || section.isEmpty() ? "その他" : section;
         sections.computeIfAbsent(normalizedSection, k -> new ArrayList<>()).add(line);
     }
@@ -1412,6 +1497,9 @@ public final class UpdatingControllerEvaluationRecorder {
             String label,
             long states,
             long transitions) {
+        if (!isEnabled()) {
+            return;
+        }
 
         if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
             if (label != null && label.contains("[2. Meta]")) {
@@ -1452,6 +1540,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void recordOutputReductionIfAvailable(long outputStates, long outputTransitions) {
+        if (!isEnabled()) {
+            return;
+        }
         if ("Traditional DUC".equals(mode)
                 && traditionalFinalStates >= 0
                 && traditionalFinalTransitions >= 0) {
@@ -1478,6 +1569,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void putOrReplace(String section, String label, String line) {
+        if (!isEnabled()) {
+            return;
+        }
         String normalizedSection = section == null || section.isEmpty() ? "その他" : section;
         String key = timerKey(normalizedSection, label);
         LineRef ref = lineRefs.get(key);
@@ -1495,6 +1589,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void putOrReplaceTime(String section, String label, long millis, String suffix) {
+        if (!isEnabled()) {
+            return;
+        }
         long normalizedMillis = Math.max(0, millis);
         timeMillisByKey.put(timerKey(section, label), normalizedMillis);
         putOrReplace(section, label, label + suffix + " : " + normalizedMillis + " ms");
@@ -1538,6 +1635,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void ensureMemoryCheckpointHeader(String section) {
+        if (!isEnabled()) {
+            return;
+        }
         String key = section + "\u0000__memory_checkpoint_header__";
         if (lineRefs.containsKey(key)) {
             return;
@@ -3317,6 +3417,9 @@ public final class UpdatingControllerEvaluationRecorder {
             String value,
             String unit,
             String formula) {
+        if (!isEnabled()) {
+            return;
+        }
         String normalizedKey = key == null || key.isEmpty() ? metricKey(section, label) : key;
         dataMetrics.put(normalizedKey, new DataMetric(
                 normalizedKey,
@@ -3328,6 +3431,9 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void attachDataMetricFormula(String key, String formula) {
+        if (!isEnabled()) {
+            return;
+        }
         if (formula == null || formula.isEmpty()) {
             return;
         }

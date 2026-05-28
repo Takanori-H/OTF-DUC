@@ -92,10 +92,16 @@ public class UpdatingControllerSafetySynthesizer {
                 System.currentTimeMillis() - valuateSafetyStart);
 
         // ▼▼▼ 評価実験用: [3] 枝刈り(Pruning)直後の状態数・遷移数 ▼▼▼
-        long prunedCountStart = System.currentTimeMillis();
-        int prunedStates = safetyEnv.getStates().size();
-        int prunedTrans = countTransitions(safetyEnv); // ※このクラス内にも countTransitions メソッドをコピペしてください
-        long prunedCountTime = System.currentTimeMillis() - prunedCountStart;
+        long prunedCountStart = 0;
+        int prunedStates = 0;
+        int prunedTrans = 0;
+        long prunedCountTime = 0;
+        if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+            prunedCountStart = System.currentTimeMillis();
+            prunedStates = safetyEnv.getStates().size();
+            prunedTrans = countTransitions(safetyEnv); // ※このクラス内にも countTransitions メソッドをコピペしてください
+            prunedCountTime = System.currentTimeMillis() - prunedCountStart;
+        }
         TraditionalDUCDebugLogger.logStage(
                 output,
                 "[3. Pruned] Safety Environment before DontDoTwice",

@@ -196,6 +196,9 @@ public final class UpdatePhaseEvaluator {
             String section,
             String artifactLabel,
             MTS<Long, String> mts) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (mts == null) {
             return;
         }
@@ -222,6 +225,9 @@ public final class UpdatePhaseEvaluator {
             String section,
             String artifactLabel,
             MTS<Long, String> mts) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (mts == null) {
             return;
         }
@@ -242,6 +248,9 @@ public final class UpdatePhaseEvaluator {
             String completionPathSection,
             String artifactLabel,
             MTS<Long, String> mts) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         recordMtsUpdatePhaseTransitionAnalysis(
                 detailSection,
                 flowSection,
@@ -266,6 +275,9 @@ public final class UpdatePhaseEvaluator {
             String artifactLabel,
             MTS<Long, String> mts,
             Set<String> controllableActions) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         recordMtsUpdatePhaseTransitionAnalysis(
                 detailSection,
                 flowSection,
@@ -294,6 +306,9 @@ public final class UpdatePhaseEvaluator {
             String artifactLabel,
             MTS<Long, String> mts,
             Set<String> controllableActions) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (mts == null) {
             return;
         }
@@ -333,6 +348,9 @@ public final class UpdatePhaseEvaluator {
             String section,
             String artifactLabel,
             CompactState machine) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (machine == null || machine.states == null) {
             return;
         }
@@ -359,6 +377,9 @@ public final class UpdatePhaseEvaluator {
             String section,
             String artifactLabel,
             CompactState machine) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (machine == null || machine.states == null) {
             return;
         }
@@ -386,6 +407,9 @@ public final class UpdatePhaseEvaluator {
             String completionPathSection,
             String artifactLabel,
             CompactState machine) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         recordCompactStateUpdatePhaseTransitionAnalysis(
                 detailSection,
                 flowSection,
@@ -410,6 +434,9 @@ public final class UpdatePhaseEvaluator {
             String artifactLabel,
             CompactState machine,
             Set<String> controllableActions) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         recordCompactStateUpdatePhaseTransitionAnalysis(
                 detailSection,
                 flowSection,
@@ -438,6 +465,9 @@ public final class UpdatePhaseEvaluator {
             String artifactLabel,
             CompactState machine,
             Set<String> controllableActions) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (machine == null || machine.states == null) {
             return;
         }

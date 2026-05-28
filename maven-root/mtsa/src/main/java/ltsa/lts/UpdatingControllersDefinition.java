@@ -89,7 +89,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         long oldCTime = System.currentTimeMillis() - oldCStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "UpdatingControllersDefinition", "Old Controller 合成時間");
-        if (oldC.composition != null) {
+        if (UpdatingControllerEvaluationRecorder.isEnabled() && oldC.composition != null) {
             long oldCCountStart = System.currentTimeMillis();
             int oldControllerStates = oldC.composition.maxStates;
             int oldControllerTransitions = oldC.composition.ntransitions();
@@ -336,16 +336,18 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             }
 
             output.outln(" - New Controller synthesized successfully. States: " + newC.composition.maxStates);
-            long newCCountStart = System.currentTimeMillis();
-            int newControllerStates = newC.composition.maxStates;
-            int newControllerTransitions = newC.composition.ntransitions();
-            long newCCountTime = System.currentTimeMillis() - newCCountStart;
-            UpdatingControllerEvaluationRecorder.recordStateSpace(
-                    "入力規模 / 事前合成",
-                    "New Controller",
-                    newControllerStates,
-                    newControllerTransitions,
-                    newCCountTime);
+            if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+                long newCCountStart = System.currentTimeMillis();
+                int newControllerStates = newC.composition.maxStates;
+                int newControllerTransitions = newC.composition.ntransitions();
+                long newCCountTime = System.currentTimeMillis() - newCCountStart;
+                UpdatingControllerEvaluationRecorder.recordStateSpace(
+                        "入力規模 / 事前合成",
+                        "New Controller",
+                        newControllerStates,
+                        newControllerTransitions,
+                        newCCountTime);
+            }
             
             //評価実験用:New Controllerの計測終了
             newCTime = System.currentTimeMillis() - newCStart;
@@ -720,20 +722,23 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         long UCDefTime = System.currentTimeMillis() - UCDefStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "UpdatingControllersDefinition", "compose の全体実行時間");
-        UpdatingControllerEvaluationRecorder.beginFailureTimer(
-                "UpdatingControllersDefinition", "入力規模集計時間");
-        long inputScaleStart = System.currentTimeMillis();
-        UpdatingControllerEvaluationRecorder.beginCountScope(
-                "UpdatingControllersDefinition", "入力規模集計時間");
-        try {
-            recordInputScale(oldGoalDef, newGoalDef, controllableSet, mappingComponents, ucce, oldC);
-        } finally {
-            UpdatingControllerEvaluationRecorder.endCountScope(
+        long inputScaleTime = 0;
+        if (UpdatingControllerEvaluationRecorder.isEnabled()) {
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllersDefinition", "入力規模集計時間");
+            long inputScaleStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginCountScope(
+                    "UpdatingControllersDefinition", "入力規模集計時間");
+            try {
+                recordInputScale(oldGoalDef, newGoalDef, controllableSet, mappingComponents, ucce, oldC);
+            } finally {
+                UpdatingControllerEvaluationRecorder.endCountScope(
+                        "UpdatingControllersDefinition", "入力規模集計時間");
+            }
+            inputScaleTime = System.currentTimeMillis() - inputScaleStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
                     "UpdatingControllersDefinition", "入力規模集計時間");
         }
-        long inputScaleTime = System.currentTimeMillis() - inputScaleStart;
-        UpdatingControllerEvaluationRecorder.endFailureTimer(
-                "UpdatingControllersDefinition", "入力規模集計時間");
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("UpdatingControllersDefinition compose 後");
         UpdatingControllerEvaluationRecorder.recordTime(
                 "UpdatingControllersDefinition", "compose の全体実行時間", UCDefTime);
@@ -774,6 +779,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             Vector<CompactState> mappingComponents,
             UpdatingControllerCompositeState ucce,
             CompositeState oldC) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
 
         UpdatingControllerEvaluationRecorder.recordCount(
                 "入力規模", "old env component 数", safeSize(oldEnvironmentList), "個");
@@ -849,6 +857,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     }
 
     private void recordEnvironmentComponentStateSpaces(String kind, List<Symbol> environmentList) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (environmentList == null) {
             return;
         }
@@ -883,6 +894,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     }
 
     private static void recordMappingComponentStateSpaces(Vector<CompactState> mappingComponents) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         long totalStates = 0;
         long totalTransitions = 0;
         long maxStates = 0;
@@ -929,6 +943,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     }
 
     private static void recordTraditionalMappingEnvironmentStateSpace(CompositeState mappingComposite) {
+        if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
         if (mappingComposite == null || mappingComposite.composition == null) {
             return;
         }
