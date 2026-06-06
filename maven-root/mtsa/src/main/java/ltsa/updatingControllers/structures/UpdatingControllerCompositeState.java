@@ -152,6 +152,10 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		return updateGRGoal;
 	}
 
+	public boolean isShowGRGameInDraw() {
+		return Boolean.getBoolean("updating.controller.draw.grGame");
+	}
+
 	public void setUpdateEnvironment(MTS<Long, String> updateEnvironment) {
 		this.updateEnvironment = updateEnvironment;
 	}

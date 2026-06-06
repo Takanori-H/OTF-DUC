@@ -1,6 +1,8 @@
 package ltsa.jung;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import ltsa.lts.Alphabet;
 
@@ -29,6 +31,10 @@ public class TransitionEdge {
 	
 	public String getFirstLabel() {
 		return transitionLabels.get(0);
+	}
+
+	public List<String> getLabels() {
+		return Collections.unmodifiableList(transitionLabels);
 	}
 	
 	public int getOriginState() {

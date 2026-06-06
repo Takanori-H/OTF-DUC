@@ -49,6 +49,7 @@ public class LTSViewerPluggableMouse extends PluggableGraphMouse {
     protected GraphMousePlugin rotatingPlugin;
     protected GraphMousePlugin popupPlugin;
     protected GraphMousePlugin navigatingPlugin;
+    protected GraphMousePlugin panningPlugin;
     
 
     public LTSViewerPluggableMouse() {
@@ -62,11 +63,13 @@ public class LTSViewerPluggableMouse extends PluggableGraphMouse {
     
 	public void setMode(EnumMode m) {
 		mode = m;
-       	if (mode == EnumMode.Edit) {
-       		setEdit();
-       	} else {
-       		setActivate();
-       	}
+		if (mode == EnumMode.Edit) {
+			setEdit();
+		} else if (mode == EnumMode.Pan) {
+			setPan();
+		} else {
+			setActivate();
+		}
 	}
 
 	/**
@@ -74,30 +77,42 @@ public class LTSViewerPluggableMouse extends PluggableGraphMouse {
      *
      */
     protected void loadPlugins() {
-    	scalingPlugin = new ScalingGraphMousePlugin(new CrossoverScalingControl(), 0, in, out);
-    	popupPlugin = new PopupTranslatingGraphMousePlugin();
-    	pickingPlugin = new PickingGraphMousePlugin<StateVertex,TransitionEdge>();
-    	translatingPlugin = new TranslatingGraphMousePlugin(MouseEvent.BUTTON3_MASK);
-    	navigatingPlugin = new NavigationGraphMousePlugin();
-    	add(scalingPlugin);
-       	if (mode == EnumMode.Edit) {
-       		setEdit();
-       	} else {
-       		setActivate();
-       	}
+		scalingPlugin = new ScalingGraphMousePlugin(new CrossoverScalingControl(), 0, in, out);
+		popupPlugin = new PopupTranslatingGraphMousePlugin();
+		pickingPlugin = new PickingGraphMousePlugin<StateVertex,TransitionEdge>();
+		translatingPlugin = new TranslatingGraphMousePlugin(MouseEvent.BUTTON3_MASK);
+		panningPlugin = new TranslatingGraphMousePlugin(MouseEvent.BUTTON1_MASK);
+		navigatingPlugin = new NavigationGraphMousePlugin();
+		add(scalingPlugin);
+		if (mode == EnumMode.Edit) {
+			setEdit();
+		} else if (mode == EnumMode.Pan) {
+			setPan();
+		} else {
+			setActivate();
+		}
     }
     
     private void setEdit() {
-   	    remove(translatingPlugin);
-   	    remove(navigatingPlugin);
-   	    add(pickingPlugin);
-    	add(popupPlugin);   	
+		remove(translatingPlugin);
+		remove(panningPlugin);
+		remove(navigatingPlugin);
+		add(pickingPlugin);
+		add(popupPlugin);
     }
     private void setActivate() {
-   		remove(popupPlugin);
-   		remove(pickingPlugin);
-   		add(translatingPlugin);
-   		add(navigatingPlugin);
+		remove(popupPlugin);
+		remove(pickingPlugin);
+		remove(panningPlugin);
+		add(translatingPlugin);
+		add(navigatingPlugin);
+    }
+    private void setPan() {
+		remove(popupPlugin);
+		remove(pickingPlugin);
+		remove(translatingPlugin);
+		remove(navigatingPlugin);
+		add(panningPlugin);
     }
 
     /**

@@ -36,7 +36,9 @@ import java.util.*;
 public class LTSLayoutWindow extends JSplitPane implements EventClient {
     LTSJUNGCanvas output; //the panel where all the machines are drawn
 
-    EnumLayout layout = EnumLayout.FruchtermanReingold; //current layout selected
+    EnumLayout layout = LTSJUNGCanvas.isDucPhaseLayoutEnabled()
+            ? EnumLayout.DUCPhase
+            : EnumLayout.FruchtermanReingold; //current layout selected
     EventManager eman; //the event manager sending events to renew the canvas
     CompositeState cs; //the list of LTS to draw
     int[] lastEvent, prevEvent; //last event received, event before that one
@@ -93,7 +95,8 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
 
         ArrayList<EnumLayout> layoutTypes = new ArrayList<EnumLayout>();
         for (EnumLayout l : EnumLayout.values()) {
-            if (l != EnumLayout.Aggregate)
+            if (l != EnumLayout.Aggregate
+                    && (l != EnumLayout.DUCPhase || LTSJUNGCanvas.isDucPhaseLayoutEnabled()))
                 layoutTypes.add(l);
         }
         JComboBox layoutTypeComboBox = new JComboBox(layoutTypes.toArray(new EnumLayout[layoutTypes.size()]));
@@ -124,12 +127,24 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
                 list.clearSelection();
             }
         });
-        JCheckBox navigateCheckBox = new JCheckBox("Navigate");
+        final JCheckBox navigateCheckBox = new JCheckBox("Navigate");
+        final JCheckBox panCheckBox = new JCheckBox("Pan");
         navigateCheckBox.addItemListener(new ItemListener() {
             public void itemStateChanged(ItemEvent e) {
                 if (e.getStateChange() == ItemEvent.SELECTED) {
+                    panCheckBox.setSelected(false);
                     output.setInteraction(EnumMode.Activate);
-                } else {
+                } else if (!panCheckBox.isSelected()) {
+                    output.setInteraction(EnumMode.Edit);
+                }
+            }
+        });
+        panCheckBox.addItemListener(new ItemListener() {
+            public void itemStateChanged(ItemEvent e) {
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    navigateCheckBox.setSelected(false);
+                    output.setInteraction(EnumMode.Pan);
+                } else if (!navigateCheckBox.isSelected()) {
                     output.setInteraction(EnumMode.Edit);
                 }
             }
@@ -196,6 +211,7 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
         layoutControls.add(clearButton);
         layoutControls.addSeparator();
         layoutControls.add(navigateCheckBox);
+        layoutControls.add(panCheckBox);
         layoutControls.addSeparator();
         layoutControls.add(reachingButton);
         layoutControls.add(previousButton);

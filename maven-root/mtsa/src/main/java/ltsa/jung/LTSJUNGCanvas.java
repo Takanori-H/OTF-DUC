@@ -41,6 +41,7 @@ public class LTSJUNGCanvas extends JPanel {
     	Circle("Circle"), 
     	TreeLikeLTS("Top-down tree"), 
     	RadialLTS("Radial tree"),
+        DUCPhase("DUC phase"),
     	Aggregate("Aggregate");
     	
     	private String name;
@@ -54,7 +55,7 @@ public class LTSJUNGCanvas extends JPanel {
     		return name;
     	};
     }
-	public static enum EnumMode {Edit, Activate};
+	public static enum EnumMode {Edit, Activate, Pan};
 	public static enum LayoutOptions {KK_length_factor, KK_distance, KK_max_iterations,
 										FR_attraction, FR_repulsion, FR_max_iterations,
 										Tree_distX, Tree_distY, Radial_distX, Radial_distY};
@@ -82,10 +83,11 @@ public class LTSJUNGCanvas extends JPanel {
     public static double FR_attraction = 0.75;
     public static double FR_repulsion = 0.75;
     public static int FR_max_iterations = 500;
-    public static int Tree_distX = 100;
+	public static int Tree_distX = 100;
     public static int Tree_distY = 100;
     public static int Radial_distX = 100;
     public static int Radial_distY = 100;
+    private static final String DUC_PHASE_LAYOUT_PROPERTY = "updating.controller.layout.ducPhase";
     
     public LTSJUNGCanvas() {
     	super();
@@ -93,7 +95,7 @@ public class LTSJUNGCanvas extends JPanel {
 		addComponentListener(new ComponentAdapter() {
 			public final void componentResized(ComponentEvent e) {
 				if (view != null) {
-					view.setPreferredSize(getSize());
+					view.setPreferredSize(viewerPreferredSize(view.getGraphLayout()));
 					view.setLocation(0, 0);
 					remove();
 					display();
@@ -181,6 +183,9 @@ public class LTSJUNGCanvas extends JPanel {
 	}
 	public Set<StateVertex> getSelectedVertices() {
 		return Collections.unmodifiableSet(selectedStates);
+	}
+	public static boolean isDucPhaseLayoutEnabled() {
+		return Boolean.getBoolean(DUC_PHASE_LAYOUT_PROPERTY);
 	}
 //-----------------------------------------------------------------------------
 // Interactions
@@ -383,6 +388,7 @@ public class LTSJUNGCanvas extends JPanel {
 		//how many squares will be needed to display all the graphs, x horizontally and y vertically
 		int x = (int) Math.ceil(Math.sqrt(graphs.size()-1));
 		int y = x == 0 ? 0 : (int) Math.ceil((double)(graphs.size()-1)/x);
+		Dimension preferredSize = this.getSize();
 		
 		//allocated width and height of each square in the total canvas size
 		int width = x == 0 ? 0 : this.getSize().width/x;
@@ -397,9 +403,16 @@ public class LTSJUNGCanvas extends JPanel {
 			final Point2D center = new Point2D.Double();
 			//centered on the width and height of each square
 			center.setLocation(width*x_i+width/2, height*y_i+height/2);
+
+			Layout<StateVertex,TransitionEdge> graphLayout = getLayout(graphs.get(i),enumLayouts.get(graphs.get(i)),dimension);
+			if (graphLayout instanceof DUCPhaseLayout) {
+				Dimension graphLayoutSize = graphLayout.getSize();
+				center.setLocation(width*x_i + graphLayoutSize.width/2.0, height*y_i + graphLayoutSize.height/2.0);
+				preferredSize = expandPreferredSize(preferredSize, center, graphLayoutSize);
+			}
 			
 			//make a new sublayout of the size of a square and centered on one, add it to the aggregate layout
-			((AggregateLayout<StateVertex,TransitionEdge>) l).put(getLayout(graphs.get(i),enumLayouts.get(graphs.get(i)),dimension), center);
+			((AggregateLayout<StateVertex,TransitionEdge>) l).put(graphLayout, center);
 			
 			x_i += 1;
 			if (x_i == x) {
@@ -407,8 +420,24 @@ public class LTSJUNGCanvas extends JPanel {
 				y_i += 1;
 			}
 		}
-		
-		view = new LTSViewer(l,this.getSize(),this);
+
+		l.setSize(preferredSize);
+		view = new LTSViewer(l,viewerPreferredSize(l),this);
+	}
+
+	private Dimension viewerPreferredSize(Layout<StateVertex,TransitionEdge> layout) {
+		Dimension canvasSize = this.getSize();
+		if (layout == null || layout.getSize() == null) {
+			return canvasSize;
+		}
+		Dimension layoutSize = layout.getSize();
+		return new Dimension(Math.max(canvasSize.width, layoutSize.width), Math.max(canvasSize.height, layoutSize.height));
+	}
+
+	private static Dimension expandPreferredSize(Dimension current, Point2D center, Dimension layoutSize) {
+		int width = (int) Math.ceil(center.getX() + layoutSize.width / 2.0 + 20.0);
+		int height = (int) Math.ceil(center.getY() + layoutSize.height / 2.0 + 20.0);
+		return new Dimension(Math.max(current.width, width), Math.max(current.height, height));
 	}
 	
 	private void remove() {
@@ -458,6 +487,19 @@ public class LTSJUNGCanvas extends JPanel {
 	    		out.setSize(dms);
     			return out;
 	    	}
+            case DUCPhase: {
+                if (!isDucPhaseLayoutEnabled() || !DUCPhaseLayout.isDucGraph(graph)) {
+                    final FRLayout<StateVertex,TransitionEdge> out = new FRLayout<StateVertex,TransitionEdge>(graph);
+                    out.setSize(dms);
+                    out.setAttractionMultiplier(FR_attraction);
+                    out.setRepulsionMultiplier(FR_repulsion);
+                    out.setMaxIterations(FR_max_iterations);
+                    return out;
+                }
+                final DUCPhaseLayout out = new DUCPhaseLayout(graph);
+                out.setSize(dms);
+                return out;
+            }
 	    	case Aggregate: {
 	    		 final StaticLayout<StateVertex,TransitionEdge> out = new StaticLayout<StateVertex,TransitionEdge>(graph);
 	    		 out.setSize(dms);

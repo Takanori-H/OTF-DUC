@@ -79,6 +79,7 @@ public final class UpdatePhaseEvaluator {
     private static final int BIT_STOP = 1;
     private static final int BIT_RECONFIGURE = 2;
     private static final int BIT_START = 4;
+    private static final String WORSE_RANK_PREFIX = "#w#_";
 
     private static final int[] PHASE_ORDER = {
             PHASE_PRE,
@@ -707,10 +708,14 @@ public final class UpdatePhaseEvaluator {
         if (action == null) {
             return "";
         }
-        if (action.endsWith(".old")) {
-            return action.substring(0, action.length() - ".old".length());
+        String normalized = action;
+        if (normalized.startsWith(WORSE_RANK_PREFIX)) {
+            normalized = normalized.substring(WORSE_RANK_PREFIX.length());
         }
-        return action;
+        if (normalized.endsWith(".old")) {
+            normalized = normalized.substring(0, normalized.length() - ".old".length());
+        }
+        return normalized;
     }
 
     private static Boolean isControllable(String action, Set<String> controllableActions) {

@@ -18,6 +18,7 @@ import MTSSynthesis.controller.model.gr.GRGoal;
 import MTSTools.ac.ic.doc.commons.relations.Pair;
 import MTSTools.ac.ic.doc.mtstools.model.MTS;
 import MTSTools.ac.ic.doc.mtstools.model.impl.LTSAdapter;
+import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 import MTSTools.ac.ic.doc.mtstools.model.impl.MTSAdapter;
 import MTSTools.ac.ic.doc.mtstools.utils.GenericMTSToLongStringMTSConverter;
 import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
@@ -30,6 +31,7 @@ import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Vector;
 import java.util.logging.Logger;
 
 /**
@@ -82,6 +84,9 @@ public class UpdatingControllerGRSynthesizer {
                 "Traditional DUC GR1 時間内訳",
                 "非決定環境の subset construction 時間",
                 System.currentTimeMillis() - subsetStart);
+        if (uccs.isShowGRGameInDraw()) {
+            addGRGameDrawMachine(uccs, buildPerfectInfoGRGameCompactState(perfectInfoGame), output);
+        }
 
         FluentStateValuation<Set<Long>> valuation = fluentUtils.buildValuation(perfectInfoGame, uccs.getUpdateGRGoal().getFluents());
         long goalBuildStart = System.currentTimeMillis();
@@ -277,6 +282,9 @@ public class UpdatingControllerGRSynthesizer {
                 "Traditional DUC GR1 時間内訳",
                 "GR game 構築時間",
                 System.currentTimeMillis() - gameBuildStart);
+        if (uccs.isShowGRGameInDraw()) {
+            addGRGameDrawMachine(uccs, buildDeterministicGRGameCompactState(game), output);
+        }
         long rankSystemStart = System.currentTimeMillis();
         DUCHeartbeat.beginPhase("TRADITIONAL_GR1_RANK_SYSTEM_BUILD");
         DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
@@ -376,6 +384,49 @@ public class UpdatingControllerGRSynthesizer {
             uccs.setComposition(null);
         }
 
+    }
+
+    private static CompactState buildDeterministicGRGameCompactState(GRGame<Long> game) {
+        Long initialState = game.getInitialStates().iterator().next();
+        MTS<Long, String> gameMts = new MTSImpl<Long, String>(initialState);
+        gameMts.addStates(game.getStates());
+        gameMts.addAction("controllable");
+        gameMts.addAction("uncontrollable");
+
+        for (Long state : game.getStates()) {
+            for (Long successor : game.getControllableSuccessors(state)) {
+                gameMts.addRequired(state, "controllable", successor);
+            }
+            for (Long successor : game.getUncontrollableSuccessors(state)) {
+                gameMts.addRequired(state, "uncontrollable", successor);
+            }
+        }
+
+        return MTSToAutomataConverter.getInstance().convert(gameMts, "GRGame", false, true);
+    }
+
+    private static CompactState buildPerfectInfoGRGameCompactState(MTS<Set<Long>, String> perfectInfoGame) {
+        GenericMTSToLongStringMTSConverter<Set<Long>, String> transformer =
+                new GenericMTSToLongStringMTSConverter<Set<Long>, String>();
+        MTS<Long, String> plainGame = transformer.transform(perfectInfoGame);
+        return MTSToAutomataConverter.getInstance().convert(plainGame, "GRGame(perfect-info)", false, true);
+    }
+
+    private static void addGRGameDrawMachine(
+            UpdatingControllerCompositeState uccs,
+            CompactState compactGRGame,
+            LTSOutput output) {
+        if (compactGRGame == null) {
+            return;
+        }
+
+        Vector<CompactState> machines = uccs.getMachines();
+        if (machines == null) {
+            machines = new Vector<CompactState>();
+            uccs.setMachines(machines);
+        }
+        machines.add(compactGRGame);
+        output.outln("GR game graph added to Draw tab as " + compactGRGame.name + ".");
     }
 
 }
