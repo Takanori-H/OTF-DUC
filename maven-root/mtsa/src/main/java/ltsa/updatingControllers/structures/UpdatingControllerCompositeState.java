@@ -56,10 +56,16 @@ public class UpdatingControllerCompositeState extends CompositeState {
 
 	public UpdatingControllerCompositeState(CompositeState oldController, CompositeState mapping,
 											ControllerGoalDefinition safetyGoals, ControllerGoal<String> updateGRGoal, String name) {
+		this(oldController, mapping, safetyGoals, updateGRGoal, name, false, null);
+	}
+
+	public UpdatingControllerCompositeState(CompositeState oldController, CompositeState mapping,
+											ControllerGoalDefinition safetyGoals, ControllerGoal<String> updateGRGoal,
+											String name, boolean fineGrained, UpdateProtocolSpec updateProtocolSpec) {
 		super.setMachines(new Vector<CompactState>());
 		this.oldController = oldController;
 		this.mapping = mapping;
-        this.updateSafetyGoals = safetyGoals;
+		this.updateSafetyGoals = safetyGoals;
 		this.updateGRGoal = updateGRGoal;
 		this.controllableActions = this.updateGRGoal.getControllableActions();
 
@@ -69,8 +75,8 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		//明示的な初期化
 		this.newController = null;
 		this.isOTF = false;
-		this.fineGrained = false;
-		this.updateProtocolSpec = null;
+		this.fineGrained = fineGrained;
+		this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = null;
 	}
 
@@ -250,9 +256,10 @@ public class UpdatingControllerCompositeState extends CompositeState {
 														updateProtocolSpec,
 														controllableActions,
 														isOTF, fineGrained, name);
-        } else {
-            clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals, updateGRGoal, name);
-        }
+		} else {
+			clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals,
+						updateGRGoal, name, fineGrained, updateProtocolSpec);
+		}
 		clone.setCompositionType(getCompositionType());
 		clone.makeAbstract = makeAbstract;
 		clone.makeClousure = makeClousure;

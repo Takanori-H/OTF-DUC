@@ -116,7 +116,8 @@ public class UpdatingControllerSynthesizer {
             // --- 従来手法 (DUCS) の実行 ---
             // 環境モデル全体(UpdatingEnvironment)を構築してから合成を行う
             output.outln("=========================================");
-            output.outln("Mode: Traditional DUC");
+            output.outln("Mode: Traditional DUC"
+                    + (uccs.isFineGrained() ? " (fine-grained update events)" : " (legacy update events)"));
             output.outln("=========================================");
 
             //評価実験用
@@ -128,8 +129,17 @@ public class UpdatingControllerSynthesizer {
             MTS<Long, String> mapping = uccs.getMapping();
 
             //old controllerとmapping environmentからゲームを分析するための空間を作る
-            UpdatingEnvironmentGenerator updEnvGenerator = new UpdatingEnvironmentGenerator(oldC, mapping);
-		    updEnvGenerator.generateEnvironment();
+            UpdatingEnvironment updEnv;
+            if (uccs.isFineGrained()) {
+                FineGrainedUpdatingEnvironmentGenerator updEnvGenerator =
+                        new FineGrainedUpdatingEnvironmentGenerator(oldC, mapping, uccs.getUpdateProtocolSpec());
+                updEnvGenerator.generateEnvironment();
+                updEnv = updEnvGenerator.getUpdEnv();
+            } else {
+                UpdatingEnvironmentGenerator updEnvGenerator = new UpdatingEnvironmentGenerator(oldC, mapping);
+                updEnvGenerator.generateEnvironment();
+                updEnv = updEnvGenerator.getUpdEnv();
+            }
             TraditionalDUCDebugLogger.logOldController(output, oldC);
 
             UpdatingEnvironmentGenerateTime = System.currentTimeMillis() - UpdatingEnvironmentGenerateStart;
@@ -147,7 +157,7 @@ public class UpdatingControllerSynthesizer {
                     "Traditional solveControlProblem / OTF generateDUC 実行時間");
 
             try {
-                solveControlProblem(uccs, updEnvGenerator.getUpdEnv(), output);
+                solveControlProblem(uccs, updEnv, output);
             } finally {
                 UpdatingControllerEvaluationRecorder.endCountScope(
                         "UpdatingControllerSynthesizer",
@@ -239,7 +249,7 @@ public class UpdatingControllerSynthesizer {
 
         //GoalからFluentを抽出
         SafetyFormulaExtractionResult safetyFormulasAndFluents =
-                getSafetyFormulas(uccs.getUpdateSafetyGoals(), output); // plain safety(G_u)
+                getSafetyFormulas(uccs.getUpdateSafetyGoals(), uccs.getUpdateProtocolSpec(), output); // plain safety(G_u)
         List<Formula> safetyFormulas = safetyFormulasAndFluents.formulas;
         Set<Fluent> goalFluents = safetyFormulasAndFluents.fluents;
 
@@ -386,7 +396,17 @@ public class UpdatingControllerSynthesizer {
         //論理式（Formula）の評価による状態空間の前処理（Safety違反状態の無効化）
         MTS<Long, String> safetyEnv;
         try {
-            safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions(), output);
+            if (uccs.isFineGrained()) {
+                safetyEnv = FineGrainedUpdatingControllerSafetySynthesizer.synthesizeSafety(
+                        metaEnvironment,
+                        goalFluents,
+                        safetyFormulas,
+                        uccs.getUpdateGRGoal().getControllableActions(),
+                        uccs.getUpdateProtocolSpec(),
+                        output);
+            } else {
+                safetyEnv = UpdatingControllerSafetySynthesizer.synthesizeSafety(metaEnvironment, goalFluents, safetyFormulas, uccs.getUpdateGRGoal().getControllableActions(), output);
+            }
         } finally {
             UpdatingControllerEvaluationRecorder.endCountScope(
                     "solveControlProblem (Traditional DUC)",
@@ -541,6 +561,13 @@ public class UpdatingControllerSynthesizer {
     private static SafetyFormulaExtractionResult getSafetyFormulas(
             ControllerGoalDefinition newGoalDef,
             LTSOutput output) {
+        return getSafetyFormulas(newGoalDef, null, output);
+    }
+
+    private static SafetyFormulaExtractionResult getSafetyFormulas(
+            ControllerGoalDefinition newGoalDef,
+            UpdateProtocolSpec updateProtocolSpec,
+            LTSOutput output) {
         Set<Fluent> safetyFluents = new HashSet<Fluent>();
         Set<Fluent> oldSafetyFluents = new HashSet<Fluent>();
         Set<Fluent> newSafetyFluents = new HashSet<Fluent>();
@@ -553,17 +580,17 @@ public class UpdatingControllerSynthesizer {
             Set<Fluent> formulaFluents = new HashSet<Fluent>();
             Formula safetyFormula;
             if (safetyName.endsWith(UpdateConstants.OLD_SUFFIX)) {
-                safetyFormula = buildInternalOldSafetyFormula(safetyName, formulaFluents);
+                safetyFormula = updateProtocolSpec == null
+                        ? buildInternalOldSafetyFormula(safetyName, formulaFluents)
+                        : buildFineGrainedOldSafetyFormula(safetyName, formulaFluents, updateProtocolSpec);
                 oldSafetyFluents.addAll(formulaFluents);
             } else if (safetyName.endsWith(UpdateConstants.NEW_SUFFIX)) {
-                safetyFormula = buildInternalNewSafetyFormula(safetyName, formulaFluents);
+                safetyFormula = updateProtocolSpec == null
+                        ? buildInternalNewSafetyFormula(safetyName, formulaFluents)
+                        : buildFineGrainedNewSafetyFormula(safetyName, formulaFluents, updateProtocolSpec);
                 newSafetyFluents.addAll(formulaFluents);
             } else {
-                AssertDefinition def = AssertDefinition.getConstraint(safetyName);
-                if (def == null) {
-                    Diagnostics.fatal("Assertion not defined ["	+ safetyDefinition.getName() + "].");
-                }
-                safetyFormula = FormulaUtils.adaptFormulaAndCreateFluents(def.getFormula(false), formulaFluents);
+                safetyFormula = adaptTransitionRequirementFormula(safetyName, formulaFluents);
                 transitionRequirementFluents.addAll(formulaFluents);
             }
             safetyFormulas.add(safetyFormula);
@@ -588,6 +615,24 @@ public class UpdatingControllerSynthesizer {
                 originalViolationFormula);
     }
 
+    private static Formula buildFineGrainedOldSafetyFormula(
+            String generatedSafetyName,
+            Set<Fluent> formulaFluents,
+            UpdateProtocolSpec updateProtocolSpec) {
+        String originalSafetyName = stripSuffix(generatedSafetyName, UpdateConstants.OLD_SUFFIX);
+        Formula originalViolationFormula = adaptOriginalSafetyFormula(originalSafetyName, formulaFluents);
+        String stopAction = updateProtocolSpec.getOldSafetyToStopAction().get(originalSafetyName);
+        if (stopAction == null) {
+            Diagnostics.fatal("No fine-grained stopOldSpec action generated for old safety: "
+                    + originalSafetyName);
+        }
+        Fluent stopFluent = FineGrainedUpdatingControllersUtils.createPersistentActionFluent(stopAction);
+        formulaFluents.add(stopFluent);
+        return new AndFormula(
+                new NotFormula(new FluentPropositionalVariable(stopFluent)),
+                originalViolationFormula);
+    }
+
     private static Formula buildInternalNewSafetyFormula(String generatedSafetyName, Set<Fluent> formulaFluents) {
         Formula originalViolationFormula = adaptOriginalSafetyFormula(
                 stripSuffix(generatedSafetyName, UpdateConstants.NEW_SUFFIX),
@@ -595,6 +640,24 @@ public class UpdatingControllerSynthesizer {
         formulaFluents.add(UpdatingControllersUtils.startFluent);
         return new AndFormula(
                 new FluentPropositionalVariable(UpdatingControllersUtils.startFluent),
+                originalViolationFormula);
+    }
+
+    private static Formula buildFineGrainedNewSafetyFormula(
+            String generatedSafetyName,
+            Set<Fluent> formulaFluents,
+            UpdateProtocolSpec updateProtocolSpec) {
+        String originalSafetyName = stripSuffix(generatedSafetyName, UpdateConstants.NEW_SUFFIX);
+        Formula originalViolationFormula = adaptOriginalSafetyFormula(originalSafetyName, formulaFluents);
+        String startAction = updateProtocolSpec.getNewSafetyToStartAction().get(originalSafetyName);
+        if (startAction == null) {
+            Diagnostics.fatal("No fine-grained startNewSpec action generated for new safety: "
+                    + originalSafetyName);
+        }
+        Fluent startFluent = FineGrainedUpdatingControllersUtils.createPersistentActionFluent(startAction);
+        formulaFluents.add(startFluent);
+        return new AndFormula(
+                new FluentPropositionalVariable(startFluent),
                 originalViolationFormula);
     }
 
@@ -608,6 +671,10 @@ public class UpdatingControllerSynthesizer {
         Hashtable initParams = originalDef.getInitParams() != null ? originalDef.getInitParams() : new Hashtable();
         factory.setFormula(strippedSyntax.expand(factory, new Hashtable(), initParams));
         return FormulaUtils.adaptFormulaAndCreateFluents(factory.getFormula(), formulaFluents);
+    }
+
+    private static Formula adaptTransitionRequirementFormula(String requirementName, Set<Fluent> formulaFluents) {
+        return adaptOriginalSafetyFormula(requirementName, formulaFluents);
     }
 
     private static String stripSuffix(String value, String suffix) {

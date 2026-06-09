@@ -13,6 +13,7 @@ import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
+import ltsa.updatingControllers.synthesis.FineGrainedUpdatingControllersUtils;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
 
 import java.util.*;
@@ -267,8 +268,11 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         int mapStateCount = 0;
         int mapTransCount = 0;
 
-        if (fineGrained && !this.isOTF) {
-            Diagnostics.fatal("fine_grained update events are currently implemented for on_the_fly O-DUCS only.");
+        if (fineGrained) {
+            controllableSet.remove(UpdateConstants.STOP_OLD_SPEC);
+            controllableSet.remove(UpdateConstants.RECONFIGURE);
+            controllableSet.remove(UpdateConstants.START_NEW_SPEC);
+            controllableSet.addAll(updateProtocolSpec.getProgressActions());
         }
 
         // ---------------------------------------------------------
@@ -279,13 +283,6 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         {
             output.outln("Mode: On-The-Fly Updating Controller Synthesis"
                     + (fineGrained ? " (fine-grained update events)" : " (legacy update events)"));
-
-            if (fineGrained) {
-                controllableSet.remove(UpdateConstants.STOP_OLD_SPEC);
-                controllableSet.remove(UpdateConstants.RECONFIGURE);
-                controllableSet.remove(UpdateConstants.START_NEW_SPEC);
-                controllableSet.addAll(updateProtocolSpec.getProgressActions());
-            }
 
             // OTF固有の設定
             // hotSwapIn は従来 DUC の hotSwap と同様に、更新開始を制限しない
@@ -685,8 +682,11 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間");
             long goalStart = System.currentTimeMillis();
 
-            ControllerGoal<String> grGoal = UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
-                    controllableSet);
+            ControllerGoal<String> grGoal = fineGrained
+                    ? FineGrainedUpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
+                            controllableSet, updateProtocolSpec)
+                    : UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
+                            controllableSet);
 
             grGoalTime = System.currentTimeMillis() - goalStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
@@ -695,8 +695,11 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間");
             long safetyGoalStart = System.currentTimeMillis();
 
-            ControllerGoalDefinition safetyGoal = UpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
-                    newGoalDef, controllableSet, output);
+            ControllerGoalDefinition safetyGoal = fineGrained
+                    ? FineGrainedUpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
+                            newGoalDef, controllableSet, updateProtocolSpec, output)
+                    : UpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
+                            newGoalDef, controllableSet, output);
             
             safetyGoalTime = System.currentTimeMillis() - safetyGoalStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
@@ -740,7 +743,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // output.outln("======================================================");
         // // ▲▲▲ デバッグ表示ここまで ▲▲▲
 
-            ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal, name.getName());
+            ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal,
+                    name.getName(), fineGrained, updateProtocolSpec);
         }
 
         //評価実験用：UpdatingControllersDefinition.compose測定終了

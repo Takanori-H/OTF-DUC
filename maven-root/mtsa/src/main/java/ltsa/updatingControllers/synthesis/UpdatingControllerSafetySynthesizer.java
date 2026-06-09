@@ -29,6 +29,22 @@ public class UpdatingControllerSafetySynthesizer {
 
 
     public static MTS<Long, String> synthesizeSafety(MTS<Long, String> metaEnvironment, Set<Fluent> goalFluents, List<Formula> safetyFormulas, Set<String> controllableActions, LTSOutput output) {
+        return synthesizeSafety(
+                metaEnvironment,
+                goalFluents,
+                safetyFormulas,
+                controllableActions,
+                Arrays.asList(UpdateConstants.STOP_OLD_SPEC, UpdateConstants.START_NEW_SPEC),
+                output);
+    }
+
+    public static MTS<Long, String> synthesizeSafety(
+            MTS<Long, String> metaEnvironment,
+            Set<Fluent> goalFluents,
+            List<Formula> safetyFormulas,
+            Set<String> controllableActions,
+            Collection<String> dontDoTwiceActions,
+            LTSOutput output) {
 
         // /*
         // ▼▼▼ 追加: 追跡しているFluentの名前を一覧表示 ▼▼▼
@@ -141,7 +157,7 @@ public class UpdatingControllerSafetySynthesizer {
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "Traditional DUC safetyEnv 構築時間内訳",
                 "DontDoTwice goal 合成時間");
-        MTS<Long, String> result = getDontDoTwiceGoals(safetyEnv);
+        MTS<Long, String> result = getDontDoTwiceGoals(safetyEnv, dontDoTwiceActions);
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "Traditional DUC safetyEnv 構築時間内訳",
                 "DontDoTwice goal 合成時間");
@@ -370,13 +386,22 @@ public class UpdatingControllerSafetySynthesizer {
     }
 
     public static MTS<Long, String> getDontDoTwiceGoals(MTS<Long, String> SafetyEnv) {
+        return getDontDoTwiceGoals(
+                SafetyEnv,
+                Arrays.asList(UpdateConstants.STOP_OLD_SPEC, UpdateConstants.START_NEW_SPEC));
+    }
+
+    public static MTS<Long, String> getDontDoTwiceGoals(
+            MTS<Long, String> SafetyEnv,
+            Collection<String> dontDoTwiceActions) {
 
         Vector<CompactState> machinesToCompose = new Vector<CompactState>();
         machinesToCompose.add(MTSToAutomataConverter.getInstance().convert(SafetyEnv, "safetyEnv", true));
 
         // add machines from models that specify that special events cant be done twice
-        machinesToCompose.add(dontDoTwiceModel("stopOldSpec", SafetyEnv.getActions()));
-        machinesToCompose.add(dontDoTwiceModel("startNewSpec", SafetyEnv.getActions()));
+        for (String action : dontDoTwiceActions) {
+            machinesToCompose.add(dontDoTwiceModel(action, SafetyEnv.getActions()));
+        }
 
         CompositeState c = new CompositeState(machinesToCompose);
         c.compose(new StandardOutput());

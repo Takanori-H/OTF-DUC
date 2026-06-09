@@ -131,7 +131,10 @@ public class UpdatingControllersUtils {
 	 */
 	public static boolean isNotUpdateAction(String action) {
 		return !START_NEW_SPEC.equals(action) && !STOP_OLD_SPEC.equals(action) &&
-			!RECONFIGURE.equals(action);
+			!RECONFIGURE.equals(action) &&
+			!action.startsWith(START_NEW_SPEC_PREFIX) &&
+			!action.startsWith(STOP_OLD_SPEC_PREFIX) &&
+			!action.startsWith(RECONFIGURE_PREFIX);
 	}
 
 	/**

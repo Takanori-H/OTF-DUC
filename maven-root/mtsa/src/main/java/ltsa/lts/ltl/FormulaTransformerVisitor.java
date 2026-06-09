@@ -163,19 +163,42 @@ public class FormulaTransformerVisitor implements FormulaVisitor {
 	private Fluent generateFluentFromEvent(String name) {
 		HashSet<Symbol> initiating = new HashSet<>();
 		String fluentName = name + "_a";
+		String normalizedName = name.trim();
 
-		if (name.contains(new String("[")) || name.contains(new String("["))){
-			String[] splited = name.split(new String("\\["));
+		if (isActionSet(normalizedName)) {
+			for (String action : normalizedName.substring(1, normalizedName.length() - 1).split(",")) {
+				addActionSymbol(initiating, action.trim());
+			}
+			fluentName = normalizedName.replaceAll("[^A-Za-z0-9_]", "_") + "_a";
+		} else if (normalizedName.contains(new String("[")) || normalizedName.contains(new String("["))){
+			String[] splited = normalizedName.split(new String("\\["));
 			String value = splited[1].split(new String("\\]"))[0];
 			initiating.add(new SingleSymbol(splited[0] + "." +value));
 			fluentName = splited[0] + "." +value + "_a";
 		} else {
-			initiating.add(new SingleSymbol(name));
+			initiating.add(new SingleSymbol(normalizedName));
 		}
 
 		HashSet<Symbol> terminating = new HashSet<>();
 		terminating.add(new SingleSymbol("*"));
 		return new FluentImpl(fluentName, initiating, terminating, false);
+	}
+
+	private boolean isActionSet(String name) {
+		return name.startsWith("{") && name.endsWith("}") && name.length() > 2;
+	}
+
+	private void addActionSymbol(HashSet<Symbol> symbols, String action) {
+		if (action.isEmpty()) {
+			return;
+		}
+		if (action.contains(new String("["))) {
+			String[] splited = action.split(new String("\\["));
+			String value = splited[1].split(new String("\\]"))[0];
+			symbols.add(new SingleSymbol(splited[0] + "." + value));
+		} else {
+			symbols.add(new SingleSymbol(action));
+		}
 	}
 
 	private Set<Symbol> transformFluentActions(Vector fluentActions) {

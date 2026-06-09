@@ -184,11 +184,20 @@ public final class UpdatePhaseEvaluator {
     public static String transitionCategory(String action) {
         String normalizedAction = normalizeAction(action);
         if (UpdateConstants.BEGIN_UPDATE.equals(normalizedAction)
-                || UpdateConstants.STOP_OLD_SPEC.equals(normalizedAction)
-                || UpdateConstants.RECONFIGURE.equals(normalizedAction)
-                || UpdateConstants.START_NEW_SPEC.equals(normalizedAction)
                 || UpdateConstants.FINISH_UPDATE.equals(normalizedAction)) {
             return normalizedAction;
+        }
+        if (UpdateConstants.STOP_OLD_SPEC.equals(normalizedAction)
+                || normalizedAction.startsWith(UpdateConstants.STOP_OLD_SPEC_PREFIX)) {
+            return UpdateConstants.STOP_OLD_SPEC;
+        }
+        if (UpdateConstants.RECONFIGURE.equals(normalizedAction)
+                || normalizedAction.startsWith(UpdateConstants.RECONFIGURE_PREFIX)) {
+            return UpdateConstants.RECONFIGURE;
+        }
+        if (UpdateConstants.START_NEW_SPEC.equals(normalizedAction)
+                || normalizedAction.startsWith(UpdateConstants.START_NEW_SPEC_PREFIX)) {
+            return UpdateConstants.START_NEW_SPEC;
         }
         return NORMAL_TRANSITION;
     }
@@ -678,27 +687,27 @@ public final class UpdatePhaseEvaluator {
     }
 
     private static int nextPhase(int phase, String action) {
-        String normalizedAction = normalizeAction(action);
+        String category = transitionCategory(action);
         if (phase == PHASE_POST) {
             return PHASE_POST;
         }
         if (phase == PHASE_PRE) {
-            return UpdateConstants.BEGIN_UPDATE.equals(normalizedAction) ? PHASE_000 : PHASE_PRE;
+            return UpdateConstants.BEGIN_UPDATE.equals(category) ? PHASE_000 : PHASE_PRE;
         }
 
-        if (UpdateConstants.FINISH_UPDATE.equals(normalizedAction)) {
+        if (UpdateConstants.FINISH_UPDATE.equals(category)) {
             return PHASE_POST;
         }
-        if (UpdateConstants.BEGIN_UPDATE.equals(normalizedAction)) {
+        if (UpdateConstants.BEGIN_UPDATE.equals(category)) {
             return phase;
         }
 
         int mask = phase - 1;
-        if (UpdateConstants.STOP_OLD_SPEC.equals(normalizedAction)) {
+        if (UpdateConstants.STOP_OLD_SPEC.equals(category)) {
             mask |= BIT_STOP;
-        } else if (UpdateConstants.RECONFIGURE.equals(normalizedAction)) {
+        } else if (UpdateConstants.RECONFIGURE.equals(category)) {
             mask |= BIT_RECONFIGURE;
-        } else if (UpdateConstants.START_NEW_SPEC.equals(normalizedAction)) {
+        } else if (UpdateConstants.START_NEW_SPEC.equals(category)) {
             mask |= BIT_START;
         }
         return 1 + mask;
