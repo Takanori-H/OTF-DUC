@@ -34,7 +34,7 @@ public class DUCExplorationHeuristic<State, Action> {
             this.goals.add(new HashSet<>());
         }
 
-        this.abstraction = new DUCAbstraction<>(dcs.ltss, 0, mappingStart, mappingEnd, dcs.defaultTargets);
+        this.abstraction = new DUCAbstraction<>(dcs, dcs.ltss, 0, mappingStart, mappingEnd, dcs.defaultTargets);
         this.frontier = new PriorityQueue<>(compostateRanker);
     }
 
@@ -44,7 +44,7 @@ public class DUCExplorationHeuristic<State, Action> {
      * 2. Sequence ID (新しさ/LIFO)
      * 3. Heuristic Score (アグレッシブ度)
      */
-    private static class CompostateRanker<State, Action> implements Comparator<CompostateDUC<State, Action>> {
+    private class CompostateRanker<State, Action> implements Comparator<CompostateDUC<State, Action>> {
         @Override
         public int compare(CompostateDUC<State, Action> o1, CompostateDUC<State, Action> o2) {
             
@@ -78,15 +78,7 @@ public class DUCExplorationHeuristic<State, Action> {
             Object mStateObj = c.getStates().get(0);
             long mState = (mStateObj instanceof Long) ? (Long)mStateObj : ((Integer)mStateObj).longValue();
 
-            if (mState == 0) return 0; // 初期
-            if (mState == 1) return 1; // hotSwapIn
-            if (mState == 9) return 5; // Goal (hotSwapOut)
-            
-            // 2,3,5(1つ完了) -> Depth 2
-            // 4,6,7(2つ完了) -> Depth 3
-            // 8(3つ完了)     -> Depth 4
-            long mask = mState - 1;
-            return 1 + Long.bitCount(mask);
+            return DUCExplorationHeuristic.this.dcs.markingDepthForHeuristic(mState);
         }
     }
 

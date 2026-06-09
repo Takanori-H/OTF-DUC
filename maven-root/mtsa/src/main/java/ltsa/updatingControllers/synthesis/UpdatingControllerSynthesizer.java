@@ -35,8 +35,10 @@ import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
+import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC;
+import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisFineGrainedDUC;
 import ltsa.lts.EventState;
 
 import java.util.*;
@@ -734,6 +736,8 @@ public class UpdatingControllerSynthesizer {
                 "MarkingLTS 生成時間");
 
         // --- A. Marking LTS (Goal & Process Management) ---
+        UpdateProtocolSpec updateProtocolSpec = uccs.getUpdateProtocolSpec();
+        boolean fineGrained = uccs.isFineGrained();
         // システム全体のアクション集合を収集して、Marking LTSのアルファベットとする
         Set<String> allActions = new HashSet<>();
         //allActions.addAll(uccs.getControllableActions());
@@ -746,27 +750,42 @@ public class UpdatingControllerSynthesizer {
             allActions.addAll(uccs.getNewController().getActions());
         }
         allActions.add(UpdateConstants.BEGIN_UPDATE);
-        allActions.add(UpdateConstants.STOP_OLD_SPEC);
-        allActions.add(UpdateConstants.RECONFIGURE);
-        allActions.add(UpdateConstants.START_NEW_SPEC);
         allActions.add(UpdateConstants.FINISH_UPDATE);
+        if (fineGrained && updateProtocolSpec != null) {
+            allActions.addAll(updateProtocolSpec.getProgressActions());
+        } else {
+            allActions.add(UpdateConstants.STOP_OLD_SPEC);
+            allActions.add(UpdateConstants.RECONFIGURE);
+            allActions.add(UpdateConstants.START_NEW_SPEC);
+        }
         // 内部遷移(tau)は除外
         allActions.remove("tau");
         
         // 10状態の Marking LTS を作成
         // 0:Pre ->(hotSwapIn)-> 1-8:In ->(hotSwapOut)-> 9:Post
         // OTF用の進捗管理Marking LTSを作成 (createOTFMarkingLTS使用)
-        MTS<Long, String> markingMTS = createOTFMarkingLTS(
-            UpdateConstants.BEGIN_UPDATE, 
-            UpdateConstants.FINISH_UPDATE, 
-            allActions
-        );
+        MTS<Long, String> markingMTS = fineGrained
+                ? createFineGrainedProgressSlotLTS(
+                        UpdateConstants.BEGIN_UPDATE,
+                        UpdateConstants.FINISH_UPDATE,
+                        allActions,
+                        updateProtocolSpec)
+                : createOTFMarkingLTS(
+                        UpdateConstants.BEGIN_UPDATE,
+                        UpdateConstants.FINISH_UPDATE,
+                        allActions);
         
-        // ゴール設定: 状態9のみをMarkedとする
+        // ゴール設定: legacyは状態9、fine-grainedはsynthetic goal状態2のみをMarkedとする
         LTS<Long, String> markingLTS = new LTSAdapter<>(markingMTS, TransitionType.REQUIRED);
         MarkedLTSAdapter<Long, String> markedMarkingLTS = new MarkedLTSAdapter<>(markingLTS);
-        for(long i = 0; i <= 8; i++) markedMarkingLTS.unmark(i);
-        markedMarkingLTS.mark(9L);
+        if (fineGrained) {
+            markedMarkingLTS.unmark(0L);
+            markedMarkingLTS.unmark(1L);
+            markedMarkingLTS.mark(2L);
+        } else {
+            for(long i = 0; i <= 8; i++) markedMarkingLTS.unmark(i);
+            markedMarkingLTS.mark(9L);
+        }
 
         //評価実験章
         long createMarkingLTSTime = System.currentTimeMillis() - createMarkingLTSStart;
@@ -814,11 +833,21 @@ public class UpdatingControllerSynthesizer {
 
         // --- E. Old Safety ---
         oldSafeStartIndex = boxList.size();
+        Map<Integer, String> oldSafetyStopActionsByIndex = new HashMap<>();
         if (uccs.getOldSafetyLTSs() != null)
         {
             for (CompactState cs : uccs.getOldSafetyLTSs())
             {
-                boxList.add(new LTSAdapter<>(converter.convert(cs), TransitionType.REQUIRED));
+                LTS<Long, String> lts = new LTSAdapter<>(converter.convert(cs), TransitionType.REQUIRED);
+                boxList.add(lts);
+                if (fineGrained && updateProtocolSpec != null) {
+                    int currentIndex = boxList.size() - 1;
+                    String stopAction = updateProtocolSpec.getOldSafetyToStopAction().get(cs.name);
+                    if (stopAction == null) {
+                        Diagnostics.fatal("No fine-grained stopOldSpec action generated for old safety: " + cs.name);
+                    }
+                    oldSafetyStopActionsByIndex.put(currentIndex, stopAction);
+                }
             }
         }
         oldSafeEndIndex = boxList.size() - 1;
@@ -828,6 +857,7 @@ public class UpdatingControllerSynthesizer {
         // --- F. New Safety ---
         // StateMapper用には、元の定義(LTSAdapter)を別途リスト化して保持しておく必要がある
         newSafeStartIndex = boxList.size();
+        Map<Integer, String> newSafetyStartActionsByIndex = new HashMap<>();
         List<LTS<Long, String>> stateMapperSafetyAdapters = new ArrayList<>(); // Mapper用(非Synched)
 
         // ★追加: CompactState -> LTS<Long, String> の変換対応を保持するマップ
@@ -844,6 +874,14 @@ public class UpdatingControllerSynthesizer {
                 // BoxList用
                 LTS<Long, String> originalForBox = new LTSAdapter<>(converter.convert(cs), TransitionType.REQUIRED);
                 boxList.add(originalForBox);
+                if (fineGrained && updateProtocolSpec != null) {
+                    int currentIndex = boxList.size() - 1;
+                    String startAction = updateProtocolSpec.getNewSafetyToStartAction().get(cs.name);
+                    if (startAction == null) {
+                        Diagnostics.fatal("No fine-grained startNewSpec action generated for new safety: " + cs.name);
+                    }
+                    newSafetyStartActionsByIndex.put(currentIndex, startAction);
+                }
                 
                 // Mapper用(NCとの接続計算用)
                 stateMapperSafetyAdapters.add(originalForBox);
@@ -1113,25 +1151,48 @@ public class UpdatingControllerSynthesizer {
                 "generateDUC (OTF-DUC)",
                 "DCS 実行時間");
 
-        DirectedControllerSynthesisDUC<Long, String> ducSynthesis = new DirectedControllerSynthesisDUC<>();
+        DirectedControllerSynthesisDUC<Long, String> ducSynthesis = fineGrained
+                ? new DirectedControllerSynthesisFineGrainedDUC<>()
+                : new DirectedControllerSynthesisDUC<>();
 
         LTS<Long, String> result;
         try {
-            result = ducSynthesis.synthesizeDUC(
-                boxList,
-                uccs.getControllableActions(),
-                mappingStartIndex, mappingEndIndex,
-                oldSafeStartIndex, oldSafeEndIndex,
-                newSafeStartIndex, newSafeEndIndex,
-                transReqStartIndex, transReqEndIndex,
-                synthesisStartIndex, synthesisEndIndex,
-                uccs.getMappingMapEnvToNewEnv(),
-                newControllerConnectionMap,
-                realNewContLTS,
-                safetyComponentIndicesMap,  // ★追加: LTSベースのコンポーネントマップ
-                safetyStateLookupMap,    // ★追加: LTSベースの状態追跡マップ
-                output
-            );
+            if (fineGrained) {
+                result = ((DirectedControllerSynthesisFineGrainedDUC<Long, String>) ducSynthesis).synthesizeDUC(
+                    boxList,
+                    uccs.getControllableActions(),
+                    mappingStartIndex, mappingEndIndex,
+                    oldSafeStartIndex, oldSafeEndIndex,
+                    newSafeStartIndex, newSafeEndIndex,
+                    transReqStartIndex, transReqEndIndex,
+                    synthesisStartIndex, synthesisEndIndex,
+                    uccs.getMappingMapEnvToNewEnv(),
+                    newControllerConnectionMap,
+                    realNewContLTS,
+                    safetyComponentIndicesMap,
+                    safetyStateLookupMap,
+                    updateProtocolSpec,
+                    oldSafetyStopActionsByIndex,
+                    newSafetyStartActionsByIndex,
+                    output
+                );
+            } else {
+                result = ducSynthesis.synthesizeDUC(
+                    boxList,
+                    uccs.getControllableActions(),
+                    mappingStartIndex, mappingEndIndex,
+                    oldSafeStartIndex, oldSafeEndIndex,
+                    newSafeStartIndex, newSafeEndIndex,
+                    transReqStartIndex, transReqEndIndex,
+                    synthesisStartIndex, synthesisEndIndex,
+                    uccs.getMappingMapEnvToNewEnv(),
+                    newControllerConnectionMap,
+                    realNewContLTS,
+                    safetyComponentIndicesMap,  // ★追加: LTSベースのコンポーネントマップ
+                    safetyStateLookupMap,    // ★追加: LTSベースの状態追跡マップ
+                    output
+                );
+            }
         } finally {
             UpdatingControllerEvaluationRecorder.endCountScope(
                     "generateDUC (OTF-DUC)",
@@ -1208,6 +1269,39 @@ public class UpdatingControllerSynthesizer {
      * OTF探索用の進捗管理機能付き Marking LTS を作成する。
      * (修正版: 完了済みの更新アクションはブロックし、自己ループさせない)
      */
+    private static MTS<Long, String> createFineGrainedProgressSlotLTS(
+            String startAction, String endAction, Set<String> alphabet, UpdateProtocolSpec protocolSpec)
+    {
+        MTS<Long, String> progressMTS = new MTSImpl<>(0L);
+        progressMTS.addState(0L); // pre-update
+        progressMTS.addState(1L); // in-update, empty completed set
+        progressMTS.addState(2L); // post-update goal
+        progressMTS.setInitialState(0L);
+
+        Set<String> fullAlphabet = new HashSet<>(alphabet);
+        fullAlphabet.add(startAction);
+        fullAlphabet.add(endAction);
+        if (protocolSpec != null) {
+            fullAlphabet.addAll(protocolSpec.getProgressActions());
+        }
+        fullAlphabet.remove("tau");
+        progressMTS.addActions(fullAlphabet);
+
+        for (String action : fullAlphabet) {
+            boolean updateAction = action.equals(startAction)
+                    || action.equals(endAction)
+                    || (protocolSpec != null && protocolSpec.isProgressAction(action));
+            if (action.equals(startAction)) {
+                progressMTS.addTransition(0L, action, 1L, TransitionType.REQUIRED);
+            } else if (!updateAction) {
+                progressMTS.addTransition(0L, action, 0L, TransitionType.REQUIRED);
+                progressMTS.addTransition(1L, action, 1L, TransitionType.REQUIRED);
+                progressMTS.addTransition(2L, action, 2L, TransitionType.REQUIRED);
+            }
+        }
+        return progressMTS;
+    }
+
     private static MTS<Long, String> createOTFMarkingLTS(
             String startAction, String endAction, Set<String> alphabet)
     {

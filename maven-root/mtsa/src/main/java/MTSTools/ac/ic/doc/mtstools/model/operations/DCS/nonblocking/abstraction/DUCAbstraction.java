@@ -31,9 +31,12 @@ public class DUCAbstraction<State, Action> {
     private final int markingLTSIndex; 
     private final int mappingStart;
     private final int mappingEnd;
+    private final DirectedControllerSynthesisDUC<State, Action> dcs;
     private List<Map<State, Integer>> envBFSDistanceMaps;
 
-    public DUCAbstraction(List<LTS<State, Action>> ltss, int markingIndex, int mappingStart, int mappingEnd, List<Set<State>> defaultTargets) {
+    public DUCAbstraction(DirectedControllerSynthesisDUC<State, Action> dcs, List<LTS<State, Action>> ltss,
+            int markingIndex, int mappingStart, int mappingEnd, List<Set<State>> defaultTargets) {
+        this.dcs = dcs;
         this.markingLTSIndex = markingIndex;
         this.mappingStart = mappingStart;
         this.mappingEnd = mappingEnd;
@@ -222,26 +225,18 @@ public class DUCAbstraction<State, Action> {
             currentMarkingId = ((Integer) mStateObj).longValue();
         }
         
-        int currentDepth = (currentMarkingId != -1) ? getMarkingDepth(currentMarkingId) : 0;
+        int currentDepth = (currentMarkingId != -1) ? dcs.markingDepthForHeuristic(currentMarkingId) : 0;
         String actionName = action.toString();
-        int actionCost = getActionPriorityCost(actionName);
+        int actionCost = dcs.actionPriorityCost(actionName);
         int predictedDepth = currentDepth;
 
         // 更新事象による進捗予測
-        if (actionName.equals(UpdateConstants.BEGIN_UPDATE) && currentDepth == 0) {
-            predictedDepth = 1;
-        } else if (actionName.equals(UpdateConstants.STOP_OLD_SPEC) || 
-                   actionName.equals(UpdateConstants.RECONFIGURE) || 
-                   actionName.equals(UpdateConstants.START_NEW_SPEC)) {
-            if (currentDepth >= 1 && currentDepth < 4) {
-                predictedDepth = currentDepth + 1;
-            }
-        } else if (actionName.equals(UpdateConstants.FINISH_UPDATE) && currentDepth == 4) {
-            predictedDepth = 5;
+        if (actionCost < COST_DEFAULT) {
+            predictedDepth = currentDepth + 1;
         }
 
         // スコア計算: Marking重み * (最大深さ - 予測深さ) + 環境距離 + アクション固有コスト
-        double markingScore = W_MARKING * (5 - predictedDepth);
+        double markingScore = W_MARKING * (dcs.maxMarkingDepthForHeuristic() - predictedDepth);
         int envDist = getEnvHeuristic(currentStates);
         int totalScore = (int) markingScore + envDist + actionCost;
 

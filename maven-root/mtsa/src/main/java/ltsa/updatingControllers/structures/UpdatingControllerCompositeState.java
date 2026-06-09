@@ -26,6 +26,8 @@ public class UpdatingControllerCompositeState extends CompositeState {
 	//OTF用
 	private CompositeState newController;
 	private boolean isOTF;
+	private boolean fineGrained;
+	private UpdateProtocolSpec updateProtocolSpec;
 	// ★追加: Mappingを構成するLTSのリスト (OTF探索で利用)
     private Vector<CompactState> mappingComponents;
 	// ★追加: Safety & Transition Constraints
@@ -67,6 +69,8 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		//明示的な初期化
 		this.newController = null;
 		this.isOTF = false;
+		this.fineGrained = false;
+		this.updateProtocolSpec = null;
 		this.mappingComponents = null;
 	}
 
@@ -80,8 +84,9 @@ public class UpdatingControllerCompositeState extends CompositeState {
 											Vector<CompactState> synthesisMachines, // Monitor + Fluents
 											Map<CompactState, List<CompactState>> safetyComponentsMap,
 											Map<CompactState, Map<List<Integer>, Integer>> safetyStateMapping,
+											UpdateProtocolSpec updateProtocolSpec,
 											Set<String> controllableActions,
-											boolean isOTF, String name) {
+											boolean isOTF, boolean fineGrained, String name) {
 		super.setMachines(new Vector<CompactState>());
 		this.oldController = oldController;
 		// OTFモードではこれらはnullにしておく（またはダミー）
@@ -97,6 +102,8 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		//追加フィールド
 		this.newController = newController;
 		this.isOTF = isOTF;
+		this.fineGrained = fineGrained;
+		this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = mappingComponents;
 		this.newEnvironmentComponents = newEnvironmentComponents;
 		this.mappingMapEnvToNewEnv = mappingMapEnvToNewEnv;
@@ -186,6 +193,16 @@ public class UpdatingControllerCompositeState extends CompositeState {
         return isOTF;
     }
 
+	public boolean isFineGrained()
+	{
+		return fineGrained;
+	}
+
+	public UpdateProtocolSpec getUpdateProtocolSpec()
+	{
+		return updateProtocolSpec;
+	}
+
 	public void setNewEnvironmentComponents(Vector<CompactState> components)
 	{
         this.newEnvironmentComponents = components;
@@ -230,8 +247,9 @@ public class UpdatingControllerCompositeState extends CompositeState {
 														synthesisMachines,
 														safetyComponentsMap,
 														safetyStateMapping,
+														updateProtocolSpec,
 														controllableActions,
-														isOTF, name);
+														isOTF, fineGrained, name);
         } else {
             clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals, updateGRGoal, name);
         }

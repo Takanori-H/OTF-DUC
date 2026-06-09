@@ -228,6 +228,16 @@ public class CompostateDUC<State, Action> {
      * @param isFullUpdate 呼び出し元が全更新モードか (使用していないが拡張性のため)
      */
     private void updateAllowedSetForComponent(int i, long markingState, boolean isFullUpdate) {
+        if (dcs.isFineGrainedMode() && i == dcs.idxMarking) {
+            for (Action action : dcs.ltss.get(i).getActions()) {
+                HAction<State, Action> hAction = dcs.alphabet.getHAction(action);
+                if (hAction != null && dcs.isFineGrainedProgressActionEnabled(markingState, action.toString())) {
+                    dcs.allowed.add(i, hAction);
+                }
+            }
+            return;
+        }
+
         // 1. Trace = OFF の場合。
         if (!dcs.isTrace(i, markingState)) {
             // OC (Index 1) は切り離し中なので action を生成させない。
@@ -262,6 +272,9 @@ public class CompostateDUC<State, Action> {
     }
 
     private boolean checkComponentAllows(int ltsIndex, String actionName) {
+        if (dcs.isFineGrainedMode() && ltsIndex == dcs.idxMarking) {
+            return dcs.isFineGrainedProgressActionEnabled(getMarkingState(), actionName);
+        }
         Action matchedAction = null;
         for(Action a : dcs.ltss.get(ltsIndex).getActions()) {
             if(a.toString().equals(actionName)) {

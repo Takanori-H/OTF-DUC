@@ -2422,6 +2422,11 @@ public class LTSCompiler {
                 ucDefinition.setIsOTF();
                 next_symbol();
             }
+            else if(current.kind == Symbol.FINE_GRAINED)
+            {
+                ucDefinition.setFineGrained();
+                next_symbol();
+            }
             else if(current.kind == Symbol.NEW_CONTROLLER)
             {
                 ucDefinition.setNewController(this.controllerSubUpdateController());
@@ -2731,8 +2736,9 @@ public class LTSCompiler {
                     actStr = ((ActionName)action).name.toString();
                 }
 
-                if (!foundReconfigure && actStr.equals("reconfigure")) {
+                if (!foundReconfigure && isRelationReconfigureAction(actStr)) {
                     foundReconfigure = true;
+                    rule.reconfigureAction = action;
                 } else {
                     if (foundReconfigure) {
                         rule.postReconfigureActions.add(action);
@@ -2749,7 +2755,7 @@ public class LTSCompiler {
         }
 
         if (!foundReconfigure) {
-            error("'reconfigure' action is mandatory in relation rule");
+            error("'reconfigure' or 'reconfigure_*' action is mandatory in relation rule");
         }
 
         // 5. 右辺の残り: ProcessName
@@ -2765,6 +2771,10 @@ public class LTSCompiler {
         // ▲▲▲ デバッグ追加ここまで ▲▲▲
 
         relDef.addRule(rule);
+    }
+
+    private boolean isRelationReconfigureAction(String actionName) {
+        return actionName.equals("reconfigure") || actionName.startsWith("reconfigure_");
     }
 
     /**

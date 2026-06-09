@@ -3,6 +3,7 @@ package ltsa.lts;
 import java.util.*;
 
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 
 public class MappingEnvironmentGenerator {
 
@@ -22,6 +23,7 @@ public class MappingEnvironmentGenerator {
     private static class FlattenedRule {
         String oldLabel;
         String newLabel;
+        String reconfigureAction;
         Vector<String> preActions; // 展開済みのアクション文字列リスト
         Vector<String> postActions; // 展開済みのアクション文字列リスト
     }
@@ -30,6 +32,15 @@ public class MappingEnvironmentGenerator {
             Hashtable<String, CompactState> compiled,
             Hashtable<String, RelationDefinition> relations,
             LTSOutput output) {
+        return generate(mapDef, compiled, relations, output, null, -1);
+    }
+
+    public CompactState generate(MapDefinition mapDef,
+            Hashtable<String, CompactState> compiled,
+            Hashtable<String, RelationDefinition> relations,
+            LTSOutput output,
+            UpdateProtocolSpec updateProtocolSpec,
+            int mappingIndex) {
 
         // 生成のたびにマップを初期化
         this.stateMapping.clear();
@@ -46,6 +57,7 @@ public class MappingEnvironmentGenerator {
         }
 
         output.outln("Generating Mapping Environment: " + mapEnvName);
+        String componentReconfigureAction = null;
 
         // 1. ルールの展開と必要な追加状態数の計算
         Vector<FlattenedRule> flatRules = new Vector<>();
@@ -57,6 +69,15 @@ public class MappingEnvironmentGenerator {
             Vector<FlattenedRule> expanded = expandRule(rule, mapDef, relDef);
             flatRules.addAll(expanded);
             for (FlattenedRule fr : expanded) {
+                fr.reconfigureAction = normalizeReconfigureAction(fr.reconfigureAction,
+                        mapEnvName, updateProtocolSpec != null);
+                if (componentReconfigureAction == null) {
+                    componentReconfigureAction = fr.reconfigureAction;
+                } else if (!componentReconfigureAction.equals(fr.reconfigureAction)) {
+                    Diagnostics.fatal("A mapping component can have only one reconfigure action: "
+                            + componentReconfigureAction + " and " + fr.reconfigureAction
+                            + " in " + mapEnvName + ".");
+                }
                 // 必要なステップ数: preActions + reconfigure(1) + postActions
                 int steps = fr.preActions.size() + 1 + fr.postActions.size();
                 // 必要な中間状態数: steps - 1
@@ -64,6 +85,12 @@ public class MappingEnvironmentGenerator {
                     extraStatesCount += (steps - 1);
                 }
             }
+        }
+        if (updateProtocolSpec != null) {
+            if (componentReconfigureAction == null) {
+                componentReconfigureAction = UpdateConstants.RECONFIGURE_PREFIX + mapEnvName;
+            }
+            updateProtocolSpec.registerReconfigure(mappingIndex, componentReconfigureAction);
         }
 
         // 2. LTS枠組み作成
@@ -85,9 +112,9 @@ public class MappingEnvironmentGenerator {
             if (!alphabet.contains(s))
                 alphabet.add(s);
         }
-        if (!alphabet.contains(UpdateConstants.RECONFIGURE))
-            alphabet.add(UpdateConstants.RECONFIGURE);
         for (FlattenedRule fr : flatRules) {
+            if (!alphabet.contains(fr.reconfigureAction))
+                alphabet.add(fr.reconfigureAction);
             addActionsToAlphabet(alphabet, fr.preActions);
             addActionsToAlphabet(alphabet, fr.postActions);
         }
@@ -132,7 +159,7 @@ public class MappingEnvironmentGenerator {
 
             // アクションシーケンスの構築
             Vector<String> sequence = new Vector<>(fr.preActions);
-            sequence.add(UpdateConstants.RECONFIGURE);
+            sequence.add(fr.reconfigureAction);
             sequence.addAll(fr.postActions);
             int currentNode = startNode;
             for (int i = 0; i < sequence.size(); i++) {
@@ -242,12 +269,14 @@ public class MappingEnvironmentGenerator {
                 // アクションリストも展開 (変数が含まれる可能性があるため)
                 Vector<String> pre = expandActionList(rule.preReconfigureActions, locals, globals);
                 Vector<String> post = expandActionList(rule.postReconfigureActions, locals, globals);
+                String recon = expandSingleAction(rule.reconfigureAction, locals, globals);
 
                 for (String oldL : oldLabels) {
                     for (String newL : newLabels) {
                         FlattenedRule fr = new FlattenedRule();
                         fr.oldLabel = convertFspLabelToInternal(oldL);
                         fr.newLabel = convertFspLabelToInternal(newL);
+                        fr.reconfigureAction = recon;
                         fr.preActions = pre;
                         fr.postActions = post;
                         result.add(fr);
@@ -279,12 +308,14 @@ public class MappingEnvironmentGenerator {
             Vector<String> newLabels = rule.newStateSelector.getActions(locals, globals);
             Vector<String> pre = expandActionList(rule.preReconfigureActions, locals, globals);
             Vector<String> post = expandActionList(rule.postReconfigureActions, locals, globals);
+            String recon = expandSingleAction(rule.reconfigureAction, locals, globals);
 
             for (String oldL : oldLabels) {
                 for (String newL : newLabels) {
                     FlattenedRule fr = new FlattenedRule();
                     fr.oldLabel = convertFspLabelToInternal(oldL);
                     fr.newLabel = convertFspLabelToInternal(newL);
+                    fr.reconfigureAction = recon;
                     fr.preActions = pre;
                     fr.postActions = post;
                     result.add(fr);
@@ -292,6 +323,30 @@ public class MappingEnvironmentGenerator {
             }
         }
         return result;
+    }
+
+    private String expandSingleAction(ActionLabels action, Hashtable<String, Value> locals,
+            Hashtable<String, Value> globals) {
+        Vector<String> expanded = action.getActions(locals, globals);
+        if (expanded.size() != 1) {
+            Diagnostics.fatal("A relation reconfigure action must expand to exactly one action.");
+        }
+        return expanded.get(0);
+    }
+
+    private String normalizeReconfigureAction(String actionName, String mapEnvName, boolean fineGrained) {
+        if (!fineGrained) {
+            if (!UpdateConstants.RECONFIGURE.equals(actionName)) {
+                Diagnostics.fatal("Relation action '" + actionName
+                        + "' requires fine_grained mode. Legacy O-DUCS expects 'reconfigure'.");
+            }
+            return actionName;
+        }
+        if (UpdateConstants.RECONFIGURE.equals(actionName)) {
+            return UpdateConstants.RECONFIGURE_PREFIX + mapEnvName;
+        }
+        UpdateProtocolSpec.validateReconfigureAction(actionName);
+        return actionName;
     }
 
     private Vector<String> expandActionList(Vector<ActionLabels> actions, Hashtable<String, Value> locals,

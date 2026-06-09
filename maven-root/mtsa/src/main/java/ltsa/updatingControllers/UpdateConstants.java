@@ -8,6 +8,9 @@ public class UpdateConstants {
 	public static final String BEGIN_UPDATE = "hotSwapIn";
 	public static final String START_NEW_SPEC = "startNewSpec";
 	public static final String STOP_OLD_SPEC = "stopOldSpec";
+	public static final String STOP_OLD_SPEC_PREFIX = "stopOldSpec_";
+	public static final String RECONFIGURE_PREFIX = "reconfigure_";
+	public static final String START_NEW_SPEC_PREFIX = "startNewSpec_";
 	public static final String OLD_LABEL = ".old";
 	public static final String OLD_SUFFIX = "_UPD_OLD";
 	public static final String NEW_SUFFIX = "_UPD_NEW";

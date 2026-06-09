@@ -38,6 +38,9 @@ public class RelationDefinition {
         // ▼▼▼ 追加 ▼▼▼
         // reconfigureの前に行うアクション列 (例: jump)
         public Vector<ActionLabels> preReconfigureActions = new Vector<>();
+
+        // mapping componentを旧環境側から新環境側へ切り替える中心アクション
+        public ActionLabels reconfigureAction;
         
         // reconfigureの後に行うアクション列 (例: down)
         public Vector<ActionLabels> postReconfigureActions = new Vector<>();

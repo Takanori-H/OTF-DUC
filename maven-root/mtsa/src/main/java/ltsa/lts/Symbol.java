@@ -445,6 +445,8 @@ public class Symbol {
 			return "new environment";
 		case MAP_RELATION:
 			return "map relation";
+		case FINE_GRAINED:
+			return "fine_grained";
 
 		// _______________________________________________________________________________________
 		// Probabilistic
@@ -666,8 +668,9 @@ public class Symbol {
 	public static final int RELATION = 3502;
     public static final int OLD_ENVIRONMENT = 3503;
     public static final int NEW_ENVIRONMENT = 3504;
-    public static final int MAP_RELATION = 3505;
+	public static final int MAP_RELATION = 3505;
 	public static final int MAP = 3506;
+	public static final int FINE_GRAINED = 3507;
 	
 	static {
 		blueSymbols.add(OPTIMISTIC);
@@ -735,6 +738,7 @@ public class Symbol {
 
 		//OTF-DUC
 		blueSymbols.add(ON_THE_FLY);
+		blueSymbols.add(FINE_GRAINED);
 		blueSymbols.add(NEW_CONTROLLER);
 		blueSymbols.add(RELATION);
 		blueSymbols.add(OLD_ENVIRONMENT);

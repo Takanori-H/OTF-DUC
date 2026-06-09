@@ -35,6 +35,7 @@ import ltsa.updatingControllers.EvaluationProfiler;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.synthesis.UpdatePhaseEvaluator;
+import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.gr1.Statistics;
 
 public class DirectedControllerSynthesisDUC<State, Action> extends DirectedControllerSynthesis<State, Action> {
@@ -453,6 +454,42 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             Map<Integer, List<Integer>> safetyComponentIndicesMap,
             Map<Integer, Map<List<Integer>, Integer>> safetyStateLookupMap,
             LTSOutput output) {
+        return synthesizeDUC(
+                ltss,
+                controllable,
+                mappingStart, mappingEnd,
+                oldSafeStart, oldSafeEnd,
+                newSafeStart, newSafeEnd,
+                transReqStart, transReqEnd,
+                synthesisStart, synthesisEnd,
+                mappingMapEnvToNewEnv,
+                newControllerConnectionMap,
+                newController,
+                safetyComponentIndicesMap,
+                safetyStateLookupMap,
+                null,
+                null,
+                null,
+                output);
+    }
+
+    protected LTS<Long, Action> synthesizeDUC(
+            List<LTS<State, Action>> ltss,
+            Set<Action> controllable,
+            int mappingStart, int mappingEnd,
+            int oldSafeStart, int oldSafeEnd,
+            int newSafeStart, int newSafeEnd,
+            int transReqStart, int transReqEnd,
+            int synthesisStart, int synthesisEnd,
+            List<Map<Integer, Integer>> mappingMapEnvToNewEnv,
+            Map<String, Long> newControllerConnectionMap,
+            LTS<Long, String> newController,
+            Map<Integer, List<Integer>> safetyComponentIndicesMap,
+            Map<Integer, Map<List<Integer>, Integer>> safetyStateLookupMap,
+            UpdateProtocolSpec updateProtocolSpec,
+            Map<Integer, String> oldSafetyStopActionsByIndex,
+            Map<Integer, String> newSafetyStartActionsByIndex,
+            LTSOutput output) {
         
         long synthesizeDUCStart = System.currentTimeMillis();
         UpdatingControllerEvaluationRecorder.beginCountScope(
@@ -473,6 +510,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         this.safetyComponentIndicesMap = safetyComponentIndicesMap;
         this.safetyStateLookupMap = safetyStateLookupMap;
+        configureUpdateProtocol(
+                updateProtocolSpec,
+                oldSafetyStopActionsByIndex,
+                newSafetyStartActionsByIndex);
 
         this.mappingMapEnvToNewEnv = mappingMapEnvToNewEnv;
         this.newControllerConnectionMap = newControllerConnectionMap;
@@ -505,6 +546,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 e.printStackTrace();
             }
         }
+        onDebugLogOpened();
 
         try {
             setupSynthesisDUC(ltss, controllable);
@@ -627,6 +669,21 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             logWriter.println(message);
             logWriter.flush();
         }
+    }
+
+    protected void configureUpdateProtocol(
+            UpdateProtocolSpec updateProtocolSpec,
+            Map<Integer, String> oldSafetyStopActionsByIndex,
+            Map<Integer, String> newSafetyStartActionsByIndex) {
+        // Legacy O-DUCS has a fixed update protocol; subclasses may install a richer one.
+    }
+
+    protected boolean isFineGrainedMode() {
+        return false;
+    }
+
+    protected void onDebugLogOpened() {
+        // Extension hook for mode-specific debug headers.
     }
 
     private void beginStrategy1NormalOtfSimpleMergeMeasurement() {
@@ -1083,6 +1140,10 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         this.lookupBuffer = new long[ltssSize];
         this.reusableKey = new StateKey(); // 検索専用インスタンス
     
+        if (isFineGrainedMode()) {
+            return;
+        }
+
         // isTraceの結果をビットマスク化 (Marking 0-9)
         // [最適化] ループ内での isTrace メソッド呼び出し(仮想関数オーバーヘッド)を排除するため、
         // 各フェーズにおける Trace 対象コンポーネントをビットマスク(int)として保持。
@@ -1141,7 +1202,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         // [最適化] getMarkingStateFromList 内の instanceof 呼び出しを削減するための型キャスト
         long mState = getMarkingStateFromList(states);
         // [最適化] ビットマスクを取得。これにより 19要素のループ内での分岐が極めて高速になる。
-        int currentMask = traceMasks[(int) mState];
+        int currentMask = isFineGrainedMode() ? traceMaskFor(mState) : traceMasks[(int) mState];
 
         // 1. プリミティブ配列バッファへの転記と同時に正規化
         // 1. 正規化とアンボクシングの同時実行
@@ -1184,7 +1245,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
             // Marking 8 では hotSwapOut ガードを先に評価する。
             // 状態生成時にあらかじめチェックすることで、ヒューリスティックがこの手を選ばないようにする
-            if (mState == 8) {
+            if (isFinishUpdateReadyStateId(mState)) {
                 long guardStart = System.nanoTime();
                 finishUpdateGuardChecks++;
                 if (!checkHotswapEndCondition(result)) {
@@ -1195,7 +1256,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
             // ======================================================
         
             heuristic.newState(result, parent);
-            if (mState == 9) {
+            if (isGoalProgressStateId(mState)) {
                 result.setStatus(Status.GOAL);
                 // result.setStatus(CompostateDUC.Status.GOAL);
                 result.setBestControllable(0, null);
@@ -1215,6 +1276,16 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return result;
     }
 
+    private int traceMaskFor(long markingState) {
+        int mask = 0;
+        for (int i = 0; i < ltssSize; i++) {
+            if (isTrace(i, markingState)) {
+                mask |= (1 << i);
+            }
+        }
+        return mask;
+    }
+
     /**
      * 状態リストから現在の Marking State ID を抽出するヘルパー。
      * 正規化判定のために buildCompostate 内で使用。
@@ -1228,7 +1299,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return -1;
     }
 
-    private boolean isInRange(int index, int start, int end) {
+    protected boolean isInRange(int index, int start, int end) {
         return start != -1 && index >= start && index <= end;
     }
 
@@ -1317,7 +1388,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     public boolean isTrace(int ltsIndex, long markingState) {
-
         // 1. Old Controller (OC)
         // hotSwapIn 発火後（State 1 以上）は旧コントローラを trace から外す。
         if (ltsIndex == idxOC) {
@@ -1366,7 +1436,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private boolean isFairnessEligibleState(CompostateDUC<State, Action> compostate) {
-        return getMarkingState(compostate) == 8;
+        return isFinishUpdateReadyStateId(getMarkingState(compostate));
     }
 
     private boolean isFairnessEligibleLoop(Set<CompostateDUC<State, Action>> states) {
@@ -1381,9 +1451,66 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return true;
     }
 
-    private boolean isUpdateProgressState(CompostateDUC<State, Action> compostate) {
+    protected boolean isUpdateProgressState(CompostateDUC<State, Action> compostate) {
         long markingState = getMarkingState(compostate);
         return markingState >= 1 && markingState <= 7;
+    }
+
+    protected boolean isFinishUpdateReadyStateId(long markingState) {
+        return markingState == 8;
+    }
+
+    protected boolean isGoalProgressStateId(long markingState) {
+        return markingState == 9;
+    }
+
+    public boolean isFineGrainedProgressActionEnabled(long progressState, String actionName) {
+        return false;
+    }
+
+    public int markingDepthForHeuristic(long markingState) {
+        if (markingState == 0) {
+            return 0;
+        }
+        if (markingState == 1) {
+            return 1;
+        }
+        if (markingState == 9) {
+            return 5;
+        }
+        long mask = markingState - 1;
+        return 1 + Long.bitCount(mask);
+    }
+
+    public int maxMarkingDepthForHeuristic() {
+        return 5;
+    }
+
+    public int actionPriorityCost(String actionName) {
+        if (UpdateConstants.FINISH_UPDATE.equals(actionName)) {
+            return 0;
+        }
+        if (UpdateConstants.STOP_OLD_SPEC.equals(actionName)) {
+            return 10;
+        }
+        if (UpdateConstants.RECONFIGURE.equals(actionName)) {
+            return 20;
+        }
+        if (UpdateConstants.START_NEW_SPEC.equals(actionName)) {
+            return 30;
+        }
+        if (UpdateConstants.BEGIN_UPDATE.equals(actionName)) {
+            return 40;
+        }
+        return 100;
+    }
+
+    protected boolean usesSyntheticProgressSlot(int ltsIndex) {
+        return false;
+    }
+
+    protected Set<State> progressSlotSuccessors(long progressState, String actionName) {
+        return null;
     }
 
     private boolean checkErrorWithEnforce(CompostateDUC<State, Action> compostate) {
@@ -1573,11 +1700,11 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         cartesianProductNanos += System.nanoTime() - cartesianStart;
 
         // startNewSpec の場合の Safety の同期(上書き)
-        if (actionName.equals(UpdateConstants.START_NEW_SPEC)) {
+        if (isStartNewSpecActionForSafetySync(actionName)) {
             long safetySyncStart = System.nanoTime();
             safetySyncCalls++;
             for (List<State> childVector : cartesianProduct) {
-                applySafetySync(childVector);
+                applyStartNewSpecSafetySync(childVector, actionName);
             }
             safetySyncNanos += System.nanoTime() - safetySyncStart;
         }
@@ -1608,6 +1735,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private ComponentStepResult<State> computeComponentStep(int ltsIndex, long markingState, State currentState,
             HAction<State, Action> action, boolean isOldAction, String strippedActionName) {
+
+        if (usesSyntheticProgressSlot(ltsIndex)) {
+            long progressState = ((Long) currentState).longValue();
+            Set<State> successors = progressSlotSuccessors(progressState, action.toString());
+            if (successors == null || successors.isEmpty()) {
+                return ComponentStepResult.invalid();
+            }
+            return ComponentStepResult.successors(successors);
+        }
 
         if (!isTrace(ltsIndex, markingState)) {
             return ComponentStepResult.successors(Collections.singleton(currentState));
@@ -1660,9 +1796,27 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private void applySafetySync(List<State> childStates) {
         for (Map.Entry<Integer, List<Integer>> entry : safetyComponentIndicesMap.entrySet()) {
-            int safetyIdx = entry.getKey();
-            List<Integer> compIndices = entry.getValue();
+            applySafetySyncForIndex(childStates, entry.getKey(), entry.getValue());
+        }
+    }
 
+    protected boolean isStartNewSpecActionForSafetySync(String actionName) {
+        return UpdateConstants.START_NEW_SPEC.equals(actionName);
+    }
+
+    protected void applyStartNewSpecSafetySync(List<State> childStates, String actionName) {
+        applySafetySync(childStates);
+    }
+
+    protected void applySafetySyncForIndex(List<State> childStates, int safetyIdx) {
+        List<Integer> compIndices = safetyComponentIndicesMap.get(safetyIdx);
+        if (compIndices == null) {
+            return;
+        }
+        applySafetySyncForIndex(childStates, safetyIdx, compIndices);
+    }
+
+    private void applySafetySyncForIndex(List<State> childStates, int safetyIdx, List<Integer> compIndices) {
             // 遷移後(Child)の状態を使ってキーを作成 (純粋なFluentの組み合わせ)
             List<Integer> lookupKey = new ArrayList<>();
             for (int compIdx : compIndices) {
@@ -1685,7 +1839,6 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                 // log("  [StateJump-Error] Safety[" + safetyIdx + "] forced to ERROR (-1) due to unknown Fluent combination: " + lookupKey);
             }
-        }
     }
 
     /**
@@ -2374,7 +2527,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
-    private boolean isUpdateProtocolAction(HAction<State, Action> action) {
+    protected boolean isUpdateProtocolAction(HAction<State, Action> action) {
         String actionName = action.toString();
         return actionName.equals(UpdateConstants.STOP_OLD_SPEC)
             || actionName.equals(UpdateConstants.RECONFIGURE)
@@ -3139,7 +3292,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return sb.toString();
     }
 
-    private void recordOtfDetailedEvaluation() {
+    protected void recordOtfDetailedEvaluation() {
         recordOtfMarkingAndStatusBreakdown();
         recordOtfExploredUpdateEventTransitionCounts();
         recordOtfExploredUpdatePhaseTransitionAnalysis();
@@ -3248,7 +3401,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC cache 統計","allChildrenGoal cache hit rate", formatRatio(allChildrenGoalCacheHits, allChildrenGoalCacheHits + allChildrenGoalCacheMisses));
     }
 
-    private void recordOtfExploredUpdateEventTransitionCounts() {
+    protected void recordOtfExploredUpdateEventTransitionCounts() {
         long countStart = System.currentTimeMillis();
         UpdatePhaseEvaluator.TransitionCategoryCount counts =
                 new UpdatePhaseEvaluator.TransitionCategoryCount();
@@ -3308,7 +3461,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 System.currentTimeMillis() - countStart);
     }
 
-    private void recordOtfProjectionSplitStats() {
+    protected void recordOtfProjectionSplitStats() {
         recordProjectionSplitStats("marking", idxMarking, idxMarking);
         recordProjectionSplitStats("oldController", idxOC, idxOC);
         recordProjectionSplitStats("mappingEnv", mappingStart, mappingEnd);
@@ -3636,7 +3789,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
                 if (toAdd) {
                     // hotSwapOut の場合は NC への接続を試みる
-                    if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE) && getMarkingState(child) == 9) {
+                    if (hAction.toString().equals(UpdateConstants.FINISH_UPDATE)
+                            && isGoalProgressStateId(getMarkingState(child))) {
                         finishUpdateTransitions++;
                         directorNcConnectionAttempts++;
 
@@ -5255,19 +5409,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         if (!controllableAction) {
             return 50;
         }
-        if (actionName.equals(UpdateConstants.STOP_OLD_SPEC)) {
-            return 10;
-        }
-        if (actionName.equals(UpdateConstants.RECONFIGURE)) {
-            return 20;
-        }
-        if (actionName.equals(UpdateConstants.START_NEW_SPEC)) {
-            return 30;
-        }
-        if (actionName.equals(UpdateConstants.FINISH_UPDATE)) {
-            return 40;
-        }
-        return 100;
+        return actionPriorityCost(actionName);
     }
 
     private int beliefNodeMaxMarkingDepth(BeliefNode node) {
@@ -5295,17 +5437,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private int markingDepth(long markingState) {
-        if (markingState == 0) {
-            return 0;
-        }
-        if (markingState == 1) {
-            return 1;
-        }
-        if (markingState == 9) {
-            return 5;
-        }
-        long mask = markingState - 1;
-        return 1 + Long.bitCount(mask);
+        return markingDepthForHeuristic(markingState);
     }
 
     private void markRemainingUnexploredUncontrollablesBad(BeliefRepairPlan plan) {
@@ -5604,7 +5736,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                     if (!edge.actionName.equals(UpdateConstants.FINISH_UPDATE)) {
                         continue;
                     }
-                    if (getMarkingState(edge.child) != 9 || !isSafeWinningBeliefChild(edge.child)) {
+                    if (!isGoalProgressStateId(getMarkingState(edge.child)) || !isSafeWinningBeliefChild(edge.child)) {
                         continue;
                     }
                     String signature = generateNCSignature(edge.child);
@@ -5994,7 +6126,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return isUpdateProtocolOutputActionName(action.toString());
     }
 
-    private boolean isUpdateProtocolOutputActionName(String actionName) {
+    protected boolean isUpdateProtocolOutputActionName(String actionName) {
         return actionName.equals(UpdateConstants.STOP_OLD_SPEC)
             || actionName.equals(UpdateConstants.RECONFIGURE)
             || actionName.equals(UpdateConstants.START_NEW_SPEC)
@@ -7018,7 +7150,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         }
     }
 
-    private String describeOtfExecutionMode() {
+    protected String describeOtfExecutionMode() {
         String nondetRepair = nondeterministicActionBeliefRepairEnabled ? "+非決定action repair" : "";
         if (beliefRepairEnabled) {
             if (preUpdateSimpleMergeEnabled) {

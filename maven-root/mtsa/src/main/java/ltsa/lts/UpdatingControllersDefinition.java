@@ -11,6 +11,7 @@ import ltsa.lts.ltl.FormulaSyntax;
 import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
 
@@ -26,6 +27,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
     // ★追加: OTF用
     private boolean isOTF;
+    private boolean fineGrained;
     private Symbol newController;
     // ▼▼▼ 追加: 新しい構文用のリストフィールド ▼▼▼
     private List<Symbol> oldEnvironmentList;
@@ -44,6 +46,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // OTFで追加
         newController = new Symbol();
         isOTF = false;
+        fineGrained = false;
         this.output = output;
 
         // ▼▼▼ 追加: 初期化 ▼▼▼
@@ -112,6 +115,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
         // 全体のControllable Action (OTF探索用)
         Set<String> controllableSet = this.generateUpdatingControllableActions(oldGoalDef, newGoalDef);
+        UpdateProtocolSpec updateProtocolSpec = fineGrained
+                ? UpdateProtocolSpec.forFineGrained(oldGoalDef, newGoalDef)
+                : null;
         long goalDefTime = System.currentTimeMillis() - goalDefStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間");
@@ -138,6 +144,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // mappingが未指定の場合、kindはUNKNOWN、toString()は"unknown"となるため
         if (this.getMapping() != null && !this.getMapping().toString().equals("unknown")
                 && !this.getMapping().toString().isEmpty()) {
+            if (fineGrained) {
+                Diagnostics.fatal("fine_grained mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
+            }
             String mappingName = this.getMapping().toString();
             mappingComponents = getComponentsWithoutComposition(mappingName);
             output.outln(" - Mapping components loaded from composite '" + mappingName + "': "
@@ -187,7 +196,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 // ▲▲▲ 修正ここまで ▲▲▲
 
                 // relations を渡す
-                CompactState mapComp = generator.generate(mapDef, compiledProcesses, relations, this.output);
+                CompactState mapComp = generator.generate(mapDef, compiledProcesses, relations, this.output,
+                        updateProtocolSpec, i);
 
                 if (mapComp != null) {
                     mapComp.name = mapEnvName;
@@ -257,13 +267,25 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         int mapStateCount = 0;
         int mapTransCount = 0;
 
+        if (fineGrained && !this.isOTF) {
+            Diagnostics.fatal("fine_grained update events are currently implemented for on_the_fly O-DUCS only.");
+        }
+
         // ---------------------------------------------------------
         // 4. モード別処理 (OTF / Traditional)
         // ---------------------------------------------------------
         UpdatingControllerCompositeState ucce;
         if (this.isOTF)
         {
-            output.outln("Mode: On-The-Fly Updating Controller Synthesis");
+            output.outln("Mode: On-The-Fly Updating Controller Synthesis"
+                    + (fineGrained ? " (fine-grained update events)" : " (legacy update events)"));
+
+            if (fineGrained) {
+                controllableSet.remove(UpdateConstants.STOP_OLD_SPEC);
+                controllableSet.remove(UpdateConstants.RECONFIGURE);
+                controllableSet.remove(UpdateConstants.START_NEW_SPEC);
+                controllableSet.addAll(updateProtocolSpec.getProgressActions());
+            }
 
             // OTF固有の設定
             // hotSwapIn は従来 DUC の hotSwap と同様に、更新開始を制限しない
@@ -464,8 +486,12 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // アルファベットに含まれていないと遷移が生成されないため、明示的に追加します。
             alphaSet.add(UpdateConstants.BEGIN_UPDATE); // "hotSwapIn"
             alphaSet.add(UpdateConstants.FINISH_UPDATE); // "hotSwapOut"
-            alphaSet.add(UpdateConstants.STOP_OLD_SPEC); // "stopOldSpec"
-            alphaSet.add(UpdateConstants.START_NEW_SPEC);// "startNewSpec"
+            if (fineGrained && updateProtocolSpec != null) {
+                alphaSet.addAll(updateProtocolSpec.getAllUpdateActions());
+            } else {
+                alphaSet.add(UpdateConstants.STOP_OLD_SPEC); // "stopOldSpec"
+                alphaSet.add(UpdateConstants.START_NEW_SPEC);// "startNewSpec"
+            }
 
             // =========================================================
             // アルファベットのクリーニング (?付きを除外)
@@ -644,7 +670,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                                                         oldSafetyLTSs, newSafetyLTSs,
                                                         // transitionGoals,
                                                         transitionLTSs, synthesisMachines, safetyComponentsMap, safetyStateMapping,
-                                                        controllableSet,true, name.getName());
+                                                        updateProtocolSpec,
+                                                        controllableSet,true, fineGrained, name.getName());
             
 
         }
@@ -1092,6 +1119,14 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     // ★追加: セッターメソッド
     public void setIsOTF() {
         this.isOTF = true;
+    }
+
+    public void setFineGrained() {
+        this.fineGrained = true;
+    }
+
+    public boolean isFineGrained() {
+        return fineGrained;
     }
 
     public void setNewController(ArrayList<Symbol> newController) {

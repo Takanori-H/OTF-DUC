@@ -122,6 +122,7 @@ public class SymbolTable {
         addSymbols("oldEnvironment", Symbol.OLD_ENVIRONMENT);
         addSymbols("newEnvironment", Symbol.NEW_ENVIRONMENT);
         addSymbols("mapRelation", Symbol.MAP_RELATION);
+        addSymbols("fine_grained", Symbol.FINE_GRAINED);
     }
 
     private static void addSymbols(String key, Integer elem) {
