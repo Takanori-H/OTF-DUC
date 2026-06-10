@@ -29,6 +29,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     // ★追加: OTF用
     private boolean isOTF;
     private boolean fineGrained;
+    private boolean selectiveFineGrained;
     private Symbol newController;
     // ▼▼▼ 追加: 新しい構文用のリストフィールド ▼▼▼
     private List<Symbol> oldEnvironmentList;
@@ -48,6 +49,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         newController = new Symbol();
         isOTF = false;
         fineGrained = false;
+        selectiveFineGrained = false;
         this.output = output;
 
         // ▼▼▼ 追加: 初期化 ▼▼▼
@@ -113,10 +115,14 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         long goalDefStart = System.currentTimeMillis();
         ControllerGoalDefinition oldGoalDef = ControllerGoalDefinition.getDefinition(this.getOldGoal());
         ControllerGoalDefinition newGoalDef = ControllerGoalDefinition.getDefinition(this.getNewGoal());
+        if (fineGrained && selectiveFineGrained) {
+            Diagnostics.fatal("fine_grained and selective_fine_grained cannot be used together.");
+        }
+        boolean fineGrainedMode = fineGrained || selectiveFineGrained;
 
         // 全体のControllable Action (OTF探索用)
         Set<String> controllableSet = this.generateUpdatingControllableActions(oldGoalDef, newGoalDef);
-        UpdateProtocolSpec updateProtocolSpec = fineGrained
+        UpdateProtocolSpec updateProtocolSpec = fineGrainedMode
                 ? UpdateProtocolSpec.forFineGrained(oldGoalDef, newGoalDef)
                 : null;
         long goalDefTime = System.currentTimeMillis() - goalDefStart;
@@ -145,8 +151,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // mappingが未指定の場合、kindはUNKNOWN、toString()は"unknown"となるため
         if (this.getMapping() != null && !this.getMapping().toString().equals("unknown")
                 && !this.getMapping().toString().isEmpty()) {
-            if (fineGrained) {
-                Diagnostics.fatal("fine_grained mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
+            if (fineGrainedMode) {
+                Diagnostics.fatal("fine_grained/selective_fine_grained mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
             }
             String mappingName = this.getMapping().toString();
             mappingComponents = getComponentsWithoutComposition(mappingName);
@@ -254,6 +260,16 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 "UpdatingControllersDefinition", "Mapping Environment Component 合成時間");
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Mapping Environment Component 生成後");
 
+        if (fineGrainedMode && updateProtocolSpec != null) {
+            Set<String> referencedUpdateActions = collectTransitionRequirementActionReferences();
+            validateFineGrainedTransitionRequirementReferences(updateProtocolSpec, referencedUpdateActions);
+            if (selectiveFineGrained) {
+                UpdateProtocolSpec candidateProtocolSpec = updateProtocolSpec;
+                updateProtocolSpec = UpdateProtocolSpec.forSelective(candidateProtocolSpec, referencedUpdateActions);
+                relabelSelectiveMappingComponents(mappingComponents, candidateProtocolSpec, updateProtocolSpec);
+            }
+        }
+
         long newCTime = 0;
         long mapETime = 0;
         long oldSafetyToTesterTime = 0;
@@ -268,7 +284,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         int mapStateCount = 0;
         int mapTransCount = 0;
 
-        if (fineGrained) {
+        if (fineGrainedMode) {
             controllableSet.remove(UpdateConstants.STOP_OLD_SPEC);
             controllableSet.remove(UpdateConstants.RECONFIGURE);
             controllableSet.remove(UpdateConstants.START_NEW_SPEC);
@@ -282,7 +298,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         if (this.isOTF)
         {
             output.outln("Mode: On-The-Fly Updating Controller Synthesis"
-                    + (fineGrained ? " (fine-grained update events)" : " (legacy update events)"));
+                    + (fineGrainedMode
+                    ? (selectiveFineGrained ? " (selective fine-grained update events)" : " (fine-grained update events)")
+                    : " (legacy update events)"));
 
             // OTF固有の設定
             // hotSwapIn は従来 DUC の hotSwap と同様に、更新開始を制限しない
@@ -483,7 +501,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             // アルファベットに含まれていないと遷移が生成されないため、明示的に追加します。
             alphaSet.add(UpdateConstants.BEGIN_UPDATE); // "hotSwapIn"
             alphaSet.add(UpdateConstants.FINISH_UPDATE); // "hotSwapOut"
-            if (fineGrained && updateProtocolSpec != null) {
+            if (fineGrainedMode && updateProtocolSpec != null) {
                 alphaSet.addAll(updateProtocolSpec.getAllUpdateActions());
             } else {
                 alphaSet.add(UpdateConstants.STOP_OLD_SPEC); // "stopOldSpec"
@@ -668,7 +686,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                                                         // transitionGoals,
                                                         transitionLTSs, synthesisMachines, safetyComponentsMap, safetyStateMapping,
                                                         updateProtocolSpec,
-                                                        controllableSet,true, fineGrained, name.getName());
+                                                        controllableSet,true, fineGrainedMode, name.getName());
             
 
         }
@@ -682,7 +700,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間");
             long goalStart = System.currentTimeMillis();
 
-            ControllerGoal<String> grGoal = fineGrained
+            ControllerGoal<String> grGoal = fineGrainedMode
                     ? FineGrainedUpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
                             controllableSet, updateProtocolSpec)
                     : UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
@@ -695,7 +713,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間");
             long safetyGoalStart = System.currentTimeMillis();
 
-            ControllerGoalDefinition safetyGoal = fineGrained
+            ControllerGoalDefinition safetyGoal = fineGrainedMode
                     ? FineGrainedUpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
                             newGoalDef, controllableSet, updateProtocolSpec, output)
                     : UpdatingControllersUtils.generateSafetyGoalDef(this, oldGoalDef,
@@ -744,7 +762,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // // ▲▲▲ デバッグ表示ここまで ▲▲▲
 
             ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal,
-                    name.getName(), fineGrained, updateProtocolSpec);
+                    name.getName(), fineGrainedMode, updateProtocolSpec);
         }
 
         //評価実験用：UpdatingControllersDefinition.compose測定終了
@@ -801,6 +819,71 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 "UpdatingControllersDefinition", "入力規模集計時間", inputScaleTime);
 
         return ucce;
+    }
+
+    private Set<String> collectTransitionRequirementActionReferences() {
+        Set<String> references = new HashSet<>();
+        for (Symbol transitionGoal : transitionGoals) {
+            AssertDefinition definition = AssertDefinition.getConstraint(transitionGoal.getName());
+            if (definition == null) {
+                definition = AssertDefinition.getDefinition(transitionGoal.getName());
+            }
+            if (definition == null || definition.getLTLFormula() == null) {
+                Diagnostics.fatal("Transition requirement is not defined: " + transitionGoal.getName());
+            }
+            references.addAll(definition.getLTLFormula().collectActionReferences());
+        }
+        return references;
+    }
+
+    private void validateFineGrainedTransitionRequirementReferences(
+            UpdateProtocolSpec candidateProtocolSpec,
+            Set<String> referencedActions) {
+        for (String action : referencedActions) {
+            if (UpdateProtocolSpec.isLegacyUpdateActionName(action)) {
+                Diagnostics.fatal("Transition requirement in fine_grained/selective_fine_grained mode must not use legacy update action '"
+                        + action + "'. Use generated fine-grained action names, or write explicit LTS fluents over them.");
+            }
+            if (!UpdateProtocolSpec.looksLikeFineGrainedUpdateAction(action)
+                    && !UpdateProtocolSpec.isOthersActionName(action)) {
+                continue;
+            }
+            if (UpdateProtocolSpec.isOthersActionName(action)) {
+                if (!selectiveFineGrained) {
+                    Diagnostics.fatal("Transition requirement action '" + action
+                            + "' requires selective_fine_grained mode.");
+                }
+                continue;
+            }
+            if (action.startsWith(UpdateConstants.STOP_OLD_SPEC_PREFIX)
+                    && !candidateProtocolSpec.getStopOldSpecActions().contains(action)) {
+                Diagnostics.fatal("Transition requirement references unknown fine-grained stopOldSpec action: "
+                        + action + ". Check the old safety name.");
+            }
+            if (action.startsWith(UpdateConstants.RECONFIGURE_PREFIX)
+                    && !candidateProtocolSpec.getReconfigureActions().contains(action)) {
+                Diagnostics.fatal("Transition requirement references unknown fine-grained reconfigure action: "
+                        + action + ". Check the map relation action name.");
+            }
+            if (action.startsWith(UpdateConstants.START_NEW_SPEC_PREFIX)
+                    && !candidateProtocolSpec.getStartNewSpecActions().contains(action)) {
+                Diagnostics.fatal("Transition requirement references unknown fine-grained startNewSpec action: "
+                        + action + ". Check the new safety name.");
+            }
+        }
+    }
+
+    private void relabelSelectiveMappingComponents(
+            Vector<CompactState> mappingComponents,
+            UpdateProtocolSpec candidateProtocolSpec,
+            UpdateProtocolSpec finalProtocolSpec) {
+        for (int i = 0; i < mappingComponents.size(); i++) {
+            String candidateAction = candidateProtocolSpec.getReconfigureActionForMappingIndex(i);
+            String finalAction = finalProtocolSpec.getReconfigureActionForMappingIndex(i);
+            if (candidateAction != null && finalAction != null && !candidateAction.equals(finalAction)) {
+                CompactStateActionRelabeler.relabelAction(mappingComponents.get(i), candidateAction, finalAction);
+            }
+        }
     }
 
     private void recordInputScale(
@@ -1129,8 +1212,16 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         this.fineGrained = true;
     }
 
+    public void setSelectiveFineGrained() {
+        this.selectiveFineGrained = true;
+    }
+
     public boolean isFineGrained() {
-        return fineGrained;
+        return fineGrained || selectiveFineGrained;
+    }
+
+    public boolean isSelectiveFineGrained() {
+        return selectiveFineGrained;
     }
 
     public void setNewController(ArrayList<Symbol> newController) {

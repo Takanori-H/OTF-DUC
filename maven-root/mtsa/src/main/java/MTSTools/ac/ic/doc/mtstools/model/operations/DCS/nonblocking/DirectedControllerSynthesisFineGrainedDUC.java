@@ -15,11 +15,11 @@ import java.util.Set;
 public class DirectedControllerSynthesisFineGrainedDUC<State, Action>
         extends DirectedControllerSynthesisDUC<State, Action> {
 
-    private UpdateProtocolSpec updateProtocolSpec;
-    private ProgressRegistry progressRegistry;
-    private Map<Integer, String> oldSafetyStopActionsByIndex = Collections.emptyMap();
-    private Map<Integer, String> newSafetyStartActionsByIndex = Collections.emptyMap();
-    private Map<String, Integer> newSafetyIndexByStartAction = Collections.emptyMap();
+    protected UpdateProtocolSpec updateProtocolSpec;
+    protected ProgressRegistry progressRegistry;
+    protected Map<Integer, String> oldSafetyStopActionsByIndex = Collections.emptyMap();
+    protected Map<Integer, String> newSafetyStartActionsByIndex = Collections.emptyMap();
+    protected Map<String, List<Integer>> newSafetyIndicesByStartAction = Collections.emptyMap();
 
     public LTS<Long, Action> synthesizeDUC(
             List<LTS<State, Action>> ltss,
@@ -73,9 +73,14 @@ public class DirectedControllerSynthesisFineGrainedDUC<State, Action>
         this.newSafetyStartActionsByIndex = newSafetyStartActionsByIndex == null
                 ? Collections.<Integer, String>emptyMap()
                 : newSafetyStartActionsByIndex;
-        this.newSafetyIndexByStartAction = new HashMap<>();
+        this.newSafetyIndicesByStartAction = new HashMap<>();
         for (Map.Entry<Integer, String> entry : this.newSafetyStartActionsByIndex.entrySet()) {
-            this.newSafetyIndexByStartAction.put(entry.getValue(), entry.getKey());
+            List<Integer> indices = this.newSafetyIndicesByStartAction.get(entry.getValue());
+            if (indices == null) {
+                indices = new java.util.ArrayList<>();
+                this.newSafetyIndicesByStartAction.put(entry.getValue(), indices);
+            }
+            indices.add(entry.getKey());
         }
     }
 
@@ -304,12 +309,14 @@ public class DirectedControllerSynthesisFineGrainedDUC<State, Action>
 
     @Override
     protected void applyStartNewSpecSafetySync(List<State> childStates, String actionName) {
-        Integer safetyIdx = newSafetyIndexByStartAction.get(actionName);
-        if (safetyIdx == null) {
+        List<Integer> safetyIndices = newSafetyIndicesByStartAction.get(actionName);
+        if (safetyIndices == null || safetyIndices.isEmpty()) {
             return;
         }
-        log("[FineGrained-SafetySync] action=" + actionName + ", newSafetyIndex=" + safetyIdx);
-        applySafetySyncForIndex(childStates, safetyIdx);
+        log("[FineGrained-SafetySync] action=" + actionName + ", newSafetyIndices=" + safetyIndices);
+        for (Integer safetyIdx : safetyIndices) {
+            applySafetySyncForIndex(childStates, safetyIdx);
+        }
     }
 
     @Override

@@ -83,6 +83,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     private boolean debugLogEnabled = Boolean.getBoolean("otfduc.debug");
     private boolean profileLogEnabled = Boolean.getBoolean("otfduc.profile");
+    private boolean finishUpdateFairnessEnabled =
+            Boolean.parseBoolean(System.getProperty("otfduc.fairness", "true"))
+                    && !Boolean.getBoolean("otfduc.disableFairness");
     private boolean mergeProofLogEnabled = Boolean.parseBoolean(System.getProperty("otfduc.debug.mergeProof", "true"));
     private boolean beliefRepairEnabled = Boolean.parseBoolean(System.getProperty("otfduc.belief.repair", "false"));
     private boolean nondeterministicActionBeliefRepairEnabled =
@@ -528,15 +531,15 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 logWriter = new PrintWriter(new FileWriter(LOG_FILE_PATH));
                 if (debugLogEnabled) {
                     log("=== Starting OTF-DUC Synthesis ===");
-                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], MergeProof[%s], NondetActionBeliefRepair[%s], SimpleMerge[%s]",
+                    log(String.format("Config: MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d], Fairness[%s], MergeProof[%s], NondetActionBeliefRepair[%s], SimpleMerge[%s]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
-                            transReqEnd, synthesisStart, synthesisEnd, mergeProofLogEnabled,
+                            transReqEnd, synthesisStart, synthesisEnd, finishUpdateFairnessEnabled, mergeProofLogEnabled,
                             nondeterministicActionBeliefRepairEnabled, preUpdateSimpleMergeEnabled));
                 }
                 if (profileLogEnabled) {
                     profileLog("=== Starting OTF-DUC Profiling ===");
-                    profileLog(String.format("[Profile-Config] debug=%s, profile=%s, file=%s",
-                            debugLogEnabled, profileLogEnabled, LOG_FILE_PATH));
+                    profileLog(String.format("[Profile-Config] debug=%s, profile=%s, fairness=%s, file=%s",
+                            debugLogEnabled, profileLogEnabled, finishUpdateFairnessEnabled, LOG_FILE_PATH));
                     profileLog(String.format("[Profile-Config] MarkingLTS[0], OldController[1], MapEnv[%d-%d], OldSafe[%d-%d], NewSafe[%d-%d], TransReq[%d-%d], Synthesis[%d-%d]",
                             mappingStart, mappingEnd, oldSafeStart, oldSafeEnd, newSafeStart, newSafeEnd, transReqStart,
                             transReqEnd, synthesisStart, synthesisEnd));
@@ -1969,7 +1972,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // Phase 2: marking state 8 の SCC だけを fairness のもとで固定点計算する。
         long phase2Start = System.nanoTime();
-        propagateGoalPhase2Fair(winners, queue);
+        if (finishUpdateFairnessEnabled) {
+            propagateGoalPhase2Fair(winners, queue);
+        }
         propagateGoalPhase2Nanos += System.nanoTime() - phase2Start;
 
         // Phase 3: hotSwapIn 前の旧コントローラ通常運転を GOAL 側へ閉包する。
@@ -2890,7 +2895,7 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
         // fairness は、更新三事象が完了して hotSwapOut 待ちになった
         // marking state 8 のループにだけ適用する。
-        if (isFairnessEligibleLoop(loop)) {
+        if (finishUpdateFairnessEnabled && isFairnessEligibleLoop(loop)) {
             probablyWinningStates.addAll(loop);
         }
     }
@@ -3131,6 +3136,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private boolean tryPromoteFairLoopToGoal() {
+        if (!finishUpdateFairnessEnabled) {
+            return false;
+        }
         if (!isFairnessEligibleLoop(loop)) {
             return false;
         }
@@ -3313,6 +3321,8 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
                 "OTF-DUC fairness / loop 統計", "検出した loop 数", detectedLoopCount, "個");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC fairness / loop 統計", "更新前 m0 loop 例外扱い数", preUpdateLoopExceptionCount, "個");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "OTF-DUC fairness / loop 統計", "marking state 8 fairness 有効", finishUpdateFairnessEnabled ? 1 : 0, "boolean");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "OTF-DUC fairness / loop 統計", "fairness により GOAL 昇格した loop 数", fairPromotedLoopCount, "個");
         UpdatingControllerEvaluationRecorder.recordCount(
@@ -7152,16 +7162,17 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
 
     protected String describeOtfExecutionMode() {
         String nondetRepair = nondeterministicActionBeliefRepairEnabled ? "+非決定action repair" : "";
+        String fairness = finishUpdateFairnessEnabled ? "" : "+m8 fairnessなし";
         if (beliefRepairEnabled) {
             if (preUpdateSimpleMergeEnabled) {
-                return "通常OTF-DUC+簡単マージ+repair" + nondetRepair;
+                return "通常OTF-DUC+簡単マージ+repair" + nondetRepair + fairness;
             }
-            return "通常OTF-DUC+repair" + nondetRepair;
+            return "通常OTF-DUC+repair" + nondetRepair + fairness;
         }
         if (preUpdateSimpleMergeEnabled) {
-            return "通常OTF-DUC+簡単マージ" + nondetRepair;
+            return "通常OTF-DUC+簡単マージ" + nondetRepair + fairness;
         }
-        return "通常OTF-DUC" + nondetRepair;
+        return "通常OTF-DUC" + nondetRepair + fairness;
     }
 
     private void recordOtfDcsTimingEvaluation() {

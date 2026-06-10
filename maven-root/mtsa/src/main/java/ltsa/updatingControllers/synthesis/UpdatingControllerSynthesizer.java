@@ -39,6 +39,7 @@ import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisFineGrainedDUC;
+import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisSelectiveFineGrainedDUC;
 import ltsa.lts.EventState;
 
 import java.util.*;
@@ -115,9 +116,14 @@ public class UpdatingControllerSynthesizer {
             DUCHeartbeat.beginPhase("TRADITIONAL_BUILD_UPDATE_ENV");
             // --- 従来手法 (DUCS) の実行 ---
             // 環境モデル全体(UpdatingEnvironment)を構築してから合成を行う
+            String updateEventMode = " (legacy update events)";
+            if (uccs.isFineGrained()) {
+                updateEventMode = uccs.getUpdateProtocolSpec() != null && uccs.getUpdateProtocolSpec().isSelective()
+                        ? " (selective fine-grained update events)"
+                        : " (fine-grained update events)";
+            }
             output.outln("=========================================");
-            output.outln("Mode: Traditional DUC"
-                    + (uccs.isFineGrained() ? " (fine-grained update events)" : " (legacy update events)"));
+            output.outln("Mode: Traditional DUC" + updateEventMode);
             output.outln("=========================================");
 
             //評価実験用
@@ -662,19 +668,23 @@ public class UpdatingControllerSynthesizer {
     }
 
     private static Formula adaptOriginalSafetyFormula(String originalSafetyName, Set<Fluent> formulaFluents) {
-        AssertDefinition originalDef = AssertDefinition.getConstraint(originalSafetyName);
+        return adaptFormulaWithoutLeadingTemporalOperators(originalSafetyName, formulaFluents);
+    }
+
+    private static Formula adaptTransitionRequirementFormula(String requirementName, Set<Fluent> formulaFluents) {
+        return adaptFormulaWithoutLeadingTemporalOperators(requirementName, formulaFluents);
+    }
+
+    private static Formula adaptFormulaWithoutLeadingTemporalOperators(String assertionName, Set<Fluent> formulaFluents) {
+        AssertDefinition originalDef = AssertDefinition.getConstraint(assertionName);
         if (originalDef == null) {
-            Diagnostics.fatal("Assertion not defined [" + originalSafetyName + "].");
+            Diagnostics.fatal("Assertion not defined [" + assertionName + "].");
         }
         FormulaSyntax strippedSyntax = originalDef.getLTLFormula().removeLeftTemporalOperators();
         FormulaFactory factory = new FormulaFactory();
         Hashtable initParams = originalDef.getInitParams() != null ? originalDef.getInitParams() : new Hashtable();
         factory.setFormula(strippedSyntax.expand(factory, new Hashtable(), initParams));
         return FormulaUtils.adaptFormulaAndCreateFluents(factory.getFormula(), formulaFluents);
-    }
-
-    private static Formula adaptTransitionRequirementFormula(String requirementName, Set<Fluent> formulaFluents) {
-        return adaptOriginalSafetyFormula(requirementName, formulaFluents);
     }
 
     private static String stripSuffix(String value, String suffix) {
@@ -1219,7 +1229,9 @@ public class UpdatingControllerSynthesizer {
                 "DCS 実行時間");
 
         DirectedControllerSynthesisDUC<Long, String> ducSynthesis = fineGrained
-                ? new DirectedControllerSynthesisFineGrainedDUC<>()
+                ? (updateProtocolSpec != null && updateProtocolSpec.isSelective()
+                        ? new DirectedControllerSynthesisSelectiveFineGrainedDUC<>()
+                        : new DirectedControllerSynthesisFineGrainedDUC<>())
                 : new DirectedControllerSynthesisDUC<>();
 
         LTS<Long, String> result;

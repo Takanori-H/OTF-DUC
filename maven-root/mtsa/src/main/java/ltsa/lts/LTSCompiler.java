@@ -2427,6 +2427,11 @@ public class LTSCompiler {
                 ucDefinition.setFineGrained();
                 next_symbol();
             }
+            else if(current.kind == Symbol.SELECTIVE_FINE_GRAINED)
+            {
+                ucDefinition.setSelectiveFineGrained();
+                next_symbol();
+            }
             else if(current.kind == Symbol.NEW_CONTROLLER)
             {
                 ucDefinition.setNewController(this.controllerSubUpdateController());

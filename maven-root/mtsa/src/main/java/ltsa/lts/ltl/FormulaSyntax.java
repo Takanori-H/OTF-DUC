@@ -1,6 +1,8 @@
 package ltsa.lts.ltl;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Set;
 import java.util.Stack;
 import java.util.Vector;
 
@@ -150,6 +152,100 @@ public class FormulaSyntax  {
 			return false;
 		}
 
+	}
+
+	public Set<String> collectActionReferences() {
+		Set<String> references = new HashSet<String>();
+		collectActionReferences(references, new Hashtable(), new Hashtable(), new HashSet<String>());
+		return references;
+	}
+
+	private void collectActionReferences(Set<String> references, Hashtable locals, Hashtable globals,
+			Set<String> visitingDefinitions) {
+		if (proposition != null) {
+			collectPropositionReferences(references, locals, globals, visitingDefinitions);
+		} else if (action != null) {
+			addActions(references, action.getActions(locals, globals));
+		} else if (operator != null && operator.kind == Symbol.RIGID) {
+			return;
+		} else if (operator != null && range == null) {
+			if (left != null) {
+				left.collectActionReferences(references, locals, globals, visitingDefinitions);
+			}
+			if (right != null) {
+				right.collectActionReferences(references, locals, globals, visitingDefinitions);
+			}
+		} else if (range != null && right != null) {
+			range.initContext(locals, globals);
+			while (range.hasMoreNames()) {
+				range.nextName();
+				right.collectActionReferences(references, locals, globals, visitingDefinitions);
+			}
+			range.clearContext();
+		}
+	}
+
+	private void collectPropositionReferences(Set<String> references, Hashtable locals, Hashtable globals,
+			Set<String> visitingDefinitions) {
+		String name = proposition.toString();
+		if (range != null) {
+			range.initContext(locals, globals);
+			while (range.hasMoreNames()) {
+				String suffix = range.nextName();
+				collectNamedPropositionReferences(name + "." + suffix, references, locals, globals,
+						visitingDefinitions);
+			}
+			range.clearContext();
+			return;
+		}
+		collectNamedPropositionReferences(name, references, locals, globals, visitingDefinitions);
+	}
+
+	private void collectNamedPropositionReferences(String name, Set<String> references, Hashtable locals,
+			Hashtable globals, Set<String> visitingDefinitions) {
+		PredicateDefinition predicateDefinition = PredicateDefinition.get(name);
+		if (predicateDefinition != null) {
+			PredicateDefinition.compile(predicateDefinition);
+			addActions(references, predicateDefinition.getInitiatingActions());
+			addActions(references, predicateDefinition.getTerminatingActions());
+			return;
+		}
+
+		AssertDefinition definition = AssertDefinition.getDefinition(name);
+		if (definition == null) {
+			definition = AssertDefinition.getConstraint(name);
+		}
+		if (definition == null) {
+			return;
+		}
+		if (visitingDefinitions.contains(name)) {
+			return;
+		}
+		visitingDefinitions.add(name);
+		Hashtable actualParams = definition.init_params;
+		if (parameters != null) {
+			if (parameters.size() != definition.params.size()) {
+				Diagnostics.fatal("Actual parameters do not match formals: " + proposition, proposition);
+			}
+			actualParams = new Hashtable();
+			Vector values = paramValues(parameters, locals, globals);
+			for (int i = 0; i < parameters.size(); ++i) {
+				actualParams.put(definition.params.elementAt(i), values.elementAt(i));
+			}
+		}
+		definition.ltl_formula.collectActionReferences(references, locals, actualParams, visitingDefinitions);
+		visitingDefinitions.remove(name);
+	}
+
+	private void addActions(Set<String> references, Vector actions) {
+		if (actions == null) {
+			return;
+		}
+		for (Object action : actions) {
+			if (action != null) {
+				references.add(action.toString());
+			}
+		}
 	}
 
 	/**

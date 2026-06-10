@@ -345,6 +345,10 @@ public class MappingEnvironmentGenerator {
         if (UpdateConstants.RECONFIGURE.equals(actionName)) {
             return UpdateConstants.RECONFIGURE_PREFIX + mapEnvName;
         }
+        if (UpdateConstants.RECONFIGURE_OTHERS.equals(actionName)) {
+            Diagnostics.fatal("Relation action '" + actionName
+                    + "' is reserved for selective_fine_grained mode.");
+        }
         UpdateProtocolSpec.validateReconfigureAction(actionName);
         return actionName;
     }

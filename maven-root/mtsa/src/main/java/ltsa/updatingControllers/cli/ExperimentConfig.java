@@ -16,6 +16,8 @@ final class ExperimentConfig {
     final File configFile;
     File outputDir = new File("Experiment/result");
     long timeoutMillis = DEFAULT_TIMEOUT_MILLIS;
+    int runs = 1;
+    boolean runsSpecified = false;
     final List<String> javaOptions = new ArrayList<String>();
     final List<ExperimentCase> cases = new ArrayList<ExperimentCase>();
 
@@ -76,6 +78,11 @@ final class ExperimentConfig {
         KeyValue keyValue = parseKeyValue(line, lineNumber);
         if ("outputDir".equals(keyValue.key)) {
             config.outputDir = new File(keyValue.value);
+        } else if ("runs".equals(keyValue.key)
+                || "runCount".equals(keyValue.key)
+                || "repetitions".equals(keyValue.key)) {
+            config.runs = parsePositiveInt(keyValue.value, keyValue.key, lineNumber);
+            config.runsSpecified = true;
         } else if ("timeoutHours".equals(keyValue.key)) {
             config.timeoutMillis = hoursToMillis(keyValue.value);
         } else if ("timeoutMinutes".equals(keyValue.key)) {
@@ -191,6 +198,19 @@ final class ExperimentConfig {
 
     private static long minutesToMillis(String value) {
         return Math.round(Double.parseDouble(value) * 60.0 * 1000.0);
+    }
+
+    private static int parsePositiveInt(String value, String key, int lineNumber) {
+        try {
+            int result = Integer.parseInt(value);
+            if (result < 1) {
+                throw new IllegalArgumentException(key + " must be >= 1 at line " + (lineNumber + 1));
+            }
+            return result;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(key + " must be an integer at line "
+                    + (lineNumber + 1) + ": " + value);
+        }
     }
 
     private static boolean isBlank(String value) {
