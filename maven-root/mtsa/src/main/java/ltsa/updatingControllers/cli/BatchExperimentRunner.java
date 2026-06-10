@@ -51,23 +51,41 @@ public final class BatchExperimentRunner {
             ExperimentConfig config = ExperimentConfig.load(configFile);
             int failures = 0;
 
-            for (ExperimentCase experimentCase : config.cases) {
-                for (String warning : experimentCase.validationWarnings()) {
-                    System.err.println("[WARN] " + experimentCase.id + ": " + warning);
+            boolean useRunDirectories = config.runsSpecified;
+            for (int runIndex = 1; runIndex <= config.runs; runIndex++) {
+                String runLabel = useRunDirectories ? runLabel(runIndex, config.runs) : null;
+                File runOutputDir = outputDirForRun(config.outputDir, runLabel);
+                if (runLabel != null) {
+                    System.out.println("=== " + runLabel + " / " + config.runs + " ===");
                 }
 
-                CasePaths paths = CasePaths.create(config.outputDir, experimentCase);
-                if (dryRun) {
-                    System.out.println("[DRY-RUN] " + experimentCase.id
-                            + " -> " + paths.outputFile.getPath());
-                    continue;
-                }
+                for (ExperimentCase experimentCase : config.cases) {
+                    for (String warning : experimentCase.validationWarnings()) {
+                        System.err.println("[WARN] " + experimentCase.id + ": " + warning);
+                    }
 
-                CaseResult result = runCase(config, experimentCase, paths);
-                writeMetaJson(config, experimentCase, paths, result);
-                System.out.println("[" + result.status + "] " + experimentCase.id);
-                if (!STATUS_SUCCESS.equals(result.status)) {
-                    failures++;
+                    CasePaths paths = CasePaths.create(
+                            runOutputDir,
+                            experimentCase,
+                            runIndex,
+                            config.runs,
+                            runLabel);
+                    if (dryRun) {
+                        System.out.println("[DRY-RUN] "
+                                + (runLabel == null ? "" : runLabel + " ")
+                                + experimentCase.id
+                                + " -> " + paths.outputFile.getPath());
+                        continue;
+                    }
+
+                    CaseResult result = runCase(config, experimentCase, paths);
+                    writeMetaJson(config, experimentCase, paths, result);
+                    System.out.println("[" + result.status + "] "
+                            + (runLabel == null ? "" : runLabel + " ")
+                            + experimentCase.id);
+                    if (!STATUS_SUCCESS.equals(result.status)) {
+                        failures++;
+                    }
                 }
             }
 
@@ -247,6 +265,11 @@ public final class BatchExperimentRunner {
         values.put("variant", experimentCase.variant);
         values.put("target", experimentCase.target);
         values.put("lts", experimentCase.lts.getPath());
+        values.put("runIndex", Integer.valueOf(paths.runIndex));
+        values.put("runCount", Integer.valueOf(paths.runCount));
+        if (paths.runLabel != null) {
+            values.put("runLabel", paths.runLabel);
+        }
         values.put("output", paths.outputFile.getPath());
         values.put("transitions", paths.transitionsFile.getPath());
         values.put("stdout", paths.stdoutFile.getPath());
@@ -358,6 +381,7 @@ public final class BatchExperimentRunner {
         out.println("");
         out.println("Config format:");
         out.println("  outputDir: Experiment/result");
+        out.println("  runs: 5  # optional; writes Experiment/run_01/result, Experiment/run_02/result, ...");
         out.println("  timeoutHours: 16");
         out.println("  javaOptions:");
         out.println("    - -Xmx32g");
@@ -386,6 +410,22 @@ public final class BatchExperimentRunner {
         }
     }
 
+    private static String runLabel(int runIndex, int runCount) {
+        int width = Math.max(2, Integer.toString(runCount).length());
+        return String.format(Locale.ROOT, "run_%0" + width + "d", Integer.valueOf(runIndex));
+    }
+
+    private static File outputDirForRun(File outputDir, String runLabel) {
+        if (runLabel == null) {
+            return outputDir;
+        }
+        File parent = outputDir.getParentFile();
+        if (parent == null) {
+            return new File(new File(runLabel), outputDir.getPath());
+        }
+        return new File(new File(parent, runLabel), outputDir.getName());
+    }
+
     private static final class CasePaths {
         final File caseDirectory;
         final File outputFile;
@@ -393,6 +433,9 @@ public final class BatchExperimentRunner {
         final File stdoutFile;
         final File stderrFile;
         final File metaFile;
+        final int runIndex;
+        final int runCount;
+        final String runLabel;
 
         private CasePaths(
                 File caseDirectory,
@@ -400,16 +443,27 @@ public final class BatchExperimentRunner {
                 File transitionsFile,
                 File stdoutFile,
                 File stderrFile,
-                File metaFile) {
+                File metaFile,
+                int runIndex,
+                int runCount,
+                String runLabel) {
             this.caseDirectory = caseDirectory;
             this.outputFile = outputFile;
             this.transitionsFile = transitionsFile;
             this.stdoutFile = stdoutFile;
             this.stderrFile = stderrFile;
             this.metaFile = metaFile;
+            this.runIndex = runIndex;
+            this.runCount = runCount;
+            this.runLabel = runLabel;
         }
 
-        static CasePaths create(File outputDir, ExperimentCase experimentCase) {
+        static CasePaths create(
+                File outputDir,
+                ExperimentCase experimentCase,
+                int runIndex,
+                int runCount,
+                String runLabel) {
             File caseDirectory = new File(
                     new File(outputDir, ExperimentConfig.sanitizePreservingCase(experimentCase.example)),
                     experimentCase.methodFolderName());
@@ -421,7 +475,10 @@ public final class BatchExperimentRunner {
                     new File(caseDirectory, prefix + "_transitions_" + target + ".txt"),
                     new File(caseDirectory, prefix + "_stdout.txt"),
                     new File(caseDirectory, prefix + "_stderr.txt"),
-                    new File(caseDirectory, prefix + "_meta.json"));
+                    new File(caseDirectory, prefix + "_meta.json"),
+                    runIndex,
+                    runCount,
+                    runLabel);
         }
 
         void ensureDirectories() throws IOException {

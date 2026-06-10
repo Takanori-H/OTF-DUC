@@ -194,7 +194,8 @@ public class DUCAbstraction<State, Action> {
                 if (c1 != c2) {
                     return c1 ? 1 : -1;
                 }
-                return 0;
+
+                return r1.getAction().toString().compareTo(r2.getAction().toString());
             }
         });
     }

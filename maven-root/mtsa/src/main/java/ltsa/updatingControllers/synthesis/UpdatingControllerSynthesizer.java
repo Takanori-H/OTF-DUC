@@ -557,11 +557,7 @@ public class UpdatingControllerSynthesizer {
                 safetyFormula = buildInternalNewSafetyFormula(safetyName, formulaFluents);
                 newSafetyFluents.addAll(formulaFluents);
             } else {
-                AssertDefinition def = AssertDefinition.getConstraint(safetyName);
-                if (def == null) {
-                    Diagnostics.fatal("Assertion not defined ["	+ safetyDefinition.getName() + "].");
-                }
-                safetyFormula = FormulaUtils.adaptFormulaAndCreateFluents(def.getFormula(false), formulaFluents);
+                safetyFormula = adaptTransitionRequirementFormula(safetyName, formulaFluents);
                 transitionRequirementFluents.addAll(formulaFluents);
             }
             safetyFormulas.add(safetyFormula);
@@ -597,9 +593,17 @@ public class UpdatingControllerSynthesizer {
     }
 
     private static Formula adaptOriginalSafetyFormula(String originalSafetyName, Set<Fluent> formulaFluents) {
-        AssertDefinition originalDef = AssertDefinition.getConstraint(originalSafetyName);
+        return adaptFormulaWithoutLeadingTemporalOperators(originalSafetyName, formulaFluents);
+    }
+
+    private static Formula adaptTransitionRequirementFormula(String requirementName, Set<Fluent> formulaFluents) {
+        return adaptFormulaWithoutLeadingTemporalOperators(requirementName, formulaFluents);
+    }
+
+    private static Formula adaptFormulaWithoutLeadingTemporalOperators(String assertionName, Set<Fluent> formulaFluents) {
+        AssertDefinition originalDef = AssertDefinition.getConstraint(assertionName);
         if (originalDef == null) {
-            Diagnostics.fatal("Assertion not defined [" + originalSafetyName + "].");
+            Diagnostics.fatal("Assertion not defined [" + assertionName + "].");
         }
         FormulaSyntax strippedSyntax = originalDef.getLTLFormula().removeLeftTemporalOperators();
         FormulaFactory factory = new FormulaFactory();
