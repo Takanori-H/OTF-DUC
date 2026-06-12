@@ -272,6 +272,13 @@ public class DirectedControllerSynthesisFineGrainedDUC<State, Action>
     }
 
     @Override
+    public boolean isUpdateActionForExploration(String actionName) {
+        return UpdateConstants.BEGIN_UPDATE.equals(actionName)
+                || UpdateConstants.FINISH_UPDATE.equals(actionName)
+                || updateProtocolSpec.isProgressAction(actionName);
+    }
+
+    @Override
     protected boolean usesSyntheticProgressSlot(int ltsIndex) {
         return ltsIndex == idxMarking;
     }

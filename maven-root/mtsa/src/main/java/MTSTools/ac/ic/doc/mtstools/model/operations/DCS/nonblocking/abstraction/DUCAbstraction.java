@@ -19,13 +19,6 @@ import ltsa.updatingControllers.UpdateConstants;
 
 public class DUCAbstraction<State, Action> {
 
-    private static final int COST_FINISH_UPDATE = 0;
-    private static final int COST_STOP_OLD = 10;
-    private static final int COST_RECONFIGURE = 20;
-    private static final int COST_START_NEW = 30;
-    private static final int COST_BEGIN_UPDATE = 40;
-    private static final int COST_DEFAULT = 100;
-
     private static final int W_MARKING = 1000;
 
     private final int markingLTSIndex; 
@@ -125,9 +118,10 @@ public class DUCAbstraction<State, Action> {
     }
 
     /**
-     * アグレッシブな更新戦略に基づく eval 実装。
-     * 1. 進捗スコア (Predicted Depth) により更新事象を最優先する。
-     * 2. スコアが同じ場合は、安全性の検証のために Uncontrollable を優先する。
+     * 探索順を決める eval 実装。
+     * 1. Uncontrollable action を最優先する。
+     * 2. 次に update action を優先する。
+     * 3. 最後に ordinary controllable action を探索する。
      */
     public void eval(CompostateDUC<State, Action> compostate, List<Set<State>> knownMarked, List<Set<State>> goals) {
         // long start = System.nanoTime();
@@ -187,21 +181,23 @@ public class DUCAbstraction<State, Action> {
             @Override
             public int compare(CompostateDUC<State, Action>.RecommendationDUC r1, 
                                CompostateDUC<State, Action>.RecommendationDUC r2) {
-                // 1. 進捗スコア (HEstimate) で比較
+                // 1. 探索カテゴリで比較: Uncontrollable -> update -> ordinary controllable。
+                int categoryCompare = Integer.compare(explorationCategory(r1), explorationCategory(r2));
+                if (categoryCompare != 0) return categoryCompare;
+
+                // 2. 同じカテゴリ内では進捗スコア (HEstimate) で比較。
                 int costCompare = r1.compareTo(r2);
                 if (costCompare != 0) return costCompare;
 
-                // 2. スコアが同じなら Uncontrollable を優先 (false < true)
-                boolean c1 = r1.getAction().isControllable();
-                boolean c2 = r2.getAction().isControllable();
-                if (c1 != c2) {
-                    return c1 ? 1 : -1;
-                }
-
-                // 3. 同じスコア・同じ controllability なら辞書順にする。
+                // 3. 同じカテゴリ・同じスコアなら辞書順にする。
                 return r1.getAction().toString().compareTo(r2.getAction().toString());
             }
         });
+    }
+
+    private int explorationCategory(CompostateDUC<State, Action>.RecommendationDUC recommendation) {
+        HAction<State, Action> action = recommendation.getAction();
+        return dcs.explorationActionCategoryRank(action.toString(), action.isControllable());
     }
 
     /**
@@ -233,7 +229,7 @@ public class DUCAbstraction<State, Action> {
         int predictedDepth = currentDepth;
 
         // 更新事象による進捗予測
-        if (actionCost < COST_DEFAULT) {
+        if (dcs.isUpdateActionForExploration(actionName)) {
             predictedDepth = currentDepth + 1;
         }
 
@@ -245,12 +241,4 @@ public class DUCAbstraction<State, Action> {
         return new HEstimate<>(1, new HDist(totalScore, 1));
     }
     
-    private int getActionPriorityCost(String actionName) {
-        if (actionName.equals(UpdateConstants.FINISH_UPDATE)) return COST_FINISH_UPDATE;
-        if (actionName.equals(UpdateConstants.STOP_OLD_SPEC)) return COST_STOP_OLD;
-        if (actionName.equals(UpdateConstants.RECONFIGURE)) return COST_RECONFIGURE;
-        if (actionName.equals(UpdateConstants.START_NEW_SPEC)) return COST_START_NEW;
-        if (actionName.equals(UpdateConstants.BEGIN_UPDATE)) return COST_BEGIN_UPDATE;
-        return COST_DEFAULT;
-    }
 }

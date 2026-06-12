@@ -1508,6 +1508,24 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
         return 100;
     }
 
+    public boolean isUpdateActionForExploration(String actionName) {
+        return UpdateConstants.BEGIN_UPDATE.equals(actionName)
+                || UpdateConstants.FINISH_UPDATE.equals(actionName)
+                || UpdateConstants.STOP_OLD_SPEC.equals(actionName)
+                || UpdateConstants.RECONFIGURE.equals(actionName)
+                || UpdateConstants.START_NEW_SPEC.equals(actionName);
+    }
+
+    public int explorationActionCategoryRank(String actionName, boolean controllableAction) {
+        if (!controllableAction) {
+            return 0;
+        }
+        if (isUpdateActionForExploration(actionName)) {
+            return 1;
+        }
+        return 2;
+    }
+
     protected boolean usesSyntheticProgressSlot(int ltsIndex) {
         return false;
     }
@@ -5416,10 +5434,9 @@ public class DirectedControllerSynthesisDUC<State, Action> extends DirectedContr
     }
 
     private int beliefActionPriority(String actionName, boolean controllableAction) {
-        if (!controllableAction) {
-            return 50;
-        }
-        return actionPriorityCost(actionName);
+        int categoryRank = explorationActionCategoryRank(actionName, controllableAction);
+        int actionCost = categoryRank == 1 ? actionPriorityCost(actionName) : 0;
+        return categoryRank * 1000 + actionCost;
     }
 
     private int beliefNodeMaxMarkingDepth(BeliefNode node) {

@@ -42,12 +42,19 @@ public class DUCExplorationHeuristic<State, Action> {
      * 探索候補（フロンティア）の優先順位を決定する比較器。
      * 1. Marking Depth (進捗)
      * 2. Sequence ID (新しさ/LIFO)
-     * 3. Heuristic Score (アグレッシブ度)
+     * 3. Action category (Uncontrollable -> update -> ordinary controllable)
+     * 4. Heuristic Score
      */
     private class CompostateRanker<State, Action> implements Comparator<CompostateDUC<State, Action>> {
         @Override
         public int compare(CompostateDUC<State, Action> o1, CompostateDUC<State, Action> o2) {
-            
+            CompostateDUC<State, Action>.RecommendationDUC r1 = o1.peekRecommendation();
+            CompostateDUC<State, Action>.RecommendationDUC r2 = o2.peekRecommendation();
+
+            if (r1 == null && r2 == null) return 0;
+            if (r1 == null) return 1;
+            if (r2 == null) return -1;
+
             // --- Tier 1: Marking Depth (進捗フェーズ優先) ---
             int depth1 = getMarkingDepth(o1);
             int depth2 = getMarkingDepth(o2);
@@ -59,16 +66,19 @@ public class DUCExplorationHeuristic<State, Action> {
             // これにより、環境アクションの先(子)を親より先に調べ、逆伝播を狙う。
             if (o1.seq != o2.seq) return o2.seq - o1.seq;
 
-            // --- Tier 3: Heuristic Score (アクション役割優先) ---
-            // 進捗も新しさも同じなら、evalで計算されたスコア(Update > U > C)で選ぶ。
-            CompostateDUC<State, Action>.RecommendationDUC r1 = o1.peekRecommendation();
-            CompostateDUC<State, Action>.RecommendationDUC r2 = o2.peekRecommendation();
-            
-            if (r1 == null && r2 == null) return 0;
-            if (r1 == null) return 1;
-            if (r2 == null) return -1;
+            // --- Tier 3: Action category (U -> update -> C) ---
+            int category1 = explorationCategory(r1);
+            int category2 = explorationCategory(r2);
+            if (category1 != category2) return category1 - category2;
 
+            // --- Tier 4: Heuristic Score ---
             return r1.compareTo(r2);
+        }
+
+        private int explorationCategory(CompostateDUC<State, Action>.RecommendationDUC recommendation) {
+            HAction<State, Action> action = recommendation.getAction();
+            return DUCExplorationHeuristic.this.dcs.explorationActionCategoryRank(
+                    action.toString(), action.isControllable());
         }
 
         /**
