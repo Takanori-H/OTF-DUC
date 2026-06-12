@@ -11,6 +11,7 @@ import ltsa.lts.ltl.FormulaSyntax;
 import ltsa.lts.chart.util.FormulaUtils;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.structures.UpdateActionKind;
 import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.synthesis.FineGrainedUpdatingControllersUtils;
@@ -839,10 +840,18 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     private void validateFineGrainedTransitionRequirementReferences(
             UpdateProtocolSpec candidateProtocolSpec,
             Set<String> referencedActions) {
+        Set<UpdateActionKind> legacyKinds = EnumSet.noneOf(UpdateActionKind.class);
+        Set<UpdateActionKind> fineGrainedKinds = EnumSet.noneOf(UpdateActionKind.class);
+
         for (String action : referencedActions) {
-            if (UpdateProtocolSpec.isLegacyUpdateActionName(action)) {
-                Diagnostics.fatal("Transition requirement in fine_grained/selective_fine_grained mode must not use legacy update action '"
-                        + action + "'. Use generated fine-grained action names, or write explicit LTS fluents over them.");
+            UpdateActionKind legacyKind = legacyUpdateActionKind(action);
+            if (legacyKind != null) {
+                if (!selectiveFineGrained) {
+                    Diagnostics.fatal("Transition requirement in fine_grained mode must not use legacy update action '"
+                            + action + "'. Use generated fine-grained action names.");
+                }
+                legacyKinds.add(legacyKind);
+                continue;
             }
             if (!UpdateProtocolSpec.looksLikeFineGrainedUpdateAction(action)
                     && !UpdateProtocolSpec.isOthersActionName(action)) {
@@ -853,6 +862,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     Diagnostics.fatal("Transition requirement action '" + action
                             + "' requires selective_fine_grained mode.");
                 }
+                fineGrainedKinds.add(fineGrainedUpdateActionKind(action));
                 continue;
             }
             if (action.startsWith(UpdateConstants.STOP_OLD_SPEC_PREFIX)
@@ -870,7 +880,58 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 Diagnostics.fatal("Transition requirement references unknown fine-grained startNewSpec action: "
                         + action + ". Check the new safety name.");
             }
+            fineGrainedKinds.add(fineGrainedUpdateActionKind(action));
         }
+
+        if (selectiveFineGrained) {
+            for (UpdateActionKind kind : UpdateActionKind.values()) {
+                if (legacyKinds.contains(kind) && fineGrainedKinds.contains(kind)) {
+                    Diagnostics.fatal("Transition requirements in selective_fine_grained mode mix legacy and fine-grained "
+                            + updateKindDescription(kind) + " actions. Use either the legacy action or generated "
+                            + updateKindDescription(kind) + " actions for that kind, not both.");
+                }
+            }
+        }
+    }
+
+    private UpdateActionKind legacyUpdateActionKind(String action) {
+        if (UpdateConstants.STOP_OLD_SPEC.equals(action)) {
+            return UpdateActionKind.STOP_OLD_SPEC;
+        }
+        if (UpdateConstants.RECONFIGURE.equals(action)) {
+            return UpdateActionKind.RECONFIGURE;
+        }
+        if (UpdateConstants.START_NEW_SPEC.equals(action)) {
+            return UpdateActionKind.START_NEW_SPEC;
+        }
+        return null;
+    }
+
+    private UpdateActionKind fineGrainedUpdateActionKind(String action) {
+        if (action.startsWith(UpdateConstants.STOP_OLD_SPEC_PREFIX)) {
+            return UpdateActionKind.STOP_OLD_SPEC;
+        }
+        if (action.startsWith(UpdateConstants.RECONFIGURE_PREFIX)) {
+            return UpdateActionKind.RECONFIGURE;
+        }
+        if (action.startsWith(UpdateConstants.START_NEW_SPEC_PREFIX)) {
+            return UpdateActionKind.START_NEW_SPEC;
+        }
+        Diagnostics.fatal("Unknown fine-grained update action: " + action);
+        return null;
+    }
+
+    private String updateKindDescription(UpdateActionKind kind) {
+        if (UpdateActionKind.STOP_OLD_SPEC.equals(kind)) {
+            return "stopOldSpec";
+        }
+        if (UpdateActionKind.RECONFIGURE.equals(kind)) {
+            return "reconfigure";
+        }
+        if (UpdateActionKind.START_NEW_SPEC.equals(kind)) {
+            return "startNewSpec";
+        }
+        return "update";
     }
 
     private void relabelSelectiveMappingComponents(
