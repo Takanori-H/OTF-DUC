@@ -83,9 +83,7 @@ public class PrintWindow extends JSplitPane implements LTSOutput, EventClient {
         int machine = list.getSelectedIndex();
         if (machine<0 || machine >=Nmach) return;
         selectedMachine = machine;
-        clearOutput();
-        PrintTransitions p = new PrintTransitions(sm[selectedMachine]);
-        p.print(thisWindow,MAXPRINT);
+        printSelectedMachine();
     }
   }
 
@@ -136,11 +134,26 @@ public class PrintWindow extends JSplitPane implements LTSOutput, EventClient {
 		        lm.addElement("||"+sm[i].name);
 		    else
 		        lm.addElement(sm[i].name);
-		}
-    list.setModel(lm);
-    if (selectedMachine>=Nmach) selectedMachine = 0;
-	  clearOutput();
+			}
+	    list.setModel(lm);
+	    if (Nmach == 0) {
+	        selectedMachine = 0;
+	        clearOutput();
+	    } else {
+	        selectedMachine = hasC == 1 ? Nmach - 1 : 0;
+	        list.setSelectedIndex(selectedMachine);
+	        printSelectedMachine();
+	    }
 	}
+
+  private void printSelectedMachine() {
+    clearOutput();
+    if (selectedMachine < 0 || selectedMachine >= Nmach || sm == null) {
+        return;
+    }
+    PrintTransitions p = new PrintTransitions(sm[selectedMachine]);
+    p.print(thisWindow,MAXPRINT);
+  }
 
   //--------------------------------------------------------------------
   public void removeClient() {

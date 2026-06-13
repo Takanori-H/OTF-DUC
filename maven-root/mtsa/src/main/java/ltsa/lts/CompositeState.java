@@ -449,7 +449,8 @@ public class CompositeState{
 
 	public boolean compositionNotRequired() {
 		return (hidden == null && priorityLabels == null && !makeDeterministic
-				&& !makeMinimal && !makeCompose && !makeController && !makeRTCController && !makeRTCAnalysisController);
+				&& !makeMinimal && !makeCompose && !makeController && !makeRTCController && !makeRTCAnalysisController
+				&& compositionType != Symbol.UPDATING_CONTROLLER);
 	}
 
 	/*
