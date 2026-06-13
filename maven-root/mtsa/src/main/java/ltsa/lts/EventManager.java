@@ -39,7 +39,11 @@ public class EventManager implements Runnable{
         Enumeration e = clients.keys();
         while(e.hasMoreElements()) {
             EventClient c = (EventClient)e.nextElement();
-            c.ltsAction(le);
+            try {
+                c.ltsAction(le);
+            } catch (RuntimeException ex) {
+                ex.printStackTrace();
+            }
         }
         queue.removeElement(le);
     }

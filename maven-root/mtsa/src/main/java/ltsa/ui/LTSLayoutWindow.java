@@ -241,6 +241,13 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
     }
 
     public void setCurrentState(int[] currentStateNumbers) {
+        if (currentStateNumbers == null || currentStateNumbers.length == 0) {
+            this.prevEvent = null;
+            this.lastEvent = null;
+            this.lastName = null;
+            return;
+        }
+
         this.prevEvent = Arrays.copyOf(currentStateNumbers, currentStateNumbers.length + 2);
         this.lastEvent = Arrays.copyOf(currentStateNumbers, currentStateNumbers.length + 2);
 
@@ -293,11 +300,9 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
 
                 Set<StateVertex> currentVertex = new HashSet<StateVertex>(1);
                 for (StateVertex aVertex : graph.getVertices())
-                    try {
-                        if (aVertex.getStateName() == lastEvent[machine])
-                            currentVertex.add(aVertex);
-                    } catch (NullPointerException e) {
-                    }
+                    if (lastEvent != null && machine < lastEvent.length
+                            && aVertex.getStateName() == lastEvent[machine])
+                        currentVertex.add(aVertex);
                 output.setSelectedStates(currentVertex);
 
                 output.draw(graph, layout);
@@ -393,10 +398,20 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
      * Retrieves the newly highlighted transition and gives it to the canvas
      */
     private void new_transitions(String label, int[] from, int[] to) {
+        if (sm == null || machineHasAction == null || to == null) {
+            return;
+        }
+
+        int machinesToUpdate = sm.length - hasC;
+        if (machinesToUpdate <= 0 || to.length < machinesToUpdate
+                || (from != null && from.length < machinesToUpdate)) {
+            return;
+        }
+
         final Set<TransitionEdge> transitions = new HashSet<TransitionEdge>();
         final Set<StateVertex> outStates = new HashSet<StateVertex>();
 
-        for (int i = 0; i < sm.length - hasC; i++) {
+        for (int i = 0; i < machinesToUpdate; i++) {
             final LTSGraph g = makeGraph(i);
             if (machineHasAction[i]) {
                 final TransitionEdge e = g.getTransitionFromLabel(label, from != null ? from[i] : 0, to != null ? to[i] : 0);
@@ -432,7 +447,7 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
         if (label == null && machineHasAction != null) {
             for (int i = 0; i < machineHasAction.length; i++)
                 machineHasAction[i] = false;
-        } else if (machineHasAction != null) {
+        } else if (machineHasAction != null && sm != null) {
             for (int i = 0; i < sm.length - hasC; i++)
                 machineHasAction[i] = (!label.equals("tau") && sm[i].hasLabel(label));
         }
@@ -478,6 +493,12 @@ public class LTSLayoutWindow extends JSplitPane implements EventClient {
                 lm.addElement(sm[i].name);
         }
         list.setModel(lm);
+
+        if (Nmach > 0) {
+            setCurrentState(new int[Nmach]);
+        } else {
+            setCurrentState(null);
+        }
 
         output.clear();
     }
