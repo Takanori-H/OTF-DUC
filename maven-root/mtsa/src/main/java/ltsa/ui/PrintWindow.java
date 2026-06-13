@@ -78,16 +78,14 @@ public class PrintWindow extends JSplitPane implements LTSOutput, EventClient {
 
   
 
-  class PrintAction implements ListSelectionListener {
-    public void valueChanged(ListSelectionEvent e) {
-        int machine = list.getSelectedIndex();
-        if (machine<0 || machine >=Nmach) return;
-        selectedMachine = machine;
-        clearOutput();
-        PrintTransitions p = new PrintTransitions(sm[selectedMachine]);
-        p.print(thisWindow,MAXPRINT);
-    }
-  }
+	  class PrintAction implements ListSelectionListener {
+	    public void valueChanged(ListSelectionEvent e) {
+	        int machine = list.getSelectedIndex();
+	        if (machine<0 || machine >=Nmach) return;
+	        selectedMachine = machine;
+	        printSelectedMachine();
+	    }
+	  }
 
 /*---------LTS event broadcast action-----------------------------*/
 	public void ltsAction(LTSEvent e ) {
@@ -118,12 +116,12 @@ public class PrintWindow extends JSplitPane implements LTSOutput, EventClient {
 		output.setText("");
 	}
 
-	private void new_machines(CompositeState cs){
-     int hasC = (cs!=null && cs.composition!=null)?1:0;
-     if (cs !=null && cs.machines !=null && cs.machines.size()>0) { // get set of machines
-         sm = new CompactState[cs.machines.size()+hasC];
-         Enumeration e = cs.machines.elements();
-         for(int i=0; e.hasMoreElements(); i++)
+		private void new_machines(CompositeState cs){
+	     int hasC = (cs!=null && cs.composition!=null)?1:0;
+	     if (cs !=null && cs.machines !=null && cs.machines.size()>0) { // get set of machines
+	         sm = new CompactState[cs.machines.size()+hasC];
+	         Enumeration e = cs.machines.elements();
+	         for(int i=0; e.hasMoreElements(); i++)
             sm[i] = (CompactState)e.nextElement();
          Nmach = sm.length;
          if (hasC==1)
@@ -136,11 +134,26 @@ public class PrintWindow extends JSplitPane implements LTSOutput, EventClient {
 		        lm.addElement("||"+sm[i].name);
 		    else
 		        lm.addElement(sm[i].name);
+			}
+	    list.setModel(lm);
+	    if (Nmach == 0) {
+	        selectedMachine = 0;
+	        clearOutput();
+	    } else {
+	        selectedMachine = hasC == 1 ? Nmach - 1 : 0;
+	        list.setSelectedIndex(selectedMachine);
+	        printSelectedMachine();
+	    }
 		}
-    list.setModel(lm);
-    if (selectedMachine>=Nmach) selectedMachine = 0;
-	  clearOutput();
-	}
+
+	  private void printSelectedMachine() {
+	    clearOutput();
+	    if (selectedMachine < 0 || selectedMachine >= Nmach || sm == null) {
+	        return;
+	    }
+	    PrintTransitions p = new PrintTransitions(sm[selectedMachine]);
+	    p.print(thisWindow,MAXPRINT);
+	  }
 
   //--------------------------------------------------------------------
   public void removeClient() {

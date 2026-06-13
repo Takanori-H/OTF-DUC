@@ -2637,16 +2637,32 @@ public class TransitionSystemDispatcher {
     public static ltsa.lts.Animator generateAnimator(CompositeState compositeState, LTSOutput output,
                                                      ltsa.lts.EventManager eventManager) {
         // return new MTSAnimator(compositeState, eventManager);
+        CompositeState animatorState = getAnimatorCompositeState(compositeState);
 
-        if (MTSUtils.isMTSRepresentation(compositeState)) {
-            return new MTSAnimator(compositeState, eventManager);
+        if (MTSUtils.isMTSRepresentation(animatorState)) {
+            return new MTSAnimator(animatorState, eventManager);
         } else {
-            Analyser analyser = new Analyser(compositeState, output, eventManager);
+            Analyser analyser = new Analyser(animatorState, output, eventManager);
             // DIPI: here we could remove the maybe transitions from the
             // alphabet
             // return new AnimatorDecorator(analyser);
             return analyser;
         }
+    }
+
+    private static CompositeState getAnimatorCompositeState(CompositeState compositeState) {
+        if (compositeState instanceof UpdatingControllerCompositeState) {
+            UpdatingControllerCompositeState updatingState = (UpdatingControllerCompositeState) compositeState;
+            CompactState outputController = updatingState.getComposition();
+            if (updatingState.isOTF() && outputController != null) {
+                // OTF-DUC keeps synthesis components in machines for Draw/debug.
+                // Animator consumes machines, so give it the synthesized controller.
+                Vector<CompactState> machines = new Vector<CompactState>();
+                machines.add(outputController);
+                return new CompositeState(updatingState.getName(), machines);
+            }
+        }
+        return compositeState;
     }
 
     /**

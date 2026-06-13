@@ -2249,18 +2249,24 @@ public class HPWindow extends JFrame implements Runnable {
                         .withSuccessfulCompositionCallback(
                                 new CompositionEvaluationRunner.SuccessfulCompositionCallback() {
                                     @Override
-                                    public void afterSuccessfulComposition(CompositeState composed) {
-                                        postState(composed);
-                                        int[] currentStates = new int[composed.machines.size() + 1];
-                                        for (int i = 0; i < composed.machines.size() + 1; i++) {
-                                            currentStates[i] = 0;
-                                        }
-                                        layouts.setCurrentState(currentStates);
-                                    }
-                                });
+	                                    public void afterSuccessfulComposition(CompositeState composed) {
+	                                        postState(composed);
+	                                        int[] currentStates = new int[composed.machines.size() + 1];
+	                                        for (int i = 0; i < composed.machines.size() + 1; i++) {
+	                                            currentStates[i] = 0;
+	                                        }
+	                                        if (layouts != null) {
+	                                            layouts.setCurrentState(currentStates);
+	                                        }
+	                                    }
+	                                });
 
-        current = CompositionEvaluationRunner.run(request).getCompositeState();
-    }
+	        CompositionEvaluationRunner.Result result = CompositionEvaluationRunner.run(request);
+	        current = result.getCompositeState();
+	        if (!result.isSuccessful() || current == null || current.getComposition() == null) {
+	            postState(null);
+	        }
+	    }
 
 
     // ------------------------------------------------------------------------
