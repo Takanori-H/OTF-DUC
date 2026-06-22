@@ -2655,8 +2655,9 @@ public class TransitionSystemDispatcher {
             UpdatingControllerCompositeState updatingState = (UpdatingControllerCompositeState) compositeState;
             CompactState outputController = updatingState.getComposition();
             if (updatingState.isOTF() && outputController != null) {
-                // OTF-DUC keeps synthesis components in machines for Draw/debug.
-                // Animator consumes machines, so give it the synthesized controller.
+                // OTF-DUC machines are synthesis/debug components, not a plain
+                // LTSA parallel composition of the intermediate game. Animate
+                // the synthesized update controller stored in composition.
                 Vector<CompactState> machines = new Vector<CompactState>();
                 machines.add(outputController);
                 return new CompositeState(updatingState.getName(), machines);
