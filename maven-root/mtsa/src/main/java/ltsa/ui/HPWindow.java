@@ -49,6 +49,7 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.CodeSource;
 import java.util.*;
 import java.util.List;
 
@@ -1108,7 +1109,7 @@ public class HPWindow extends JFrame implements Runnable {
             setTitle("MTS Analyser");
             savedText = "";
             openFile = fileType;
-            currentDirectory = System.getProperty("user.home");
+            currentDirectory = initialDirectory();
             input.setText("");
             swapto(0);
             output.setText("");
@@ -1228,6 +1229,22 @@ public class HPWindow extends JFrame implements Runnable {
             } catch (IOException e) {
                 ltsOutput.outln("Error saving file: " + e);
             }
+    }
+
+    private static String initialDirectory() {
+        try {
+            CodeSource codeSource = HPWindow.class.getProtectionDomain().getCodeSource();
+            if (codeSource != null && codeSource.getLocation() != null) {
+                File location = new File(codeSource.getLocation().toURI());
+                File directory = location.isFile() ? location.getParentFile() : location;
+                if (directory != null && directory.isDirectory()) {
+                    return directory.getAbsolutePath();
+                }
+            }
+        } catch (Exception ignored) {
+            // Fall back to the previous default if the runtime location is unavailable.
+        }
+        return System.getProperty("user.home");
     }
 
     // -------------------------------------------------------------------------
@@ -3086,7 +3103,7 @@ public class HPWindow extends JFrame implements Runnable {
         if (args.length > 0) {
             SwingUtilities.invokeLater(new ScheduleOpenFile(window, args[0]));
         } else {
-            window.currentDirectory = System.getProperty("user.home");
+            window.currentDirectory = initialDirectory();
         }
     }
 
