@@ -1139,7 +1139,7 @@ public final class UpdatingControllerEvaluationRecorder {
         recordEvaluationOutputMetrics(false);
         recordCountScopeMetrics();
         recordComparisonSummary();
-        printDataCsv(output);
+        // CSV output is temporarily disabled for all DUCS modes.
     }
 
     private static boolean shouldPrintDetailedReport() {

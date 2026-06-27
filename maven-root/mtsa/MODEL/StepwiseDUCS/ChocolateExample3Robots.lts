@@ -1,0 +1,179 @@
+//チョコレートロボットの例題（3ロボット設計）
+
+//ACTION SETS
+set OldControllableActions = {out, drill, polish}
+//set OldControllableActions = {out, polish}
+set OldAlphabet = {OldControllableActions, in, reset, drillOk, drillNOk, polishOk, polishNOk}
+set NewControllableActions = {out, drill, paint}
+//set NewControllableActions = {out, paint}
+set NewAlphabet = {NewControllableActions, in, reset, drillOk, drillNOk, paintOk, paintNOk}
+
+//Domain Old Model: transport robot + drill robot + polish robot
+OLD_TRAY_TRANSPORT = (in -> OLD_TRAY_READY),
+	OLD_TRAY_READY = (drill -> OLD_TRAY_DRILLING
+		| polish -> OLD_TRAY_POLISHING
+		| out -> OLD_TRAY_OUT),
+	OLD_TRAY_DRILLING = ({drillOk, drillNOk} -> OLD_TRAY_READY),
+	OLD_TRAY_POLISHING = ({polishOk, polishNOk} -> OLD_TRAY_READY),
+	OLD_TRAY_OUT = (reset -> OLD_TRAY_TRANSPORT).
+
+OLD_DRILL_ROBOT = (drill -> OLD_DRILL_BUSY),
+	OLD_DRILL_BUSY = ({drillOk, drillNOk} -> OLD_DRILL_ROBOT).
+
+POLISH_ROBOT = (polish -> POLISH_BUSY),
+	POLISH_BUSY = ({polishOk, polishNOk} -> POLISH_ROBOT).
+
+//Domain New Model: transport robot + drill robot + paint robot
+NEW_TRAY_TRANSPORT = (in -> NEW_TRAY_READY),
+	NEW_TRAY_READY = (drill -> NEW_TRAY_DRILLING
+		| paint -> NEW_TRAY_PAINTING
+		| out -> NEW_TRAY_OUT),
+	NEW_TRAY_DRILLING = ({drillOk, drillNOk} -> NEW_TRAY_READY),
+	NEW_TRAY_PAINTING = ({paintOk, paintNOk} -> NEW_TRAY_READY),
+	NEW_TRAY_OUT = (reset -> NEW_TRAY_TRANSPORT).
+
+NEW_DRILL_ROBOT = (drill -> NEW_DRILL_BUSY),
+	NEW_DRILL_BUSY = ({drillOk, drillNOk} -> NEW_DRILL_ROBOT).
+
+PAINT_ROBOT = (paint -> PAINT_BUSY),
+	PAINT_BUSY = ({paintOk, paintNOk} -> PAINT_ROBOT).
+
+//DUCS map relations for the three environment components
+relation R_TRAY_CHOCOLATE = {OLD_TRAY_TRANSPORT@OLD_TRAY_TRANSPORT	= reconfigure -> NEW_TRAY_TRANSPORT@NEW_TRAY_TRANSPORT,
+							OLD_TRAY_READY@OLD_TRAY_TRANSPORT		= reconfigure -> NEW_TRAY_READY@NEW_TRAY_TRANSPORT,
+							OLD_TRAY_OUT@OLD_TRAY_TRANSPORT			= reconfigure -> NEW_TRAY_OUT@NEW_TRAY_TRANSPORT,
+							OLD_TRAY_DRILLING@OLD_TRAY_TRANSPORT	= reconfigure -> NEW_TRAY_DRILLING@NEW_TRAY_TRANSPORT,
+							OLD_TRAY_POLISHING@OLD_TRAY_TRANSPORT	= reconfigure -> NEW_TRAY_READY@NEW_TRAY_TRANSPORT}
+
+relation R_DRILL_ROBOT = {OLD_DRILL_ROBOT@OLD_DRILL_ROBOT	= reconfigure -> NEW_DRILL_ROBOT@NEW_DRILL_ROBOT,
+						 OLD_DRILL_BUSY@OLD_DRILL_ROBOT		= reconfigure -> NEW_DRILL_BUSY@NEW_DRILL_ROBOT}
+
+relation R_FINISH_ROBOT = {POLISH_ROBOT@POLISH_ROBOT	= reconfigure -> PAINT_ROBOT@PAINT_ROBOT,
+						  POLISH_BUSY@POLISH_ROBOT		= reconfigure -> PAINT_ROBOT@PAINT_ROBOT}
+
+map MAP_TRAY_CHOCOLATE = {OLD_TRAY_TRANSPORT, NEW_TRAY_TRANSPORT, R_TRAY_CHOCOLATE}
+map MAP_DRILL_CHOCOLATE = {OLD_DRILL_ROBOT, NEW_DRILL_ROBOT, R_DRILL_ROBOT}
+map MAP_FINISH_CHOCOLATE = {POLISH_ROBOT, PAINT_ROBOT, R_FINISH_ROBOT}
+
+||OLD_ENV = (OLD_TRAY_TRANSPORT || OLD_DRILL_ROBOT || POLISH_ROBOT).
+||NEW_ENV = (NEW_TRAY_TRANSPORT || NEW_DRILL_ROBOT || PAINT_ROBOT).
+||MAPPING_ENV = (MAP_TRAY_CHOCOLATE || MAP_DRILL_CHOCOLATE || MAP_FINISH_CHOCOLATE).
+||MapEnvironment = (MAP_TRAY_CHOCOLATE || MAP_DRILL_CHOCOLATE || MAP_FINISH_CHOCOLATE).
+
+//DEFINED FLUENTS 
+fluent Drilled = <drillOk,reset>
+fluent DrillPending = <drill,{drillOk,drillNOk}>
+fluent Polished = <polishOk,reset>
+fluent PolishPending = <polish,{polishOk,polishNOk}>
+fluent Painted = <paintOk,reset>
+fluent PaintPending = <paint,{paintOk,paintNOk}>
+
+fluent Processing = <in,out>
+fluent OutDone = <out,reset>
+
+// ---------------------------OLD CONTROLLER SPEC-----------------------------
+assert OLD_TOOL_ORDER = (PolishPending -> Drilled)
+//assert OLD_OUT_IF_FINISHED = (out -> (Drilled && Polished))
+assert OLD_OUT_IF_FINISHED = (out -> (Drilled && Polished))
+assert DRILL_ONCE = ( drill-> !Drilled )
+assert POLISH_ONCE = ( polish -> !Polished )
+
+ltl_property P_OLD_TOOL_ORDER = []OLD_TOOL_ORDER
+ltl_property P_OLD_OUT_IF_FINISHED = []OLD_OUT_IF_FINISHED
+ltl_property P_DRILL_ONCE = []DRILL_ONCE
+ltl_property P_POLISH_ONCE = []POLISH_ONCE
+
+controllerSpec DRILL_POLISH = {
+	safety = {
+			P_OLD_TOOL_ORDER,
+			P_OLD_OUT_IF_FINISHED,
+			P_DRILL_ONCE,
+			P_POLISH_ONCE
+			}
+	controllable = {OldControllableActions}
+}
+controller ||OldController = (OLD_ENV)~{DRILL_POLISH}.
+||OldCon = (OldController || OLD_ENV).
+
+// ---------------------------NEW CONTROLLER SPEC-----------------------------
+
+assert NEW_TOOL_ORDER = (PaintPending -> Drilled)
+assert NEW_OUT_IF_FINISHED = (out -> (Drilled && Painted))
+assert PAINT_ONCE =   ( paint -> !Painted )
+
+ltl_property P_NEW_TOOL_ORDER = []NEW_TOOL_ORDER
+ltl_property P_NEW_OUT_IF_FINISHED = []NEW_OUT_IF_FINISHED
+ltl_property P_PAINT_ONCE = []PAINT_ONCE
+
+
+controllerSpec DRILL_PAINT = {
+	safety = {
+			P_NEW_TOOL_ORDER,
+			P_NEW_OUT_IF_FINISHED,
+			P_DRILL_ONCE,
+			P_PAINT_ONCE,
+			}
+	controllable = {NewControllableActions}
+}
+controller ||NewController = (NEW_ENV)~{DRILL_PAINT}.
+||NewCon = (NewController || NEW_ENV).
+
+// ---------------------------UPDATING CONTROLLER SPEC-----------------------------
+assert AnyRobotAction = (drill || polish || out || paint)
+
+
+ltl_property T_UPDATE_WHILE_EMPTY = (StartNewSpec -> !Processing) // should give no controller because in is uncontrollable
+ltl_property T_NO_OLD_FINISH_ON_UPDATE = (StartNewSpec -> (Processing -> !Polished))
+//ltl_property T_REMOVE_POLISHED_OR_NEW_REQ = ((StopOldSpec && !StartNewSpec) -> (S_NEW || (out -> Faulty)) )
+ltl_property T_NO_ROBOT_ACTION = ((StopOldSpec && !StartNewSpec) -> !AnyRobotAction)
+
+
+fluent OldToolApplied = <{drillOk,polishOk}, {reset}>
+fluent NewToolApplied = <{drillOk,paintOk}, {reset}>
+fluent AnyToolApplied = <{drillOk,polishOk,paintOk}, {reset}>
+ltl_property T_FINISH_WITH_OLD_REQ = ((OldToolApplied && StopOldSpec && !StartNewSpec) -> OLD_TOOL_ORDER)
+ltl_property T_SWITCH_TO_NEW_ASAP = ((OldToolApplied && StopOldSpec && !StartNewSpec) -> NEW_TOOL_ORDER)
+
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_TRAY_TRANSPORT, OLD_DRILL_ROBOT, POLISH_ROBOT},
+	newEnvironment = {NEW_TRAY_TRANSPORT, NEW_DRILL_ROBOT, PAINT_ROBOT},
+	mapRelation = {R_TRAY_CHOCOLATE, R_DRILL_ROBOT, R_FINISH_ROBOT},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_ROBOT_ACTION,
+//	transition = T_REMOVE_POLISHED_OR_NEW_REQ,
+//	transition = T_UPDATE_WHILE_EMPTY,
+//	transition = T_NO_OLD_FINISH_ON_UPDATE,
+//	transition = T_FINISH_WITH_OLD_REQ,
+//	transition = T_SWITCH_TO_NEW_ASAP,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_OTF = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_TRAY_TRANSPORT, OLD_DRILL_ROBOT, POLISH_ROBOT},
+	newEnvironment = {NEW_TRAY_TRANSPORT, NEW_DRILL_ROBOT, PAINT_ROBOT},
+	mapRelation = {R_TRAY_CHOCOLATE, R_DRILL_ROBOT, R_FINISH_ROBOT},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_ROBOT_ACTION,
+    nonblocking,
+	on_the_fly
+}
+
+||UPDATE_CONTROLLER_OTF = UpdCont_OTF.
+
+// ---------------------------TEST AND RESULTS-----------------------------
+fluent StopOldSpec = <stopOldSpec, hotswap_begin>
+fluent StartNewSpec = <startNewSpec,hotswap_begin>
+fluent Reconfigure = <reconfigure, hotswap_begin>
+
+assert S_OLD = (OLD_TOOL_ORDER  && OLD_OUT_IF_FINISHED && DRILL_ONCE && POLISH_ONCE)
+assert S_NEW = (NEW_TOOL_ORDER && NEW_OUT_IF_FINISHED && DRILL_ONCE && PAINT_ONCE)
+
+assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
+assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
+assert TEST_FORMULA3 = [](hotswap_begin -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))

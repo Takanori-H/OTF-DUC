@@ -8,6 +8,7 @@ import ltsa.lts.CompactState;
 import ltsa.lts.CompositeState;
 import ltsa.lts.Symbol;
 import ltsa.lts.util.MTSUtils;
+import ltsa.updatingControllers.stepwise.StepwiseStage;
 
 import java.util.Set;
 import java.util.Vector;
@@ -17,6 +18,7 @@ import java.util.Map;
 public class UpdatingControllerCompositeState extends CompositeState {
 
 	private CompositeState oldController;
+	private String oldControllerName;
 	private CompositeState mapping;
 	private ControllerGoalDefinition updateSafetyGoals;
 	private ControllerGoal<String> updateGRGoal;
@@ -27,6 +29,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 	private CompositeState newController;
 	private boolean isOTF;
 	private boolean fineGrained;
+	private boolean stepwise;
 	private UpdateProtocolSpec updateProtocolSpec;
 	// ★追加: Mappingを構成するLTSのリスト (OTF探索で利用)
     private Vector<CompactState> mappingComponents;
@@ -54,6 +57,11 @@ public class UpdatingControllerCompositeState extends CompositeState {
     // ★追加: Safetyプロパティの状態追跡マップ (Look-up Table)
     private Map<CompactState, Map<List<Integer>, Integer>> safetyStateMapping;
 
+	private List<StepwiseStage> stepwiseStages;
+	private ControllerGoalDefinition stepwiseOldGoalDefinition;
+	private ControllerGoalDefinition stepwiseNewGoalDefinition;
+	private List<Symbol> stepwiseTransitionGoals;
+
 	public UpdatingControllerCompositeState(CompositeState oldController, CompositeState mapping,
 											ControllerGoalDefinition safetyGoals, ControllerGoal<String> updateGRGoal, String name) {
 		this(oldController, mapping, safetyGoals, updateGRGoal, name, false, null);
@@ -64,6 +72,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 											String name, boolean fineGrained, UpdateProtocolSpec updateProtocolSpec) {
 		super.setMachines(new Vector<CompactState>());
 		this.oldController = oldController;
+		this.oldControllerName = oldController == null ? null : oldController.getName();
 		this.mapping = mapping;
 		this.updateSafetyGoals = safetyGoals;
 		this.updateGRGoal = updateGRGoal;
@@ -76,8 +85,56 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		this.newController = null;
 		this.isOTF = false;
 		this.fineGrained = fineGrained;
+		this.stepwise = false;
 		this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = null;
+	}
+
+	public UpdatingControllerCompositeState(CompositeState oldController,
+											String oldControllerName,
+											List<StepwiseStage> stepwiseStages,
+											ControllerGoalDefinition oldGoalDefinition,
+											ControllerGoalDefinition newGoalDefinition,
+											List<Symbol> transitionGoals,
+											ControllerGoal<String> updateGRGoal,
+											Set<String> controllableActions,
+											String name) {
+		super.setMachines(new Vector<CompactState>());
+		this.oldController = oldController;
+		this.oldControllerName = oldControllerName;
+		this.mapping = null;
+		this.updateSafetyGoals = null;
+		this.updateGRGoal = updateGRGoal;
+		this.controllableActions = controllableActions;
+
+		super.setCompositionType(Symbol.UPDATING_CONTROLLER);
+		super.name = name;
+
+		this.newController = null;
+		this.isOTF = false;
+		this.fineGrained = false;
+		this.stepwise = true;
+		this.updateProtocolSpec = null;
+		this.mappingComponents = new Vector<CompactState>();
+		this.newEnvironmentComponents = new Vector<CompactState>();
+		this.stepwiseStages = stepwiseStages;
+		this.stepwiseOldGoalDefinition = oldGoalDefinition;
+		this.stepwiseNewGoalDefinition = newGoalDefinition;
+		this.stepwiseTransitionGoals = transitionGoals;
+
+		Vector<CompactState> allMachines = new Vector<CompactState>();
+		if (stepwiseStages != null) {
+			for (StepwiseStage stage : stepwiseStages) {
+				if (stage.getMappingEnvironment() != null) {
+					this.mappingComponents.add(stage.getMappingEnvironment());
+					allMachines.add(stage.getMappingEnvironment());
+				}
+				if (stage.getNewEnvironment() != null) {
+					this.newEnvironmentComponents.add(stage.getNewEnvironment());
+				}
+			}
+		}
+		super.setMachines(allMachines);
 	}
 
 	//OTF用
@@ -95,6 +152,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 											boolean isOTF, boolean fineGrained, String name) {
 		super.setMachines(new Vector<CompactState>());
 		this.oldController = oldController;
+		this.oldControllerName = oldController == null ? null : oldController.getName();
 		// OTFモードではこれらはnullにしておく（またはダミー）
 		this.mapping = null;
 		this.updateSafetyGoals = null; 
@@ -109,6 +167,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		this.newController = newController;
 		this.isOTF = isOTF;
 		this.fineGrained = fineGrained;
+		this.stepwise = false;
 		this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = mappingComponents;
 		this.newEnvironmentComponents = newEnvironmentComponents;
@@ -145,7 +204,13 @@ public class UpdatingControllerCompositeState extends CompositeState {
 	}
 
 	public MTS<Long, String> getOldController() {
+		if (oldController == null) return null;
 		return MTSUtils.getMTSComposition(oldController);
+	}
+
+	public String getOldControllerName() {
+		if (oldController != null) return oldController.getName();
+		return oldControllerName == null ? "(none)" : oldControllerName;
 	}
 
 	public MTS<Long, String> getMapping() {
@@ -199,6 +264,11 @@ public class UpdatingControllerCompositeState extends CompositeState {
         return isOTF;
     }
 
+	public boolean isStepwise()
+	{
+		return stepwise;
+	}
+
 	public boolean isFineGrained()
 	{
 		return fineGrained;
@@ -239,13 +309,29 @@ public class UpdatingControllerCompositeState extends CompositeState {
         return safetyStateMapping;
     }
 
+	public List<StepwiseStage> getStepwiseStages() {
+		return stepwiseStages;
+	}
+
+	public ControllerGoalDefinition getStepwiseOldGoalDefinition() {
+		return stepwiseOldGoalDefinition;
+	}
+
+	public ControllerGoalDefinition getStepwiseNewGoalDefinition() {
+		return stepwiseNewGoalDefinition;
+	}
+
+	public List<Symbol> getStepwiseTransitionGoals() {
+		return stepwiseTransitionGoals;
+	}
+
 	@Override
 	public UpdatingControllerCompositeState clone() {
 		UpdatingControllerCompositeState clone;
 
 		// ★修正: OTFモードかどうかでコンストラクタを使い分ける
         if (this.isOTF) {
-            clone = new UpdatingControllerCompositeState(oldController, newController, mappingComponents, newEnvironmentComponents,
+	            clone = new UpdatingControllerCompositeState(oldController, newController, mappingComponents, newEnvironmentComponents,
 														mappingMapEnvToNewEnv,
 														oldSafetyLTSs, newSafetyLTSs,
 														// transitionGoals,
@@ -256,6 +342,10 @@ public class UpdatingControllerCompositeState extends CompositeState {
 														updateProtocolSpec,
 														controllableActions,
 														isOTF, fineGrained, name);
+			} else if (this.stepwise) {
+				clone = new UpdatingControllerCompositeState(oldController, oldControllerName, stepwiseStages,
+						stepwiseOldGoalDefinition, stepwiseNewGoalDefinition, stepwiseTransitionGoals,
+						updateGRGoal, controllableActions, name);
 		} else {
 			clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals,
 						updateGRGoal, name, fineGrained, updateProtocolSpec);

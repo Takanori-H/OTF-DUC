@@ -12,6 +12,7 @@ import ltsa.lts.CompactState;
 import ltsa.lts.CompositeState;
 import ltsa.lts.LTSInputString;
 import ltsa.lts.PrintTransitions;
+import ltsa.dispatcher.TransitionSystemDispatcher;
 import ltsa.updatingControllers.CompositionEvaluationRunner;
 
 public final class SingleCompositionRunner {
@@ -44,6 +45,7 @@ public final class SingleCompositionRunner {
             String target = required(options, "target");
             File outputFile = requiredFile(options, "output");
             File transitionsFile = requiredFile(options, "transitions");
+            boolean minimize = booleanOption(options, "minimize");
 
             output = new CliFileLTSOutput(outputFile);
             String source = new String(Files.readAllBytes(ltsFile.toPath()), StandardCharsets.UTF_8);
@@ -80,6 +82,9 @@ public final class SingleCompositionRunner {
             if (selected == null) {
                 System.err.println("Transition target was not found: " + target);
                 return EXIT_NO_TRANSITION_OUTPUT;
+            }
+            if (minimize) {
+                selected = TransitionSystemDispatcher.minimise(selected, output);
             }
 
             writeTransitions(selected, transitionsFile);
@@ -173,10 +178,19 @@ public final class SingleCompositionRunner {
         return new File(required(options, key));
     }
 
+    private static boolean booleanOption(Map<String, String> options, String key) {
+        String value = options.get(key);
+        return value != null
+                && ("true".equalsIgnoreCase(value)
+                || "yes".equalsIgnoreCase(value)
+                || "1".equals(value));
+    }
+
     private static void printUsage(PrintStream out) {
         out.println("Usage: java -cp mtsa.jar "
                 + "ltsa.updatingControllers.cli.SingleCompositionRunner "
                 + "--lts file.lts --target Target "
-                + "--output output.txt --transitions transitions.txt");
+                + "--output output.txt --transitions transitions.txt "
+                + "[--minimize true]");
     }
 }

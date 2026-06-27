@@ -1,0 +1,341 @@
+//チョコレートロボットの例題（2台ロボット設計）
+
+//ACTION SETS
+set OldControllableActions_1 = {out_1, drill_1, polish_1}
+set OldControllableActions_2 = {out_2, drill_2, polish_2}
+set OldControllableActions = {out_1, drill_1, polish_1, out_2, drill_2, polish_2}
+set OldAlphabet = {OldControllableActions, in_1, reset_1, drillOk_1, drillNOk_1, polishOk_1, polishNOk_1,
+					in_2, reset_2, drillOk_2, drillNOk_2, polishOk_2, polishNOk_2}
+set NewControllableActions_1 = {out_1, drill_1, paint_1}
+set NewControllableActions_2 = {out_2, drill_2, paint_2}
+set NewControllableActions = {out_1, drill_1, paint_1, out_2, drill_2, paint_2}
+set NewAlphabet = {NewControllableActions, in_1, reset_1, drillOk_1, drillNOk_1, paintOk_1, paintNOk_1,
+					in_2, reset_2, drillOk_2, drillNOk_2, paintOk_2, paintNOk_2}
+
+//Domain Old Model: robot 1
+CHOCOLATE_OLD_1 = (in_1 -> ARM_OLD_1),
+	ARM_OLD_1 = (drill_1 -> DRILLED_OLD_1
+		| polish_1 -> POLISHED_OLD_1
+		| out_1 -> OUT_OLD_1),
+	OUT_OLD_1 = (reset_1 -> CHOCOLATE_OLD_1),
+	DRILLED_OLD_1 = ({drillOk_1, drillNOk_1} -> ARM_OLD_1),
+	POLISHED_OLD_1 = ({polishOk_1, polishNOk_1} -> ARM_OLD_1).
+
+//Domain Old Model: robot 2
+CHOCOLATE_OLD_2 = (in_2 -> ARM_OLD_2),
+	ARM_OLD_2 = (drill_2 -> DRILLED_OLD_2
+		| polish_2 -> POLISHED_OLD_2
+		| out_2 -> OUT_OLD_2),
+	OUT_OLD_2 = (reset_2 -> CHOCOLATE_OLD_2),
+	DRILLED_OLD_2 = ({drillOk_2, drillNOk_2} -> ARM_OLD_2),
+	POLISHED_OLD_2 = ({polishOk_2, polishNOk_2} -> ARM_OLD_2).
+
+//Domain New Model: robot 1
+CHOCOLATE_NEW_1 = (in_1 -> ARM_NEW_1),
+	ARM_NEW_1 = (drill_1 -> DRILLED_NEW_1
+		| paint_1 -> PAINTED_NEW_1
+		| out_1 -> OUT_NEW_1),
+	OUT_NEW_1 = (reset_1 -> CHOCOLATE_NEW_1),
+	DRILLED_NEW_1 = ({drillOk_1, drillNOk_1} -> ARM_NEW_1),
+	PAINTED_NEW_1 = ({paintOk_1, paintNOk_1} -> ARM_NEW_1).
+
+//Domain New Model: robot 2
+CHOCOLATE_NEW_2 = (in_2 -> ARM_NEW_2),
+	ARM_NEW_2 = (drill_2 -> DRILLED_NEW_2
+		| paint_2 -> PAINTED_NEW_2
+		| out_2 -> OUT_NEW_2),
+	OUT_NEW_2 = (reset_2 -> CHOCOLATE_NEW_2),
+	DRILLED_NEW_2 = ({drillOk_2, drillNOk_2} -> ARM_NEW_2),
+	PAINTED_NEW_2 = ({paintOk_2, paintNOk_2} -> ARM_NEW_2).
+
+//DUCS map relations: robot 1
+relation R_CHOCOLATE_1 = {CHOCOLATE_OLD_1@CHOCOLATE_OLD_1	= reconfigure -> CHOCOLATE_NEW_1@CHOCOLATE_NEW_1,
+						 ARM_OLD_1@CHOCOLATE_OLD_1			= reconfigure -> ARM_NEW_1@CHOCOLATE_NEW_1,
+						 OUT_OLD_1@CHOCOLATE_OLD_1			= reconfigure -> OUT_NEW_1@CHOCOLATE_NEW_1,
+						 DRILLED_OLD_1@CHOCOLATE_OLD_1		= reconfigure -> DRILLED_NEW_1@CHOCOLATE_NEW_1,
+						 POLISHED_OLD_1@CHOCOLATE_OLD_1		= reconfigure -> ARM_NEW_1@CHOCOLATE_NEW_1}
+
+//DUCS map relations: robot 2
+relation R_CHOCOLATE_2 = {CHOCOLATE_OLD_2@CHOCOLATE_OLD_2	= reconfigure -> CHOCOLATE_NEW_2@CHOCOLATE_NEW_2,
+						 ARM_OLD_2@CHOCOLATE_OLD_2			= reconfigure -> ARM_NEW_2@CHOCOLATE_NEW_2,
+						 OUT_OLD_2@CHOCOLATE_OLD_2			= reconfigure -> OUT_NEW_2@CHOCOLATE_NEW_2,
+						 DRILLED_OLD_2@CHOCOLATE_OLD_2		= reconfigure -> DRILLED_NEW_2@CHOCOLATE_NEW_2,
+						 POLISHED_OLD_2@CHOCOLATE_OLD_2		= reconfigure -> ARM_NEW_2@CHOCOLATE_NEW_2}
+
+map MAP_CHOCOLATE_1 = {CHOCOLATE_OLD_1, CHOCOLATE_NEW_1, R_CHOCOLATE_1}
+map MAP_CHOCOLATE_2 = {CHOCOLATE_OLD_2, CHOCOLATE_NEW_2, R_CHOCOLATE_2}
+
+||OLD_ENV_1 = (CHOCOLATE_OLD_1).
+||OLD_ENV_2 = (CHOCOLATE_OLD_2).
+||OLD_ENV = (CHOCOLATE_OLD_1 || CHOCOLATE_OLD_2).
+||NEW_ENV_1 = (CHOCOLATE_NEW_1).
+||NEW_ENV_2 = (CHOCOLATE_NEW_2).
+||NEW_ENV = (CHOCOLATE_NEW_1 || CHOCOLATE_NEW_2).
+||MAPPING_ENV_1 = (MAP_CHOCOLATE_1).
+||MAPPING_ENV_2 = (MAP_CHOCOLATE_2).
+||MAPPING_ENV = (MAP_CHOCOLATE_1 || MAP_CHOCOLATE_2).
+||MapEnvironment = (MAP_CHOCOLATE_1 || MAP_CHOCOLATE_2).
+
+//DEFINED FLUENTS
+fluent Drilled_1 = <drillOk_1, reset_1>
+fluent DrillPending_1 = <drill_1, {drillOk_1, drillNOk_1}>
+fluent Polished_1 = <polishOk_1, reset_1>
+fluent PolishPending_1 = <polish_1, {polishOk_1, polishNOk_1}>
+fluent Painted_1 = <paintOk_1, reset_1>
+fluent PaintPending_1 = <paint_1, {paintOk_1, paintNOk_1}>
+
+fluent Drilled_2 = <drillOk_2, reset_2>
+fluent DrillPending_2 = <drill_2, {drillOk_2, drillNOk_2}>
+fluent Polished_2 = <polishOk_2, reset_2>
+fluent PolishPending_2 = <polish_2, {polishOk_2, polishNOk_2}>
+fluent Painted_2 = <paintOk_2, reset_2>
+fluent PaintPending_2 = <paint_2, {paintOk_2, paintNOk_2}>
+
+fluent Processing_1 = <in_1, out_1>
+fluent Processing_2 = <in_2, out_2>
+fluent OutDone_1 = <out_1, reset_1>
+fluent OutDone_2 = <out_2, reset_2>
+
+// ---------------------------OLD CONTROLLER SPEC-----------------------------
+assert OLD_TOOL_ORDER_1 = (PolishPending_1 -> Drilled_1)
+assert OLD_TOOL_ORDER_2 = (PolishPending_2 -> Drilled_2)
+
+assert OLD_OUT_IF_FINISHED_1 = (out_1 -> (Drilled_1 && Polished_1))
+assert OLD_OUT_IF_FINISHED_2 = (out_2 -> (Drilled_2 && Polished_2))
+
+assert DRILL_ONCE_1 = (drill_1 -> !Drilled_1)
+assert DRILL_ONCE_2 = (drill_2 -> !Drilled_2)
+
+assert POLISH_ONCE_1 = (polish_1 -> !Polished_1)
+assert POLISH_ONCE_2 = (polish_2 -> !Polished_2)
+
+ltl_property P_OLD_TOOL_ORDER_1 = []OLD_TOOL_ORDER_1
+ltl_property P_OLD_TOOL_ORDER_2 = []OLD_TOOL_ORDER_2
+ltl_property P_OLD_OUT_IF_FINISHED_1 = []OLD_OUT_IF_FINISHED_1
+ltl_property P_OLD_OUT_IF_FINISHED_2 = []OLD_OUT_IF_FINISHED_2
+ltl_property P_DRILL_ONCE_1 = []DRILL_ONCE_1
+ltl_property P_DRILL_ONCE_2 = []DRILL_ONCE_2
+ltl_property P_POLISH_ONCE_1 = []POLISH_ONCE_1
+ltl_property P_POLISH_ONCE_2 = []POLISH_ONCE_2
+
+controllerSpec DRILL_POLISH = {
+	safety = {
+			P_OLD_TOOL_ORDER_1,
+			P_OLD_TOOL_ORDER_2,
+			P_OLD_OUT_IF_FINISHED_1,
+			P_OLD_OUT_IF_FINISHED_2,
+			P_DRILL_ONCE_1,
+			P_DRILL_ONCE_2,
+			P_POLISH_ONCE_1,
+			P_POLISH_ONCE_2
+			}
+	controllable = {OldControllableActions}
+}
+controller ||OldController = (OLD_ENV)~{DRILL_POLISH}.
+||OldCon = (OldController || OLD_ENV).
+
+controllerSpec DRILL_POLISH_1 = {
+	safety = {
+			P_OLD_TOOL_ORDER_1,
+			P_OLD_OUT_IF_FINISHED_1,
+			P_DRILL_ONCE_1,
+			P_POLISH_ONCE_1
+			}
+	controllable = {OldControllableActions_1}
+}
+controller ||OldController_1 = (OLD_ENV_1)~{DRILL_POLISH_1}.
+||OldCon_1 = (OldController_1 || OLD_ENV_1).
+
+controllerSpec DRILL_POLISH_2 = {
+	safety = {
+			P_OLD_TOOL_ORDER_2,
+			P_OLD_OUT_IF_FINISHED_2,
+			P_DRILL_ONCE_2,
+			P_POLISH_ONCE_2
+			}
+	controllable = {OldControllableActions_2}
+}
+controller ||OldController_2 = (OLD_ENV_2)~{DRILL_POLISH_2}.
+||OldCon_2 = (OldController_2 || OLD_ENV_2).
+
+||OLDC = (OldCon_1 || OldCon_2).
+
+// ---------------------------NEW CONTROLLER SPEC-----------------------------
+assert NEW_TOOL_ORDER_1 = (PaintPending_1 -> Drilled_1)
+assert NEW_TOOL_ORDER_2 = (PaintPending_2 -> Drilled_2)
+
+assert NEW_OUT_IF_FINISHED_1 = (out_1 -> (Drilled_1 && Painted_1))
+assert NEW_OUT_IF_FINISHED_2 = (out_2 -> (Drilled_2 && Painted_2))
+
+assert PAINT_ONCE_1 = (paint_1 -> !Painted_1)
+assert PAINT_ONCE_2 = (paint_2 -> !Painted_2)
+
+ltl_property P_NEW_TOOL_ORDER_1 = []NEW_TOOL_ORDER_1
+ltl_property P_NEW_TOOL_ORDER_2 = []NEW_TOOL_ORDER_2
+ltl_property P_NEW_OUT_IF_FINISHED_1 = []NEW_OUT_IF_FINISHED_1
+ltl_property P_NEW_OUT_IF_FINISHED_2 = []NEW_OUT_IF_FINISHED_2
+ltl_property P_PAINT_ONCE_1 = []PAINT_ONCE_1
+ltl_property P_PAINT_ONCE_2 = []PAINT_ONCE_2
+
+controllerSpec DRILL_PAINT = {
+	safety = {
+			P_NEW_TOOL_ORDER_1,
+			P_NEW_TOOL_ORDER_2,
+			P_NEW_OUT_IF_FINISHED_1,
+			P_NEW_OUT_IF_FINISHED_2,
+			P_DRILL_ONCE_1,
+			P_DRILL_ONCE_2,
+			P_PAINT_ONCE_1,
+			P_PAINT_ONCE_2,
+			}
+	controllable = {NewControllableActions}
+}
+controller ||NewController = (NEW_ENV)~{DRILL_PAINT}.
+||NewCon = (NewController || NEW_ENV).
+
+controllerSpec DRILL_PAINT_1 = {
+	safety = {
+			P_NEW_TOOL_ORDER_1,
+			P_NEW_OUT_IF_FINISHED_1,
+			P_DRILL_ONCE_1,
+			P_PAINT_ONCE_1
+			}
+	controllable = {NewControllableActions_1}
+}
+controller ||NewController_1 = (NEW_ENV_1)~{DRILL_PAINT_1}.
+||NewCon_1 = (NewController_1 || NEW_ENV_1).
+
+controllerSpec DRILL_PAINT_2 = {
+	safety = {
+			P_NEW_TOOL_ORDER_2,
+			P_NEW_OUT_IF_FINISHED_2,
+			P_DRILL_ONCE_2,
+			P_PAINT_ONCE_2
+			}
+	controllable = {NewControllableActions_2}
+}
+controller ||NewController_2 = (NEW_ENV_2)~{DRILL_PAINT_2}.
+||NewCon_2 = (NewController_2 || NEW_ENV_2).
+
+// ---------------------------UPDATING CONTROLLER SPEC-----------------------------
+assert AnyAction_1 = (drill_1 || polish_1 || out_1 || paint_1)
+assert AnyAction_2 = (drill_2 || polish_2 || out_2 || paint_2)
+
+ltl_property T_UPDATE_WHILE_EMPTY_1 = (StartNewSpec -> !Processing_1)
+ltl_property T_UPDATE_WHILE_EMPTY_2 = (StartNewSpec -> !Processing_2)
+ltl_property T_NO_POLISH_ON_UPDATE_1 = (StartNewSpec -> (Processing_1 -> !Polished_1))
+ltl_property T_NO_POLISH_ON_UPDATE_2 = (StartNewSpec -> (Processing_2 -> !Polished_2))
+ltl_property T_NO_TP_1 = ((StopOldSpec && !StartNewSpec) -> !AnyAction_1)
+ltl_property T_NO_TP_2 = ((StopOldSpec && !StartNewSpec) -> !AnyAction_2)
+
+fluent ToolApplied_1 = <{drillOk_1, polishOk_1}, {reset_1}>
+fluent ToolApplied_2 = <{drillOk_2, polishOk_2}, {reset_2}>
+ltl_property T_FINISH_WITH_OLD_REQ_1 = ((ToolApplied_1 && StopOldSpec && !StartNewSpec) -> OLD_TOOL_ORDER_1)
+ltl_property T_FINISH_WITH_OLD_REQ_2 = ((ToolApplied_2 && StopOldSpec && !StartNewSpec) -> OLD_TOOL_ORDER_2)
+ltl_property T_SWITCH_TO_NEW_ASAP_1 = ((ToolApplied_1 && StopOldSpec && !StartNewSpec) -> NEW_TOOL_ORDER_1)
+ltl_property T_SWITCH_TO_NEW_ASAP_2 = ((ToolApplied_2 && StopOldSpec && !StartNewSpec) -> NEW_TOOL_ORDER_2)
+
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD_1, CHOCOLATE_OLD_2},
+	newEnvironment = {CHOCOLATE_NEW_1, CHOCOLATE_NEW_2},
+	mapRelation = {R_CHOCOLATE_1, R_CHOCOLATE_2},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP_1,
+//	transition = T_NO_TP_2,
+//	transition = T_UPDATE_WHILE_EMPTY_1,
+//	transition = T_UPDATE_WHILE_EMPTY_2,
+//	transition = T_NO_POLISH_ON_UPDATE_1,
+//	transition = T_NO_POLISH_ON_UPDATE_2,
+//	transition = T_FINISH_WITH_OLD_REQ_1,
+//	transition = T_FINISH_WITH_OLD_REQ_2,
+//	transition = T_SWITCH_TO_NEW_ASAP_1,
+//	transition = T_SWITCH_TO_NEW_ASAP_2,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_stepwise = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD_1, CHOCOLATE_OLD_2},
+	newEnvironment = {CHOCOLATE_NEW_1, CHOCOLATE_NEW_2},
+	mapRelation = {R_CHOCOLATE_1, R_CHOCOLATE_2},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP_1,
+//	transition = T_NO_TP_2,
+//	transition = T_UPDATE_WHILE_EMPTY_1,
+//	transition = T_UPDATE_WHILE_EMPTY_2,
+//	transition = T_NO_POLISH_ON_UPDATE_1,
+//	transition = T_NO_POLISH_ON_UPDATE_2,
+//	transition = T_FINISH_WITH_OLD_REQ_1,
+//	transition = T_FINISH_WITH_OLD_REQ_2,
+//	transition = T_SWITCH_TO_NEW_ASAP_1,
+//	transition = T_SWITCH_TO_NEW_ASAP_2,
+    nonblocking,
+	stepwise
+}
+
+||STEPWISE_UPDATE_CONTROLLER = UpdCont_stepwise.
+
+updatingController UpdCont_1 = {
+    oldController = OldCon_1,
+    oldEnvironment = {CHOCOLATE_OLD_1},
+	newEnvironment = {CHOCOLATE_NEW_1},
+	mapRelation = {R_CHOCOLATE_1},
+    oldGoal = DRILL_POLISH_1,
+    newGoal = DRILL_PAINT_1,
+//	transition = T_NO_TP_1,
+//	transition = T_UPDATE_WHILE_EMPTY_1,
+//	transition = T_NO_POLISH_ON_UPDATE_1,
+//	transition = T_FINISH_WITH_OLD_REQ_1,
+//	transition = T_SWITCH_TO_NEW_ASAP_1,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_1 = UpdCont_1.
+
+updatingController UpdCont_2 = {
+    oldController = OldCon_2,
+    oldEnvironment = {CHOCOLATE_OLD_2},
+	newEnvironment = {CHOCOLATE_NEW_2},
+	mapRelation = {R_CHOCOLATE_2},
+    oldGoal = DRILL_POLISH_2,
+    newGoal = DRILL_PAINT_2,
+//	transition = T_NO_TP_2,
+//	transition = T_UPDATE_WHILE_EMPTY_2,
+//	transition = T_NO_POLISH_ON_UPDATE_2,
+//	transition = T_FINISH_WITH_OLD_REQ_2,
+//	transition = T_SWITCH_TO_NEW_ASAP_2,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_2 = UpdCont_2.
+
+||Stepwise_UPDATE_CONTROLLER = (UpdCont_1 || UpdCont_2).
+
+// ---------------------------TEST AND RESULTS-----------------------------
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+fluent Reconfigure = <reconfigure, hotSwapIn>
+
+assert TEST_OLD_TOOL_ORDER_1 = [](!StopOldSpec -> OLD_TOOL_ORDER_1)
+assert TEST_OLD_TOOL_ORDER_2 = [](!StopOldSpec -> OLD_TOOL_ORDER_2)
+assert TEST_OLD_OUT_IF_FINISHED_1 = [](!StopOldSpec -> OLD_OUT_IF_FINISHED_1)
+assert TEST_OLD_OUT_IF_FINISHED_2 = [](!StopOldSpec -> OLD_OUT_IF_FINISHED_2)
+assert TEST_OLD_DRILL_ONCE_1 = [](!StopOldSpec -> DRILL_ONCE_1)
+assert TEST_OLD_DRILL_ONCE_2 = [](!StopOldSpec -> DRILL_ONCE_2)
+assert TEST_OLD_POLISH_ONCE_1 = [](!StopOldSpec -> POLISH_ONCE_1)
+assert TEST_OLD_POLISH_ONCE_2 = [](!StopOldSpec -> POLISH_ONCE_2)
+
+assert TEST_NEW_TOOL_ORDER_1 = [](StartNewSpec -> NEW_TOOL_ORDER_1)
+assert TEST_NEW_TOOL_ORDER_2 = [](StartNewSpec -> NEW_TOOL_ORDER_2)
+assert TEST_NEW_OUT_IF_FINISHED_1 = [](StartNewSpec -> NEW_OUT_IF_FINISHED_1)
+assert TEST_NEW_OUT_IF_FINISHED_2 = [](StartNewSpec -> NEW_OUT_IF_FINISHED_2)
+assert TEST_NEW_DRILL_ONCE_1 = [](StartNewSpec -> DRILL_ONCE_1)
+assert TEST_NEW_DRILL_ONCE_2 = [](StartNewSpec -> DRILL_ONCE_2)
+assert TEST_NEW_PAINT_ONCE_1 = [](StartNewSpec -> PAINT_ONCE_1)
+assert TEST_NEW_PAINT_ONCE_2 = [](StartNewSpec -> PAINT_ONCE_2)
+assert TEST_FORMULA3 = [](hotswap_begin -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))

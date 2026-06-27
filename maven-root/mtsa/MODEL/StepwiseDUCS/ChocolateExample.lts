@@ -1,0 +1,174 @@
+//チョコレートロボットの例題
+
+//ACTION SETS
+set OldControllableActions = {out, drill, polish}
+//set OldControllableActions = {out, polish}
+set OldAlphabet = {OldControllableActions, in, reset, drillOk, drillNOk, polishOk, polishNOk}
+set NewControllableActions = {out, drill, paint}
+//set NewControllableActions = {out, paint}
+set NewAlphabet = {NewControllableActions, in, reset, drillOk, drillNOk, paintOk, paintNOk}
+
+//Domain Old Model
+CHOCOLATE_OLD = (in -> ARM),
+	ARM = (drill -> DRILLED
+		| polish -> POLISHED
+		| out -> OUT),
+	OUT = (reset -> CHOCOLATE_OLD),
+	DRILLED = ({drillOk, drillNOk} -> ARM),
+	POLISHED = ({polishOk, polishNOk} -> ARM).
+
+//Domain New Model
+CHOCOLATE_NEW = (in -> ARM),
+	ARM = (drill -> DRILLED
+		| paint -> PAINTED
+		| out -> OUT),
+	OUT = (reset -> CHOCOLATE_NEW),
+	DRILLED = ({drillOk, drillNOk} -> ARM),
+	PAINTED = ({paintOk, paintNOk} -> ARM).
+
+relation R_CHOCOLATE = {CHOCOLATE_OLD@CHOCOLATE_OLD	= reconfigure -> CHOCOLATE_NEW@CHOCOLATE_NEW,
+						ARM@CHOCOLATE_OLD			= reconfigure -> ARM@CHOCOLATE_NEW,
+						OUT@CHOCOLATE_OLD			= reconfigure -> OUT@CHOCOLATE_NEW,
+						DRILLED@CHOCOLATE_OLD		= reconfigure -> DRILLED@CHOCOLATE_NEW,
+						POLISHED@CHOCOLATE_OLD		= reconfigure -> ARM@CHOCOLATE_NEW}
+map MAP_CHOCOLATE = {CHOCOLATE_OLD, CHOCOLATE_NEW, R_CHOCOLATE}
+
+//Domain mapping Model
+CHOCOLATE_MAP =  CHOCOLATE_OLD,
+	CHOCOLATE_OLD = (in -> ARM_OLD | reconfigure -> CHOCOLATE_NEW),
+	ARM_OLD = ( drill -> DRILLED_OLD 
+		| polish -> POLISHED_OLD
+		| out -> OUT_OLD
+		| reconfigure -> ARM_NEW),
+	OUT_OLD = (reset -> CHOCOLATE_OLD | reconfigure -> OUT_NEW),
+	DRILLED_OLD = ({drillOk,drillNOk}  -> ARM_OLD | reconfigure -> DRILLED_NEW),
+	POLISHED_OLD = ({polishOk,polishNOk} -> ARM_OLD | reconfigure -> ARM_NEW),
+
+	CHOCOLATE_NEW = (in -> ARM_NEW),
+	ARM_NEW = ( drill -> DRILLED_NEW 
+		| paint -> PAINTED_NEW
+		| out -> OUT_NEW),
+	OUT_NEW = (reset -> CHOCOLATE_NEW),
+	DRILLED_NEW = ({drillOk,drillNOk} -> ARM_NEW),
+	PAINTED_NEW = ({paintOk,paintNOk} -> ARM_NEW).
+
+||OLD_ENV = (CHOCOLATE_OLD).
+||NEW_ENV = (CHOCOLATE_NEW).
+||MAPPING_ENV = (CHOCOLATE_MAP).
+||MapEnvironment = (MAP_CHOCOLATE).
+
+//DEFINED FLUENTS 
+fluent Drilled = <drillOk,reset>
+fluent DrillPending = <drill,{drillOk,drillNOk}>
+fluent Polished = <polishOk,reset>
+fluent PolishPending = <polish,{polishOk,polishNOk}>
+fluent Painted = <paintOk,reset>
+fluent PaintPending = <paint,{paintOk,paintNOk}>
+
+fluent Processing = <in,out>
+fluent OutDone = <out,reset>
+
+// ---------------------------OLD CONTROLLER SPEC-----------------------------
+assert OLD_TOOL_ORDER = (PolishPending -> Drilled)
+//assert OLD_OUT_IF_FINISHED = (out -> (Drilled && Polished))
+assert OLD_OUT_IF_FINISHED = (out -> (Drilled && Polished))
+assert DRILL_ONCE = ( drill-> !Drilled )
+assert POLISH_ONCE = ( polish -> !Polished )
+
+ltl_property P_OLD_TOOL_ORDER = []OLD_TOOL_ORDER
+ltl_property P_OLD_OUT_IF_FINISHED = []OLD_OUT_IF_FINISHED
+ltl_property P_DRILL_ONCE = []DRILL_ONCE
+ltl_property P_POLISH_ONCE = []POLISH_ONCE
+
+controllerSpec DRILL_POLISH = {
+	safety = {
+			P_OLD_TOOL_ORDER,
+			P_OLD_OUT_IF_FINISHED,
+			P_DRILL_ONCE,
+			P_POLISH_ONCE
+			}
+	controllable = {OldControllableActions}
+}
+controller ||OldController = (OLD_ENV)~{DRILL_POLISH}.
+||OldCon = (OldController || OLD_ENV).
+
+// ---------------------------NEW CONTROLLER SPEC-----------------------------
+
+assert NEW_TOOL_ORDER = (PaintPending -> Drilled)
+assert NEW_OUT_IF_FINISHED = (out -> (Drilled && Painted))
+assert PAINT_ONCE =   ( paint -> !Painted )
+
+ltl_property P_NEW_TOOL_ORDER = []NEW_TOOL_ORDER
+ltl_property P_NEW_OUT_IF_FINISHED = []NEW_OUT_IF_FINISHED
+ltl_property P_PAINT_ONCE = []PAINT_ONCE
+
+
+controllerSpec DRILL_PAINT = {
+	safety = {
+			P_NEW_TOOL_ORDER,
+			P_NEW_OUT_IF_FINISHED,
+			P_DRILL_ONCE,
+			P_PAINT_ONCE,
+			}
+	controllable = {NewControllableActions}
+}
+controller ||NewController = (NEW_ENV)~{DRILL_PAINT}.
+||NewCon = (NewController || NEW_ENV).
+
+// ---------------------------UPDATING CONTROLLER SPEC-----------------------------
+assert AnyAction = (drill || polish || out || paint)
+
+
+ltl_property T_UPDATE_WHILE_EMPTY = (StartNewSpec -> !Processing) // should give no controller because in is uncontrollable
+ltl_property T_NO_POLISH_ON_UPDATE = (startNewSpec -> (Processing -> !Polished))
+//ltl_property T_REMOVE_POLISHED_OR_NEW_REQ = ((StopOldSpec && !StartNewSpec) -> (S_NEW || (out -> Faulty)) )
+ltl_property T_NO_TP = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
+
+
+fluent ToolApplied = <{drillOk,polishOk}, {reset}>
+ltl_property T_FINISH_WITH_OLD_REQ = ((ToolApplied && StopOldSpec && !StartNewSpec) -> OLD_TOOL_ORDER)
+ltl_property T_SWITCH_TO_NEW_ASAP = ((ToolApplied && StopOldSpec && !StartNewSpec) -> NEW_TOOL_ORDER)
+
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD},
+	newEnvironment = {CHOCOLATE_NEW},
+	mapRelation = {R_CHOCOLATE},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP,
+//	transition = T_REMOVE_POLISHED_OR_NEW_REQ,
+//	transition = T_UPDATE_WHILE_EMPTY,
+//	transition = T_NO_POLISH_ON_UPDATE,
+//	transition = T_FINISH_WITH_OLD_REQ,
+//	transition = T_SWITCH_TO_NEW_ASAP,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_OTF = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD},
+	newEnvironment = {CHOCOLATE_NEW},
+	mapRelation = {R_CHOCOLATE},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP,
+    nonblocking,
+	on_the_fly
+}
+
+||UPDATE_CONTROLLER_OTF = UpdCont_OTF.
+
+// ---------------------------TEST AND RESULTS-----------------------------
+fluent StopOldSpec = <stopOldSpec, hotswap_begin>
+fluent StartNewSpec = <startNewSpec,hotswap_begin>
+fluent Reconfigure = <reconfigure, hotswap_begin>
+
+assert S_OLD = (OLD_TOOL_ORDER  && OLD_OUT_IF_FINISHED && DRILL_ONCE && POLISH_ONCE)
+assert S_NEW = (NEW_TOOL_ORDER && NEW_OUT_IF_FINISHED && DRILL_ONCE && PAINT_ONCE)
+
+assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
+assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
+assert TEST_FORMULA3 = [](hotswap_begin -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))

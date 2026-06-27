@@ -16,6 +16,7 @@ import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.synthesis.FineGrainedUpdatingControllersUtils;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
+import ltsa.updatingControllers.stepwise.StepwiseStage;
 
 import java.util.*;
 
@@ -31,6 +32,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     private boolean isOTF;
     private boolean fineGrained;
     private boolean selectiveFineGrained;
+    private boolean stepwise;
     private Symbol newController;
     // ▼▼▼ 追加: 新しい構文用のリストフィールド ▼▼▼
     private List<Symbol> oldEnvironmentList;
@@ -51,6 +53,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         isOTF = false;
         fineGrained = false;
         selectiveFineGrained = false;
+        stepwise = false;
         this.output = output;
 
         // ▼▼▼ 追加: 初期化 ▼▼▼
@@ -90,13 +93,19 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 "UpdatingControllersDefinition", "Old Controller 合成時間");
         long oldCStart = System.currentTimeMillis();
 
-        CompositeState oldC = composeLTS(this.getOldController().toString());
+        String oldControllerName = this.getOldController().toString();
+        CompositeState oldC = null;
+        if (stepwise) {
+            output.outln(" - Stepwise mode: oldController '" + oldControllerName + "' is not pre-composed.");
+        } else {
+            oldC = composeLTS(oldControllerName);
+        }
 
         //評価実験用：Old Controllerの計測終了
         long oldCTime = System.currentTimeMillis() - oldCStart;
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 "UpdatingControllersDefinition", "Old Controller 合成時間");
-        if (UpdatingControllerEvaluationRecorder.isEnabled() && oldC.composition != null) {
+        if (UpdatingControllerEvaluationRecorder.isEnabled() && oldC != null && oldC.composition != null) {
             long oldCCountStart = System.currentTimeMillis();
             int oldControllerStates = oldC.composition.maxStates;
             int oldControllerTransitions = oldC.composition.ntransitions();
@@ -118,6 +127,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         ControllerGoalDefinition newGoalDef = ControllerGoalDefinition.getDefinition(this.getNewGoal());
         if (fineGrained && selectiveFineGrained) {
             Diagnostics.fatal("fine_grained and selective_fine_grained cannot be used together.");
+        }
+        if (stepwise && (isOTF || fineGrained || selectiveFineGrained)) {
+            Diagnostics.fatal("stepwise cannot be combined with on_the_fly, fine_grained, or selective_fine_grained.");
         }
         boolean fineGrainedMode = fineGrained || selectiveFineGrained;
 
@@ -143,6 +155,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         Hashtable<String, RelationDefinition> relations = LTSCompiler.getRelations();
         Hashtable<String, ProcessSpec> processes = LTSCompiler.getProcesses();
         Vector<CompactState> mappingComponents = new Vector<>();
+        List<StepwiseStage> stepwiseStages = new ArrayList<>();
 
         // ★追加: MappingEnv -> NewEnv の状態ID対応マップを保持するリスト
         List<Map<Integer, Integer>> mappingMapEnvToNewEnv = new ArrayList<>();
@@ -152,6 +165,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // mappingが未指定の場合、kindはUNKNOWN、toString()は"unknown"となるため
         if (this.getMapping() != null && !this.getMapping().toString().equals("unknown")
                 && !this.getMapping().toString().isEmpty()) {
+            if (stepwise) {
+                Diagnostics.fatal("stepwise mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
+            }
             if (fineGrainedMode) {
                 Diagnostics.fatal("fine_grained/selective_fine_grained mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
             }
@@ -210,6 +226,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 if (mapComp != null) {
                     mapComp.name = mapEnvName;
                     mappingComponents.add(mapComp);
+                    CompactState oldComponent = compiledProcesses.get(oldName);
+                    CompactState newComponent = compiledProcesses.get(newName);
+                    stepwiseStages.add(new StepwiseStage(i, oldName, newName, relNameStr,
+                            oldComponent, newComponent, mapComp));
                     if (!compiledProcesses.containsKey(mapEnvName)) {
                         compiledProcesses.put(mapEnvName, mapComp);
                     }
@@ -296,7 +316,20 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         // 4. モード別処理 (OTF / Traditional)
         // ---------------------------------------------------------
         UpdatingControllerCompositeState ucce;
-        if (this.isOTF)
+        if (this.stepwise)
+        {
+            output.outln("Mode: Stepwise Updating Controller Synthesis (initial baseline)");
+            if (stepwiseStages.isEmpty()) {
+                Diagnostics.fatal("stepwise mode requires at least one oldEnvironment/newEnvironment/mapRelation stage.");
+            }
+
+            ControllerGoal<String> grGoal = UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
+                    controllableSet);
+            grGoalTime = 0;
+            ucce = new UpdatingControllerCompositeState(null, oldControllerName, stepwiseStages, oldGoalDef, newGoalDef,
+                    new ArrayList<Symbol>(this.getTransitionGoals()), grGoal, controllableSet, name.getName());
+        }
+        else if (this.isOTF)
         {
             output.outln("Mode: On-The-Fly Updating Controller Synthesis"
                     + (fineGrainedMode
@@ -1275,6 +1308,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
     public void setSelectiveFineGrained() {
         this.selectiveFineGrained = true;
+    }
+
+    public void setStepwise() {
+        this.stepwise = true;
     }
 
     public boolean isFineGrained() {

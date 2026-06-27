@@ -1,0 +1,1378 @@
+Process:
+	UpdCont_stepwise
+States:
+	431
+Transitions:
+	UpdCont_stepwise = Q0,
+	Q0	= (in_1 -> Q332
+		  |hotSwapIn -> Q339
+		  |in_2 -> Q351),
+	Q1	= (paintNOk_2 -> Q74
+		  |out_1 -> Q79
+		  |paintOk_2 -> Q124),
+	Q2	= (in_2 -> Q32
+		  |startNewSpec -> Q204
+		  |{drillNOk_1, drillOk_1} -> Q223),
+	Q3	= ({drillNOk_2, drillOk_2} -> Q47
+		  |reconfigure -> Q109
+		  |reset_1 -> Q282),
+	Q4	= (startNewSpec -> Q15
+		  |drillOk_1 -> Q91
+		  |drillNOk_1 -> Q152
+		  |reset_2 -> Q219),
+	Q5	= (reconfigure -> Q88
+		  |{polishNOk_1, polishOk_1} -> Q234),
+	Q6	= (reset_2 -> Q77
+		  |paintOk_1 -> Q104
+		  |paintNOk_1 -> Q106),
+	Q7	= (polish_2 -> Q65
+		  |reconfigure -> Q88
+		  |{polishNOk_1, polishOk_1} -> Q234),
+	Q8	= (startNewSpec -> Q86
+		  |drillOk_1 -> Q115
+		  |drillNOk_1 -> Q119),
+	Q9	= (drill_1 -> Q20
+		  |paintOk_2 -> Q54
+		  |paintNOk_2 -> Q90),
+	Q10	= (in_1 -> Q9
+		  |paintOk_2 -> Q46
+		  |paintNOk_2 -> Q55),
+	Q11	= (drillNOk_2 -> Q38
+		  |drillOk_2 -> Q47
+		  |reconfigure -> Q48
+		  |reset_1 -> Q193),
+	Q12	= (paint_2 -> Q50
+		  |paintOk_1 -> Q74
+		  |paintNOk_1 -> Q88),
+	Q13	= (reconfigure -> Q52
+		  |drillNOk_2 -> Q167
+		  |drillOk_2 -> Q175
+		  |{drillNOk_1, drillOk_1} -> Q225),
+	Q14	= (in_1 -> Q25
+		  |drill_2 -> Q40),
+	Q15	= (drillNOk_1 -> Q37
+		  |reset_2 -> Q39
+		  |drillOk_1 -> Q106),
+	Q16	= (reset_1 -> Q51
+		  |reset_2 -> Q154),
+	Q17	= (reset_1 -> Q14
+		  |drill_2 -> Q48),
+	Q18	= (out_1 -> Q17
+		  |drill_2 -> Q19),
+	Q19	= (drillNOk_2 -> Q18
+		  |out_1 -> Q48
+		  |drillOk_2 -> Q74),
+	Q20	= (drillNOk_1 -> Q9
+		  |paintOk_2 -> Q49
+		  |paintNOk_2 -> Q86
+		  |drillOk_1 -> Q93),
+	Q21	= (drill_2 -> Q53
+		  |paint_1 -> Q143),
+	Q22	= (drillNOk_2 -> Q25
+		  |drill_1 -> Q57
+		  |drillOk_2 -> Q90),
+	Q23	= (in_2 -> Q30
+		  |drill_1 -> Q61
+		  |polish_1 -> Q81
+		  |out_1 -> Q110
+		  |reconfigure -> Q255
+		  |startNewSpec -> Q374),
+	Q24	= (in_2 -> Q14
+		  |in_1 -> Q130),
+	Q25	= (drill_2 -> Q22
+		  |drill_1 -> Q41),
+	Q26	= ({drillNOk_2, drillOk_2} -> Q12
+		  |paintOk_1 -> Q56
+		  |paintNOk_1 -> Q137),
+	Q27	= (in_2 -> Q30
+		  |startNewSpec -> Q374),
+	Q28	= (reconfigure -> Q31
+		  |in_2 -> Q69
+		  |{polishNOk_1, polishOk_1} -> Q198),
+	Q29	= (out_2 -> Q6
+		  |paintOk_1 -> Q124
+		  |paintNOk_1 -> Q133),
+	Q30	= (startNewSpec -> Q250),
+	Q31	= (in_2 -> Q21
+		  |paint_1 -> Q77),
+	Q32	= ({drillNOk_1, drillOk_1} -> Q84
+		  |startNewSpec -> Q168),
+	Q33	= (drill_2 -> Q67
+		  |drill_1 -> Q89
+		  |polish_2 -> Q97
+		  |reconfigure -> Q115
+		  |polish_1 -> Q118
+		  |out_1 -> Q132
+		  |out_2 -> Q136
+		  |startNewSpec -> Q233),
+	Q34	= (startNewSpec -> Q233),
+	Q35	= (startNewSpec -> Q58
+		  |reconfigure -> Q91
+		  |{polishNOk_1, polishOk_1} -> Q136
+		  |reset_2 -> Q231),
+	Q36	= (out_2 -> Q16
+		  |reset_1 -> Q46),
+	Q37	= (drill_1 -> Q15
+		  |reset_2 -> Q130),
+	Q38	= (reconfigure -> Q17
+		  |reset_1 -> Q246),
+	Q39	= (drillOk_1 -> Q31
+		  |in_2 -> Q41
+		  |drillNOk_1 -> Q130),
+	Q40	= (drillNOk_2 -> Q14
+		  |in_1 -> Q22
+		  |drillOk_2 -> Q55),
+	Q41	= (drillOk_1 -> Q21
+		  |drillNOk_1 -> Q25
+		  |drill_2 -> Q57),
+	Q42	= (startNewSpec -> Q74),
+	Q43	= (polish_2 -> Q59
+		  |reconfigure -> Q60
+		  |reset_1 -> Q292),
+	Q44	= ({drillNOk_1, drillOk_1} -> Q21
+		  |drill_2 -> Q52),
+	Q45	= (reconfigure -> Q17
+		  |{polishNOk_2, polishOk_2} -> Q38
+		  |reset_1 -> Q248),
+	Q46	= (out_2 -> Q51
+		  |in_1 -> Q54),
+	Q47	= (reconfigure -> Q60
+		  |reset_1 -> Q292),
+	Q48	= (drillNOk_2 -> Q17
+		  |reset_1 -> Q40
+		  |drillOk_2 -> Q60),
+	Q49	= (out_2 -> Q15
+		  |drillNOk_1 -> Q54
+		  |drillOk_1 -> Q133),
+	Q50	= (paintOk_1 -> Q1
+		  |paintNOk_2 -> Q12
+		  |paintOk_2 -> Q29
+		  |paintNOk_1 -> Q93),
+	Q51	= (reset_2 -> Q24
+		  |in_1 -> Q37),
+	Q52	= (drillNOk_2 -> Q44
+		  |{drillNOk_1, drillOk_1} -> Q53
+		  |drillOk_2 -> Q72),
+	Q53	= (drillNOk_2 -> Q21
+		  |drillOk_2 -> Q88
+		  |paint_1 -> Q92),
+	Q54	= (out_2 -> Q37
+		  |drill_1 -> Q49),
+	Q55	= (paint_2 -> Q10
+		  |in_1 -> Q90),
+	Q56	= ({drillNOk_2, drillOk_2} -> Q74
+		  |out_1 -> Q109),
+	Q57	= (drillNOk_1 -> Q22
+		  |drillNOk_2 -> Q41
+		  |drillOk_1 -> Q53
+		  |drillOk_2 -> Q86),
+	Q58	= (reset_2 -> Q28
+		  |reconfigure -> Q106
+		  |{polishNOk_1, polishOk_1} -> Q257),
+	Q59	= ({polishNOk_2, polishOk_2} -> Q47
+		  |reconfigure -> Q60
+		  |reset_1 -> Q100),
+	Q60	= (reset_1 -> Q55
+		  |paint_2 -> Q79),
+	Q61	= (drillNOk_1 -> Q27
+		  |in_2 -> Q151
+		  |drillOk_1 -> Q223
+		  |startNewSpec -> Q270),
+	Q62	= (in_2 -> Q68
+		  |startNewSpec -> Q154
+		  |reset_1 -> Q323),
+	Q63	= (reconfigure -> Q86
+		  |polish_2 -> Q101
+		  |drillOk_1 -> Q234
+		  |drillNOk_1 -> Q307),
+	Q64	= (in_2 -> Q18
+		  |out_1 -> Q154),
+	Q65	= ({polishNOk_2, polishOk_2} -> Q5
+		  |reconfigure -> Q88
+		  |{polishNOk_1, polishOk_1} -> Q249),
+	Q66	= (reconfigure -> Q21
+		  |drill_2 -> Q99
+		  |polish_2 -> Q114
+		  |{polishNOk_1, polishOk_1} -> Q221),
+	Q67	= ({drillNOk_2, drillOk_2} -> Q34
+		  |startNewSpec -> Q142),
+	Q68	= (startNewSpec -> Q17
+		  |reset_1 -> Q103),
+	Q69	= (reconfigure -> Q21
+		  |{polishNOk_1, polishOk_1} -> Q221),
+	Q70	= (out_1 -> Q98
+		  |hotSwapIn -> Q174
+		  |drillOk_2 -> Q302
+		  |drillNOk_2 -> Q367),
+	Q71	= (reconfigure -> Q86
+		  |drillOk_1 -> Q234
+		  |drillNOk_1 -> Q307),
+	Q72	= ({drillNOk_1, drillOk_1} -> Q88
+		  |paint_2 -> Q95),
+	Q73	= (startNewSpec -> Q104
+		  |reset_2 -> Q254),
+	Q74	= (paint_2 -> Q1
+		  |out_1 -> Q60),
+	Q75	= (startNewSpec -> Q41
+		  |drillOk_1 -> Q140
+		  |drillNOk_1 -> Q179),
+	Q76	= (startNewSpec -> Q370),
+	Q77	= (paintNOk_1 -> Q31
+		  |paintOk_1 -> Q64
+		  |in_2 -> Q143),
+	Q78	= (drillOk_2 -> Q34
+		  |drillNOk_2 -> Q84
+		  |startNewSpec -> Q228),
+	Q79	= (reset_1 -> Q10
+		  |paintOk_2 -> Q36
+		  |paintNOk_2 -> Q60),
+	Q80	= (drillOk_2 -> Q34
+		  |drillNOk_2 -> Q84
+		  |drill_1 -> Q96
+		  |polish_1 -> Q113
+		  |reconfigure -> Q148
+		  |startNewSpec -> Q228
+		  |out_1 -> Q312),
+	Q81	= ({polishNOk_1, polishOk_1} -> Q27
+		  |startNewSpec -> Q94
+		  |reconfigure -> Q255
+		  |in_2 -> Q273),
+	Q82	= (drill_1 -> Q32
+		  |drill_2 -> Q78
+		  |polish_1 -> Q123
+		  |out_1 -> Q125
+		  |polish_2 -> Q128
+		  |out_2 -> Q136
+		  |reconfigure -> Q140
+		  |startNewSpec -> Q218),
+	Q83	= (in_2 -> Q38
+		  |reconfigure -> Q154
+		  |reset_1 -> Q235),
+	Q84	= (startNewSpec -> Q218),
+	Q85	= (in_1 -> Q30
+		  |reconfigure -> Q103
+		  |drill_2 -> Q105
+		  |polish_2 -> Q122
+		  |out_2 -> Q129
+		  |startNewSpec -> Q245),
+	Q86	= (paint_2 -> Q20
+		  |drillOk_1 -> Q88
+		  |drillNOk_1 -> Q90),
+	Q87	= (in_1 -> Q30
+		  |startNewSpec -> Q245),
+	Q88	= (paint_1 -> Q12
+		  |paint_2 -> Q93),
+	Q89	= ({drillNOk_1, drillOk_1} -> Q34
+		  |startNewSpec -> Q176),
+	Q90	= (paint_2 -> Q9
+		  |drill_1 -> Q86),
+	Q91	= (startNewSpec -> Q106
+		  |reset_2 -> Q162),
+	Q92	= (drillOk_2 -> Q12
+		  |paintOk_1 -> Q19
+		  |paintNOk_1 -> Q53
+		  |drillNOk_2 -> Q143),
+	Q93	= (paint_1 -> Q50
+		  |paintNOk_2 -> Q88
+		  |paintOk_2 -> Q133),
+	Q94	= (reconfigure -> Q130
+		  |in_2 -> Q291
+		  |{polishNOk_1, polishOk_1} -> Q375),
+	Q95	= (paintNOk_2 -> Q72
+		  |{drillNOk_1, drillOk_1} -> Q93
+		  |paintOk_2 -> Q238),
+	Q96	= (startNewSpec -> Q13
+		  |drillNOk_2 -> Q32
+		  |{drillNOk_1, drillOk_1} -> Q78
+		  |drillOk_2 -> Q89),
+	Q97	= ({polishNOk_2, polishOk_2} -> Q34
+		  |reconfigure -> Q115
+		  |startNewSpec -> Q346),
+	Q98	= (drillOk_2 -> Q276
+		  |reset_1 -> Q353
+		  |drillNOk_2 -> Q368
+		  |hotSwapIn -> Q376),
+	Q99	= (drillOk_2 -> Q5
+		  |reconfigure -> Q53
+		  |drillNOk_2 -> Q69
+		  |{polishNOk_1, polishOk_1} -> Q225),
+	Q100	= (reconfigure -> Q55
+		  |in_1 -> Q120
+		  |{polishNOk_2, polishOk_2} -> Q292),
+	Q101	= ({polishNOk_2, polishOk_2} -> Q71
+		  |reconfigure -> Q86
+		  |drillNOk_1 -> Q120
+		  |drillOk_1 -> Q249),
+	Q102	= (reset_2 -> Q81
+		  |{polishNOk_1, polishOk_1} -> Q108
+		  |reconfigure -> Q152
+		  |startNewSpec -> Q329),
+	Q103	= (startNewSpec -> Q14
+		  |in_1 -> Q179),
+	Q104	= (out_1 -> Q16
+		  |reset_2 -> Q64),
+	Q105	= (drillNOk_2 -> Q87
+		  |drillOk_2 -> Q147
+		  |startNewSpec -> Q193
+		  |in_1 -> Q244),
+	Q106	= (paint_1 -> Q6
+		  |reset_2 -> Q31),
+	Q107	= (stopOldSpec -> Q146
+		  |in_1 -> Q384),
+	Q108	= (reset_2 -> Q27
+		  |startNewSpec -> Q321),
+	Q109	= ({drillNOk_2, drillOk_2} -> Q60
+		  |reset_1 -> Q186),
+	Q110	= (startNewSpec -> Q83
+		  |in_2 -> Q125
+		  |reset_1 -> Q166),
+	Q111	= (startNewSpec -> Q308),
+	Q112	= (stopOldSpec -> Q82),
+	Q113	= ({polishNOk_1, polishOk_1} -> Q78
+		  |startNewSpec -> Q99
+		  |drillOk_2 -> Q118
+		  |drillNOk_2 -> Q123
+		  |reconfigure -> Q148),
+	Q114	= (reconfigure -> Q21
+		  |{polishNOk_2, polishOk_2} -> Q69
+		  |{polishNOk_1, polishOk_1} -> Q271),
+	Q115	= (startNewSpec -> Q88),
+	Q116	= (startNewSpec -> Q88
+		  |out_2 -> Q91
+		  |drill_2 -> Q117
+		  |drill_1 -> Q126
+		  |out_1 -> Q139
+		  |paint_1 -> Q149
+		  |paint_2 -> Q150),
+	Q117	= ({drillNOk_2, drillOk_2} -> Q115
+		  |startNewSpec -> Q137),
+	Q118	= (startNewSpec -> Q7
+		  |{polishNOk_1, polishOk_1} -> Q34
+		  |reconfigure -> Q115),
+	Q119	= (startNewSpec -> Q90),
+	Q120	= (reconfigure -> Q90
+		  |{polishNOk_2, polishOk_2} -> Q307),
+	Q121	= (reconfigure -> Q90
+		  |drill_1 -> Q101
+		  |polish_1 -> Q141
+		  |{polishNOk_2, polishOk_2} -> Q307),
+	Q122	= ({polishNOk_2, polishOk_2} -> Q87
+		  |reconfigure -> Q103
+		  |startNewSpec -> Q248
+		  |in_1 -> Q263),
+	Q123	= (startNewSpec -> Q66
+		  |{polishNOk_1, polishOk_1} -> Q84
+		  |reconfigure -> Q140),
+	Q124	= (out_1 -> Q36
+		  |out_2 -> Q104),
+	Q125	= (reset_1 -> Q87
+		  |startNewSpec -> Q145),
+	Q126	= (startNewSpec -> Q72
+		  |{drillNOk_1, drillOk_1} -> Q115),
+	Q127	= ({drillNOk_1, drillOk_1} -> Q106
+		  |reset_2 -> Q256),
+	Q128	= ({polishNOk_2, polishOk_2} -> Q84
+		  |reconfigure -> Q140
+		  |startNewSpec -> Q305),
+	Q129	= (in_1 -> Q108
+		  |reset_2 -> Q166
+		  |startNewSpec -> Q412),
+	Q130	= (in_2 -> Q25
+		  |drill_1 -> Q39),
+	Q131	= (in_2 -> Q134
+		  |{drillNOk_1, drillOk_1} -> Q162
+		  |startNewSpec -> Q256),
+	Q132	= (startNewSpec -> Q43
+		  |reset_1 -> Q147),
+	Q133	= (paint_1 -> Q29
+		  |out_2 -> Q106),
+	Q134	= (startNewSpec -> Q44
+		  |{drillNOk_1, drillOk_1} -> Q140),
+	Q135	= (startNewSpec -> Q51
+		  |in_1 -> Q152
+		  |reset_2 -> Q323),
+	Q136	= (reset_2 -> Q223
+		  |startNewSpec -> Q258),
+	Q137	= (paint_1 -> Q26
+		  |{drillNOk_2, drillOk_2} -> Q88),
+	Q138	= (startNewSpec -> Q21
+		  |out_1 -> Q68
+		  |out_2 -> Q91
+		  |drill_1 -> Q134
+		  |drill_2 -> Q148
+		  |paint_1 -> Q161
+		  |paint_2 -> Q170),
+	Q139	= (startNewSpec -> Q60
+		  |reset_1 -> Q215),
+	Q140	= (startNewSpec -> Q21),
+	Q141	= (reconfigure -> Q90
+		  |{polishNOk_1, polishOk_1} -> Q120
+		  |{polishNOk_2, polishOk_2} -> Q330),
+	Q142	= (reconfigure -> Q137
+		  |polish_1 -> Q156
+		  |{drillNOk_2, drillOk_2} -> Q234),
+	Q143	= (paintOk_1 -> Q18
+		  |paintNOk_1 -> Q21
+		  |drill_2 -> Q92),
+	Q144	= (reconfigure -> Q137
+		  |{drillNOk_2, drillOk_2} -> Q234),
+	Q145	= (drill_2 -> Q11
+		  |reconfigure -> Q17
+		  |polish_2 -> Q45
+		  |reset_1 -> Q246),
+	Q146	= (in_1 -> Q111
+		  |out_2 -> Q129
+		  |drill_2 -> Q155
+		  |polish_2 -> Q183
+		  |reconfigure -> Q215
+		  |startNewSpec -> Q293),
+	Q147	= (in_1 -> Q111
+		  |startNewSpec -> Q293),
+	Q148	= (startNewSpec -> Q53
+		  |drillOk_2 -> Q115
+		  |drillNOk_2 -> Q140),
+	Q149	= (startNewSpec -> Q12
+		  |paintOk_1 -> Q42
+		  |paintNOk_1 -> Q115),
+	Q150	= (startNewSpec -> Q93
+		  |paintNOk_2 -> Q115
+		  |paintOk_2 -> Q385),
+	Q151	= (drillNOk_1 -> Q30
+		  |drillOk_1 -> Q84
+		  |startNewSpec -> Q394),
+	Q152	= (startNewSpec -> Q37
+		  |reset_2 -> Q255),
+	Q153	= (reconfigure -> Q22
+		  |drillNOk_2 -> Q251
+		  |drillOk_2 -> Q307),
+	Q154	= (in_2 -> Q17
+		  |reset_1 -> Q24),
+	Q155	= ({drillNOk_2, drillOk_2} -> Q147
+		  |in_1 -> Q159
+		  |startNewSpec -> Q282),
+	Q156	= ({drillNOk_2, drillOk_2} -> Q5
+		  |reconfigure -> Q137
+		  |{polishNOk_1, polishOk_1} -> Q144),
+	Q157	= (startNewSpec -> Q65
+		  |{polishNOk_1, polishOk_1} -> Q97
+		  |reconfigure -> Q115
+		  |{polishNOk_2, polishOk_2} -> Q118),
+	Q158	= (startNewSpec -> Q106
+		  |reset_2 -> Q162
+		  |drill_1 -> Q172
+		  |paint_1 -> Q182
+		  |out_1 -> Q202),
+	Q159	= ({drillNOk_2, drillOk_2} -> Q111
+		  |startNewSpec -> Q216),
+	Q160	= (startNewSpec -> Q7
+		  |{polishNOk_1, polishOk_1} -> Q34
+		  |out_2 -> Q35
+		  |reconfigure -> Q115
+		  |polish_2 -> Q157
+		  |drill_2 -> Q173),
+	Q161	= (paintNOk_1 -> Q140
+		  |startNewSpec -> Q143
+		  |paintOk_1 -> Q200),
+	Q162	= (startNewSpec -> Q31
+		  |in_2 -> Q140),
+	Q163	= (startNewSpec -> Q46
+		  |in_1 -> Q429),
+	Q164	= (out_2 -> Q108
+		  |reconfigure -> Q119
+		  |out_1 -> Q132
+		  |drill_2 -> Q159
+		  |drill_1 -> Q178
+		  |polish_1 -> Q180
+		  |polish_2 -> Q185
+		  |startNewSpec -> Q308),
+	Q165	= (in_1 -> Q27
+		  |in_2 -> Q87
+		  |startNewSpec -> Q235
+		  |reconfigure -> Q323),
+	Q166	= (in_1 -> Q27
+		  |in_2 -> Q87
+		  |startNewSpec -> Q235),
+	Q167	= (reconfigure -> Q44
+		  |{drillNOk_1, drillOk_1} -> Q221),
+	Q168	= (drill_2 -> Q13
+		  |reconfigure -> Q44
+		  |polish_2 -> Q181
+		  |{drillNOk_1, drillOk_1} -> Q221),
+	Q169	= (drillOk_2 -> Q54
+		  |drillNOk_2 -> Q261
+		  |drill_1 -> Q265),
+	Q170	= (paintNOk_2 -> Q140
+		  |paintOk_2 -> Q220),
+	Q171	= (polishOk_1 -> Q70
+		  |hotSwapIn -> Q187
+		  |drillOk_2 -> Q210
+		  |polishNOk_1 -> Q232
+		  |drillNOk_2 -> Q366),
+	Q172	= ({drillNOk_1, drillOk_1} -> Q91
+		  |startNewSpec -> Q127
+		  |reset_2 -> Q131),
+	Q173	= ({polishNOk_1, polishOk_1} -> Q67
+		  |reconfigure -> Q117
+		  |{drillNOk_2, drillOk_2} -> Q118
+		  |startNewSpec -> Q156),
+	Q174	= (stopOldSpec -> Q80
+		  |drillNOk_2 -> Q112
+		  |drillOk_2 -> Q203),
+	Q175	= (reconfigure -> Q72
+		  |{drillNOk_1, drillOk_1} -> Q234),
+	Q176	= (reconfigure -> Q72
+		  |polish_2 -> Q192
+		  |{drillNOk_1, drillOk_1} -> Q234),
+	Q177	= (startNewSpec -> Q53
+		  |drillOk_2 -> Q115
+		  |drillNOk_2 -> Q140
+		  |drill_1 -> Q188
+		  |paint_1 -> Q189
+		  |out_1 -> Q199),
+	Q178	= (drillOk_1 -> Q34
+		  |startNewSpec -> Q63
+		  |drillNOk_1 -> Q111),
+	Q179	= (startNewSpec -> Q25),
+	Q180	= ({polishNOk_1, polishOk_1} -> Q111
+		  |reconfigure -> Q119
+		  |startNewSpec -> Q336),
+	Q181	= (reconfigure -> Q44
+		  |{polishNOk_2, polishOk_2} -> Q167
+		  |{drillNOk_1, drillOk_1} -> Q271),
+	Q182	= (startNewSpec -> Q6
+		  |paintOk_1 -> Q73
+		  |paintNOk_1 -> Q91
+		  |reset_2 -> Q211),
+	Q183	= (startNewSpec -> Q100
+		  |{polishNOk_2, polishOk_2} -> Q147
+		  |in_1 -> Q185
+		  |reconfigure -> Q215),
+	Q184	= (drillOk_2 -> Q133
+		  |paint_1 -> Q205
+		  |drillNOk_2 -> Q341),
+	Q185	= ({polishNOk_2, polishOk_2} -> Q111
+		  |reconfigure -> Q119
+		  |startNewSpec -> Q121),
+	Q186	= ({drillNOk_2, drillOk_2} -> Q55
+		  |in_1 -> Q195),
+	Q187	= (stopOldSpec -> Q113
+		  |{polishNOk_1, polishOk_1} -> Q174
+		  |drillNOk_2 -> Q213
+		  |reconfigure -> Q227
+		  |drillOk_2 -> Q407),
+	Q188	= (startNewSpec -> Q52
+		  |drillOk_2 -> Q126
+		  |drillNOk_2 -> Q134
+		  |{drillNOk_1, drillOk_1} -> Q148),
+	Q189	= (startNewSpec -> Q92
+		  |paintNOk_1 -> Q148
+		  |drillOk_2 -> Q149
+		  |drillNOk_2 -> Q161
+		  |paintOk_1 -> Q423),
+	Q190	= (startNewSpec -> Q31
+		  |out_1 -> Q62
+		  |drill_1 -> Q131
+		  |in_2 -> Q140
+		  |paint_1 -> Q211),
+	Q191	= ({drillNOk_2, drillOk_2} -> Q71
+		  |drillOk_1 -> Q144
+		  |reconfigure -> Q196
+		  |drillNOk_1 -> Q217),
+	Q192	= (reconfigure -> Q72
+		  |{polishNOk_2, polishOk_2} -> Q175
+		  |{drillNOk_1, drillOk_1} -> Q249),
+	Q193	= (reconfigure -> Q40
+		  |in_1 -> Q153
+		  |drillNOk_2 -> Q246
+		  |drillOk_2 -> Q292),
+	Q194	= (drillNOk_2 -> Q295
+		  |drill_1 -> Q299
+		  |drillOk_2 -> Q370),
+	Q195	= ({drillNOk_2, drillOk_2} -> Q90
+		  |drill_1 -> Q196),
+	Q196	= ({drillNOk_2, drillOk_2} -> Q86
+		  |drillOk_1 -> Q137
+		  |drillNOk_1 -> Q195),
+	Q197	= (polish_1 -> Q28
+		  |reconfigure -> Q31
+		  |in_2 -> Q221),
+	Q198	= (reconfigure -> Q31
+		  |in_2 -> Q221),
+	Q199	= (startNewSpec -> Q48
+		  |drillNOk_2 -> Q68
+		  |drillOk_2 -> Q139
+		  |reset_1 -> Q207),
+	Q200	= (startNewSpec -> Q18),
+	Q201	= (stopOldSpec -> Q190
+		  |in_2 -> Q289),
+	Q202	= (startNewSpec -> Q16
+		  |reset_2 -> Q62
+		  |reset_1 -> Q135),
+	Q203	= (stopOldSpec -> Q33),
+	Q204	= (in_2 -> Q167
+		  |{drillNOk_1, drillOk_1} -> Q198
+		  |reconfigure -> Q256),
+	Q205	= (drillOk_2 -> Q29
+		  |paintNOk_1 -> Q184
+		  |drillNOk_2 -> Q209
+		  |paintOk_1 -> Q230),
+	Q206	= (reconfigure -> Q22
+		  |drillNOk_2 -> Q251
+		  |drill_1 -> Q260
+		  |polish_1 -> Q262
+		  |drillOk_2 -> Q307),
+	Q207	= (startNewSpec -> Q40
+		  |drillNOk_2 -> Q103
+		  |in_1 -> Q208
+		  |drillOk_2 -> Q215),
+	Q208	= (startNewSpec -> Q22
+		  |drillOk_2 -> Q119
+		  |drillNOk_2 -> Q179),
+	Q209	= (drill_2 -> Q205
+		  |paintOk_1 -> Q222
+		  |paintNOk_1 -> Q341),
+	Q210	= (polishNOk_1 -> Q296
+		  |polishOk_1 -> Q302
+		  |hotSwapIn -> Q407),
+	Q211	= (startNewSpec -> Q77
+		  |in_2 -> Q161
+		  |paintNOk_1 -> Q162
+		  |paintOk_1 -> Q254),
+	Q212	= (startNewSpec -> Q114
+		  |{polishNOk_2, polishOk_2} -> Q123
+		  |{polishNOk_1, polishOk_1} -> Q128
+		  |reconfigure -> Q140),
+	Q213	= ({polishNOk_1, polishOk_1} -> Q112
+		  |reconfigure -> Q289
+		  |stopOldSpec -> Q378),
+	Q214	= (reconfigure -> Q127
+		  |reset_2 -> Q204
+		  |{drillNOk_1, drillOk_1} -> Q257),
+	Q215	= (startNewSpec -> Q55
+		  |in_1 -> Q119),
+	Q216	= (drill_1 -> Q191
+		  |reconfigure -> Q195
+		  |polish_1 -> Q226
+		  |{drillNOk_2, drillOk_2} -> Q307),
+	Q217	= (reconfigure -> Q195
+		  |{drillNOk_2, drillOk_2} -> Q307),
+	Q218	= (reconfigure -> Q21
+		  |polish_1 -> Q69
+		  |drill_2 -> Q225
+		  |polish_2 -> Q271),
+	Q219	= (startNewSpec -> Q39
+		  |in_2 -> Q75
+		  |drillOk_1 -> Q162
+		  |drillNOk_1 -> Q255),
+	Q220	= (startNewSpec -> Q341),
+	Q221	= (reconfigure -> Q21),
+	Q222	= (drill_2 -> Q230
+		  |out_1 -> Q301),
+	Q223	= (in_2 -> Q84
+		  |startNewSpec -> Q197),
+	Q224	= (drill_1 -> Q2
+		  |in_2 -> Q84
+		  |out_1 -> Q110
+		  |reconfigure -> Q162
+		  |startNewSpec -> Q197
+		  |polish_1 -> Q231),
+	Q225	= (reconfigure -> Q53
+		  |drillNOk_2 -> Q221
+		  |drillOk_2 -> Q234),
+	Q226	= (reconfigure -> Q195
+		  |{polishNOk_1, polishOk_1} -> Q217
+		  |{drillNOk_2, drillOk_2} -> Q330),
+	Q227	= (stopOldSpec -> Q177
+		  |drillOk_2 -> Q237
+		  |drillNOk_2 -> Q289),
+	Q228	= (reconfigure -> Q53
+		  |polish_1 -> Q99
+		  |drillNOk_2 -> Q221
+		  |drillOk_2 -> Q234),
+	Q229	= (reconfigure -> Q16
+		  |reset_2 -> Q83
+		  |reset_1 -> Q412),
+	Q230	= (drillOk_2 -> Q124
+		  |drillNOk_2 -> Q222
+		  |out_1 -> Q239),
+	Q231	= (startNewSpec -> Q28
+		  |in_2 -> Q123
+		  |reconfigure -> Q162
+		  |{polishNOk_1, polishOk_1} -> Q223),
+	Q232	= (polish_1 -> Q171
+		  |hotSwapIn -> Q174
+		  |drillOk_2 -> Q296
+		  |drillNOk_2 -> Q362),
+	Q233	= (polish_1 -> Q5
+		  |reconfigure -> Q88
+		  |polish_2 -> Q249),
+	Q234	= (reconfigure -> Q88),
+	Q235	= (reconfigure -> Q24
+		  |in_2 -> Q246
+		  |in_1 -> Q375),
+	Q236	= (drillNOk_2 -> Q87
+		  |drillOk_2 -> Q147
+		  |startNewSpec -> Q193
+		  |reconfigure -> Q207
+		  |in_1 -> Q244),
+	Q237	= (stopOldSpec -> Q116),
+	Q238	= (out_2 -> Q127
+		  |{drillNOk_1, drillOk_1} -> Q133),
+	Q239	= (drillOk_2 -> Q36
+		  |reset_1 -> Q241
+		  |drillNOk_2 -> Q301),
+	Q240	= (reset_2 -> Q110
+		  |reset_1 -> Q129
+		  |startNewSpec -> Q229),
+	Q241	= (drillOk_2 -> Q46
+		  |in_1 -> Q169
+		  |drillNOk_2 -> Q252),
+	Q242	= (drillNOk_2 -> Q30
+		  |drillOk_2 -> Q111
+		  |startNewSpec -> Q206
+		  |reconfigure -> Q208
+		  |drill_1 -> Q247
+		  |out_1 -> Q312
+		  |polish_1 -> Q411),
+	Q243	= (startNewSpec -> Q43
+		  |reconfigure -> Q139
+		  |reset_1 -> Q147
+		  |out_2 -> Q240
+		  |polish_2 -> Q335
+		  |drill_2 -> Q391),
+	Q244	= (drillNOk_2 -> Q30
+		  |drillOk_2 -> Q111
+		  |startNewSpec -> Q206),
+	Q245	= (reconfigure -> Q14
+		  |drill_2 -> Q193
+		  |polish_2 -> Q248
+		  |in_1 -> Q251),
+	Q246	= (reconfigure -> Q14
+		  |in_1 -> Q251),
+	Q247	= (drillOk_1 -> Q78
+		  |drillNOk_2 -> Q151
+		  |drillOk_2 -> Q178
+		  |drillNOk_1 -> Q244
+		  |startNewSpec -> Q260),
+	Q248	= (reconfigure -> Q14
+		  |{polishNOk_2, polishOk_2} -> Q246
+		  |in_1 -> Q280),
+	Q249	= (reconfigure -> Q88
+		  |{polishNOk_2, polishOk_2} -> Q234),
+	Q250	= (reconfigure -> Q25
+		  |drill_2 -> Q153
+		  |drill_1 -> Q264
+		  |polish_2 -> Q280
+		  |polish_1 -> Q291),
+	Q251	= (reconfigure -> Q25),
+	Q252	= (drill_2 -> Q241
+		  |in_1 -> Q261),
+	Q253	= (drillNOk_1 -> Q30
+		  |reconfigure -> Q75
+		  |drillOk_1 -> Q84
+		  |drill_2 -> Q247
+		  |polish_2 -> Q259
+		  |out_2 -> Q380
+		  |startNewSpec -> Q394),
+	Q254	= (startNewSpec -> Q64
+		  |in_2 -> Q200),
+	Q255	= (startNewSpec -> Q130
+		  |in_2 -> Q179),
+	Q256	= ({drillNOk_1, drillOk_1} -> Q31
+		  |in_2 -> Q44),
+	Q257	= (reconfigure -> Q106
+		  |reset_2 -> Q198),
+	Q258	= (polish_1 -> Q58
+		  |reconfigure -> Q106
+		  |reset_2 -> Q198),
+	Q259	= (reconfigure -> Q75
+		  |drillOk_1 -> Q128
+		  |{polishNOk_2, polishOk_2} -> Q151
+		  |drillNOk_1 -> Q263
+		  |startNewSpec -> Q274),
+	Q260	= (reconfigure -> Q57
+		  |drillOk_2 -> Q71
+		  |drillNOk_1 -> Q153
+		  |drillOk_1 -> Q225
+		  |drillNOk_2 -> Q264),
+	Q261	= (drill_2 -> Q169
+		  |drill_1 -> Q267),
+	Q262	= (reconfigure -> Q22
+		  |{polishNOk_1, polishOk_1} -> Q153
+		  |drillNOk_2 -> Q291
+		  |drillOk_2 -> Q330),
+	Q263	= ({polishNOk_2, polishOk_2} -> Q30
+		  |reconfigure -> Q179
+		  |startNewSpec -> Q357),
+	Q264	= (reconfigure -> Q41
+		  |drillOk_1 -> Q221
+		  |drillNOk_1 -> Q251),
+	Q265	= (drillOk_2 -> Q49
+		  |drillNOk_1 -> Q169
+		  |drillOk_1 -> Q184
+		  |drillNOk_2 -> Q267),
+	Q266	= (drillOk_1 -> Q112
+		  |stopOldSpec -> Q253
+		  |drillNOk_1 -> Q395),
+	Q267	= (drillNOk_1 -> Q261
+		  |drill_2 -> Q265
+		  |drillOk_1 -> Q341),
+	Q268	= (startNewSpec -> Q11
+		  |reset_1 -> Q105
+		  |drillNOk_2 -> Q125
+		  |drillOk_2 -> Q132
+		  |reconfigure -> Q199),
+	Q269	= (reconfigure -> Q15
+		  |drillOk_1 -> Q257
+		  |reset_2 -> Q270
+		  |drillNOk_1 -> Q319),
+	Q270	= (reconfigure -> Q39
+		  |drillOk_1 -> Q198
+		  |in_2 -> Q264
+		  |drillNOk_1 -> Q375),
+	Q271	= (reconfigure -> Q21
+		  |{polishNOk_2, polishOk_2} -> Q221),
+	Q272	= (drillOk_1 -> Q174
+		  |drillNOk_2 -> Q266
+		  |drillNOk_1 -> Q278
+		  |drillOk_2 -> Q354
+		  |stopOldSpec -> Q404),
+	Q273	= ({polishNOk_1, polishOk_1} -> Q30
+		  |reconfigure -> Q179
+		  |startNewSpec -> Q350),
+	Q274	= (reconfigure -> Q41
+		  |{polishNOk_2, polishOk_2} -> Q264
+		  |drillOk_1 -> Q271
+		  |drillNOk_1 -> Q280),
+	Q275	= (polish_2 -> Q277
+		  |drillNOk_1 -> Q285
+		  |drillOk_1 -> Q296
+		  |hotSwapIn -> Q354),
+	Q276	= (polish_2 -> Q279
+		  |reset_1 -> Q297
+		  |hotSwapIn -> Q311),
+	Q277	= (polishNOk_2 -> Q275
+		  |drillNOk_1 -> Q287
+		  |drillOk_1 -> Q290
+		  |hotSwapIn -> Q400
+		  |polishOk_2 -> Q410),
+	Q278	= (stopOldSpec -> Q242
+		  |drillOk_2 -> Q384
+		  |drillNOk_2 -> Q395),
+	Q279	= (polishNOk_2 -> Q276
+		  |reset_1 -> Q283
+		  |polishOk_2 -> Q349
+		  |hotSwapIn -> Q428),
+	Q280	= (reconfigure -> Q25
+		  |{polishNOk_2, polishOk_2} -> Q251),
+	Q281	= (drillOk_1 -> Q64
+		  |drillNOk_1 -> Q286
+		  |in_2 -> Q386),
+	Q282	= (reconfigure -> Q186
+		  |in_1 -> Q217
+		  |{drillNOk_2, drillOk_2} -> Q292),
+	Q283	= (in_1 -> Q287
+		  |polishNOk_2 -> Q297
+		  |hotSwapIn -> Q424
+		  |polishOk_2 -> Q425),
+	Q284	= (in_2 -> Q112
+		  |stopOldSpec -> Q224),
+	Q285	= (drill_1 -> Q275
+		  |polish_2 -> Q287
+		  |hotSwapIn -> Q384),
+	Q286	= (drill_1 -> Q281
+		  |in_2 -> Q295),
+	Q287	= (drill_1 -> Q277
+		  |polishNOk_2 -> Q285
+		  |hotSwapIn -> Q418
+		  |polishOk_2 -> Q421),
+	Q288	= (reconfigure -> Q25
+		  |{polishNOk_1, polishOk_1} -> Q280
+		  |{polishNOk_2, polishOk_2} -> Q291),
+	Q289	= (stopOldSpec -> Q138),
+	Q290	= (polishNOk_2 -> Q296
+		  |hotSwapIn -> Q318
+		  |polishOk_2 -> Q389),
+	Q291	= (reconfigure -> Q25
+		  |{polishNOk_1, polishOk_1} -> Q251),
+	Q292	= (reconfigure -> Q55
+		  |in_1 -> Q307),
+	Q293	= (reconfigure -> Q55
+		  |polish_2 -> Q100
+		  |in_1 -> Q307),
+	Q294	= (drillOk_2 -> Q107
+		  |stopOldSpec -> Q236
+		  |in_1 -> Q278
+		  |drillNOk_2 -> Q316),
+	Q295	= (drill_2 -> Q194
+		  |drill_1 -> Q386),
+	Q296	= (hotSwapIn -> Q203
+		  |polish_1 -> Q210
+		  |polish_2 -> Q290),
+	Q297	= (hotSwapIn -> Q107
+		  |polish_2 -> Q283
+		  |in_1 -> Q285),
+	Q298	= (reset_1 -> Q416
+		  |stopOldSpec -> Q426),
+	Q299	= (drillOk_1 -> Q19
+		  |drillNOk_1 -> Q194
+		  |drillOk_2 -> Q304
+		  |drillNOk_2 -> Q386),
+	Q300	= (reconfigure -> Q62
+		  |startNewSpec -> Q83
+		  |in_2 -> Q125
+		  |reset_1 -> Q166),
+	Q301	= (drill_2 -> Q239
+		  |reset_1 -> Q252),
+	Q302	= (hotSwapIn -> Q203
+		  |out_1 -> Q276
+		  |polish_2 -> Q313),
+	Q303	= (drill_2 -> Q306
+		  |drill_1 -> Q310
+		  |hotSwapIn -> Q395),
+	Q304	= (drillOk_1 -> Q74
+		  |paint_2 -> Q314
+		  |drillNOk_1 -> Q370),
+	Q305	= (reconfigure -> Q21
+		  |polish_1 -> Q114
+		  |{polishNOk_2, polishOk_2} -> Q221),
+	Q306	= (hotSwapIn -> Q278
+		  |drillOk_2 -> Q285
+		  |drillNOk_2 -> Q303
+		  |drill_1 -> Q358),
+	Q307	= (reconfigure -> Q90),
+	Q308	= (drill_1 -> Q71
+		  |reconfigure -> Q90
+		  |polish_2 -> Q120
+		  |polish_1 -> Q330),
+	Q309	= (reconfigure -> Q68
+		  |reset_1 -> Q87
+		  |startNewSpec -> Q145
+		  |out_2 -> Q240
+		  |drill_2 -> Q312
+		  |polish_2 -> Q324),
+	Q310	= (hotSwapIn -> Q266
+		  |drillNOk_1 -> Q303
+		  |drill_2 -> Q358
+		  |drillOk_1 -> Q362),
+	Q311	= (reset_1 -> Q107
+		  |stopOldSpec -> Q243),
+	Q312	= (startNewSpec -> Q11
+		  |reset_1 -> Q105
+		  |drillNOk_2 -> Q125
+		  |drillOk_2 -> Q132),
+	Q313	= (out_1 -> Q279
+		  |polishNOk_2 -> Q302
+		  |hotSwapIn -> Q318
+		  |polishOk_2 -> Q345),
+	Q314	= (drillOk_1 -> Q1
+		  |paintNOk_2 -> Q304
+		  |drillNOk_1 -> Q315
+		  |paintOk_2 -> Q322),
+	Q315	= (drill_1 -> Q314
+		  |paintOk_2 -> Q328
+		  |paintNOk_2 -> Q370),
+	Q316	= (stopOldSpec -> Q85
+		  |in_1 -> Q395),
+	Q317	= (polish_1 -> Q320
+		  |reset_2 -> Q363
+		  |hotSwapIn -> Q371),
+	Q318	= ({polishNOk_2, polishOk_2} -> Q203
+		  |reconfigure -> Q237
+		  |stopOldSpec -> Q347),
+	Q319	= (reconfigure -> Q37
+		  |reset_2 -> Q375),
+	Q320	= (polishNOk_1 -> Q317
+		  |polishOk_1 -> Q326
+		  |reset_2 -> Q334
+		  |hotSwapIn -> Q338),
+	Q321	= (reconfigure -> Q37
+		  |drill_1 -> Q269
+		  |polish_1 -> Q329
+		  |reset_2 -> Q375),
+	Q322	= (drillOk_1 -> Q124
+		  |drillNOk_1 -> Q328
+		  |out_2 -> Q344),
+	Q323	= (startNewSpec -> Q24
+		  |in_2 -> Q103
+		  |in_1 -> Q255),
+	Q324	= (startNewSpec -> Q45
+		  |reconfigure -> Q68
+		  |reset_1 -> Q122
+		  |{polishNOk_2, polishOk_2} -> Q125),
+	Q325	= (drillOk_1 -> Q237
+		  |drillNOk_1 -> Q343
+		  |stopOldSpec -> Q392),
+	Q326	= (out_1 -> Q331
+		  |reset_2 -> Q369
+		  |hotSwapIn -> Q371),
+	Q327	= (reset_2 -> Q382
+		  |stopOldSpec -> Q401),
+	Q328	= (drill_1 -> Q322
+		  |out_2 -> Q348),
+	Q329	= (reconfigure -> Q37
+		  |reset_2 -> Q94
+		  |{polishNOk_1, polishOk_1} -> Q319),
+	Q330	= (reconfigure -> Q90
+		  |{polishNOk_1, polishOk_1} -> Q307),
+	Q331	= (reset_2 -> Q355
+		  |reset_1 -> Q356
+		  |hotSwapIn -> Q403),
+	Q332	= (in_2 -> Q303
+		  |drill_1 -> Q333
+		  |hotSwapIn -> Q382),
+	Q333	= (in_2 -> Q310
+		  |drillNOk_1 -> Q332
+		  |hotSwapIn -> Q337
+		  |drillOk_1 -> Q363),
+	Q334	= (polishNOk_1 -> Q363
+		  |in_2 -> Q366
+		  |polishOk_1 -> Q369
+		  |hotSwapIn -> Q372),
+	Q335	= (startNewSpec -> Q59
+		  |{polishNOk_2, polishOk_2} -> Q132
+		  |reconfigure -> Q139
+		  |reset_1 -> Q183),
+	Q336	= (reconfigure -> Q90
+		  |polish_2 -> Q141
+		  |{polishNOk_1, polishOk_1} -> Q307),
+	Q337	= (in_2 -> Q266
+		  |drillOk_1 -> Q284
+		  |drillNOk_1 -> Q382
+		  |stopOldSpec -> Q409),
+	Q338	= (stopOldSpec -> Q35
+		  |reconfigure -> Q365
+		  |{polishNOk_1, polishOk_1} -> Q371
+		  |reset_2 -> Q372),
+	Q339	= (stopOldSpec -> Q165
+		  |in_2 -> Q316
+		  |in_1 -> Q382),
+	Q340	= ({polishNOk_2, polishOk_2} -> Q111
+		  |reconfigure -> Q119
+		  |startNewSpec -> Q121
+		  |out_1 -> Q335
+		  |drill_1 -> Q342
+		  |polish_1 -> Q406),
+	Q341	= (drill_2 -> Q184
+		  |paint_1 -> Q209),
+	Q342	= (reconfigure -> Q8
+		  |drillOk_1 -> Q97
+		  |startNewSpec -> Q101
+		  |{polishNOk_2, polishOk_2} -> Q178
+		  |drillNOk_1 -> Q185),
+	Q343	= (stopOldSpec -> Q402),
+	Q344	= (drillOk_1 -> Q104
+		  |reset_2 -> Q281
+		  |drillNOk_1 -> Q348),
+	Q345	= (hotSwapIn -> Q203
+		  |out_2 -> Q326
+		  |out_1 -> Q349),
+	Q346	= (polish_1 -> Q65
+		  |reconfigure -> Q88
+		  |{polishNOk_2, polishOk_2} -> Q234),
+	Q347	= ({polishNOk_2, polishOk_2} -> Q34
+		  |reconfigure -> Q115
+		  |polish_1 -> Q157
+		  |out_1 -> Q335
+		  |startNewSpec -> Q346
+		  |drill_1 -> Q352),
+	Q348	= (reset_2 -> Q286
+		  |drill_1 -> Q344),
+	Q349	= (hotSwapIn -> Q311
+		  |out_2 -> Q331
+		  |reset_1 -> Q425),
+	Q350	= (reconfigure -> Q25
+		  |{polishNOk_1, polishOk_1} -> Q251
+		  |drill_2 -> Q262
+		  |polish_2 -> Q288),
+	Q351	= (in_1 -> Q303
+		  |hotSwapIn -> Q316
+		  |drill_2 -> Q353),
+	Q352	= ({polishNOk_2, polishOk_2} -> Q89
+		  |{drillNOk_1, drillOk_1} -> Q97
+		  |reconfigure -> Q126
+		  |startNewSpec -> Q192),
+	Q353	= (hotSwapIn -> Q294
+		  |drillOk_2 -> Q297
+		  |in_1 -> Q306
+		  |drillNOk_2 -> Q351),
+	Q354	= (drillOk_1 -> Q203
+		  |stopOldSpec -> Q373
+		  |drillNOk_1 -> Q384),
+	Q355	= (reset_1 -> Q0
+		  |in_2 -> Q368
+		  |hotSwapIn -> Q383),
+	Q356	= (reset_2 -> Q0
+		  |in_1 -> Q359
+		  |hotSwapIn -> Q387),
+	Q357	= (reconfigure -> Q25
+		  |{polishNOk_2, polishOk_2} -> Q251
+		  |drill_1 -> Q274
+		  |polish_1 -> Q288),
+	Q358	= (drillOk_1 -> Q232
+		  |hotSwapIn -> Q272
+		  |drillOk_2 -> Q275
+		  |drillNOk_1 -> Q306
+		  |drillNOk_2 -> Q310),
+	Q359	= (hotSwapIn -> Q327
+		  |reset_2 -> Q332
+		  |drill_1 -> Q361),
+	Q360	= (startNewSpec -> Q109
+		  |{drillNOk_2, drillOk_2} -> Q139
+		  |reset_1 -> Q405),
+	Q361	= (drillOk_1 -> Q317
+		  |reset_2 -> Q333
+		  |drillNOk_1 -> Q359
+		  |hotSwapIn -> Q398),
+	Q362	= (hotSwapIn -> Q112
+		  |drill_2 -> Q232
+		  |polish_1 -> Q366),
+	Q363	= (hotSwapIn -> Q284
+		  |polish_1 -> Q334
+		  |in_2 -> Q362),
+	Q364	= (startNewSpec -> Q79
+		  |paintNOk_2 -> Q139
+		  |reset_1 -> Q420
+		  |paintOk_2 -> Q427),
+	Q365	= (stopOldSpec -> Q158
+		  |reset_2 -> Q201),
+	Q366	= (drill_2 -> Q171
+		  |hotSwapIn -> Q213
+		  |polishNOk_1 -> Q362
+		  |polishOk_1 -> Q367),
+	Q367	= (drill_2 -> Q70
+		  |hotSwapIn -> Q112
+		  |out_1 -> Q368),
+	Q368	= (drill_2 -> Q98
+		  |reset_1 -> Q351
+		  |hotSwapIn -> Q430),
+	Q369	= (hotSwapIn -> Q284
+		  |out_1 -> Q355
+		  |in_2 -> Q367),
+	Q370	= (drill_1 -> Q304
+		  |paint_2 -> Q315),
+	Q371	= (reset_2 -> Q284
+		  |stopOldSpec -> Q415),
+	Q372	= (reconfigure -> Q201
+		  |in_2 -> Q213
+		  |stopOldSpec -> Q231
+		  |{polishNOk_1, polishOk_1} -> Q284),
+	Q373	= (reconfigure -> Q8
+		  |drillOk_1 -> Q34
+		  |startNewSpec -> Q63
+		  |drillNOk_1 -> Q111
+		  |polish_2 -> Q342
+		  |drill_2 -> Q377
+		  |out_2 -> Q380),
+	Q374	= (polish_1 -> Q94
+		  |reconfigure -> Q130
+		  |in_2 -> Q251
+		  |drill_1 -> Q270),
+	Q375	= (reconfigure -> Q130
+		  |in_2 -> Q251),
+	Q376	= (stopOldSpec -> Q268
+		  |reset_1 -> Q294
+		  |drillOk_2 -> Q311
+		  |drillNOk_2 -> Q430),
+	Q377	= (drillOk_1 -> Q67
+		  |drillNOk_1 -> Q159
+		  |{drillNOk_2, drillOk_2} -> Q178
+		  |startNewSpec -> Q191),
+	Q378	= (out_2 -> Q35
+		  |startNewSpec -> Q66
+		  |{polishNOk_1, polishOk_1} -> Q84
+		  |drill_2 -> Q113
+		  |reconfigure -> Q140
+		  |polish_2 -> Q212),
+	Q379	= (reconfigure -> Q4
+		  |reset_2 -> Q61
+		  |drillNOk_1 -> Q108
+		  |drillOk_1 -> Q136
+		  |startNewSpec -> Q269),
+	Q380	= (reset_2 -> Q61
+		  |drillNOk_1 -> Q108
+		  |drillOk_1 -> Q136
+		  |startNewSpec -> Q269),
+	Q381	= (startNewSpec -> Q49
+		  |drillOk_1 -> Q385
+		  |drillNOk_1 -> Q429),
+	Q382	= (stopOldSpec -> Q23
+		  |in_2 -> Q395),
+	Q383	= (stopOldSpec -> Q300
+		  |reset_1 -> Q339
+		  |in_2 -> Q430),
+	Q384	= (stopOldSpec -> Q164),
+	Q385	= (startNewSpec -> Q133),
+	Q386	= (drillOk_1 -> Q18
+		  |drillNOk_1 -> Q295
+		  |drill_2 -> Q299),
+	Q387	= (in_1 -> Q327
+		  |reset_2 -> Q339
+		  |stopOldSpec -> Q399),
+	Q388	= ({drillNOk_2, drillOk_2} -> Q119
+		  |startNewSpec -> Q195),
+	Q389	= (hotSwapIn -> Q203
+		  |out_2 -> Q317
+		  |polish_1 -> Q390),
+	Q390	= (out_2 -> Q320
+		  |polishOk_1 -> Q345
+		  |polishNOk_1 -> Q389
+		  |hotSwapIn -> Q407),
+	Q391	= (startNewSpec -> Q3
+		  |{drillNOk_2, drillOk_2} -> Q132
+		  |reset_1 -> Q155),
+	Q392	= (out_2 -> Q4
+		  |startNewSpec -> Q86
+		  |drillOk_1 -> Q115
+		  |drillNOk_1 -> Q119
+		  |drill_2 -> Q396
+		  |paint_2 -> Q397),
+	Q393	= (reset_2 -> Q110
+		  |reset_1 -> Q129
+		  |reconfigure -> Q202
+		  |startNewSpec -> Q229),
+	Q394	= (reconfigure -> Q41
+		  |drillOk_1 -> Q221
+		  |drillNOk_1 -> Q251
+		  |drill_2 -> Q260
+		  |polish_2 -> Q274),
+	Q395	= (stopOldSpec -> Q414),
+	Q396	= ({drillNOk_2, drillOk_2} -> Q8
+		  |drillOk_1 -> Q117
+		  |startNewSpec -> Q196
+		  |drillNOk_1 -> Q388),
+	Q397	= (paintNOk_2 -> Q8
+		  |startNewSpec -> Q20
+		  |drillOk_1 -> Q150
+		  |paintOk_2 -> Q381
+		  |drillNOk_1 -> Q417),
+	Q398	= (drillNOk_1 -> Q327
+		  |reset_2 -> Q337
+		  |drillOk_1 -> Q371
+		  |stopOldSpec -> Q379),
+	Q399	= (in_1 -> Q108
+		  |reconfigure -> Q135
+		  |reset_2 -> Q166
+		  |startNewSpec -> Q412),
+	Q400	= (drillOk_1 -> Q318
+		  |reconfigure -> Q325
+		  |stopOldSpec -> Q342
+		  |{polishNOk_2, polishOk_2} -> Q354
+		  |drillNOk_1 -> Q418),
+	Q401	= (reset_2 -> Q27
+		  |polish_1 -> Q102
+		  |reconfigure -> Q152
+		  |out_1 -> Q240
+		  |startNewSpec -> Q321
+		  |drill_1 -> Q380),
+	Q402	= (drill_1 -> Q8
+		  |startNewSpec -> Q90
+		  |out_1 -> Q139
+		  |out_2 -> Q152
+		  |drill_2 -> Q388
+		  |paint_1 -> Q413
+		  |paint_2 -> Q417),
+	Q403	= (reset_2 -> Q383
+		  |reset_1 -> Q387
+		  |stopOldSpec -> Q393),
+	Q404	= (drillOk_1 -> Q78
+		  |drillNOk_2 -> Q151
+		  |drillOk_2 -> Q178
+		  |drillNOk_1 -> Q244
+		  |startNewSpec -> Q260
+		  |reconfigure -> Q408),
+	Q405	= (startNewSpec -> Q186
+		  |{drillNOk_2, drillOk_2} -> Q215
+		  |in_1 -> Q388),
+	Q406	= (reconfigure -> Q119
+		  |startNewSpec -> Q141
+		  |{polishNOk_2, polishOk_2} -> Q180
+		  |{polishNOk_1, polishOk_1} -> Q185),
+	Q407	= (stopOldSpec -> Q160
+		  |{polishNOk_1, polishOk_1} -> Q203
+		  |reconfigure -> Q237),
+	Q408	= (drillOk_2 -> Q8
+		  |startNewSpec -> Q57
+		  |drillNOk_2 -> Q75
+		  |drillOk_1 -> Q148
+		  |drillNOk_1 -> Q208),
+	Q409	= (drillNOk_1 -> Q27
+		  |in_2 -> Q151
+		  |reconfigure -> Q219
+		  |drillOk_1 -> Q223
+		  |startNewSpec -> Q270),
+	Q410	= (hotSwapIn -> Q354
+		  |out_2 -> Q361
+		  |drillOk_1 -> Q389
+		  |drillNOk_1 -> Q421),
+	Q411	= (drillOk_2 -> Q180
+		  |reconfigure -> Q208
+		  |{polishNOk_1, polishOk_1} -> Q244
+		  |startNewSpec -> Q262
+		  |drillNOk_2 -> Q273),
+	Q412	= (reconfigure -> Q51
+		  |reset_2 -> Q235
+		  |in_1 -> Q319),
+	Q413	= (paintOk_1 -> Q76
+		  |paintNOk_1 -> Q119),
+	Q414	= (out_2 -> Q108
+		  |out_1 -> Q125
+		  |drill_1 -> Q151
+		  |reconfigure -> Q179
+		  |drill_2 -> Q244
+		  |startNewSpec -> Q250
+		  |polish_2 -> Q263
+		  |polish_1 -> Q273),
+	Q415	= (polish_1 -> Q35
+		  |reconfigure -> Q91
+		  |reset_2 -> Q223
+		  |out_1 -> Q240
+		  |startNewSpec -> Q258
+		  |drill_1 -> Q419),
+	Q416	= (in_1 -> Q343
+		  |stopOldSpec -> Q422),
+	Q417	= (startNewSpec -> Q9
+		  |paintNOk_2 -> Q119
+		  |paintOk_2 -> Q429),
+	Q418	= (stopOldSpec -> Q340
+		  |reconfigure -> Q343
+		  |{polishNOk_2, polishOk_2} -> Q384),
+	Q419	= (reset_2 -> Q2
+		  |{drillNOk_1, drillOk_1} -> Q136
+		  |startNewSpec -> Q214),
+	Q420	= (startNewSpec -> Q10
+		  |paintOk_2 -> Q163
+		  |paintNOk_2 -> Q215
+		  |in_1 -> Q417),
+	Q421	= (out_2 -> Q359
+		  |hotSwapIn -> Q384
+		  |drill_1 -> Q410),
+	Q422	= (startNewSpec -> Q55
+		  |in_1 -> Q119
+		  |out_2 -> Q135
+		  |drill_2 -> Q405
+		  |paint_2 -> Q420),
+	Q423	= (startNewSpec -> Q19
+		  |drillOk_2 -> Q42
+		  |drillNOk_2 -> Q200),
+	Q424	= ({polishNOk_2, polishOk_2} -> Q107
+		  |stopOldSpec -> Q183
+		  |reconfigure -> Q416
+		  |in_1 -> Q418),
+	Q425	= (hotSwapIn -> Q107
+		  |out_2 -> Q356
+		  |in_1 -> Q421),
+	Q426	= (startNewSpec -> Q60
+		  |out_2 -> Q202
+		  |reset_1 -> Q215
+		  |drill_2 -> Q360
+		  |paint_2 -> Q364),
+	Q427	= (startNewSpec -> Q36
+		  |reset_1 -> Q163),
+	Q428	= (reconfigure -> Q298
+		  |{polishNOk_2, polishOk_2} -> Q311
+		  |stopOldSpec -> Q335
+		  |reset_1 -> Q424),
+	Q429	= (startNewSpec -> Q54),
+	Q430	= (stopOldSpec -> Q309
+		  |reset_1 -> Q316).

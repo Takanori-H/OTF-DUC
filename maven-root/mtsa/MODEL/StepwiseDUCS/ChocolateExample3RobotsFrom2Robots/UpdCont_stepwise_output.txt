@@ -1,0 +1,425 @@
+INFO: Registered Map Environment: MAP_CHOCOLATE_1
+INFO: Registered Map Environment: MAP_CHOCOLATE_2
+INFO: Registered Map Environment: MAP_CHOCOLATE_3
+comp.compile time : 19ms
+ - Stepwise mode: oldController 'OldCon' is not pre-composed.
+ - Synthesizing Mapping Environment from lists (size=3)...
+INFO: Auto-compiling dependency: CHOCOLATE_OLD_1
+INFO: Auto-compiling dependency: CHOCOLATE_NEW_1
+Generating Mapping Environment: MAP_CHOCOLATE_OLD_1_CHOCOLATE_NEW_1
+INFO: Auto-compiling dependency: CHOCOLATE_OLD_2
+INFO: Auto-compiling dependency: CHOCOLATE_NEW_2
+Generating Mapping Environment: MAP_CHOCOLATE_OLD_2_CHOCOLATE_NEW_2
+INFO: Auto-compiling dependency: CHOCOLATE_OLD_3
+INFO: Auto-compiling dependency: CHOCOLATE_NEW_3
+Generating Mapping Environment: MAP_CHOCOLATE_OLD_3_CHOCOLATE_NEW_3
+Mode: Stepwise Updating Controller Synthesis (initial baseline)
+comp.continueCompilation time : 124ms
+=========================================
+Mode: Stepwise DUC (initial baseline)
+=========================================
+[Stepwise DUCS]
+oldController is ignored in initial stepwise mode: OldCon
+
+[Stepwise DUCS] Requirement classification:
+  P_OLD_OUT_IF_FINISHED_1 (OLD_SAFETY) -> stage 1
+  P_OLD_OUT_IF_FINISHED_2 (OLD_SAFETY) -> stage 2
+  P_OLD_OUT_IF_FINISHED_3 (OLD_SAFETY) -> stage 3
+  P_POLISH_ONCE_1 (OLD_SAFETY) -> stage 1
+  P_POLISH_ONCE_2 (OLD_SAFETY) -> stage 2
+  P_POLISH_ONCE_3 (OLD_SAFETY) -> stage 3
+  P_OLD_NO_SIMULTANEOUS_POLISH_1_2 (OLD_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={polish_2=1, polishOk_2=1, polishNOk_2=1, polish_1=0, polishOk_1=0, polishNOk_1=0}
+  P_NEW_OUT_IF_FINISHED_1 (NEW_SAFETY) -> stage 1
+  P_NEW_OUT_IF_FINISHED_2 (NEW_SAFETY) -> stage 2
+  P_NEW_OUT_IF_FINISHED_3 (NEW_SAFETY) -> stage 3
+  P_PAINT_ONCE_1 (NEW_SAFETY) -> stage 1
+  P_PAINT_ONCE_2 (NEW_SAFETY) -> stage 2
+  P_PAINT_ONCE_3 (NEW_SAFETY) -> stage 3
+
+[Stepwise DUCS] Stage 1 old=CHOCOLATE_OLD_1 new=CHOCOLATE_NEW_1 relation=R_CHOCOLATE_1
+  local old safety: [P_OLD_OUT_IF_FINISHED_1, P_POLISH_ONCE_1]
+  local new safety: [P_NEW_OUT_IF_FINISHED_1, P_PAINT_ONCE_1]
+  local transition: []
+Formula !P_OLD_OUT_IF_FINISHED_1 = (true U (out_1 & !Polished_1))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_OUT_IF_FINISHED_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |out_1&!Polished_1 -> S1).
+Composition:P_OLD_OUT_IF_FINISHED_1 = Polished_1 || out_1 || SYNC || P_OLD_OUT_IF_FINISHED_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 26934K
+Composed in 102ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_OUT_IF_FINISHED_1)
+DFA(P_OLD_OUT_IF_FINISHED_1) has 2 states.
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_POLISH_ONCE_1 = (true U (polish_1 & Polished_1))
+GBA 2 states 3 transitions
+Buchi automata:
+P_POLISH_ONCE_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |polish_1&Polished_1 -> S1).
+Composition:P_POLISH_ONCE_1 = Polished_1 || polish_1 || SYNC || P_POLISH_ONCE_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 27171K
+Composed in 65ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_POLISH_ONCE_1 minimising...
+Minimised States: 3 in 2ms
+make DFA(P_POLISH_ONCE_1)
+DFA(P_POLISH_ONCE_1) has 2 states.
+Tau reduction ON
+P_POLISH_ONCE_1 minimising...
+Minimised States: 2 in 0ms
+Composition:STEPWISE_OLD_CONTROLLER_STAGE_1 = CHOCOLATE_OLD_1 || P_OLD_OUT_IF_FINISHED_1 || P_POLISH_ONCE_1
+State Space: 4 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 5 Transitions: 8 Memory used: 27176K
+Composed in 46ms
+Environment states: 6
+Game states: 6
+Game transitions: 18
+  local Controller_i states: 5 transitions: 6
+Composition:STEPWISE_OLD_CLOSED_STAGE_1 = STEPWISE_OLD_CONTROLLER_STAGE_1 || CHOCOLATE_OLD_1
+State Space: 5 * 4 = 2 ** 5
+Composing...
+-- States: 5 Transitions: 6 Memory used: 27645K
+Composed in 59ms
+  OldCon_i states: 5 transitions: 6
+  E_u states: 13 transitions: 43
+
+[Stepwise DUCS] Stage 2 old=CHOCOLATE_OLD_2 new=CHOCOLATE_NEW_2 relation=R_CHOCOLATE_2
+  local old safety: [P_OLD_OUT_IF_FINISHED_2, P_POLISH_ONCE_2]
+  local new safety: [P_NEW_OUT_IF_FINISHED_2, P_PAINT_ONCE_2]
+  local transition: []
+Formula !P_OLD_OUT_IF_FINISHED_2 = (true U (out_2 & !Polished_2))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_OUT_IF_FINISHED_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |out_2&!Polished_2 -> S1).
+Composition:P_OLD_OUT_IF_FINISHED_2 = Polished_2 || out_2 || SYNC || P_OLD_OUT_IF_FINISHED_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 27357K
+Composed in 61ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_2 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_OUT_IF_FINISHED_2)
+DFA(P_OLD_OUT_IF_FINISHED_2) has 2 states.
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_POLISH_ONCE_2 = (true U (polish_2 & Polished_2))
+GBA 2 states 3 transitions
+Buchi automata:
+P_POLISH_ONCE_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |polish_2&Polished_2 -> S1).
+Composition:P_POLISH_ONCE_2 = Polished_2 || polish_2 || SYNC || P_POLISH_ONCE_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 27895K
+Composed in 5ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_POLISH_ONCE_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_POLISH_ONCE_2)
+DFA(P_POLISH_ONCE_2) has 2 states.
+Tau reduction ON
+P_POLISH_ONCE_2 minimising...
+Minimised States: 2 in 0ms
+Composition:STEPWISE_OLD_CONTROLLER_STAGE_2 = CHOCOLATE_OLD_2 || P_OLD_OUT_IF_FINISHED_2 || P_POLISH_ONCE_2
+State Space: 4 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 5 Transitions: 8 Memory used: 27856K
+Composed in 52ms
+Environment states: 6
+Game states: 6
+Game transitions: 18
+  local Controller_i states: 5 transitions: 6
+Composition:STEPWISE_OLD_CLOSED_STAGE_2 = STEPWISE_OLD_CONTROLLER_STAGE_2 || CHOCOLATE_OLD_2
+State Space: 5 * 4 = 2 ** 5
+Composing...
+-- States: 5 Transitions: 6 Memory used: 28248K
+Composed in 43ms
+  OldCon_i states: 5 transitions: 6
+  E_u states: 13 transitions: 43
+
+[Stepwise DUCS] Stage 3 old=CHOCOLATE_OLD_3 new=CHOCOLATE_NEW_3 relation=R_CHOCOLATE_3
+  local old safety: [P_OLD_OUT_IF_FINISHED_3, P_POLISH_ONCE_3]
+  local new safety: [P_NEW_OUT_IF_FINISHED_3, P_PAINT_ONCE_3]
+  local transition: []
+Formula !P_OLD_OUT_IF_FINISHED_3 = (true U (out_3 & !Polished_3))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_OUT_IF_FINISHED_3 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |out_3&!Polished_3 -> S1).
+Composition:P_OLD_OUT_IF_FINISHED_3 = Polished_3 || out_3 || SYNC || P_OLD_OUT_IF_FINISHED_3
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 28649K
+Composed in 1ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_3 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_OUT_IF_FINISHED_3)
+DFA(P_OLD_OUT_IF_FINISHED_3) has 2 states.
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_3 minimising...
+Minimised States: 2 in 0ms
+Formula !P_POLISH_ONCE_3 = (true U (polish_3 & Polished_3))
+GBA 2 states 3 transitions
+Buchi automata:
+P_POLISH_ONCE_3 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |polish_3&Polished_3 -> S1).
+Composition:P_POLISH_ONCE_3 = Polished_3 || polish_3 || SYNC || P_POLISH_ONCE_3
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 29342K
+Composed in 1ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_POLISH_ONCE_3 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_POLISH_ONCE_3)
+DFA(P_POLISH_ONCE_3) has 2 states.
+Tau reduction ON
+P_POLISH_ONCE_3 minimising...
+Minimised States: 2 in 0ms
+Composition:STEPWISE_OLD_CONTROLLER_STAGE_3 = CHOCOLATE_OLD_3 || P_POLISH_ONCE_3 || P_OLD_OUT_IF_FINISHED_3
+State Space: 4 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 5 Transitions: 8 Memory used: 27886K
+Composed in 47ms
+Environment states: 6
+Game states: 6
+Game transitions: 18
+  local Controller_i states: 5 transitions: 6
+Composition:STEPWISE_OLD_CLOSED_STAGE_3 = STEPWISE_OLD_CONTROLLER_STAGE_3 || CHOCOLATE_OLD_3
+State Space: 5 * 4 = 2 ** 5
+Composing...
+-- States: 5 Transitions: 6 Memory used: 28499K
+Composed in 53ms
+  OldCon_i states: 5 transitions: 6
+  E_u states: 13 transitions: 43
+
+[Stepwise DUCS] Global action alphabet for local action fluents: 32
+
+[Stepwise DUCS] Stage 1 safety pruning
+  metaEnv states: 135 transitions: 2946
+  safety pruning kept states: 127 transitions: 2381
+  safetyEnv states: 127 transitions: 2381
+
+[Stepwise DUCS] Stage 2 safety pruning
+  metaEnv states: 135 transitions: 2946
+  safety pruning kept states: 127 transitions: 2381
+  safetyEnv states: 127 transitions: 2381
+
+[Stepwise DUCS] Stage 3 safety pruning
+  metaEnv states: 135 transitions: 2946
+  safety pruning kept states: 127 transitions: 2381
+  safetyEnv states: 127 transitions: 2381
+
+[Stepwise DUCS] Cross components:
+  component 1 stages=[1, 2] goals=[P_OLD_NO_SIMULTANEOUS_POLISH_1_2]
+
+[Stepwise DUCS] Cross component 1
+  stages: [1, 2]
+  goals: [P_OLD_NO_SIMULTANEOUS_POLISH_1_2]
+  input safetyEnv stage 1 states: 127 transitions: 2381
+  input safetyEnv stage 2 states: 127 transitions: 2381
+Owner-aware product: STEPWISE_CROSS_COMPONENT_1_PRODUCT
+  component product states: 1694 transitions: 7331
+  component product with out-of-scope passive actions states: 1694 transitions: 24271
+  realActions count: 23
+  outOfScope passive action count: 14
+  action alphabet count: 36
+  cross old controller restriction
+  cross old safety: [P_OLD_NO_SIMULTANEOUS_POLISH_1_2]
+Formula !P_OLD_NO_SIMULTANEOUS_POLISH_1_2 = (true U (PolishPending_1 & PolishPending_2))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_SIMULTANEOUS_POLISH_1_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |PolishPending_1&PolishPending_2 -> S1).
+Composition:P_OLD_NO_SIMULTANEOUS_POLISH_1_2 = PolishPending_1 || PolishPending_2 || SYNC || P_OLD_NO_SIMULTANEOUS_POLISH_1_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 65 Memory used: 54887K
+Composed in 63ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_SIMULTANEOUS_POLISH_1_2 minimising...
+Minimised States: 5 in 2ms
+make DFA(P_OLD_NO_SIMULTANEOUS_POLISH_1_2)
+DFA(P_OLD_NO_SIMULTANEOUS_POLISH_1_2) has 3 states.
+Tau reduction ON
+P_OLD_NO_SIMULTANEOUS_POLISH_1_2 minimising...
+Minimised States: 3 in 1ms
+Composition:STEPWISE_CROSS_OLD_CONTROLLER_COMPONENT_1 = CHOCOLATE_OLD_1 || CHOCOLATE_OLD_2 || P_OLD_NO_SIMULTANEOUS_POLISH_1_2
+State Space: 4 * 4 * 3 = 2 ** 6
+Composing...
+-- States: 15 Transitions: 44 Memory used: 55321K
+Composed in 2ms
+Environment states: 16
+Game states: 16
+Game transitions: 48
+  cross old controllable actions: 4
+  cross old Controller states: 15 transitions: 42
+Composition:STEPWISE_CROSS_OLD_RESTRICTED = stepwise_cross_old_base || STEPWISE_CROSS_OLD_CONTROLLER_PHASED
+State Space: 1694 * 16 = 2 ** 15
+Composing...
+-- States: 1689 Transitions: 24192 Memory used: 65596K
+Composed in 107ms
+  after cross old controller restriction states: 1689 transitions: 24192
+  cross safety pruning
+  cross requirements: [P_OLD_NO_SIMULTANEOUS_POLISH_1_2]
+  cross metaEnv states: 4575 transitions: 65524
+  safety pruning kept states: 4378 transitions: 62487
+  cross safetyEnv states: 4378 transitions: 62487
+  after cross safety pruning states: 4378 transitions: 62487
+
+[Stepwise DUCS] Final product inputs: [cross component 1 stages=[1, 2], stage 3]
+Owner-aware product: STEPWISE_FINAL_SAFETY_PRODUCT
+-- States: 10001 Transitions: 34185
+-- States: 20001 Transitions: 74962
+-- States: 30001 Transitions: 114964
+-- States: 40001 Transitions: 163534
+-- States: 50000 Transitions: 211794
+-- States: 60004 Transitions: 269060
+-- States: 70001 Transitions: 330804
+-- States: 80002 Transitions: 403243
+[Stepwise DUCS] Final product before DontDoTwice states: 85013 transitions: 452777
+[Stepwise DUCS] After global DontDoTwice states: 80529 transitions: 423510
+
+[Stepwise DUCS] GR(1)
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [43886] generated successfully.
+[Stepwise DUCS] GR result: winning
+[Stepwise DUCS] output controller states: 43886 transitions: 150966
+
+[Traditional-DUC Debug] [6. Final Output Update Controller] after removeOldTransitions
+  全状態数: 43886
+  全遷移数: 150966
+  旧コントローラ該当状態数（内部BeginUpdate=false / hotSwapIn前）: 259
+  hotSwapIn が出ている状態数: 259
+  hotSwapIn 遷移数: 259
+  hotSwapIn 前状態から出る hotSwapIn 遷移数: 259
+
+================ EVALUATION ================
+Mode: Stepwise DUC
+Result: SUCCESS
+State/transition count overhead total: 7 ms
+Detailed metric report: omitted. Use -Dupdating.controller.evaluation.printDetailedReport=true to print the verbose human-readable report.
+====================================================
+
+================ EVALUATION SUMMARY ================
+
+[全体]
+手法 : Stepwise DUC
+結果 : SUCCESS
+合成の全体時間 : 973298 ms
+  算出: HPWindow の「合成ボタンを押してから合成完了までの時間」または runner の「合成全体実行時間」。
+カウントによるオーバーヘッド : 7 ms
+  算出: 状態数・遷移数を数える CountTime の合計。
+コントローラ描画時間 : 0 ms
+  算出: HPWindow の「コントローラ描画時間」。
+描画とカウントを除いた実測時間 : 973291 ms
+  算出: 合成の全体時間 - カウントによるオーバーヘッド - コントローラ描画時間。
+構文解析時間 : 19 ms
+  算出: HPWindow.docompile() 内の comp.compile() 実行時間。FSP/LTL/update controller 定義の解析と定義登録。
+compileIfChange 全体時間（参考） : 237 ms
+  算出: HPWindow の compileIfChange() 全体。構文解析時間 + 合成問題準備時間を含む参考値。
+合成問題準備時間 : 124 ms
+  算出: HPWindow.docompile() 内の comp.continueCompilation(target) 実行時間。UpdatingControllersDefinition.compose などを含む。
+update controller 生成時間 : 972886 ms
+  算出: HPWindow の TransitionSystemDispatcher.applyComposition(...) 実行時間。
+コントローラ合成時間 : 973010 ms
+  算出: 合成問題準備時間 + update controller 生成時間。
+共通準備時間 : 35 ms
+  算出: Old Controller 合成時間 + Goal 定義と controllable action 集合生成時間 + Mapping Environment Component 合成時間。
+共通処理を除いたコントローラ合成時間 : 972975 ms
+  算出: コントローラ合成時間 - 共通準備時間。 手法固有として個別計測できた時間と、未分類の非共通時間を含む。
+手法固有準備時間 : 0 ms
+  算出: 手法が未記録のため 0。
+合成用モデル準備時間 : 35 ms
+  算出: 共通準備時間 + 手法固有準備時間。
+実際の中核合成時間 : 0 ms
+  算出: 手法が未記録のため 0。
+手法固有内のその他時間 : 0 ms
+  算出: 手法固有として個別計測できた時間 - 手法固有準備時間 - 実際の中核合成時間。 主に出力構築・型変換・後処理など。
+手法固有として個別計測できた時間 : 0 ms
+  算出: 手法固有準備時間 + 実際の中核合成時間 + 手法固有内のその他時間。
+未分類の非共通時間 : 972975 ms
+  算出: 共通処理を除いたコントローラ合成時間 - 手法固有として個別計測できた時間。 0 でない場合、共通ではないが個別計測項目に分類していない処理が残っている。
+中間状態空間ピーク状態数 : 未記録
+  算出: 手法が未記録のため未記録。
+中間状態空間ピーク遷移数 : 未記録
+  算出: 手法が未記録のため未記録。
+状態数ピークの段階 : 未記録
+  算出: 中間状態空間ピーク状態数を記録した段階。
+遷移数ピークの段階 : 未記録
+  算出: 中間状態空間ピーク遷移数を記録した段階。
+出力 update controller 状態数 : 43886 states
+出力 update controller 遷移数 : 150966 transitions
+全体ピークメモリ : 4383439792 B
+  算出: 共通 / HPWindow の「コントローラ合成全体のピークメモリ」。
+増加メモリ : 4358419584 B
+  算出: コントローラ合成全体のピークメモリ - コントローラ合成のベースラインメモリ。
+
+[共通]
+共通準備時間（共通合計） : 35 ms
+  算出: Old Controller 合成時間 + Goal 定義と controllable action 集合生成時間 + Mapping Environment Component 合成時間。
+Old Controller 合成時間 : 7 ms
+Goal 定義と controllable action 集合生成時間 : 3 ms
+Mapping Environment Component 合成時間 : 25 ms
+Old Controller 状態数 : 未記録
+Old Controller 遷移数 : 未記録
+mapping component 数 : 3 個
+mapping component 状態数合計 : 24 states
+mapping component 遷移数合計 : 48 transitions
+mapping component 最大状態数 : 8 states
+mapping component 最大遷移数 : 16 transitions
+old safety 数 : 7 個
+new safety 数 : 6 個
+OTF-DUC new safety fluent 数（重複排除後） : 未記録
+transition requirement 数 : 0 個
+controllable action 数 : 12 個
+uncontrollable action 数 : 47 個
+全 action 数（controllable + uncontrollable） : 59 個
+
+[出力]
+update controller 状態数 : 43886 states
+update controller 遷移数 : 150966 transitions
+出力状態数・遷移数 CountTime : 4 ms
+hotSwapIn が出ている状態数 : 259 states
+旧コントローラ状態数 : 未記録
+  算出: hotSwapIn が出るべき基準状態数。
+hotSwapIn coverage CountTime : 3 ms
+
+[メモリ]
+ベースラインメモリ : 25020208 B
+全体ピークメモリ : 4383439792 B
+増加メモリ : 4358419584 B
+合成終了時の現在ヒープ : 2202401712 B
+合成終了時のピークヒープ : 4383439792 B
+====================================================
+

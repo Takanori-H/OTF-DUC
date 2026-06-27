@@ -449,6 +449,8 @@ public class Symbol {
 			return "fine_grained";
 		case SELECTIVE_FINE_GRAINED:
 			return "selective_fine_grained";
+		case STEPWISE:
+			return "stepwise";
 
 		// _______________________________________________________________________________________
 		// Probabilistic
@@ -674,6 +676,7 @@ public class Symbol {
 	public static final int MAP = 3506;
 	public static final int FINE_GRAINED = 3507;
 	public static final int SELECTIVE_FINE_GRAINED = 3508;
+	public static final int STEPWISE = 3509;
 	
 	static {
 		blueSymbols.add(OPTIMISTIC);
@@ -743,6 +746,7 @@ public class Symbol {
 		blueSymbols.add(ON_THE_FLY);
 		blueSymbols.add(FINE_GRAINED);
 		blueSymbols.add(SELECTIVE_FINE_GRAINED);
+		blueSymbols.add(STEPWISE);
 		blueSymbols.add(NEW_CONTROLLER);
 		blueSymbols.add(RELATION);
 		blueSymbols.add(OLD_ENVIRONMENT);

@@ -37,6 +37,7 @@ import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
 import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
+import ltsa.updatingControllers.stepwise.StepwiseUpdatingControllerSynthesizer;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisFineGrainedDUC;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisSelectiveFineGrainedDUC;
@@ -69,14 +70,23 @@ public class UpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "UpdatingControllerSynthesizer",
                 "generateController の全体実行時間");
-
-		// set environment
-		MTS<Long, String> oldC = uccs.getOldController();
-        DUCHeartbeat.start(uccs.isOTF() ? "OTF-DUC" : "Traditional-DUC", uccs.getName());
+        DUCHeartbeat.start(uccs.isStepwise() ? "Stepwise-DUC" : (uccs.isOTF() ? "OTF-DUC" : "Traditional-DUC"), uccs.getName());
         String heartbeatStatus = "completed";
 
         try {
-        if(uccs.isOTF())
+        if(uccs.isStepwise())
+        {
+            UpdatingControllerEvaluationRecorder.setMode("Stepwise DUC");
+            DUCHeartbeat.beginPhase("STEPWISE_DUC");
+            output.outln("=========================================");
+            output.outln("Mode: Stepwise DUC (initial baseline)");
+            output.outln("=========================================");
+
+            long DUCStart = System.currentTimeMillis();
+            StepwiseUpdatingControllerSynthesizer.generateController(uccs, output);
+            DUCTime = System.currentTimeMillis() - DUCStart;
+        }
+        else if(uccs.isOTF())
         {
             UpdatingControllerEvaluationRecorder.setMode("OTF-DUC");
             DUCHeartbeat.beginPhase("OTF_GENERATE_DUC");
@@ -132,6 +142,7 @@ public class UpdatingControllerSynthesizer {
                     "UpdatingControllerSynthesizer",
                     "Traditional DUC E_u 構築時間");
 
+            MTS<Long, String> oldC = uccs.getOldController();
             MTS<Long, String> mapping = uccs.getMapping();
 
             //old controllerとmapping environmentからゲームを分析するための空間を作る

@@ -2432,6 +2432,11 @@ public class LTSCompiler {
                 ucDefinition.setSelectiveFineGrained();
                 next_symbol();
             }
+            else if(current.kind == Symbol.STEPWISE)
+            {
+                ucDefinition.setStepwise();
+                next_symbol();
+            }
             else if(current.kind == Symbol.NEW_CONTROLLER)
             {
                 ucDefinition.setNewController(this.controllerSubUpdateController());
