@@ -228,9 +228,9 @@ public class TransitionSystemDispatcher {
             long removeOldTransitionsTime = System.currentTimeMillis() - removeOldTransitionsStart;
             UpdatingControllerEvaluationRecorder.recordTime(
                     "TransitionSystemDispatcher",
-                    "removeOldTransitions 実行時間",
+                    removeOldTransitionsMetricLabel(toCompose),
                     removeOldTransitionsTime);
-            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional removeOldTransitions 後");
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint(removeOldTransitionsCheckpointLabel(toCompose));
             TraditionalDUCDebugLogger.logCompactState(
                     ltsOutput,
                     "[6. Final Output Update Controller] after removeOldTransitions",
@@ -244,6 +244,32 @@ public class TransitionSystemDispatcher {
             return !((UpdatingControllerCompositeState) toCompose).isOTF();
         }
         return true;
+    }
+
+    private static String removeOldTransitionsMetricLabel(CompositeState toCompose) {
+        if (toCompose instanceof UpdatingControllerCompositeState) {
+            UpdatingControllerCompositeState uccs = (UpdatingControllerCompositeState) toCompose;
+            if (uccs.isStepwiseDelayed()) {
+                return "Stepwise Delayed DUC removeOldTransitions 実行時間";
+            }
+            if (uccs.isStepwise()) {
+                return "Stepwise DUC removeOldTransitions 実行時間";
+            }
+        }
+        return "removeOldTransitions 実行時間";
+    }
+
+    private static String removeOldTransitionsCheckpointLabel(CompositeState toCompose) {
+        if (toCompose instanceof UpdatingControllerCompositeState) {
+            UpdatingControllerCompositeState uccs = (UpdatingControllerCompositeState) toCompose;
+            if (uccs.isStepwiseDelayed()) {
+                return "Stepwise Delayed removeOldTransitions 後";
+            }
+            if (uccs.isStepwise()) {
+                return "Stepwise removeOldTransitions 後";
+            }
+        }
+        return "Traditional removeOldTransitions 後";
     }
 
     private static void compose(CompositeState toCompose, LTSOutput ltsOutput) {

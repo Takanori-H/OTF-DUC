@@ -114,6 +114,7 @@ public final class CompositionEvaluationRunner {
         long runStart = System.currentTimeMillis();
         System.gc();
         UpdatingControllerEvaluationRecorder.reset();
+        UpdatingControllerEvaluationRecorder.recordRunEnvironmentMetadata();
         EvaluationProfiler.resetPeakMemory();
         long baselineMemory = EvaluationProfiler.getCurrentMemoryUsage();
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("合成開始時");
@@ -415,6 +416,7 @@ public final class CompositionEvaluationRunner {
             CompositeState current) {
 
         long runTime = System.currentTimeMillis() - runStart;
+        UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
         long overallPeakMemory = EvaluationProfiler.getPeakMemoryUsage();
         long netPeakMemory = overallPeakMemory - baselineMemory;
         long problemPreparationTime = UpdatingControllerEvaluationRecorder.getRecordedTimeMillis(

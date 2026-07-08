@@ -280,6 +280,74 @@ updatingController UpdCont_stepwise = {
 
 ||STEPWISE_UPDATE_CONTROLLER = UpdCont_stepwise.
 
+updatingController UpdCont_stepwise_delayed = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD_1, CHOCOLATE_OLD_2},
+	newEnvironment = {CHOCOLATE_NEW_1, CHOCOLATE_NEW_2},
+	mapRelation = {R_CHOCOLATE_1, R_CHOCOLATE_2},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP_1,
+//	transition = T_NO_TP_2,
+//	transition = T_UPDATE_WHILE_EMPTY_1,
+//	transition = T_UPDATE_WHILE_EMPTY_2,
+//	transition = T_NO_POLISH_ON_UPDATE_1,
+//	transition = T_NO_POLISH_ON_UPDATE_2,
+//	transition = T_FINISH_WITH_OLD_REQ_1,
+//	transition = T_FINISH_WITH_OLD_REQ_2,
+//	transition = T_SWITCH_TO_NEW_ASAP_1,
+//	transition = T_SWITCH_TO_NEW_ASAP_2,
+    nonblocking,
+	stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_safetyBackwardPruning = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD_1, CHOCOLATE_OLD_2},
+	newEnvironment = {CHOCOLATE_NEW_1, CHOCOLATE_NEW_2},
+	mapRelation = {R_CHOCOLATE_1, R_CHOCOLATE_2},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP_1,
+//	transition = T_NO_TP_2,
+//	transition = T_UPDATE_WHILE_EMPTY_1,
+//	transition = T_UPDATE_WHILE_EMPTY_2,
+//	transition = T_NO_POLISH_ON_UPDATE_1,
+//	transition = T_NO_POLISH_ON_UPDATE_2,
+//	transition = T_FINISH_WITH_OLD_REQ_1,
+//	transition = T_FINISH_WITH_OLD_REQ_2,
+//	transition = T_SWITCH_TO_NEW_ASAP_1,
+//	transition = T_SWITCH_TO_NEW_ASAP_2,
+    nonblocking,
+	safetyBackwardPruning
+}
+
+||UPDATE_CONTROLLER_safetyBackwardPruning = UpdCont_safetyBackwardPruning.
+
+updatingController UpdCont_stepwise_delayed_safetyBackwardPruning = {
+    oldController = OldCon,
+    oldEnvironment = {CHOCOLATE_OLD_1, CHOCOLATE_OLD_2},
+	newEnvironment = {CHOCOLATE_NEW_1, CHOCOLATE_NEW_2},
+	mapRelation = {R_CHOCOLATE_1, R_CHOCOLATE_2},
+    oldGoal = DRILL_POLISH,
+    newGoal = DRILL_PAINT,
+//	transition = T_NO_TP_1,
+//	transition = T_NO_TP_2,
+//	transition = T_UPDATE_WHILE_EMPTY_1,
+//	transition = T_UPDATE_WHILE_EMPTY_2,
+//	transition = T_NO_POLISH_ON_UPDATE_1,
+//	transition = T_NO_POLISH_ON_UPDATE_2,
+//	transition = T_FINISH_WITH_OLD_REQ_1,
+//	transition = T_FINISH_WITH_OLD_REQ_2,
+//	transition = T_SWITCH_TO_NEW_ASAP_1,
+//	transition = T_SWITCH_TO_NEW_ASAP_2,
+    nonblocking,
+	stepwise_delayed,
+	safetyBackwardPruning
+}
+
 updatingController UpdCont_1 = {
     oldController = OldCon_1,
     oldEnvironment = {CHOCOLATE_OLD_1},

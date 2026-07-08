@@ -1,0 +1,123 @@
+// Minimal DUCS example with a synchronizing action shared by stages 1 and 2.
+// The shared action is intentionally present in both stage alphabets.
+
+set OldControllableActions_1 = {old_1, shared, sharedDone}
+set OldControllableActions_2 = {old_2, shared, sharedDone}
+set OldControllableActions_3 = {old_3}
+set OldControllableActions = {old_1, old_2, old_3, shared, sharedDone}
+
+set NewControllableActions_1 = {new_1, shared, sharedDone}
+set NewControllableActions_2 = {new_2, shared, sharedDone}
+set NewControllableActions_3 = {new_3}
+set NewControllableActions = {new_1, new_2, new_3, shared, sharedDone}
+
+// ---------------------------OLD ENVIRONMENTS-----------------------------
+SIMPLE_OLD_1 = (old_1 -> OLD_BUSY_1 | shared -> SIMPLE_OLD_1 | sharedDone -> SIMPLE_OLD_1),
+	OLD_BUSY_1 = (oldDone_1 -> SIMPLE_OLD_1 | shared -> OLD_BUSY_1 | sharedDone -> OLD_BUSY_1).
+
+SIMPLE_OLD_2 = (old_2 -> OLD_BUSY_2 | shared -> SIMPLE_OLD_2 | sharedDone -> SIMPLE_OLD_2),
+	OLD_BUSY_2 = (oldDone_2 -> SIMPLE_OLD_2 | shared -> OLD_BUSY_2 | sharedDone -> OLD_BUSY_2).
+
+SIMPLE_OLD_3 = (old_3 -> OLD_BUSY_3),
+	OLD_BUSY_3 = (oldDone_3 -> SIMPLE_OLD_3).
+
+// ---------------------------NEW ENVIRONMENTS-----------------------------
+SIMPLE_NEW_1 = (new_1 -> NEW_BUSY_1 | shared -> SIMPLE_NEW_1 | sharedDone -> SIMPLE_NEW_1),
+	NEW_BUSY_1 = (newDone_1 -> SIMPLE_NEW_1 | shared -> NEW_BUSY_1 | sharedDone -> NEW_BUSY_1).
+
+SIMPLE_NEW_2 = (new_2 -> NEW_BUSY_2 | shared -> SIMPLE_NEW_2 | sharedDone -> SIMPLE_NEW_2),
+	NEW_BUSY_2 = (newDone_2 -> SIMPLE_NEW_2 | shared -> NEW_BUSY_2 | sharedDone -> NEW_BUSY_2).
+
+SIMPLE_NEW_3 = (new_3 -> NEW_BUSY_3),
+	NEW_BUSY_3 = (newDone_3 -> SIMPLE_NEW_3).
+
+// ---------------------------MAP RELATIONS-----------------------------
+relation R_SIMPLE_1 = {SIMPLE_OLD_1@SIMPLE_OLD_1	= reconfigure -> SIMPLE_NEW_1@SIMPLE_NEW_1,
+					  OLD_BUSY_1@SIMPLE_OLD_1		= reconfigure -> SIMPLE_NEW_1@SIMPLE_NEW_1}
+
+relation R_SIMPLE_2 = {SIMPLE_OLD_2@SIMPLE_OLD_2	= reconfigure -> SIMPLE_NEW_2@SIMPLE_NEW_2,
+					  OLD_BUSY_2@SIMPLE_OLD_2		= reconfigure -> SIMPLE_NEW_2@SIMPLE_NEW_2}
+
+relation R_SIMPLE_3 = {SIMPLE_OLD_3@SIMPLE_OLD_3	= reconfigure -> SIMPLE_NEW_3@SIMPLE_NEW_3,
+					  OLD_BUSY_3@SIMPLE_OLD_3		= reconfigure -> SIMPLE_NEW_3@SIMPLE_NEW_3}
+
+map MAP_SIMPLE_1 = {SIMPLE_OLD_1, SIMPLE_NEW_1, R_SIMPLE_1}
+map MAP_SIMPLE_2 = {SIMPLE_OLD_2, SIMPLE_NEW_2, R_SIMPLE_2}
+map MAP_SIMPLE_3 = {SIMPLE_OLD_3, SIMPLE_NEW_3, R_SIMPLE_3}
+
+||OLD_ENV_1 = (SIMPLE_OLD_1).
+||OLD_ENV_2 = (SIMPLE_OLD_2).
+||OLD_ENV_3 = (SIMPLE_OLD_3).
+||OLD_ENV = (SIMPLE_OLD_1 || SIMPLE_OLD_2 || SIMPLE_OLD_3).
+
+||NEW_ENV_1 = (SIMPLE_NEW_1).
+||NEW_ENV_2 = (SIMPLE_NEW_2).
+||NEW_ENV_3 = (SIMPLE_NEW_3).
+||NEW_ENV = (SIMPLE_NEW_1 || SIMPLE_NEW_2 || SIMPLE_NEW_3).
+
+||MAPPING_ENV_1 = (MAP_SIMPLE_1).
+||MAPPING_ENV_2 = (MAP_SIMPLE_2).
+||MAPPING_ENV_3 = (MAP_SIMPLE_3).
+||MAPPING_ENV = (MAP_SIMPLE_1 || MAP_SIMPLE_2 || MAP_SIMPLE_3).
+||MapEnvironment = (MAP_SIMPLE_1 || MAP_SIMPLE_2 || MAP_SIMPLE_3).
+
+// ---------------------------FLUENTS-----------------------------
+fluent OldPending_1 = <old_1, oldDone_1>
+fluent OldPending_2 = <old_2, oldDone_2>
+fluent OldPending_3 = <old_3, oldDone_3>
+fluent SharedSeen = <shared, sharedDone>
+
+fluent NewPending_1 = <new_1, newDone_1>
+fluent NewPending_2 = <new_2, newDone_2>
+fluent NewPending_3 = <new_3, newDone_3>
+
+// ---------------------------OLD CONTROLLER SPEC-----------------------------
+assert OLD_NO_SIMULTANEOUS_1_2 = !(OldPending_1 && OldPending_2)
+assert OLD_SHARED_SYNC_REFERENCE = !(SharedSeen && OldPending_1 && OldPending_2)
+
+ltl_property P_OLD_NO_SIMULTANEOUS_1_2 = []OLD_NO_SIMULTANEOUS_1_2
+ltl_property P_OLD_SHARED_SYNC_REFERENCE = []OLD_SHARED_SYNC_REFERENCE
+
+controllerSpec OLD_SIMPLE = {
+	safety = {
+			P_OLD_NO_SIMULTANEOUS_1_2,
+			P_OLD_SHARED_SYNC_REFERENCE
+			}
+	controllable = {OldControllableActions}
+}
+controller ||OldController = (OLD_ENV)~{OLD_SIMPLE}.
+||OldCon = (OldController || OLD_ENV).
+
+// ---------------------------NEW CONTROLLER SPEC-----------------------------
+controllerSpec NEW_SIMPLE = {
+	safety = {}
+	controllable = {NewControllableActions}
+}
+controller ||NewController = (NEW_ENV)~{NEW_SIMPLE}.
+||NewCon = (NewController || NEW_ENV).
+
+// ---------------------------UPDATING CONTROLLER SPEC-----------------------------
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {SIMPLE_OLD_1, SIMPLE_OLD_2, SIMPLE_OLD_3},
+	newEnvironment = {SIMPLE_NEW_1, SIMPLE_NEW_2, SIMPLE_NEW_3},
+	mapRelation = {R_SIMPLE_1, R_SIMPLE_2, R_SIMPLE_3},
+    oldGoal = OLD_SIMPLE,
+    newGoal = NEW_SIMPLE,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_stepwise_delayed = {
+    oldController = OldCon,
+    oldEnvironment = {SIMPLE_OLD_1, SIMPLE_OLD_2, SIMPLE_OLD_3},
+	newEnvironment = {SIMPLE_NEW_1, SIMPLE_NEW_2, SIMPLE_NEW_3},
+	mapRelation = {R_SIMPLE_1, R_SIMPLE_2, R_SIMPLE_3},
+    oldGoal = OLD_SIMPLE,
+    newGoal = NEW_SIMPLE,
+    nonblocking,
+	stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.

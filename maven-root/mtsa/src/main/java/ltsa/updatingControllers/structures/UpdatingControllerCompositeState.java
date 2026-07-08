@@ -30,6 +30,10 @@ public class UpdatingControllerCompositeState extends CompositeState {
 	private boolean isOTF;
 	private boolean fineGrained;
 	private boolean stepwise;
+	private boolean stepwiseDelayed;
+	private boolean incrementalPruning;
+	private boolean incrementalPruningCleanup;
+	private boolean safetyBackwardPruning;
 	private UpdateProtocolSpec updateProtocolSpec;
 	// ★追加: Mappingを構成するLTSのリスト (OTF探索で利用)
     private Vector<CompactState> mappingComponents;
@@ -86,7 +90,11 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		this.isOTF = false;
 		this.fineGrained = fineGrained;
 		this.stepwise = false;
-		this.updateProtocolSpec = updateProtocolSpec;
+			this.stepwiseDelayed = false;
+			this.incrementalPruning = false;
+			this.incrementalPruningCleanup = false;
+			this.safetyBackwardPruning = false;
+			this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = null;
 	}
 
@@ -99,6 +107,36 @@ public class UpdatingControllerCompositeState extends CompositeState {
 											ControllerGoal<String> updateGRGoal,
 											Set<String> controllableActions,
 											String name) {
+		this(oldController, oldControllerName, stepwiseStages, oldGoalDefinition, newGoalDefinition,
+				transitionGoals, updateGRGoal, controllableActions, name, false);
+	}
+
+	private UpdatingControllerCompositeState(CompositeState oldController,
+											String oldControllerName,
+											List<StepwiseStage> stepwiseStages,
+											ControllerGoalDefinition oldGoalDefinition,
+											ControllerGoalDefinition newGoalDefinition,
+											List<Symbol> transitionGoals,
+											ControllerGoal<String> updateGRGoal,
+											Set<String> controllableActions,
+											String name,
+											boolean stepwiseDelayed) {
+		this(oldController, oldControllerName, stepwiseStages, oldGoalDefinition, newGoalDefinition,
+				transitionGoals, updateGRGoal, controllableActions, name, stepwiseDelayed, false, false);
+	}
+
+	private UpdatingControllerCompositeState(CompositeState oldController,
+											String oldControllerName,
+											List<StepwiseStage> stepwiseStages,
+											ControllerGoalDefinition oldGoalDefinition,
+											ControllerGoalDefinition newGoalDefinition,
+											List<Symbol> transitionGoals,
+											ControllerGoal<String> updateGRGoal,
+											Set<String> controllableActions,
+											String name,
+											boolean stepwiseDelayed,
+											boolean incrementalPruning,
+											boolean incrementalPruningCleanup) {
 		super.setMachines(new Vector<CompactState>());
 		this.oldController = oldController;
 		this.oldControllerName = oldControllerName;
@@ -113,8 +151,12 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		this.newController = null;
 		this.isOTF = false;
 		this.fineGrained = false;
-		this.stepwise = true;
-		this.updateProtocolSpec = null;
+		this.stepwise = !stepwiseDelayed;
+			this.stepwiseDelayed = stepwiseDelayed;
+			this.incrementalPruning = incrementalPruning;
+			this.incrementalPruningCleanup = incrementalPruningCleanup;
+			this.safetyBackwardPruning = false;
+			this.updateProtocolSpec = null;
 		this.mappingComponents = new Vector<CompactState>();
 		this.newEnvironmentComponents = new Vector<CompactState>();
 		this.stepwiseStages = stepwiseStages;
@@ -135,6 +177,33 @@ public class UpdatingControllerCompositeState extends CompositeState {
 			}
 		}
 		super.setMachines(allMachines);
+	}
+
+	public static UpdatingControllerCompositeState stepwiseDelayed(
+			CompositeState oldController,
+			String oldControllerName,
+			List<StepwiseStage> stepwiseStages,
+			ControllerGoalDefinition oldGoalDefinition,
+			ControllerGoalDefinition newGoalDefinition,
+			List<Symbol> transitionGoals,
+			ControllerGoal<String> updateGRGoal,
+			Set<String> controllableActions,
+			String name,
+			boolean incrementalPruning,
+			boolean incrementalPruningCleanup) {
+		return new UpdatingControllerCompositeState(
+				oldController,
+				oldControllerName,
+				stepwiseStages,
+				oldGoalDefinition,
+				newGoalDefinition,
+				transitionGoals,
+				updateGRGoal,
+				controllableActions,
+				name,
+				true,
+				incrementalPruning,
+				incrementalPruningCleanup);
 	}
 
 	//OTF用
@@ -168,7 +237,11 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		this.isOTF = isOTF;
 		this.fineGrained = fineGrained;
 		this.stepwise = false;
-		this.updateProtocolSpec = updateProtocolSpec;
+			this.stepwiseDelayed = false;
+			this.incrementalPruning = false;
+			this.incrementalPruningCleanup = false;
+			this.safetyBackwardPruning = false;
+			this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = mappingComponents;
 		this.newEnvironmentComponents = newEnvironmentComponents;
 		this.mappingMapEnvToNewEnv = mappingMapEnvToNewEnv;
@@ -269,6 +342,31 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		return stepwise;
 	}
 
+	public boolean isStepwiseDelayed()
+	{
+		return stepwiseDelayed;
+	}
+
+	public boolean isIncrementalPruning()
+	{
+		return incrementalPruning;
+	}
+
+	public boolean isIncrementalPruningCleanup()
+	{
+		return incrementalPruningCleanup;
+	}
+
+	public boolean isSafetyBackwardPruning()
+	{
+		return safetyBackwardPruning;
+	}
+
+	public void setSafetyBackwardPruning(boolean safetyBackwardPruning)
+	{
+		this.safetyBackwardPruning = safetyBackwardPruning;
+	}
+
 	public boolean isFineGrained()
 	{
 		return fineGrained;
@@ -342,15 +440,17 @@ public class UpdatingControllerCompositeState extends CompositeState {
 														updateProtocolSpec,
 														controllableActions,
 														isOTF, fineGrained, name);
-			} else if (this.stepwise) {
+			} else if (this.stepwise || this.stepwiseDelayed) {
 				clone = new UpdatingControllerCompositeState(oldController, oldControllerName, stepwiseStages,
 						stepwiseOldGoalDefinition, stepwiseNewGoalDefinition, stepwiseTransitionGoals,
-						updateGRGoal, controllableActions, name);
-		} else {
-			clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals,
-						updateGRGoal, name, fineGrained, updateProtocolSpec);
-		}
-		clone.setCompositionType(getCompositionType());
+						updateGRGoal, controllableActions, name, stepwiseDelayed,
+						incrementalPruning, incrementalPruningCleanup);
+			} else {
+				clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals,
+							updateGRGoal, name, fineGrained, updateProtocolSpec);
+			}
+			clone.setSafetyBackwardPruning(safetyBackwardPruning);
+			clone.setCompositionType(getCompositionType());
 		clone.makeAbstract = makeAbstract;
 		clone.makeClousure = makeClousure;
 		clone.makeCompose = makeCompose;

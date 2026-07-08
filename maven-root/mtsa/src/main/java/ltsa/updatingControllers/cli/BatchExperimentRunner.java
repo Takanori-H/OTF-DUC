@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.ZonedDateTime;
@@ -18,6 +20,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import ltsa.updatingControllers.checks.TraceLanguageChecker;
+import ltsa.updatingControllers.checks.TransitionGraph;
+import ltsa.updatingControllers.checks.UpdateRequirementChecker;
 import ltsa.updatingControllers.cli.ExperimentConfig.ExperimentCase;
 
 public final class BatchExperimentRunner {
@@ -39,6 +44,11 @@ public final class BatchExperimentRunner {
     }
 
     static int runMain(String[] args) {
+        ExperimentConfig config = null;
+        boolean dryRun = false;
+        int failures = 0;
+        String batchStartedAt = now();
+        long batchStartedMillis = System.currentTimeMillis();
         try {
             Map<String, String> options = parseArgs(args);
             if (options.containsKey("help")) {
@@ -47,14 +57,16 @@ public final class BatchExperimentRunner {
             }
 
             File configFile = new File(required(options, "config"));
-            boolean dryRun = Boolean.parseBoolean(options.get("dry-run"));
-            ExperimentConfig config = ExperimentConfig.load(configFile);
-            int failures = 0;
+            dryRun = Boolean.parseBoolean(options.get("dry-run"));
+            config = ExperimentConfig.load(configFile);
+            applyBooleanOverride(options, "requirements-check", config, "requirementsCheck");
+            applyBooleanOverride(options, "trace-check", config, "traceCheck");
 
             boolean useRunDirectories = config.runsSpecified;
             for (int runIndex = 1; runIndex <= config.runs; runIndex++) {
                 String runLabel = useRunDirectories ? runLabel(runIndex, config.runs) : null;
                 File runOutputDir = outputDirForRun(config.outputDir, runLabel);
+                List<CompletedCase> completedCases = new ArrayList<CompletedCase>();
                 if (runLabel != null) {
                     System.out.println("=== " + runLabel + " / " + config.runs + " ===");
                 }
@@ -67,6 +79,7 @@ public final class BatchExperimentRunner {
                     CasePaths paths = CasePaths.create(
                             runOutputDir,
                             experimentCase,
+                            config.requirementsCheck,
                             runIndex,
                             config.runs,
                             runLabel);
@@ -80,6 +93,7 @@ public final class BatchExperimentRunner {
 
                     CaseResult result = runCase(config, experimentCase, paths);
                     writeMetaJson(config, experimentCase, paths, result);
+                    completedCases.add(new CompletedCase(experimentCase, paths, result));
                     System.out.println("[" + result.status + "] "
                             + (runLabel == null ? "" : runLabel + " ")
                             + experimentCase.id);
@@ -87,15 +101,49 @@ public final class BatchExperimentRunner {
                         failures++;
                     }
                 }
+                if (!dryRun && config.traceCheck) {
+                    writeTraceComparisons(runOutputDir, runLabel, completedCases);
+                }
             }
 
-            return failures == 0 ? 0 : 1;
+            int exitCode = failures == 0 ? 0 : 1;
+            if (!dryRun) {
+                notifyBatchCompletion(
+                        config,
+                        failures == 0 ? STATUS_SUCCESS : "FAILURE",
+                        failures,
+                        batchStartedAt,
+                        now(),
+                        System.currentTimeMillis() - batchStartedMillis,
+                        null);
+            }
+            return exitCode;
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             printUsage(System.err);
+            if (config != null && !dryRun) {
+                notifyBatchCompletion(
+                        config,
+                        "FAILURE",
+                        failures,
+                        batchStartedAt,
+                        now(),
+                        System.currentTimeMillis() - batchStartedMillis,
+                        e.toString());
+            }
             return 64;
         } catch (Throwable e) {
             e.printStackTrace(System.err);
+            if (config != null && !dryRun) {
+                notifyBatchCompletion(
+                        config,
+                        "FAILURE",
+                        failures,
+                        batchStartedAt,
+                        now(),
+                        System.currentTimeMillis() - batchStartedMillis,
+                        e.toString());
+            }
             return 1;
         }
     }
@@ -174,6 +222,19 @@ public final class BatchExperimentRunner {
         addInheritedSystemProperty(command, "mtsa.evaluation.enabled");
         addInheritedSystemProperty(command, "updating.controller.evaluation.enabled");
         addInheritedSystemProperty(command, "updating.controller.evaluation.printDetailedReport");
+        addSystemProperty(command, "mtsa.evaluation.csvFile", paths.evaluationCsvFile.getPath());
+        addSystemProperty(command, "mtsa.evaluation.caseId", experimentCase.id);
+        addSystemProperty(command, "mtsa.evaluation.example", experimentCase.example);
+        addSystemProperty(command, "mtsa.evaluation.method", experimentCase.method);
+        addSystemProperty(command, "mtsa.evaluation.variant", experimentCase.variant);
+        addSystemProperty(command, "mtsa.evaluation.target", experimentCase.target);
+        addSystemProperty(command, "mtsa.evaluation.ltsFile", experimentCase.lts.getPath());
+        addSystemProperty(command, "mtsa.evaluation.configFile", config.configFile.getPath());
+        addSystemProperty(command, "mtsa.evaluation.runIndex", Integer.toString(paths.runIndex));
+        addSystemProperty(command, "mtsa.evaluation.runCount", Integer.toString(paths.runCount));
+        if (paths.runLabel != null) {
+            addSystemProperty(command, "mtsa.evaluation.runLabel", paths.runLabel);
+        }
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
         command.add(SingleCompositionRunner.class.getName());
@@ -185,7 +246,21 @@ public final class BatchExperimentRunner {
         command.add(paths.outputFile.getPath());
         command.add("--transitions");
         command.add(paths.transitionsFile.getPath());
+        command.add("--minimized-transitions");
+        command.add(paths.minimizedTransitionsFile.getPath());
+        command.add("--minimized-counts");
+        command.add(paths.minimizedCountsFile.getPath());
+        if (paths.requirementsCheckEnabled) {
+            command.add("--requirements-check");
+            command.add(paths.requirementsCheckFile.getPath());
+        }
         return command;
+    }
+
+    private static void addSystemProperty(List<String> command, String key, String value) {
+        if (value != null) {
+            command.add("-D" + key + "=" + value);
+        }
     }
 
     private static void addInheritedSystemProperty(List<String> command, String key) {
@@ -215,7 +290,10 @@ public final class BatchExperimentRunner {
 
     private static String statusFromExitCode(int exitCode, CasePaths paths) {
         if (exitCode == SingleCompositionRunner.EXIT_SUCCESS) {
-            if (paths.transitionsFile.exists()) {
+            if (paths.transitionsFile.exists()
+                    && paths.minimizedTransitionsFile.exists()
+                    && paths.minimizedCountsFile.exists()
+                    && (!paths.requirementsCheckEnabled || paths.requirementsCheckFile.exists())) {
                 return STATUS_SUCCESS;
             }
             return STATUS_NO_TRANSITION_OUTPUT;
@@ -272,6 +350,36 @@ public final class BatchExperimentRunner {
         }
         values.put("output", paths.outputFile.getPath());
         values.put("transitions", paths.transitionsFile.getPath());
+        values.put("minimizedTransitions", paths.minimizedTransitionsFile.getPath());
+        values.put("minimizedCounts", paths.minimizedCountsFile.getPath());
+        values.put("requirementsCheckEnabled", Boolean.valueOf(paths.requirementsCheckEnabled));
+        values.put("traceCheckEnabled", Boolean.valueOf(config.traceCheck));
+        values.put("requirementsCheck",
+                paths.requirementsCheckFile == null ? null : paths.requirementsCheckFile.getPath());
+        values.put("evaluationCsv", paths.evaluationCsvFile.getPath());
+        Map<String, String> minimizedCounts = readMetricCsvValues(paths.minimizedCountsFile);
+        putMetricIfPresent(values, minimizedCounts,
+                "raw_output_update_controller_states",
+                "rawOutputStates");
+        putMetricIfPresent(values, minimizedCounts,
+                "raw_output_update_controller_transitions",
+                "rawOutputTransitions");
+        putMetricIfPresent(values, minimizedCounts,
+                "minimized_output_update_controller_states",
+                "minimizedOutputStates");
+        putMetricIfPresent(values, minimizedCounts,
+                "minimized_output_update_controller_transitions",
+                "minimizedOutputTransitions");
+        putMetricIfPresent(values, minimizedCounts,
+                "minimized_output_update_controller_count_time",
+                "minimizedCountTimeMillis");
+        putMetricIfPresent(values, minimizedCounts,
+                "minimized_output_update_controller_minimize_time",
+                "minimizeTimeMillis");
+        Map<String, String> requirementStatuses = readRequirementCsvValues(paths.requirementsCheckFile);
+        if (paths.requirementsCheckEnabled) {
+            values.put("requirementsOverall", requirementStatuses.get("OVERALL"));
+        }
         values.put("stdout", paths.stdoutFile.getPath());
         values.put("stderr", paths.stderrFile.getPath());
         values.put("startedAt", result.startedAt);
@@ -287,6 +395,386 @@ public final class BatchExperimentRunner {
 
         CliFileLTSOutput.ensureParentDirectory(paths.metaFile);
         Files.write(paths.metaFile.toPath(), toJson(values).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void notifyBatchCompletion(
+            ExperimentConfig config,
+            String status,
+            int failures,
+            String startedAt,
+            String endedAt,
+            long elapsedMillis,
+            String errorMessage) {
+        if (!shouldSendSlackNotification(config, status)) {
+            return;
+        }
+        try {
+            sendSlackNotification(
+                    config.slackWebhookUrl,
+                    config.notifyTimeoutSeconds,
+                    buildSlackNotificationText(
+                            config,
+                            status,
+                            failures,
+                            startedAt,
+                            endedAt,
+                            elapsedMillis,
+                            errorMessage));
+            System.out.println("[NOTIFY] Slack notification sent.");
+        } catch (Throwable e) {
+            System.err.println("[WARN] Failed to send Slack notification: "
+                    + sanitizeNotificationError(config, e));
+        }
+    }
+
+    private static boolean shouldSendSlackNotification(ExperimentConfig config, String status) {
+        if (config == null || isBlank(config.slackWebhookUrl)) {
+            return false;
+        }
+        String notifyOn = config.notifyOn == null
+                ? "always"
+                : config.notifyOn.toLowerCase(Locale.ROOT);
+        if ("never".equals(notifyOn)) {
+            return false;
+        }
+        boolean success = STATUS_SUCCESS.equals(status);
+        if ("success".equals(notifyOn)) {
+            return success;
+        }
+        if ("failure".equals(notifyOn)) {
+            return !success;
+        }
+        return true;
+    }
+
+    private static String buildSlackNotificationText(
+            ExperimentConfig config,
+            String status,
+            int failures,
+            String startedAt,
+            String endedAt,
+            long elapsedMillis,
+            String errorMessage) {
+        int totalCases = config.runs * config.cases.size();
+        StringBuilder builder = new StringBuilder();
+        builder.append("*MTSA experiment batch finished*").append('\n');
+        builder.append("Status: ").append(status).append('\n');
+        builder.append("Case failures: ").append(failures).append(" / ").append(totalCases).append('\n');
+        builder.append("Runs: ").append(config.runs)
+                .append(", cases/run: ").append(config.cases.size()).append('\n');
+        builder.append("Config: ").append(config.configFile.getPath()).append('\n');
+        builder.append("Output: ").append(config.outputDir.getPath()).append('\n');
+        builder.append("Started: ").append(startedAt).append('\n');
+        builder.append("Ended: ").append(endedAt).append('\n');
+        builder.append("Elapsed: ").append(formatElapsed(elapsedMillis));
+        if (!isBlank(errorMessage)) {
+            builder.append('\n').append("Runner error: ").append(truncate(errorMessage, 500));
+        }
+        return builder.toString();
+    }
+
+    private static void sendSlackNotification(
+            String webhookUrl,
+            int timeoutSeconds,
+            String text) throws IOException {
+        int timeoutMillis = Math.max(1, timeoutSeconds) * 1000;
+        byte[] payload = ("{\"text\":\"" + jsonEscape(text) + "\"}")
+                .getBytes(StandardCharsets.UTF_8);
+
+        HttpURLConnection connection = (HttpURLConnection) new URL(webhookUrl).openConnection();
+        try {
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(timeoutMillis);
+            connection.setReadTimeout(timeoutMillis);
+            connection.setDoOutput(true);
+            connection.setFixedLengthStreamingMode(payload.length);
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+
+            OutputStream output = connection.getOutputStream();
+            try {
+                output.write(payload);
+            } finally {
+                output.close();
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode < 200 || responseCode >= 300) {
+                String response = readSmallResponse(connection.getErrorStream());
+                throw new IOException("Slack webhook returned HTTP "
+                        + responseCode
+                        + (response.isEmpty() ? "" : ": " + response));
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static String readSmallResponse(InputStream input) throws IOException {
+        if (input == null) {
+            return "";
+        }
+        try {
+            byte[] buffer = new byte[1024];
+            int read = input.read(buffer);
+            if (read <= 0) {
+                return "";
+            }
+            return new String(buffer, 0, read, StandardCharsets.UTF_8);
+        } finally {
+            input.close();
+        }
+    }
+
+    private static String formatElapsed(long elapsedMillis) {
+        long totalSeconds = Math.max(0L, elapsedMillis / 1000L);
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        if (hours > 0L) {
+            return String.format(Locale.ROOT, "%dh %02dm %02ds",
+                    Long.valueOf(hours),
+                    Long.valueOf(minutes),
+                    Long.valueOf(seconds));
+        }
+        return String.format(Locale.ROOT, "%dm %02ds",
+                Long.valueOf(minutes),
+                Long.valueOf(seconds));
+    }
+
+    private static String truncate(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text == null ? "" : text;
+        }
+        return text.substring(0, maxLength) + "...";
+    }
+
+    private static String sanitizeNotificationError(ExperimentConfig config, Throwable error) {
+        String message = error == null ? "" : error.toString();
+        if (config != null && config.slackWebhookUrl != null) {
+            message = message.replace(config.slackWebhookUrl, "<slack-webhook-url>");
+        }
+        return message;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private static void writeTraceComparisons(
+            File runOutputDir,
+            String runLabel,
+            List<CompletedCase> completedCases) {
+        Map<String, Map<String, CompletedCase>> groups =
+                new LinkedHashMap<String, Map<String, CompletedCase>>();
+        for (CompletedCase completedCase : completedCases) {
+            if (!STATUS_SUCCESS.equals(completedCase.result.status)
+                    || completedCase.paths.transitionsFile == null
+                    || !completedCase.paths.transitionsFile.isFile()) {
+                continue;
+            }
+            String role = traceRole(completedCase.experimentCase);
+            if (role == null) {
+                continue;
+            }
+            String key = completedCase.experimentCase.example
+                    + "|"
+                    + variantBase(completedCase.experimentCase.variant);
+            Map<String, CompletedCase> group = groups.get(key);
+            if (group == null) {
+                group = new LinkedHashMap<String, CompletedCase>();
+                groups.put(key, group);
+            }
+            group.put(role, completedCase);
+        }
+
+        File outputFile = new File(runOutputDir, "trace_comparisons.csv");
+        StringBuilder builder = new StringBuilder();
+        builder.append("run_label,example,variant_base,pair,left_id,right_id,")
+                .append("left_subset_right,right_subset_left,equivalent,")
+                .append("left_not_in_right_witness,right_not_in_left_witness,detail\n");
+        for (Map.Entry<String, Map<String, CompletedCase>> entry : groups.entrySet()) {
+            Map<String, CompletedCase> group = entry.getValue();
+            appendTraceComparison(builder, runLabel, group,
+                    "traditional", "stepwise_delayed",
+                    "Traditional_vs_stepwise_delayed");
+            appendTraceComparison(builder, runLabel, group,
+                    "traditional", "stepwise_delayed_sbp",
+                    "Traditional_vs_stepwise_delayed_SBP");
+            appendTraceComparison(builder, runLabel, group,
+                    "traditional_sbp", "stepwise_delayed_sbp",
+                    "Traditional_SBP_vs_stepwise_delayed_SBP");
+        }
+        try {
+            CliFileLTSOutput.ensureParentDirectory(outputFile);
+            Files.write(outputFile.toPath(), builder.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            System.err.println("[WARN] Failed to write trace comparison CSV: " + e);
+        }
+    }
+
+    private static void appendTraceComparison(
+            StringBuilder builder,
+            String runLabel,
+            Map<String, CompletedCase> group,
+            String leftRole,
+            String rightRole,
+            String pairName) {
+        CompletedCase left = group.get(leftRole);
+        CompletedCase right = group.get(rightRole);
+        if (left == null || right == null) {
+            return;
+        }
+        String variantBase = variantBase(left.experimentCase.variant);
+        try {
+            TransitionGraph leftGraph = TransitionGraph.fromPrintTransitionsFile(left.paths.transitionsFile);
+            TransitionGraph rightGraph = TransitionGraph.fromPrintTransitionsFile(right.paths.transitionsFile);
+            TraceLanguageChecker.EquivalenceResult result =
+                    TraceLanguageChecker.compare(leftGraph, rightGraph);
+            builder.append(UpdateRequirementChecker.csv(runLabel == null ? "" : runLabel)).append(',')
+                    .append(UpdateRequirementChecker.csv(left.experimentCase.example)).append(',')
+                    .append(UpdateRequirementChecker.csv(variantBase)).append(',')
+                    .append(UpdateRequirementChecker.csv(pairName)).append(',')
+                    .append(UpdateRequirementChecker.csv(left.experimentCase.id)).append(',')
+                    .append(UpdateRequirementChecker.csv(right.experimentCase.id)).append(',')
+                    .append(result.leftSubsetRight.included).append(',')
+                    .append(result.rightSubsetLeft.included).append(',')
+                    .append(result.equivalent()).append(',')
+                    .append(UpdateRequirementChecker.csv(result.leftSubsetRight.witnessText())).append(',')
+                    .append(UpdateRequirementChecker.csv(result.rightSubsetLeft.witnessText())).append(',')
+                    .append(UpdateRequirementChecker.csv(traceDetail(result)))
+                    .append('\n');
+        } catch (Throwable e) {
+            builder.append(UpdateRequirementChecker.csv(runLabel == null ? "" : runLabel)).append(',')
+                    .append(UpdateRequirementChecker.csv(left.experimentCase.example)).append(',')
+                    .append(UpdateRequirementChecker.csv(variantBase)).append(',')
+                    .append(UpdateRequirementChecker.csv(pairName)).append(',')
+                    .append(UpdateRequirementChecker.csv(left.experimentCase.id)).append(',')
+                    .append(UpdateRequirementChecker.csv(right.experimentCase.id)).append(',')
+                    .append("ERROR,ERROR,ERROR,,,")
+                    .append(UpdateRequirementChecker.csv(e.toString()))
+                    .append('\n');
+        }
+    }
+
+    private static String traceDetail(TraceLanguageChecker.EquivalenceResult result) {
+        StringBuilder builder = new StringBuilder();
+        if (!result.leftSubsetRight.included) {
+            builder.append("left_not_subset_right: ").append(result.leftSubsetRight.detail);
+        }
+        if (!result.rightSubsetLeft.included) {
+            if (builder.length() > 0) {
+                builder.append("; ");
+            }
+            builder.append("right_not_subset_left: ").append(result.rightSubsetLeft.detail);
+        }
+        return builder.toString();
+    }
+
+    private static String traceRole(ExperimentCase experimentCase) {
+        String text = (safeLower(experimentCase.method)
+                + " "
+                + safeLower(experimentCase.variant)
+                + " "
+                + safeLower(experimentCase.id));
+        if (text.contains("otf")) {
+            return null;
+        }
+        boolean sbp = text.contains("sbp")
+                || text.contains("safetybackward")
+                || text.contains("safety_backward")
+                || text.contains("safety-backward");
+        boolean delayed = text.contains("stepwise_delayed")
+                || text.contains("stepwisedelayed")
+                || (text.contains("stepwise") && text.contains("delayed"));
+        boolean traditional = text.contains("traditional");
+        if (delayed) {
+            return sbp ? "stepwise_delayed_sbp" : "stepwise_delayed";
+        }
+        if (traditional) {
+            return sbp ? "traditional_sbp" : "traditional";
+        }
+        return null;
+    }
+
+    private static String variantBase(String variant) {
+        String value = variant == null ? "" : variant;
+        value = value.replaceAll("(?i)(^|[_-])sbp($|[_-])", "$1");
+        value = value.replaceAll("(?i)safety[_-]?backward[_-]?pruning", "");
+        value = value.replaceAll("__+", "_");
+        value = value.replaceAll("--+", "-");
+        while (value.startsWith("_") || value.startsWith("-")) {
+            value = value.substring(1);
+        }
+        while (value.endsWith("_") || value.endsWith("-")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value.isEmpty() ? "default" : value;
+    }
+
+    private static String safeLower(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private static Map<String, String> readMetricCsvValues(File csvFile) {
+        Map<String, String> values = new LinkedHashMap<String, String>();
+        if (csvFile == null || !csvFile.isFile()) {
+            return values;
+        }
+        try {
+            List<String> lines = Files.readAllLines(csvFile.toPath(), StandardCharsets.UTF_8);
+            for (int i = 1; i < lines.size(); i++) {
+                String[] columns = lines.get(i).split(",", -1);
+                if (columns.length >= 4) {
+                    values.put(unquoteCsv(columns[1]), unquoteCsv(columns[3]));
+                }
+            }
+        } catch (IOException e) {
+            // Keep meta writing best-effort; paths are still recorded above.
+        }
+        return values;
+    }
+
+    private static Map<String, String> readRequirementCsvValues(File csvFile) {
+        Map<String, String> values = new LinkedHashMap<String, String>();
+        if (csvFile == null || !csvFile.isFile()) {
+            return values;
+        }
+        try {
+            List<String> lines = Files.readAllLines(csvFile.toPath(), StandardCharsets.UTF_8);
+            for (int i = 1; i < lines.size(); i++) {
+                String[] columns = lines.get(i).split(",", -1);
+                if (columns.length >= 3) {
+                    values.put(unquoteCsv(columns[0]), unquoteCsv(columns[2]));
+                }
+            }
+        } catch (IOException e) {
+            // Keep meta writing best-effort; paths are still recorded above.
+        }
+        return values;
+    }
+
+    private static String unquoteCsv(String value) {
+        if (value == null || value.length() < 2 || value.charAt(0) != '"'
+                || value.charAt(value.length() - 1) != '"') {
+            return value == null ? "" : value;
+        }
+        return value.substring(1, value.length() - 1).replace("\"\"", "\"");
+    }
+
+    private static void putMetricIfPresent(
+            Map<String, Object> output,
+            Map<String, String> metrics,
+            String metricKey,
+            String jsonKey) {
+        String value = metrics.get(metricKey);
+        if (value == null || value.trim().isEmpty()) {
+            return;
+        }
+        try {
+            output.put(jsonKey, Long.valueOf(value));
+        } catch (NumberFormatException e) {
+            output.put(jsonKey, value);
+        }
     }
 
     private static String toJson(Map<String, Object> values) {
@@ -366,6 +854,36 @@ public final class BatchExperimentRunner {
         return options;
     }
 
+    private static void applyBooleanOverride(
+            Map<String, String> options,
+            String optionName,
+            ExperimentConfig config,
+            String fieldName) {
+        if (!options.containsKey(optionName)) {
+            return;
+        }
+        boolean value = parseBooleanOption(options.get(optionName), optionName);
+        if ("requirementsCheck".equals(fieldName)) {
+            config.requirementsCheck = value;
+        } else if ("traceCheck".equals(fieldName)) {
+            config.traceCheck = value;
+        }
+    }
+
+    private static boolean parseBooleanOption(String value, String optionName) {
+        if ("true".equalsIgnoreCase(value)
+                || "yes".equalsIgnoreCase(value)
+                || "1".equals(value)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(value)
+                || "no".equalsIgnoreCase(value)
+                || "0".equals(value)) {
+            return false;
+        }
+        throw new IllegalArgumentException("--" + optionName + " must be true or false: " + value);
+    }
+
     private static String required(Map<String, String> options, String key) {
         String value = options.get(key);
         if (value == null || value.trim().isEmpty()) {
@@ -383,6 +901,11 @@ public final class BatchExperimentRunner {
         out.println("  outputDir: Experiment/result");
         out.println("  runs: 5  # optional; writes Experiment/run_01/result, Experiment/run_02/result, ...");
         out.println("  timeoutHours: 16");
+        out.println("  requirementsCheck: true  # optional; default false");
+        out.println("  traceCheck: true         # optional; default false");
+        out.println("  notifyOn: always         # optional; always, success, failure, never");
+        out.println("  slackWebhookUrl: https://hooks.slack.com/services/...  # optional; keep out of Git");
+        out.println("  notifyTimeoutSeconds: 30 # optional; default 30");
         out.println("  javaOptions:");
         out.println("    - -Xmx32g");
         out.println("    - -Dmtsa.evaluation.enabled=true");
@@ -393,6 +916,11 @@ public final class BatchExperimentRunner {
         out.println("      variant: no_tr");
         out.println("      lts: Experiment/lts/Workflow/workflow_no_tr.lts");
         out.println("      target: UpdCont");
+        out.println("      requirementsCheck: false  # optional per-case override");
+        out.println("");
+        out.println("CLI top-level defaults:");
+        out.println("  --requirements-check true|false");
+        out.println("  --trace-check true|false");
     }
 
     private static String now() {
@@ -430,6 +958,11 @@ public final class BatchExperimentRunner {
         final File caseDirectory;
         final File outputFile;
         final File transitionsFile;
+        final File minimizedTransitionsFile;
+        final File minimizedCountsFile;
+        final File requirementsCheckFile;
+        final boolean requirementsCheckEnabled;
+        final File evaluationCsvFile;
         final File stdoutFile;
         final File stderrFile;
         final File metaFile;
@@ -441,6 +974,11 @@ public final class BatchExperimentRunner {
                 File caseDirectory,
                 File outputFile,
                 File transitionsFile,
+                File minimizedTransitionsFile,
+                File minimizedCountsFile,
+                File requirementsCheckFile,
+                boolean requirementsCheckEnabled,
+                File evaluationCsvFile,
                 File stdoutFile,
                 File stderrFile,
                 File metaFile,
@@ -450,6 +988,11 @@ public final class BatchExperimentRunner {
             this.caseDirectory = caseDirectory;
             this.outputFile = outputFile;
             this.transitionsFile = transitionsFile;
+            this.minimizedTransitionsFile = minimizedTransitionsFile;
+            this.minimizedCountsFile = minimizedCountsFile;
+            this.requirementsCheckFile = requirementsCheckFile;
+            this.requirementsCheckEnabled = requirementsCheckEnabled;
+            this.evaluationCsvFile = evaluationCsvFile;
             this.stdoutFile = stdoutFile;
             this.stderrFile = stderrFile;
             this.metaFile = metaFile;
@@ -461,6 +1004,7 @@ public final class BatchExperimentRunner {
         static CasePaths create(
                 File outputDir,
                 ExperimentCase experimentCase,
+                boolean defaultRequirementsCheck,
                 int runIndex,
                 int runCount,
                 String runLabel) {
@@ -469,10 +1013,20 @@ public final class BatchExperimentRunner {
                     experimentCase.methodFolderName());
             String prefix = experimentCase.filePrefix();
             String target = ExperimentConfig.sanitizePreservingCase(experimentCase.target);
+            String caseId = ExperimentConfig.sanitize(experimentCase.id);
+            boolean requirementsCheckEnabled =
+                    experimentCase.requirementsCheckOrDefault(defaultRequirementsCheck);
             return new CasePaths(
                     caseDirectory,
                     new File(caseDirectory, prefix + "_output.txt"),
                     new File(caseDirectory, prefix + "_transitions_" + target + ".txt"),
+                    new File(caseDirectory, caseId + "_minimized_transitions_" + target + ".txt"),
+                    new File(caseDirectory, caseId + "_minimized_counts_" + target + ".csv"),
+                    requirementsCheckEnabled
+                            ? new File(caseDirectory, caseId + "_requirements_check_" + target + ".csv")
+                            : null,
+                    requirementsCheckEnabled,
+                    new File(caseDirectory, caseId + "_evaluation_" + target + ".csv"),
                     new File(caseDirectory, prefix + "_stdout.txt"),
                     new File(caseDirectory, prefix + "_stderr.txt"),
                     new File(caseDirectory, prefix + "_meta.json"),
@@ -496,6 +1050,18 @@ public final class BatchExperimentRunner {
         String endedAt;
         String errorMessage;
         List<String> command;
+    }
+
+    private static final class CompletedCase {
+        final ExperimentCase experimentCase;
+        final CasePaths paths;
+        final CaseResult result;
+
+        CompletedCase(ExperimentCase experimentCase, CasePaths paths, CaseResult result) {
+            this.experimentCase = experimentCase;
+            this.paths = paths;
+            this.result = result;
+        }
     }
 
     private static final class StreamCopyThread extends Thread {

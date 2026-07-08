@@ -1,0 +1,162 @@
+set Controllable64 = {des64, output}
+set Controllable128 = {des128, output}
+set Alphabet64 = {Controllable64, input}
+set Alphabet128 = {Controllable128, input}
+set Alphabet = {des64, des128, output, input}
+
+//ENVIRONMENTS
+	IO = (input -> output -> IO).
+
+	DES64 = (des64 -> DES64).
+
+	DES128 = (des128 -> DES128).
+
+MAP_64_128 = (des64 -> MAP_64_128 | reconfigure -> DONE),
+DONE = (des128 -> DONE).
+||Mapping_64_128 = (MAP_64_128 || IO).
+
+||ENV_DES64 = (DES64 || IO).
+||ENV_DES128 = (DES128 || IO).
+
+//OTF-DUCで追加
+	IO_OLD = (input -> PROCESS),
+	PROCESS = (output -> IO_OLD).
+	
+	IO_NEW = (input -> PROCESS),
+	PROCESS = (output -> IO_NEW).
+
+	relation R_IO = {IO_OLD@IO_OLD = reconfigure -> IO_NEW@IO_NEW,
+					 PROCESS@IO_OLD = reconfigure -> PROCESS@IO_NEW}
+
+	relation R_64_128 = {DES64@DES64 = reconfigure -> DES128@DES128}
+
+	map MAPPING_IO = {IO_OLD, IO_NEW, R_IO}.
+
+	map MAPPING_64_128 = {DES64, DES128, R_64_128}.
+
+||MapEnv_64_128 = (MAPPING_IO || MAPPING_64_128).
+
+// PROPERTIES
+fluent InputRecieve = <input, output>
+fluent EncriptionDone64 = <des64, input>
+fluent EncriptionDone128 = <des128, input>
+
+ltl_property P_DES64 = []((des64 -> InputRecieve) && (output -> EncriptionDone64))
+ltl_property P_DES128 = []((des128 -> InputRecieve) && (output -> EncriptionDone128))
+
+// CONTROLLERS
+// 1
+controllerSpec DES64_SPEC = {
+	safety = {P_DES64}
+	controllable = {Controllable64}
+}
+
+controller ||CONTROLLER64 = ENV_DES64~{DES64_SPEC}.
+||CONTROLLER_ENVIRONMENT_64 = (CONTROLLER64||ENV_DES64).
+
+// 2
+controllerSpec DES128_SPEC = {
+	safety = {P_DES128}
+	controllable = {Controllable128}
+}
+
+controller ||CONTROLLER128 = ENV_DES128~{DES128_SPEC}.
+||CONTROLLER_ENVIRONMENT_128 = (CONTROLLER128||ENV_DES128).
+
+//------------------T--------------------
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+fluent Reconfigure = <reconfigure, hotSwapIn>
+
+// For avoiding overlapping
+ltl_property R8 = (StartNewSpec -> !EncriptionDone64)
+
+
+// For overlapping updates
+ltl_property R9 = (StopOldSpec -> StartNewSpec)
+
+// For avoiding overlapping
+ltl_property R8_OTF = [](StartNewSpec -> !EncriptionDone64)
+
+
+// For overlapping updates
+ltl_property R9_OTF = [](StopOldSpec -> StartNewSpec)
+
+// Updates controllers
+
+// 1
+updatingController UpdCont = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+//  transition = R8,
+//  transition = R9,
+	nonblocking
+}
+||UPDATE_CONTROLLER = UpdCont.
+
+
+updatingController UpdCont_stepwise_delayed = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+//  transition = R8,
+//  transition = R9,
+	nonblocking,
+    stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_incrementalPruning = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+//  transition = R8,
+//  transition = R9,
+	nonblocking,
+    stepwise_delayed,
+    incrementalPruning
+}
+
+||STEPWISE_DELAYED_INCREMENTAL_PRUNING_UPDATE_CONTROLLER = UpdCont_stepwise_delayed_incrementalPruning.
+
+updatingController UpdCont_stepwise_delayed_incrementalPruningCleanup = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+//  transition = R8,
+//  transition = R9,
+	nonblocking,
+    stepwise_delayed,
+    incrementalPruning,
+    incrementalPruningCleanup
+}
+
+||STEPWISE_DELAYED_INCREMENTAL_PRUNING_CLEANUP_UPDATE_CONTROLLER = UpdCont_stepwise_delayed_incrementalPruningCleanup.
+
+updatingController UpdCont_OTF = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+//  transition = R8_OTF,
+//  transition = R9_OTF,
+	nonblocking,
+	on_the_fly
+}
+||UPDATE_CONTROLLER_OTF = UpdCont_OTF.

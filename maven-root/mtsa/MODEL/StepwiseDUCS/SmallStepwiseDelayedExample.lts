@@ -1,0 +1,99 @@
+// Small two-stage example for explaining stepwise_delayed.
+// The example is intentionally tiny: Traditional metaEnv should stay below 100 states.
+
+set OldControllableActions_1 = {e1_start, e1_work}
+set OldControllableActions_2 = {e2_start}
+set OldControllableActions = {e1_start, e1_work, e2_start}
+
+set NewControllableActions_1 = {e1_start, e1_work}
+set NewControllableActions_2 = {e2_start, e2_work}
+set NewControllableActions = {e1_start, e1_work, e2_start, e2_work}
+
+// ---------------------------OLD ENVIRONMENTS-----------------------------
+E1_old = (e1_start -> E1_old_busy | e1_work -> E1_old),
+	E1_old_busy = (e1_work -> E1_old_busy | e1_done -> E1_old).
+
+E2_old = (e2_start -> E2_old_busy),
+	E2_old_busy = (e2_done -> E2_old).
+
+// ---------------------------NEW ENVIRONMENTS-----------------------------
+E1_new = (e1_start -> E1_new_busy | e1_work -> E1_new),
+	E1_new_busy = (e1_work -> E1_new_busy | e1_done -> E1_new).
+
+E2_new = (e2_start -> E2_new_busy | e2_work -> E2_new),
+	E2_new_busy = (e2_work -> E2_new_busy | e2_done -> E2_new).
+
+// ---------------------------MAP RELATIONS-----------------------------
+relation R_E1 = {E1_old@E1_old			= reconfigure -> E1_new@E1_new,
+				E1_old_busy@E1_old		= reconfigure -> E1_new_busy@E1_new}
+
+relation R_E2 = {E2_old@E2_old			= reconfigure -> E2_new@E2_new,
+				E2_old_busy@E2_old		= reconfigure -> E2_new_busy@E2_new}
+
+map MAP_E1 = {E1_old, E1_new, R_E1}
+map MAP_E2 = {E2_old, E2_new, R_E2}
+
+||OLD_ENV = (E1_old || E2_old).
+||NEW_ENV = (E1_new || E2_new).
+||MAPPING_ENV = (MAP_E1 || MAP_E2).
+||MapEnvironment = (MAP_E1 || MAP_E2).
+
+// ---------------------------FLUENTS-----------------------------
+fluent E1Busy = <e1_start, e1_done>
+fluent E2Busy = <e2_start, e2_done>
+
+// ---------------------------OLD REQUIREMENTS-----------------------------
+ltl_property R1_old = [](e1_work -> E1Busy)
+ltl_property R12_old = []!(E1Busy && E2Busy)
+
+controllerSpec OLD_REQ = {
+	safety = {
+			R1_old,
+			R12_old
+			}
+	controllable = {OldControllableActions}
+}
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+// ---------------------------NEW REQUIREMENTS-----------------------------
+ltl_property R1_new = [](e1_work -> E1Busy)
+ltl_property R2_new = [](e2_work -> E2Busy)
+ltl_property R12_new = []!(E1Busy && E2Busy)
+
+controllerSpec NEW_REQ = {
+	safety = {
+			R1_new,
+			R2_new,
+			R12_new
+			}
+	controllable = {NewControllableActions}
+}
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// ---------------------------UPDATING CONTROLLER SPEC-----------------------------
+updatingController UpdCont = {
+	oldController = OldCon,
+	oldEnvironment = {E1_old, E2_old},
+	newEnvironment = {E1_new, E2_new},
+	mapRelation = {R_E1, R_E2},
+	oldGoal = OLD_REQ,
+	newGoal = NEW_REQ,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_stepwise_delayed = {
+	oldController = OldCon,
+	oldEnvironment = {E1_old, E2_old},
+	newEnvironment = {E1_new, E2_new},
+	mapRelation = {R_E1, R_E2},
+	oldGoal = OLD_REQ,
+	newGoal = NEW_REQ,
+	nonblocking,
+	stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.

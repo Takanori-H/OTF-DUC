@@ -1,14 +1,23 @@
 package ltsa.updatingControllers;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import ltsa.MultiCore.ComputerOptions;
 import ltsa.lts.LTSOutput;
+import ltsa.ui.EnvConfiguration;
 
 /**
  * 更新コントローラ合成の評価値を 1 回の合成単位で集約する recorder。
@@ -18,6 +27,13 @@ public final class UpdatingControllerEvaluationRecorder {
     private static final String EVALUATION_ENABLED_PROPERTY = "mtsa.evaluation.enabled";
     private static final String LEGACY_EVALUATION_ENABLED_PROPERTY = "updating.controller.evaluation.enabled";
     private static final String PRINT_DETAILED_REPORT_PROPERTY = "updating.controller.evaluation.printDetailedReport";
+    private static final String CSV_FILE_PROPERTY = "mtsa.evaluation.csvFile";
+    private static final String LEGACY_CSV_FILE_PROPERTY = "updating.controller.evaluation.csvFile";
+    private static final String CSV_DIR_PROPERTY = "mtsa.evaluation.csvDir";
+    private static final String DEFAULT_CSV_DIR = "Experiment/evaluation_csv";
+    private static final String DATA_CSV_HEADER = "mode,result,failure_reason,section,metric_key,metric_label,value,unit,formula,"
+            + "metric_schema_version,metric_description_id,"
+            + "section_readable_ja,metric_readable_ja,metric_category,artifact,phase,action,event,stat";
     private static final String METRIC_SCHEMA_VERSION = "2026-05-19";
 
     public enum ResultStatus {
@@ -43,6 +59,9 @@ public final class UpdatingControllerEvaluationRecorder {
     private static String failureMessage = "";
     private static boolean printed = false;
     private static long stateSpaceCountOverheadMillis = 0;
+    private static long stateSpaceCountOverheadObservedMillis = 0;
+    private static long stateSpaceCountOverheadPostObservedMillis = 0;
+    private static boolean observedTimeWindowClosed = false;
     private static long oldControllerStates = -1;
     private static long beginUpdateReferenceStates = -1;
     private static long traditionalMetaStates = -1;
@@ -62,6 +81,8 @@ public final class UpdatingControllerEvaluationRecorder {
     private static long previousMemoryCheckpointBytes = -1;
     private static String currentSummarySection = "";
     private static String otfExecutionMode = "";
+    private static String autoCsvFile = "";
+    private static long autoCsvSequence = 0;
 
     private UpdatingControllerEvaluationRecorder() {
     }
@@ -87,6 +108,9 @@ public final class UpdatingControllerEvaluationRecorder {
         failureMessage = "";
         printed = false;
         stateSpaceCountOverheadMillis = 0;
+        stateSpaceCountOverheadObservedMillis = 0;
+        stateSpaceCountOverheadPostObservedMillis = 0;
+        observedTimeWindowClosed = false;
         oldControllerStates = -1;
         beginUpdateReferenceStates = -1;
         traditionalMetaStates = -1;
@@ -106,6 +130,7 @@ public final class UpdatingControllerEvaluationRecorder {
         previousMemoryCheckpointBytes = -1;
         currentSummarySection = "";
         otfExecutionMode = "";
+        autoCsvFile = "";
     }
 
     public static synchronized void setMode(String value) {
@@ -115,6 +140,33 @@ public final class UpdatingControllerEvaluationRecorder {
         if (value != null && !value.isEmpty()) {
             mode = value;
         }
+    }
+
+    public static synchronized void recordRunEnvironmentMetadata() {
+        if (!isEnabled()) {
+            return;
+        }
+        Runtime runtime = Runtime.getRuntime();
+        recordDataMetric("run_allowed_threads", "Run", "allowed threads",
+                Long.toString(ComputerOptions.getInstance().getAllowedThreads()), "threads");
+        recordDataMetric("run_available_processors", "Run", "available processors",
+                Long.toString(runtime.availableProcessors()), "processors");
+        recordDataMetric("run_jvm_max_heap", "Run", "JVM max heap", bytesToByteText(runtime.maxMemory()), "B");
+        recordDataMetric("run_java_version", "Run", "Java version",
+                System.getProperty("java.version", ""), "text");
+        recordDataMetric("run_java_vm_name", "Run", "Java VM name",
+                System.getProperty("java.vm.name", ""), "text");
+        recordDataMetric("run_os_name", "Run", "OS name",
+                System.getProperty("os.name", ""), "text");
+        recordDataMetric("run_os_arch", "Run", "OS arch",
+                System.getProperty("os.arch", ""), "text");
+    }
+
+    public static synchronized void closeObservedTimeWindow() {
+        if (!isEnabled()) {
+            return;
+        }
+        observedTimeWindowClosed = true;
     }
 
     public static synchronized void setOtfExecutionMode(String value) {
@@ -215,6 +267,24 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric(section, label, Long.toString(count), unit == null ? "count" : unit);
     }
 
+    public static synchronized void recordText(String section, String label, String value, String unit) {
+        if (!isEnabled()) {
+            return;
+        }
+        String safeValue = value == null ? "" : value;
+        add(section, label + " : " + safeValue);
+        recordDataMetric(section, label, safeValue, unit == null ? "text" : unit);
+    }
+
+    public static synchronized void recordDouble(String section, String label, double value, String unit) {
+        if (!isEnabled()) {
+            return;
+        }
+        String formatted = formatDouble(value);
+        add(section, label + " : " + formatted + (unit == null || unit.isEmpty() ? "" : " " + unit));
+        recordDataMetric(section, label, formatted, unit == null ? "number" : unit);
+    }
+
     public static synchronized void beginCountScope(String section, String label) {
         if (!isEnabled()) {
             return;
@@ -247,6 +317,11 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         long safeCountTime = Math.max(0, countTimeMillis);
         stateSpaceCountOverheadMillis += safeCountTime;
+        if (observedTimeWindowClosed) {
+            stateSpaceCountOverheadPostObservedMillis += safeCountTime;
+        } else {
+            stateSpaceCountOverheadObservedMillis += safeCountTime;
+        }
         if (safeCountTime == 0 || activeCountScopes.isEmpty()) {
             return;
         }
@@ -256,6 +331,75 @@ public final class UpdatingControllerEvaluationRecorder {
                 scope.countTimeMillis += safeCountTime;
             }
         }
+    }
+
+    private static void refreshStateSpaceCountOverheadDataMetrics() {
+        recordDataMetric("state_transition_count_overhead_total", "Evaluation Summary",
+                "State/transition count overhead total", Long.toString(stateSpaceCountOverheadMillis), "ms");
+        recordDataMetric("state_transition_count_overhead_in_observed_time", "Evaluation Summary",
+                "State/transition count overhead in observed time",
+                Long.toString(stateSpaceCountOverheadObservedMillis), "ms");
+        recordDataMetric("state_transition_count_overhead_after_observed_time", "Evaluation Summary",
+                "State/transition count overhead after observed time",
+                Long.toString(stateSpaceCountOverheadPostObservedMillis), "ms");
+
+        recordDataMetricWithFormula(
+                "comparison_count_overhead_time",
+                "比較用時間集計",
+                "評価用カウント時間（状態数・遷移数）",
+                Long.toString(stateSpaceCountOverheadObservedMillis),
+                "ms",
+                "実測総時間に含まれる状態数・遷移数 CountTime。合成本来の処理ではない評価用オーバーヘッドで、比較用時間から差し引く。");
+        recordDataMetricWithFormula(
+                "comparison_count_overhead_total",
+                "比較用時間集計",
+                "評価用カウント時間（合計）",
+                Long.toString(stateSpaceCountOverheadMillis),
+                "ms",
+                "実測総時間内と実測総時間外の状態数・遷移数 CountTime の合計。診断用の総量であり、実測総時間から丸ごとは差し引かない。");
+        recordDataMetricWithFormula(
+                "comparison_count_overhead_after_observed_time",
+                "比較用時間集計",
+                "評価用カウント時間（実測時間外）",
+                Long.toString(stateSpaceCountOverheadPostObservedMillis),
+                "ms",
+                "実測総時間を確定した後に、出力 controller や post-synthesis 診断のために数えた CountTime。主比較用時間からは差し引かない。");
+
+        recordDataMetricWithFormula(
+                "Evaluation Summary / 全体",
+                "カウントによるオーバーヘッド（実測時間内）",
+                Long.toString(stateSpaceCountOverheadObservedMillis),
+                "ms",
+                "実測総時間に含まれる状態数・遷移数 CountTime。比較用時間から差し引く対象。");
+        recordDataMetricWithFormula(
+                "Evaluation Summary / 全体",
+                "カウントによるオーバーヘッド（実測時間外）",
+                Long.toString(stateSpaceCountOverheadPostObservedMillis),
+                "ms",
+                "実測総時間確定後に出力 controller や post-synthesis 診断のために数えた CountTime。比較用時間からは差し引かない。");
+        recordDataMetricWithFormula(
+                "Evaluation Summary / 全体",
+                "カウントによるオーバーヘッド（合計）",
+                Long.toString(stateSpaceCountOverheadMillis),
+                "ms",
+                "実測時間内と実測時間外の状態数・遷移数 CountTime の合計。");
+    }
+
+    public static synchronized void recordEvaluationCountTime(
+            String section,
+            String label,
+            long countTimeMillis,
+            String description) {
+        if (!isEnabled()) {
+            return;
+        }
+        long safeCountTime = Math.max(0, countTimeMillis);
+        addStateSpaceCountOverhead(safeCountTime);
+        add(section, label + " : " + safeCountTime + " ms");
+        if (description != null && !description.isEmpty()) {
+            add(section, "  説明: " + description);
+        }
+        recordDataMetric(metricKey(section, label), section, label, Long.toString(safeCountTime), "ms");
     }
 
     public static synchronized void recordStateSpace(
@@ -280,6 +424,79 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric(baseKey + "_transitions", section, label + " / Transitions", Long.toString(transitions), "transitions");
         recordDataMetric(baseKey + "_count_time", section, label + " / CountTime", Long.toString(countTimeMillis), "ms");
         captureReferenceStateSpace(section, label, states, transitions);
+    }
+
+    public static synchronized void recordFinalGrInputStateSpace(
+            String methodKey,
+            String methodLabel,
+            long states,
+            long transitions,
+            String sourceStage) {
+        if (!isEnabled()) {
+            return;
+        }
+        String safeMethodKey = methodKey == null || methodKey.isEmpty()
+                ? "duc"
+                : metricToken(methodKey);
+        String safeMethodLabel = methodLabel == null || methodLabel.isEmpty()
+                ? "DUC"
+                : methodLabel;
+        String section = "Final GR(1) Input";
+        add(section, safeMethodLabel + " final safety environment States: " + states
+                + ", Transitions: " + transitions
+                + (sourceStage == null || sourceStage.isEmpty() ? "" : ", SourceStage: " + sourceStage));
+        recordDataMetric(safeMethodKey + "_final_gr_input_states",
+                section,
+                safeMethodLabel + " final safety environment / States",
+                Long.toString(states),
+                "states");
+        recordDataMetric(safeMethodKey + "_final_gr_input_transitions",
+                section,
+                safeMethodLabel + " final safety environment / Transitions",
+                Long.toString(transitions),
+                "transitions");
+        if (sourceStage != null && !sourceStage.isEmpty()) {
+            recordDataMetric(safeMethodKey + "_final_gr_input_source_stage",
+                    section,
+                    safeMethodLabel + " final safety environment / source stage",
+                    sourceStage,
+                    "text");
+        }
+    }
+
+    public static synchronized void recordGrGameStateSpace(
+            String section,
+            String label,
+            long states,
+            long controllableSuccessors,
+            long uncontrollableSuccessors,
+            long countTimeMillis) {
+        if (!isEnabled()) {
+            return;
+        }
+        long safeCountTime = Math.max(0, countTimeMillis);
+        addStateSpaceCountOverhead(safeCountTime);
+        long totalSuccessors = controllableSuccessors + uncontrollableSuccessors;
+        add(section, label + ": states=" + states
+                + ", controllableSuccessors=" + controllableSuccessors
+                + ", uncontrollableSuccessors=" + uncontrollableSuccessors
+                + ", totalSuccessors=" + totalSuccessors
+                + ", CountTime=" + safeCountTime + " ms");
+        String baseKey = metricKey(section, label);
+        recordDataMetric(baseKey + "_states", section, label + " / States",
+                Long.toString(states), "states");
+        recordDataMetric(baseKey + "_controllable_successors", section,
+                label + " / controllable successors",
+                Long.toString(controllableSuccessors), "successors");
+        recordDataMetric(baseKey + "_uncontrollable_successors", section,
+                label + " / uncontrollable successors",
+                Long.toString(uncontrollableSuccessors), "successors");
+        recordDataMetric(baseKey + "_total_successors", section,
+                label + " / total successors",
+                Long.toString(totalSuccessors), "successors");
+        recordDataMetric(baseKey + "_count_time", section,
+                label + " / CountTime",
+                Long.toString(safeCountTime), "ms");
     }
 
     public static synchronized void recordUpdatePhaseCountTimeTotal(
@@ -955,6 +1172,43 @@ public final class UpdatingControllerEvaluationRecorder {
         recordOutputReductionIfAvailable(states, transitions);
     }
 
+    public static synchronized void recordMinimizedOutputController(
+            long states,
+            long transitions,
+            long countTimeMillis,
+            long minimizeTimeMillis) {
+        if (!isEnabled()) {
+            return;
+        }
+        long safeCountTime = Math.max(0, countTimeMillis);
+        long safeMinimizeTime = Math.max(0, minimizeTimeMillis);
+        addStateSpaceCountOverhead(safeCountTime);
+        add("Minimized Output Update Controller", "States: " + states
+                + ", Transitions: " + transitions
+                + ", CountTime: " + safeCountTime + " ms"
+                + ", MinimizeTime: " + safeMinimizeTime + " ms");
+        recordDataMetric("minimized_output_update_controller_states",
+                "Minimized Output Update Controller",
+                "States",
+                Long.toString(states),
+                "states");
+        recordDataMetric("minimized_output_update_controller_transitions",
+                "Minimized Output Update Controller",
+                "Transitions",
+                Long.toString(transitions),
+                "transitions");
+        recordDataMetric("minimized_output_update_controller_count_time",
+                "Minimized Output Update Controller",
+                "CountTime",
+                Long.toString(safeCountTime),
+                "ms");
+        recordDataMetric("minimized_output_update_controller_minimize_time",
+                "Minimized Output Update Controller",
+                "MinimizeTime",
+                Long.toString(safeMinimizeTime),
+                "ms");
+    }
+
     public static synchronized void recordBeginUpdateCoverage(long beginUpdateStates, long countTimeMillis) {
         addStateSpaceCountOverhead(countTimeMillis);
         long denominator = oldControllerStates >= 0 ? oldControllerStates : beginUpdateReferenceStates;
@@ -1047,7 +1301,10 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     public static synchronized boolean isUpdatingControllerMode() {
-        return isEnabled() && ("OTF-DUC".equals(mode) || "Traditional DUC".equals(mode));
+        return isEnabled() && ("OTF-DUC".equals(mode)
+                || "Traditional DUC".equals(mode)
+                || "Stepwise DUC".equals(mode)
+                || "Stepwise Delayed DUC".equals(mode));
     }
 
     public static synchronized void recordBeginUpdateReferenceStates(long states) {
@@ -1097,24 +1354,13 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         flushActiveTimers();
 
-        long headerOutputStart = System.currentTimeMillis();
-        output.outln("");
-        output.outln("================ EVALUATION ================");
-        output.outln("Mode: " + mode);
-        if ("OTF-DUC".equals(mode) && !otfExecutionMode.isEmpty()) {
-            output.outln("OTF-DUC Execution Mode: " + otfExecutionMode);
-        }
-        output.outln("Result: " + resultStatus);
-        if (isFailureStatus(resultStatus) && !failureMessage.isEmpty()) {
-            output.outln("Failure reason: " + failureMessage);
-        }
-        output.outln("State/transition count overhead total: " + stateSpaceCountOverheadMillis + " ms");
-        recordDataMetric("state_transition_count_overhead_total", "Evaluation Summary",
-                "State/transition count overhead total", Long.toString(stateSpaceCountOverheadMillis), "ms");
-        evaluationHeaderOutputMillis = System.currentTimeMillis() - headerOutputStart;
+        refreshStateSpaceCountOverheadDataMetrics();
+        evaluationHeaderOutputMillis = 0;
 
         long detailedReportOutputStart = System.currentTimeMillis();
         if (shouldPrintDetailedReport()) {
+            output.outln("");
+            output.outln("================ DETAILED EVALUATION METRICS ================");
             for (Map.Entry<String, List<String>> entry : sections.entrySet()) {
                 output.outln("");
                 output.outln("[" + entry.getKey() + "]");
@@ -1123,13 +1369,9 @@ public final class UpdatingControllerEvaluationRecorder {
                     output.outln(line);
                 }
             }
-        } else {
-            output.outln("Detailed metric report: omitted. Use -D"
-                    + PRINT_DETAILED_REPORT_PROPERTY
-                    + "=true to print the verbose human-readable report.");
+            output.outln("==============================================================");
+            output.outln("");
         }
-        output.outln("====================================================");
-        output.outln("");
         evaluationDetailedReportOutputMillis = System.currentTimeMillis() - detailedReportOutputStart;
 
         long summaryOutputStart = System.currentTimeMillis();
@@ -1139,7 +1381,8 @@ public final class UpdatingControllerEvaluationRecorder {
         recordEvaluationOutputMetrics(false);
         recordCountScopeMetrics();
         recordComparisonSummary();
-        // CSV output is temporarily disabled for all DUCS modes.
+        writeDataCsvFileIfConfigured(output);
+        // CSV output to the Output tab remains disabled for all DUCS modes.
     }
 
     private static boolean shouldPrintDetailedReport() {
@@ -1159,14 +1402,14 @@ public final class UpdatingControllerEvaluationRecorder {
                 "評価ヘッダ出力時間",
                 Long.toString(Math.max(0, evaluationHeaderOutputMillis)),
                 "ms",
-                "EVALUATION ヘッダ、手法、結果、カウントオーバーヘッド行を Output に出す時間。");
+                "通常表示では出力しない評価ヘッダ部分の時間。");
         recordDataMetricWithFormula(
                 "evaluation_output_detailed_report_time",
                 "評価出力時間",
                 "詳細評価レポート出力時間",
                 Long.toString(Math.max(0, evaluationDetailedReportOutputMillis)),
                 "ms",
-                "詳細評価レポート本文を Output に出す時間。デフォルトでは省略メッセージのみ。");
+                "詳細評価レポート本文を Output に出す時間。デフォルトでは出力しない。");
         recordDataMetricWithFormula(
                 "evaluation_output_summary_time",
                 "評価出力時間",
@@ -1254,7 +1497,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "更新コントローラ定義を読み取り、旧コントローラ・Mapping Environment・要求・手法固有の補助モデルを準備する前処理。";
         }
         if ("UpdatingControllerSynthesizer".equals(section)) {
-            return "準備済みモデルから Traditional DUC または OTF-DUC の実際の合成処理を起動する入口。";
+            return "準備済みモデルから Traditional DUC、OTF-DUC、Stepwise Delayed DUC などの実際の合成処理を起動する入口。";
         }
         if ("solveControlProblem (Traditional DUC)".equals(section)) {
             return "Traditional DUC で更新用環境から安全性制約反映後の環境を作り、最後に update controller を合成する処理。";
@@ -1264,6 +1507,12 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Traditional DUC GR1 時間内訳".equals(section)) {
             return "Traditional DUC の安全性制約反映後の環境を最終コントローラ合成器に渡し、出力コントローラを得る処理。";
+        }
+        if ("Stepwise Delayed DUC".equals(section)) {
+            return "Stepwise Delayed DUC で構築済みの final safety environment から GR(1) により出力コントローラを得る処理。";
+        }
+        if ("Stepwise Delayed DUC GR1 時間内訳".equals(section)) {
+            return "Stepwise Delayed DUC の final safety environment を最終コントローラ合成器に渡し、出力コントローラを得る処理。";
         }
         if ("generateDUC (OTF-DUC)".equals(section)) {
             return "OTF-DUC本体として、探索入力モデルの準備、on-the-fly探索、出力UC構築、MTSA側への反映を行う処理。";
@@ -1337,6 +1586,18 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
             return "Traditional DUC の中間状態空間サイズ。更新用環境、安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の各段階を比較するための値。";
         }
+        if ("Stepwise Delayed DUC 最大状態数と遷移数".equals(section)) {
+            return "Stepwise Delayed DUC の中間状態空間サイズ。local / cross / final product / delayed connection / final safety environment の各段階を比較するための値。";
+        }
+        if ("Stepwise Delayed DUC 分類統計".equals(section)) {
+            return "Stepwise Delayed DUC の requirement 分類統計。local / cross goal 数、cross goal 比率、cross component scope の大きさを記録する。";
+        }
+        if ("Stepwise Delayed DUC scope別要求数".equals(section)) {
+            return "Stepwise Delayed DUC の requirement を stage scope ごとに集計した値。各 scope について local / cross と old safety / new safety / transition の内訳を記録する。";
+        }
+        if ("Stepwise Delayed DUC scope別状態空間".equals(section)) {
+            return "Stepwise Delayed DUC の local / cross pruning で作られる metaEnv と safetyEnv を stage scope ごとに記録した状態数・遷移数。";
+        }
         if ("Traditional DUC update phase 別状態空間".equals(section)) {
             return "Traditional DUC の中間状態空間を、hotSwapIn 前後、および stopOldSpec・reconfigure・startNewSpec の実行済み組合せごとに分けた状態数・遷移数。";
         }
@@ -1386,7 +1647,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "GUI から合成を起動した場合の全体時間、前処理時間、描画時間、メモリなどの共通計測。";
         }
         if ("TransitionSystemDispatcher".equals(section)) {
-            return "合成後の CompactState に対する共通後処理。Traditional DUC では .old action の relabel などを行う。";
+            return "合成後の CompactState に対する共通後処理。Traditional DUC や Stepwise Delayed DUC では .old action の relabel などを行う。";
         }
         if ("Output Update Controller".equals(section)) {
             return "最終的に出力された update controller の状態数・遷移数。";
@@ -1431,7 +1692,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "update controller の要件に関する簡易チェック。例: hotSwapIn が旧コントローラの何状態から出ているか。";
         }
         if ("比較用時間集計".equals(section)) {
-            return "OTF-DUC と Traditional DUC を比較しやすいように、共通前処理や評価用オーバーヘッドを差し引いた集計。";
+            return "各 DUC 手法を比較しやすいように、共通前処理や評価用オーバーヘッドを差し引いた集計。";
         }
         if ("評価出力時間".equals(section)) {
             return "評価結果を Output タブへ表示するために使った時間。合成本来の処理ではない評価用オーバーヘッド。";
@@ -1454,7 +1715,7 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("全 action 数（controllable + uncontrollable）: 入力 action 全体の大きさ。通常 action と更新事象を含む。");
         } else if ("UpdatingControllerSynthesizer".equals(section)) {
             notes.add("generateController の全体実行時間: 手法本体を呼び出して update controller を生成する外側の時間。");
-            notes.add("手法別の本体呼び出し時間: Traditional では最終コントローラ合成処理、OTF では探索入力準備から出力UC反映までの本体処理時間。");
+            notes.add("手法別の本体呼び出し時間: Traditional、OTF、Stepwise Delayed など各手法の本体処理時間。");
             notes.add("Traditional DUC 更新用環境構築時間: 旧コントローラと Mapping Environment から更新中の振る舞いを表す環境を構築する時間。");
         } else if ("solveControlProblem (Traditional DUC)".equals(section)) {
             notes.add("安全性評価用合成環境構築時間: 安全性評価用に更新用環境と Fluent を組み合わせる時間。");
@@ -1464,7 +1725,10 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("探索入力モデル準備時間: on-the-fly 探索に渡す Marking LTS、旧コントローラ、MapEnv、安全性などを並べる時間。");
             notes.add("New Controller の接続先の事前計算: hotSwapOut 後に新コントローラへ接続する状態対応表を作る時間。");
             notes.add("探索呼び出しから出力UC反映までの時間: OTF-DUC の探索器呼び出しから、出力UCをMTSA側の表現へ反映するまでの中心時間。");
-        } else if ("Traditional DUC GR1 時間内訳".equals(section)) {
+        } else if ("Stepwise Delayed DUC".equals(section)) {
+            notes.add("最終コントローラ合成時間: final safety environment から controller を合成する中核時間。");
+        } else if ("Traditional DUC GR1 時間内訳".equals(section)
+                || "Stepwise Delayed DUC GR1 時間内訳".equals(section)) {
             notes.add("ゴール条件構築時間: guarantee / assumption などから最終コントローラ合成用のゴール条件を構築する時間。");
             notes.add("勝ち領域計算時間: 最終コントローラ合成ゲーム上で勝ち領域を求める時間。");
             notes.add("コントローラ戦略構築時間: 勝ち領域から controller strategy を作る時間。");
@@ -1473,7 +1737,7 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("除外する共通前処理時間: 両手法に共通する旧コントローラ合成、Goal 準備、Mapping component 生成の合計。");
             notes.add("大枠比較用時間: 実測総時間から構文解析、評価用カウント、評価出力、GUI描画を除いた時間。");
             notes.add("厳密比較用時間: 大枠比較用時間からさらに共通前処理時間を除いた時間。");
-            notes.add("手法固有時間: OTF-DUC または Traditional DUC に固有の準備・中核・後処理を合計した時間。");
+            notes.add("手法固有時間: 各 DUC 手法に固有の準備・中核・後処理を合計した時間。");
             notes.add("内部計測の中核処理時間（参考）: OTF-DUC では on-the-fly探索から出力UC反映まで、Traditional DUC では更新用環境構築から最終コントローラ合成までを対象にした内部タイマー値。評価用カウント時間を含み得るため、主比較には実測時間から評価用オーバーヘッドを差し引いた項目を使う。");
         } else if ("OTF-DUC 方針1 時間・メモリ内訳".equals(section)) {
             notes.add("通常OTF探索+簡単マージ時間: on-the-fly探索開始から、belief repair 直前の簡単マージ完了までの時間。");
@@ -1620,6 +1884,49 @@ public final class UpdatingControllerEvaluationRecorder {
         return String.format(Locale.ROOT, "%.3f", nanos / 1_000_000.0);
     }
 
+    private static String formatMillisForOutput(long millis) {
+        return formatMillisForOutput((double) millis);
+    }
+
+    private static String formatMillisForOutput(double millis) {
+        if (Double.isNaN(millis) || Double.isInfinite(millis)) {
+            return "未記録";
+        }
+        boolean negative = millis < 0;
+        long totalCentiseconds = Math.round(Math.abs(millis) / 10.0);
+        long minutes = totalCentiseconds / 6000L;
+        long centisecondsInMinute = totalCentiseconds % 6000L;
+        long seconds = centisecondsInMinute / 100L;
+        long centiseconds = centisecondsInMinute % 100L;
+        return (negative ? "-" : "")
+                + minutes
+                + "分"
+                + String.format(Locale.ROOT, "%02d.%02d秒",
+                        Long.valueOf(seconds),
+                        Long.valueOf(centiseconds));
+    }
+
+    private static String formatBytesAsGbForOutput(long bytes) {
+        double gb = bytes / 1024.0 / 1024.0 / 1024.0;
+        return String.format(Locale.ROOT, "%.2f GB", gb);
+    }
+
+    private static Double parseDouble(String value) {
+        try {
+            return Double.valueOf(value.trim());
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Long parseLong(String value) {
+        try {
+            return Long.valueOf(value.trim());
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private static String bytesToByteText(long bytes) {
         return Long.toString(bytes);
     }
@@ -1729,7 +2036,7 @@ public final class UpdatingControllerEvaluationRecorder {
                 : null;
         long broadObservedTime = totalTime == null
                 ? -1
-                : Math.max(0, totalTime - parseTime - stateSpaceCountOverheadMillis
+                : Math.max(0, totalTime - parseTime - stateSpaceCountOverheadObservedMillis
                         - evaluationOutputTime - drawTime);
         long strictObservedTime = totalTime == null
                 ? -1
@@ -1755,8 +2062,16 @@ public final class UpdatingControllerEvaluationRecorder {
                 "Old Controller 合成時間 + Goal 定義と controllable action 集合生成時間 + Mapping Environment Component 合成時間。");
         addMetric(comparisonSection,
                 "評価用カウント時間（状態数・遷移数）",
+                stateSpaceCountOverheadObservedMillis,
+                "実測総時間に含まれる状態数・遷移数 CountTime。合成本来の処理ではない評価用オーバーヘッドで、比較用時間から差し引く。");
+        addMetric(comparisonSection,
+                "評価用カウント時間（合計）",
                 stateSpaceCountOverheadMillis,
-                "状態数・遷移数を数えるための CountTime の合計。合成本来の処理ではない評価用オーバーヘッド。");
+                "実測総時間内と実測総時間外の状態数・遷移数 CountTime の合計。診断用の総量であり、実測総時間から丸ごとは差し引かない。");
+        addMetric(comparisonSection,
+                "評価用カウント時間（実測時間外）",
+                stateSpaceCountOverheadPostObservedMillis,
+                "実測総時間を確定した後に、出力 controller や post-synthesis 診断のために数えた CountTime。主比較用時間からは差し引かない。");
         addMetric(comparisonSection,
                 "評価結果出力時間（比較から除外）",
                 evaluationOutputTime,
@@ -1776,7 +2091,7 @@ public final class UpdatingControllerEvaluationRecorder {
             addMetric(comparisonSection,
                     "大枠比較用時間（構文解析・評価・描画除外）",
                     broadObservedTime,
-                    "実測総時間 - 構文解析時間 - 評価用カウント時間 - 評価結果出力時間 - GUI描画時間。共通前処理は差し引かない。");
+                    "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - 評価結果出力時間 - GUI描画時間。共通前処理は差し引かない。");
             addMetric(comparisonSection,
                     "厳密比較用時間（共通前処理も除外）",
                     strictObservedTime,
@@ -1837,6 +2152,12 @@ public final class UpdatingControllerEvaluationRecorder {
                     timeKey("TransitionSystemDispatcher", "removeOldTransitions 実行時間"));
         }
 
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return sumRecordedTimes(
+                    timeKey("UpdatingControllerSynthesizer", "generateController の全体実行時間"),
+                    timeKey("TransitionSystemDispatcher", "Stepwise Delayed DUC removeOldTransitions 実行時間"));
+        }
+
         return 0;
     }
 
@@ -1849,6 +2170,10 @@ public final class UpdatingControllerEvaluationRecorder {
             return sumRecordedTimes(
                     timeKey("UpdatingControllerSynthesizer", "Traditional DUC E_u 構築時間"),
                     timeKey("solveControlProblem (Traditional DUC)", "solveControlProblem 全体時間"));
+        }
+
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return optionalTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間");
         }
 
         return 0;
@@ -1889,6 +2214,15 @@ public final class UpdatingControllerEvaluationRecorder {
                     "Traditional DUC の.old後処理時間",
                     optionalTime("TransitionSystemDispatcher", "removeOldTransitions 実行時間"),
                     "TransitionSystemDispatcher の removeOldTransitions 実行時間。OTF-DUC では実行しない。");
+        } else if ("Stepwise Delayed DUC".equals(mode)) {
+            addMetric(comparisonSection,
+                    "Stepwise Delayed DUC の最終コントローラ合成時間（中核）",
+                    optionalTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間"),
+                    "Stepwise Delayed DUC の final safety environment から GR(1) で controller を合成する時間。");
+            addMetric(comparisonSection,
+                    "Stepwise Delayed DUC の removeOldTransitions 実行時間",
+                    optionalTime("TransitionSystemDispatcher", "Stepwise Delayed DUC removeOldTransitions 実行時間"),
+                    "TransitionSystemDispatcher の removeOldTransitions 実行時間。出力前の共通後処理として実行する。");
         }
     }
 
@@ -1902,6 +2236,9 @@ public final class UpdatingControllerEvaluationRecorder {
                     + " + Traditional DUC Mapping Environment Component 並列合成時間"
                     + " + generateController の全体実行時間 + removeOldTransitions 実行時間。";
         }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return "Stepwise Delayed DUC の generateController 全体実行時間 + removeOldTransitions 実行時間。";
+        }
         return "手法が未記録のため 0。";
     }
 
@@ -1911,6 +2248,9 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Traditional DUC".equals(mode)) {
             return "Traditional DUC 更新用環境構築時間 + 最終コントローラ合成処理全体時間の内部タイマー値。評価用カウント時間を含み得るため参考値。";
+        }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return "Stepwise Delayed DUC の final safety environment から GR(1) で controller を合成する時間。";
         }
         return "手法が未記録のため 0。";
     }
@@ -1935,102 +2275,57 @@ public final class UpdatingControllerEvaluationRecorder {
         Long totalTime = firstRecordedTime(
                 timeKey("共通 / HPWindow", "合成ボタンを押してから合成完了までの時間"),
                 timeKey("一時 runner", "合成全体実行時間"));
-        long parseTime = optionalTime("共通 / HPWindow", "構文解析時間");
-        long compileIfChangeTotalTime = optionalTime("共通 / HPWindow", "compileIfChange 全体時間（参考）");
-        long problemPreparationTime = optionalTime("共通 / HPWindow", "合成問題準備時間");
-        long updateControllerGenerationTime = optionalTime("共通 / HPWindow", "update controller 生成時間");
-        Long controllerSynthesisTime = hasRecordedTime("共通 / HPWindow", "コントローラ合成時間")
-                ? optionalTime("共通 / HPWindow", "コントローラ合成時間")
-                : null;
         long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
-        long commonTotal = commonPreparationTime();
-        long methodSpecificTotal = methodSpecificTime();
-        long methodPreparationTotal = methodPreparationTime();
-        long actualSynthesisTime = actualSynthesisTime();
-        long methodOtherTime = methodSpecificTotal - methodPreparationTotal - actualSynthesisTime;
-        long totalPreparationTime = commonTotal + methodPreparationTotal;
-        Long totalWithoutCountAndDraw = totalTime == null
+        Long comparisonTime = totalTime == null
                 ? null
-                : totalTime - stateSpaceCountOverheadMillis - drawTime;
-        Long controllerSynthesisWithoutCommon = controllerSynthesisTime == null
-                ? null
-                : controllerSynthesisTime - commonTotal;
-        Long unclassifiedNonCommonTime = controllerSynthesisWithoutCommon == null
-                ? null
-                : controllerSynthesisWithoutCommon - methodSpecificTotal;
+                : Math.max(0, totalTime - stateSpaceCountOverheadObservedMillis - drawTime);
+        recordPeakStateSpaceSummaryMetrics();
 
         output.outln("================ EVALUATION SUMMARY ================");
-        printSummarySectionHeader(output, "全体");
-        printSummaryValue(output, "手法", mode, "");
+        printSummarySectionHeader(output, "結果");
+        printSummaryValueCompact(output, "手法", mode);
+        printModeFlagSummary(output);
         if ("OTF-DUC".equals(mode)) {
-            printSummaryValue(output, "OTF-DUC実行モード", otfExecutionMode,
-                    "otfduc.simple.merge と otfduc.belief.repair の設定から分類。");
+            printSummaryValueCompact(output, "OTF-DUC実行モード", otfExecutionMode);
         }
-        printSummaryValue(output, "結果", resultStatus.toString(), "");
+        printSummaryValueCompact(output, "結果", resultStatus.toString());
         if (isFailureStatus(resultStatus) && !failureMessage.isEmpty()) {
-            printSummaryValue(output, "失敗理由", failureMessage, "");
+            printSummaryValueCompact(output, "失敗理由", failureMessage);
         }
-        printSummaryMillis(output, "合成の全体時間", totalTime,
-                "HPWindow の「合成ボタンを押してから合成完了までの時間」または runner の「合成全体実行時間」。");
-        printSummaryMillis(output, "カウントによるオーバーヘッド", stateSpaceCountOverheadMillis,
-                "状態数・遷移数を数える CountTime の合計。");
-        printSummaryMillis(output, "コントローラ描画時間", drawTime,
-                "HPWindow の「コントローラ描画時間」。");
-        printSummaryMillis(output, "描画とカウントを除いた実測時間", totalWithoutCountAndDraw,
-                "合成の全体時間 - カウントによるオーバーヘッド - コントローラ描画時間。");
-        printSummaryMillis(output, "構文解析時間", parseTime,
-                "HPWindow.docompile() 内の comp.compile() 実行時間。FSP/LTL/update controller 定義の解析と定義登録。");
-        printSummaryMillis(output, "compileIfChange 全体時間（参考）", compileIfChangeTotalTime,
-                "HPWindow の compileIfChange() 全体。構文解析時間 + 合成問題準備時間を含む参考値。");
-        printSummaryMillis(output, "合成問題準備時間", problemPreparationTime,
-                "HPWindow.docompile() 内の comp.continueCompilation(target) 実行時間。UpdatingControllersDefinition.compose などを含む。");
-        printSummaryMillis(output, "update controller 生成時間", updateControllerGenerationTime,
-                "HPWindow の TransitionSystemDispatcher.applyComposition(...) 実行時間。");
-        printSummaryMillis(output, "コントローラ合成時間", controllerSynthesisTime,
-                "合成問題準備時間 + update controller 生成時間。");
-        printSummaryMillis(output, "共通準備時間", commonTotal,
-                "Old Controller 合成時間 + Goal 定義と controllable action 集合生成時間 + Mapping Environment Component 合成時間。");
-        printSummaryMillis(output, "共通処理を除いたコントローラ合成時間", controllerSynthesisWithoutCommon,
-                "コントローラ合成時間 - 共通準備時間。"
-                        + " 手法固有として個別計測できた時間と、未分類の非共通時間を含む。");
-        printSummaryMillis(output, "手法固有準備時間", methodPreparationTotal,
-                methodPreparationFormula());
-        printSummaryMillis(output, "合成用モデル準備時間", totalPreparationTime,
-                "共通準備時間 + 手法固有準備時間。");
-        printSummaryMillis(output, "実際の中核合成時間", actualSynthesisTime,
-                actualSynthesisFormula());
-        printSummaryMillis(output, "手法固有内のその他時間", methodOtherTime,
-                "手法固有として個別計測できた時間 - 手法固有準備時間 - 実際の中核合成時間。"
-                        + " 主に出力構築・型変換・後処理など。");
-        printSummaryMillis(output, "手法固有として個別計測できた時間", methodSpecificTotal,
-                "手法固有準備時間 + 実際の中核合成時間 + 手法固有内のその他時間。");
-        printSummaryMillis(output, "未分類の非共通時間", unclassifiedNonCommonTime,
-                "共通処理を除いたコントローラ合成時間 - 手法固有として個別計測できた時間。"
-                        + " 0 でない場合、共通ではないが個別計測項目に分類していない処理が残っている。");
-        recordPeakStateSpaceSummaryMetrics();
-        printSummaryDataMetric(output, "中間状態空間ピーク状態数", "peak_state_space_states",
+        printSummaryMillisCompact(output, "比較用時間（合成全体-CountTime-描画）", comparisonTime,
+                "合成の全体時間 - 実測時間内のカウントによるオーバーヘッド - コントローラ描画時間。");
+
+        printSummarySectionHeader(output, "規模");
+        printSummaryDataMetricCompact(output, "最大状態数時の状態数", "peak_state_space_states",
                 peakStateSpaceFormula("状態数"));
-        printSummaryDataMetric(output, "中間状態空間ピーク遷移数", "peak_state_space_transitions",
-                peakStateSpaceFormula("遷移数"));
-        printSummaryDataMetric(output, "状態数ピークの段階", "peak_state_space_states_stage",
+        printSummaryDataMetricCompact(output, "最大状態数時の遷移数", "peak_state_space_states_stage_transitions",
+                "中間状態空間ピーク状態数を記録した段階における遷移数。");
+        printSummaryDataMetricIfPresentCompact(output, "最大状態数時の段階", "peak_state_space_states_stage",
                 "中間状態空間ピーク状態数を記録した段階。");
-        printSummaryDataMetric(output, "遷移数ピークの段階", "peak_state_space_transitions_stage",
+        printSummaryDataMetricCompact(output, "最大遷移数時の状態数", "peak_state_space_transitions_stage_states",
+                "中間状態空間ピーク遷移数を記録した段階における状態数。");
+        printSummaryDataMetricCompact(output, "最大遷移数時の遷移数", "peak_state_space_transitions",
+                peakStateSpaceFormula("遷移数"));
+        printSummaryDataMetricIfPresentCompact(output, "最大遷移数時の段階", "peak_state_space_transitions_stage",
                 "中間状態空間ピーク遷移数を記録した段階。");
-        printSummaryDataMetric(output, "出力 update controller 状態数", "output_update_controller_states", "");
-        printSummaryDataMetric(output, "出力 update controller 遷移数", "output_update_controller_transitions", "");
-        printSummaryDataMetric(output, "全体ピークメモリ", "controller_synthesis_peak_memory",
-                "共通 / HPWindow の「コントローラ合成全体のピークメモリ」。");
-        printSummaryDataMetric(output, "増加メモリ", "controller_synthesis_memory_increase",
+        printSummaryDataMetricCompact(output, "出力状態数", "output_update_controller_states", "");
+        printSummaryDataMetricCompact(output, "出力遷移数", "output_update_controller_transitions", "");
+        if (dataMetrics.containsKey("minimized_output_update_controller_states")
+                || dataMetrics.containsKey("minimized_output_update_controller_transitions")) {
+            printSummaryDataMetricIfPresentCompact(output, "minimized 出力状態数",
+                    "minimized_output_update_controller_states", "");
+            printSummaryDataMetricIfPresentCompact(output, "minimized 出力遷移数",
+                    "minimized_output_update_controller_transitions", "");
+        }
+
+        printGrSummary(output);
+        printSummarySectionHeader(output, "メモリ");
+        printSummaryDataMetricCompact(output, "合成使用メモリ", "controller_synthesis_memory_increase",
                 "コントローラ合成全体のピークメモリ - コントローラ合成のベースラインメモリ。");
 
-        printCommonSummary(output, commonTotal);
-        if ("OTF-DUC".equals(mode)) {
-            printOtfSummary(output, methodSpecificTotal, methodPreparationTotal, actualSynthesisTime, methodOtherTime);
-        } else if ("Traditional DUC".equals(mode)) {
-            printTraditionalSummary(output, methodSpecificTotal, methodPreparationTotal, actualSynthesisTime, methodOtherTime);
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            printStepwiseDelayedClassificationSummary(output);
         }
-        printOutputSummary(output);
-        printMemorySummary(output);
         output.outln("====================================================");
         output.outln("");
     }
@@ -2069,6 +2364,61 @@ public final class UpdatingControllerEvaluationRecorder {
                 metricKey("入力規模", "uncontrollable action 数"), "");
         printSummaryDataMetric(output, "全 action 数（controllable + uncontrollable）",
                 metricKey("入力規模", "全 action 数（controllable + uncontrollable）"), "");
+    }
+
+    private static void printStepwiseDelayedSummary(LTSOutput output) {
+        String section = "Stepwise Delayed DUC 分類統計";
+        printSummarySectionHeader(output, "Stepwise Delayed");
+        printSummaryMillis(output, "最終コントローラ合成時間",
+                optionalTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間"),
+                "final safety environment から GR(1) で controller を合成する時間。SBP 有効時は SBP 後の final safety environment が入力になる。");
+        printSummaryMillis(output, "勝ち領域計算時間",
+                optionalTime("Stepwise Delayed DUC GR1 時間内訳", "Winning region 計算時間"),
+                "");
+        printSummaryMillis(output, "コントローラ戦略構築時間",
+                optionalTime("Stepwise Delayed DUC GR1 時間内訳", "Strategy 構築時間"),
+                "");
+        printSummaryDataMetric(output, "stage 数",
+                metricKey(section, "stage 数"), "");
+        printSummaryDataMetric(output, "goal 数",
+                metricKey(section, "goal 数"), "");
+        printSummaryDataMetric(output, "local goal 数",
+                metricKey(section, "local goal 数"), "");
+        printSummaryDataMetric(output, "cross goal 数",
+                metricKey(section, "cross goal 数"), "");
+        printSummaryDataMetric(output, "cross goal 比率（千分率）",
+                metricKey(section, "cross goal 比率（千分率）"),
+                "cross goal 数 / goal 数 * 1000。Output の分類 summary では percent 表記も出す。");
+        printSummaryDataMetric(output, "local old safety goal 数",
+                metricKey(section, "local old safety goal 数"), "");
+        printSummaryDataMetric(output, "local new safety goal 数",
+                metricKey(section, "local new safety goal 数"), "");
+        printSummaryDataMetric(output, "local transition goal 数",
+                metricKey(section, "local transition goal 数"), "");
+        printSummaryDataMetric(output, "cross old safety goal 数",
+                metricKey(section, "cross old safety goal 数"), "");
+        printSummaryDataMetric(output, "cross new safety goal 数",
+                metricKey(section, "cross new safety goal 数"), "");
+        printSummaryDataMetric(output, "cross transition goal 数",
+                metricKey(section, "cross transition goal 数"), "");
+        printSummaryDataMetric(output, "cross component 数",
+                metricKey(section, "cross component 数"), "");
+        printSummaryDataMetric(output, "cross goal 最大 scope size",
+                metricKey(section, "cross goal 最大 scope size"), "");
+        printSummaryDataMetric(output, "cross component 最大 scope size",
+                metricKey(section, "cross component 最大 scope size"), "");
+        printSummaryDataMetric(output, "all-stage cross goal 数",
+                metricKey(section, "all-stage cross goal 数"), "");
+        printSummaryDataMetric(output, "all-stage cross component 数",
+                metricKey(section, "all-stage cross component 数"), "");
+        printSummaryDataMetric(output, "all-stage cross goal あり",
+                metricKey(section, "all-stage cross goal あり"), "");
+        printSummaryMillis(output, "cross component 構築時間",
+                optionalTime(section, "cross component 構築時間"),
+                "分類結果から cross component を構築し、stage scope 順に並べる時間。後続の cross 合成でも同じ component list を使うため、分類統計専用の二重実行ではない。");
+        printSummaryDataMetric(output, "分類統計計算・記録 CountTime",
+                metricKey(section, "分類統計計算・記録 CountTime"),
+                "stage/local/cross goal 数、cross 比率、cross component scope 統計を計算し、ログと評価 recorder に記録する評価用 CountTime。");
     }
 
     private static void printOtfSummary(
@@ -2299,6 +2649,10 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Traditional DUC".equals(mode)) {
             recordTraditionalPeakStateSpaceSummaryMetrics();
+            return;
+        }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            recordStepwiseDelayedPeakStateSpaceSummaryMetrics();
         }
     }
 
@@ -2341,15 +2695,15 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static void recordTraditionalPeakStateSpaceSummaryMetrics() {
         PeakValue peakStates = maxDataMetric(
-                new PeakCandidate("traditional_eu_states", "[1. E_u]"),
-                new PeakCandidate("traditional_meta_states", "[2. Meta]"),
-                new PeakCandidate("traditional_pruned_states", "[3. Pruned]"),
-                new PeakCandidate("traditional_final_states", "[4. Final]"));
+                new PeakCandidate("traditional_eu_states", "traditional_eu_transitions", "[1. E_u]"),
+                new PeakCandidate("traditional_meta_states", "traditional_meta_transitions", "[2. Meta]"),
+                new PeakCandidate("traditional_pruned_states", "traditional_pruned_transitions", "[3. Pruned]"),
+                new PeakCandidate("traditional_final_states", "traditional_final_transitions", "[4. Final]"));
         PeakValue peakTransitions = maxDataMetric(
-                new PeakCandidate("traditional_eu_transitions", "[1. E_u]"),
-                new PeakCandidate("traditional_meta_transitions", "[2. Meta]"),
-                new PeakCandidate("traditional_pruned_transitions", "[3. Pruned]"),
-                new PeakCandidate("traditional_final_transitions", "[4. Final]"));
+                new PeakCandidate("traditional_eu_transitions", "traditional_eu_states", "[1. E_u]"),
+                new PeakCandidate("traditional_meta_transitions", "traditional_meta_states", "[2. Meta]"),
+                new PeakCandidate("traditional_pruned_transitions", "traditional_pruned_states", "[3. Pruned]"),
+                new PeakCandidate("traditional_final_transitions", "traditional_final_states", "[4. Final]"));
 
         if (peakStates != null) {
             recordDataMetricWithFormula(
@@ -2366,6 +2720,15 @@ public final class UpdatingControllerEvaluationRecorder {
                     peakStates.stage,
                     "text",
                     "中間状態空間ピーク状態数を記録した段階。");
+            if (peakStates.pairedValue >= 0) {
+                recordDataMetricWithFormula(
+                        "peak_state_space_states_stage_transitions",
+                        "Evaluation Summary / 全体",
+                        "状態数ピーク時の遷移数",
+                        Long.toString(peakStates.pairedValue),
+                        "transitions",
+                        "中間状態空間ピーク状態数を記録した段階における遷移数。");
+            }
         }
         if (peakTransitions != null) {
             recordDataMetricWithFormula(
@@ -2382,7 +2745,110 @@ public final class UpdatingControllerEvaluationRecorder {
                     peakTransitions.stage,
                     "text",
                     "中間状態空間ピーク遷移数を記録した段階。");
+            if (peakTransitions.pairedValue >= 0) {
+                recordDataMetricWithFormula(
+                        "peak_state_space_transitions_stage_states",
+                        "Evaluation Summary / 全体",
+                        "遷移数ピーク時の状態数",
+                        Long.toString(peakTransitions.pairedValue),
+                        "states",
+                        "中間状態空間ピーク遷移数を記録した段階における状態数。");
+            }
         }
+    }
+
+    private static void recordStepwiseDelayedPeakStateSpaceSummaryMetrics() {
+        PeakValue peakStates = maxStateSpaceMetricInSection(
+                "Stepwise Delayed DUC 最大状態数と遷移数",
+                "states",
+                " / States",
+                "transitions",
+                " / Transitions");
+        PeakValue peakTransitions = maxStateSpaceMetricInSection(
+                "Stepwise Delayed DUC 最大状態数と遷移数",
+                "transitions",
+                " / Transitions",
+                "states",
+                " / States");
+
+        if (peakStates != null) {
+            recordDataMetricWithFormula(
+                    "peak_state_space_states",
+                    "Evaluation Summary / 全体",
+                    "中間状態空間ピーク状態数",
+                    Long.toString(peakStates.value),
+                    "states",
+                    peakStateSpaceFormula("状態数"));
+            recordDataMetricWithFormula(
+                    "peak_state_space_states_stage",
+                    "Evaluation Summary / 全体",
+                    "状態数ピークの段階",
+                    peakStates.stage,
+                    "text",
+                    "中間状態空間ピーク状態数を記録した段階。");
+            if (peakStates.pairedValue >= 0) {
+                recordDataMetricWithFormula(
+                        "peak_state_space_states_stage_transitions",
+                        "Evaluation Summary / 全体",
+                        "状態数ピーク時の遷移数",
+                        Long.toString(peakStates.pairedValue),
+                        "transitions",
+                        "中間状態空間ピーク状態数を記録した段階における遷移数。");
+            }
+        }
+        if (peakTransitions != null) {
+            recordDataMetricWithFormula(
+                    "peak_state_space_transitions",
+                    "Evaluation Summary / 全体",
+                    "中間状態空間ピーク遷移数",
+                    Long.toString(peakTransitions.value),
+                    "transitions",
+                    peakStateSpaceFormula("遷移数"));
+            recordDataMetricWithFormula(
+                    "peak_state_space_transitions_stage",
+                    "Evaluation Summary / 全体",
+                    "遷移数ピークの段階",
+                    peakTransitions.stage,
+                    "text",
+                    "中間状態空間ピーク遷移数を記録した段階。");
+            if (peakTransitions.pairedValue >= 0) {
+                recordDataMetricWithFormula(
+                        "peak_state_space_transitions_stage_states",
+                        "Evaluation Summary / 全体",
+                        "遷移数ピーク時の状態数",
+                        Long.toString(peakTransitions.pairedValue),
+                        "states",
+                        "中間状態空間ピーク遷移数を記録した段階における状態数。");
+            }
+        }
+    }
+
+    private static PeakValue maxStateSpaceMetricInSection(
+            String section,
+            String unit,
+            String labelSuffix,
+            String pairedUnit,
+            String pairedLabelSuffix) {
+        PeakValue max = null;
+        for (DataMetric metric : dataMetrics.values()) {
+            if (!section.equals(metric.section)
+                    || !unit.equals(metric.unit)
+                    || metric.label == null
+                    || !metric.label.endsWith(labelSuffix)) {
+                continue;
+            }
+            Long value = dataMetricLong(metric.key);
+            if (value == null) {
+                continue;
+            }
+            String rawStage = metric.label.substring(0, metric.label.length() - labelSuffix.length());
+            String stage = rawStage.trim();
+            long pairedValue = dataMetricLong(section, rawStage + pairedLabelSuffix, pairedUnit);
+            if (max == null || value > max.value) {
+                max = new PeakValue(value, pairedValue, stage);
+            }
+        }
+        return max;
     }
 
     private static String peakStateSpaceFormula(String target) {
@@ -2392,6 +2858,10 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Traditional DUC".equals(mode)) {
             return "Traditional DUC: 更新用環境、安全性評価用合成環境、安全性違反除去後、最終コントローラ合成入力の各段階で計測した"
+                    + target + "の最大値。出力 update controller 状態数・遷移数とは別に、中間状態空間のピークを表す。";
+        }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return "Stepwise Delayed DUC: local / cross / final product / delayed connection / final safety environment の各段階で計測した"
                     + target + "の最大値。出力 update controller 状態数・遷移数とは別に、中間状態空間のピークを表す。";
         }
         return "手法が未記録のため未記録。";
@@ -2404,8 +2874,15 @@ public final class UpdatingControllerEvaluationRecorder {
             if (value == null) {
                 continue;
             }
+            long pairedValue = -1;
+            if (candidate.pairedKey != null && !candidate.pairedKey.isEmpty()) {
+                Long paired = dataMetricLong(candidate.pairedKey);
+                if (paired != null) {
+                    pairedValue = paired;
+                }
+            }
             if (max == null || value > max.value) {
-                max = new PeakValue(value, candidate.stage);
+                max = new PeakValue(value, pairedValue, candidate.stage);
             }
         }
         return max;
@@ -2421,6 +2898,18 @@ public final class UpdatingControllerEvaluationRecorder {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private static long dataMetricLong(String section, String label, String unit) {
+        for (DataMetric metric : dataMetrics.values()) {
+            if (section.equals(metric.section)
+                    && label.equals(metric.label)
+                    && unit.equals(metric.unit)) {
+                Long value = dataMetricLong(metric.key);
+                return value == null ? -1 : value;
+            }
+        }
+        return -1;
     }
 
     private static long methodPreparationTime() {
@@ -2452,6 +2941,9 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Traditional DUC".equals(mode)) {
             return optionalTime("solveControlProblem (Traditional DUC)", "safetyEnv を GR1 で解く時間");
         }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return optionalTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間");
+        }
         return 0;
     }
 
@@ -2461,6 +2953,9 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Traditional DUC".equals(mode)) {
             return "Traditional DUC の「最終コントローラ合成時間」。";
+        }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return "Stepwise Delayed DUC の「最終コントローラ合成時間」。SBP 有効時は SBP 後の final safety environment が GR(1) 入力になる。";
         }
         return "手法が未記録のため 0。";
     }
@@ -2493,13 +2988,23 @@ public final class UpdatingControllerEvaluationRecorder {
         }
     }
 
+    private static void printSummaryValueCompact(LTSOutput output, String label, String value) {
+        output.outln(label + " : " + (value == null || value.isEmpty() ? "未記録" : value));
+    }
+
     private static void printSummaryMillis(LTSOutput output, String label, long millis, String formula) {
         printSummaryMillis(output, label, Long.valueOf(millis), formula);
     }
 
     private static void printSummaryMillis(LTSOutput output, String label, Long millis, String formula) {
-        String value = millis == null ? "未記録" : millis + " ms";
+        String value = millis == null ? "未記録" : formatMillisForOutput(millis.longValue());
         printSummaryValue(output, label, value, formula);
+        recordSummaryMillisMetric(label, millis, formula);
+    }
+
+    private static void printSummaryMillisCompact(LTSOutput output, String label, Long millis, String formula) {
+        String value = millis == null ? "未記録" : formatMillisForOutput(millis.longValue());
+        printSummaryValueCompact(output, label, value);
         recordSummaryMillisMetric(label, millis, formula);
     }
 
@@ -2509,12 +3014,151 @@ public final class UpdatingControllerEvaluationRecorder {
             printSummaryValue(output, label, "未記録", formula);
             return;
         }
+        attachDataMetricFormula(metricKey, formula);
+        printSummaryValue(output, label, dataMetricDisplayValue(metric), formula);
+    }
+
+    private static void printSummaryDataMetricCompact(
+            LTSOutput output,
+            String label,
+            String metricKey,
+            String formula) {
+        if (!printSummaryDataMetricIfPresentCompact(output, label, metricKey, formula)) {
+            printSummaryValueCompact(output, label, "未記録");
+        }
+    }
+
+    private static boolean printSummaryDataMetricIfPresentCompact(
+            LTSOutput output,
+            String label,
+            String metricKey,
+            String formula) {
+        DataMetric metric = dataMetrics.get(metricKey);
+        if (metric == null) {
+            return false;
+        }
+        if (formula != null && !formula.isEmpty()) {
+            attachDataMetricFormula(metricKey, formula);
+        }
+        printSummaryValueCompact(output, label, dataMetricDisplayValue(metric));
+        return true;
+    }
+
+    private static String dataMetricDisplayValue(DataMetric metric) {
+        if (metric == null) {
+            return "未記録";
+        }
         String value = metric.value == null || metric.value.isEmpty() ? "未記録" : metric.value;
+        if ("未記録".equals(value)) {
+            return value;
+        }
+        if ("ms".equals(metric.unit)) {
+            Double millis = parseDouble(value);
+            if (millis != null) {
+                return formatMillisForOutput(millis.doubleValue());
+            }
+        }
+        if ("B".equals(metric.unit)) {
+            Long bytes = parseLong(value);
+            if (bytes != null) {
+                return formatBytesAsGbForOutput(bytes.longValue());
+            }
+        }
         if (metric.unit != null && !metric.unit.isEmpty() && !"text".equals(metric.unit)) {
             value = value + " " + metric.unit;
         }
-        attachDataMetricFormula(metricKey, formula);
-        printSummaryValue(output, label, value, formula);
+        return value;
+    }
+
+    private static void printModeFlagSummary(LTSOutput output) {
+        if ("Traditional DUC".equals(mode)) {
+            printSummaryValueCompact(output, "設定",
+                    "safetyBackwardPruning="
+                            + booleanMetricValue(metricKey("Traditional DUC 設定", "safetyBackwardPruning 有効")));
+        } else if ("Stepwise Delayed DUC".equals(mode)) {
+            printSummaryValueCompact(output, "設定",
+                    "safetyBackwardPruning="
+                            + booleanMetricValue(metricKey("Stepwise Delayed DUC 設定", "safetyBackwardPruning 有効"))
+                            + ", incrementalPruning="
+                            + booleanMetricValue(metricKey("Stepwise Delayed DUC 設定", "incrementalPruning 有効"))
+                            + ", incrementalPruningCleanup="
+                            + booleanMetricValue(metricKey("Stepwise Delayed DUC 設定", "incrementalPruningCleanup 有効")));
+        }
+    }
+
+    private static String booleanMetricValue(String metricKey) {
+        DataMetric metric = dataMetrics.get(metricKey);
+        if (metric == null) {
+            return "未記録";
+        }
+        String value = metric.value == null ? "" : metric.value.trim();
+        if ("1".equals(value)) {
+            return "true";
+        }
+        if ("0".equals(value)) {
+            return "false";
+        }
+        return value.isEmpty() ? "未記録" : value;
+    }
+
+    private static void printGrSummary(LTSOutput output) {
+        String prefix = finalGrInputMetricPrefix();
+        Long grSolvingTime = finalGrSolvingTime();
+        boolean hasFinalGrInput = !prefix.isEmpty()
+                && (dataMetrics.containsKey(prefix + "_final_gr_input_states")
+                || dataMetrics.containsKey(prefix + "_final_gr_input_transitions"));
+        if (!hasFinalGrInput && grSolvingTime == null) {
+            return;
+        }
+
+        printSummarySectionHeader(output, "GR(1)");
+        if (hasFinalGrInput) {
+            printSummaryDataMetricIfPresentCompact(output, "final GR input 状態数",
+                    prefix + "_final_gr_input_states", "");
+            printSummaryDataMetricIfPresentCompact(output, "final GR input 遷移数",
+                    prefix + "_final_gr_input_transitions", "");
+        }
+        printSummaryMillisCompact(output, "GR(1)合成時間", grSolvingTime,
+                "final safety environment から GR(1) で controller を合成する時間。");
+    }
+
+    private static String finalGrInputMetricPrefix() {
+        if ("Traditional DUC".equals(mode)) {
+            return "traditional";
+        }
+        if ("Stepwise Delayed DUC".equals(mode)) {
+            return "stepwise_delayed";
+        }
+        return "";
+    }
+
+    private static Long finalGrSolvingTime() {
+        if ("Traditional DUC".equals(mode)
+                && hasRecordedTime("solveControlProblem (Traditional DUC)", "safetyEnv を GR1 で解く時間")) {
+            return Long.valueOf(optionalTime("solveControlProblem (Traditional DUC)", "safetyEnv を GR1 で解く時間"));
+        }
+        if ("Stepwise Delayed DUC".equals(mode)
+                && hasRecordedTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間")) {
+            return Long.valueOf(optionalTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間"));
+        }
+        return null;
+    }
+
+    private static void printStepwiseDelayedClassificationSummary(LTSOutput output) {
+        String section = "Stepwise Delayed DUC 分類統計";
+        printSummarySectionHeader(output, "Stepwise Delayed 要求分類");
+        printSummaryDataMetricCompact(output, "旧要求 local 数",
+                metricKey(section, "local old safety goal 数"), "");
+        printSummaryDataMetricCompact(output, "旧要求 cross 数",
+                metricKey(section, "cross old safety goal 数"), "");
+        printSummaryDataMetricCompact(output, "新要求 local 数",
+                metricKey(section, "local new safety goal 数"), "");
+        printSummaryDataMetricCompact(output, "新要求 cross 数",
+                metricKey(section, "cross new safety goal 数"), "");
+        printSummaryDataMetricCompact(output, "transition requirement local 数",
+                metricKey(section, "local transition goal 数"), "");
+        printSummaryDataMetricCompact(output, "transition requirement cross 数",
+                metricKey(section, "cross transition goal 数"), "");
     }
 
     private static void recordSummaryMillisMetric(String label, Long millis, String formula) {
@@ -2531,9 +3175,7 @@ public final class UpdatingControllerEvaluationRecorder {
     private static void printDataCsv(LTSOutput output) {
         long csvOutputStart = System.currentTimeMillis();
         output.outln("================ EVALUATION DATA CSV ================");
-        output.outln("mode,result,failure_reason,section,metric_key,metric_label,value,unit,formula,"
-                + "metric_schema_version,metric_description_id,"
-                + "section_readable_ja,metric_readable_ja,metric_category,artifact,phase,action,event,stat");
+        output.outln(DATA_CSV_HEADER);
         outputDataRow(output, new DataMetric("mode", "Run", "mode", mode, "text"));
         if ("OTF-DUC".equals(mode)) {
             outputDataRow(output, new DataMetric(
@@ -2581,6 +3223,105 @@ public final class UpdatingControllerEvaluationRecorder {
         output.outln("");
     }
 
+    public static synchronized void writeDataCsvFileIfConfigured(LTSOutput output) {
+        String csvFile = configuredCsvFile();
+        if (csvFile == null || csvFile.trim().isEmpty()) {
+            return;
+        }
+
+        refreshStateSpaceCountOverheadDataMetrics();
+        recordCsvFileMetadata(csvFile);
+
+        File file = new File(csvFile);
+        try {
+            File parent = file.getAbsoluteFile().getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new IOException("Failed to create directory: " + parent);
+            }
+
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream(file, false),
+                    StandardCharsets.UTF_8));
+            try {
+                writer.write(DATA_CSV_HEADER);
+                writer.newLine();
+                writeDataRow(writer, new DataMetric("mode", "Run", "mode", mode, "text"));
+                if ("OTF-DUC".equals(mode)) {
+                    writeDataRow(writer, new DataMetric(
+                            "otf_execution_mode",
+                            "Run",
+                            "OTF-DUC実行モード",
+                            otfExecutionMode,
+                            "text",
+                            "otfduc.simple.merge と otfduc.belief.repair の設定から分類。"));
+                }
+                writeDataRow(writer, new DataMetric("result", "Run", "result", resultStatus.toString(), "text"));
+                writeDataRow(writer, new DataMetric("failure_reason", "Run", "failure reason", failureMessage, "text"));
+                for (DataMetric metric : dataMetrics.values()) {
+                    writeDataRow(writer, metric);
+                }
+            } finally {
+                writer.close();
+            }
+            if (output != null) {
+                output.outln("Evaluation data CSV written to: " + file.getPath());
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to write evaluation data CSV: " + file, e);
+        }
+    }
+
+    private static String configuredCsvFile() {
+        String value = System.getProperty(CSV_FILE_PROPERTY);
+        if (value == null || value.trim().isEmpty()) {
+            value = System.getProperty(LEGACY_CSV_FILE_PROPERTY);
+        }
+        if (value != null && !value.trim().isEmpty()) {
+            return value;
+        }
+        if (autoCsvFile == null || autoCsvFile.trim().isEmpty()) {
+            autoCsvFile = defaultCsvFile();
+        }
+        return autoCsvFile;
+    }
+
+    private static String defaultCsvFile() {
+        String directory = System.getProperty(CSV_DIR_PROPERTY);
+        if (directory == null || directory.trim().isEmpty()) {
+            directory = DEFAULT_CSV_DIR;
+        }
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.ROOT).format(new Date());
+        String modeToken = metricToken(mode);
+        String openFileName = EnvConfiguration.getInstance().getOpenFileName();
+        String sourceToken = openFileName == null || openFileName.trim().isEmpty()
+                ? "no_file"
+                : metricToken(new File(openFileName).getName());
+        String sequence = Long.toString(++autoCsvSequence);
+        String hash = stableShortHash(String.valueOf(openFileName) + "|" + timestamp + "|" + sequence);
+        return new File(directory, timestamp + "_" + modeToken + "_" + sourceToken + "_" + hash + ".csv").getPath();
+    }
+
+    private static void recordCsvFileMetadata(String csvFile) {
+        recordDataMetric("evaluation_csv_file", "Run", "evaluation CSV file", csvFile, "path");
+        recordSystemPropertyMetric("batch_case_id", "mtsa.evaluation.caseId", "batch case id");
+        recordSystemPropertyMetric("batch_example", "mtsa.evaluation.example", "batch example");
+        recordSystemPropertyMetric("batch_method", "mtsa.evaluation.method", "batch method");
+        recordSystemPropertyMetric("batch_variant", "mtsa.evaluation.variant", "batch variant");
+        recordSystemPropertyMetric("batch_target", "mtsa.evaluation.target", "batch target");
+        recordSystemPropertyMetric("batch_lts_file", "mtsa.evaluation.ltsFile", "batch LTS file");
+        recordSystemPropertyMetric("batch_config_file", "mtsa.evaluation.configFile", "batch config file");
+        recordSystemPropertyMetric("batch_run_index", "mtsa.evaluation.runIndex", "batch run index");
+        recordSystemPropertyMetric("batch_run_count", "mtsa.evaluation.runCount", "batch run count");
+        recordSystemPropertyMetric("batch_run_label", "mtsa.evaluation.runLabel", "batch run label");
+    }
+
+    private static void recordSystemPropertyMetric(String metricKey, String propertyKey, String label) {
+        String value = System.getProperty(propertyKey);
+        if (value != null && !value.trim().isEmpty()) {
+            recordDataMetric(metricKey, "Run", label, value, "text");
+        }
+    }
+
     private static boolean isRecomputedAfterDataCsvMetric(String metricKey) {
         return "comparison_evaluation_output_time".equals(metricKey)
                 || "comparison_observed_time_without_parse_count_evaluation_output_and_draw".equals(metricKey)
@@ -2604,7 +3345,7 @@ public final class UpdatingControllerEvaluationRecorder {
         long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         long methodSpecificTime = methodSpecificTime();
         long observedWithoutParseCountOutputAndDraw = Math.max(0, totalTime - parseTime
-                - stateSpaceCountOverheadMillis - evaluationOutputMillis - drawTime);
+                - stateSpaceCountOverheadObservedMillis - evaluationOutputMillis - drawTime);
         long strictObservedTime = Math.max(0, observedWithoutParseCountOutputAndDraw - commonPreprocessTime);
         long strictUnclassifiedTime = Math.max(0, strictObservedTime - methodSpecificTime);
 
@@ -2614,7 +3355,7 @@ public final class UpdatingControllerEvaluationRecorder {
                 "大枠比較用時間（構文解析・評価・描画除外）",
                 Long.toString(observedWithoutParseCountOutputAndDraw),
                 "ms",
-                "実測総時間 - 構文解析時間 - 評価用カウント時間 - 評価出力時間合計（CSV含む） - GUI描画時間。共通前処理は差し引かない。"));
+                "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - 評価出力時間合計（CSV含む） - GUI描画時間。共通前処理は差し引かない。"));
         outputDataRow(output, new DataMetric(
                 "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw",
                 "比較用時間集計",
@@ -2632,8 +3373,17 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void outputDataRow(LTSOutput output, DataMetric metric) {
+        output.outln(dataCsvRow(metric));
+    }
+
+    private static void writeDataRow(BufferedWriter writer, DataMetric metric) throws IOException {
+        writer.write(dataCsvRow(metric));
+        writer.newLine();
+    }
+
+    private static String dataCsvRow(DataMetric metric) {
         MetricView view = metricView(metric);
-        output.outln(csv(mode)
+        return csv(mode)
                 + "," + csv(resultStatus.toString())
                 + "," + csv(failureMessage)
                 + "," + csv(metric.section)
@@ -2651,7 +3401,7 @@ public final class UpdatingControllerEvaluationRecorder {
                 + "," + csv(view.phase)
                 + "," + csv(view.action)
                 + "," + csv(view.event)
-                + "," + csv(view.stat));
+                + "," + csv(view.stat);
     }
 
     private static MetricView metricView(DataMetric metric) {
@@ -2728,6 +3478,12 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Traditional DUC GR1 時間内訳".equals(section)) {
             return "Traditional DUC: 最終コントローラ合成時間";
         }
+        if ("Stepwise Delayed DUC".equals(section)) {
+            return "Stepwise Delayed DUC: 合成本体";
+        }
+        if ("Stepwise Delayed DUC GR1 時間内訳".equals(section)) {
+            return "Stepwise Delayed DUC: 最終コントローラ合成時間";
+        }
         if ("generateDUC (OTF-DUC)".equals(section)) {
             return "OTF-DUC: 本体処理";
         }
@@ -2802,6 +3558,27 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
             return "Traditional DUC: 中間生成物の状態空間サイズ";
+        }
+        if ("Stepwise Delayed DUC 最大状態数と遷移数".equals(section)) {
+            return "Stepwise Delayed DUC: 中間生成物の状態空間サイズ";
+        }
+        if ("Stepwise Delayed DUC 分類統計".equals(section)) {
+            return "Stepwise Delayed DUC: requirement 分類統計";
+        }
+        if ("Stepwise Delayed DUC scope別要求数".equals(section)) {
+            return "Stepwise Delayed DUC: scope 別 requirement 数";
+        }
+        if ("Stepwise Delayed DUC scope別状態空間".equals(section)) {
+            return "Stepwise Delayed DUC: scope 別 meta/safety 状態空間";
+        }
+        if ("Stepwise Delayed DUC cross scheduling".equals(section)) {
+            return "Stepwise Delayed DUC: cross goal scheduling 集計";
+        }
+        if ("Stepwise Delayed DUC cross scheduling detail".equals(section)) {
+            return "Stepwise Delayed DUC: cross goal scheduling step 詳細";
+        }
+        if ("Stepwise Delayed DUC direct pruning 削減率".equals(section)) {
+            return "Stepwise Delayed DUC: direct safety pruning 削減率";
         }
         if ("Traditional DUC 状態空間削減率".equals(section)) {
             return "Traditional DUC: 中間生成物間の削減率";
@@ -3458,6 +4235,30 @@ public final class UpdatingControllerEvaluationRecorder {
         return "auto_" + Integer.toHexString(timerKey(section, label).hashCode());
     }
 
+    private static String metricToken(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        boolean previousUnderscore = false;
+        for (int i = 0; i < value.length(); i++) {
+            char ch = Character.toLowerCase(value.charAt(i));
+            boolean tokenChar = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+            if (tokenChar) {
+                builder.append(ch);
+                previousUnderscore = false;
+            } else if (!previousUnderscore && builder.length() > 0) {
+                builder.append('_');
+                previousUnderscore = true;
+            }
+        }
+        int length = builder.length();
+        if (length > 0 && builder.charAt(length - 1) == '_') {
+            builder.deleteCharAt(length - 1);
+        }
+        return builder.length() == 0 ? "metric" : builder.toString();
+    }
+
     private static String knownMetricKey(String section, String label) {
         if ("共通 / HPWindow".equals(section)) {
             if ("合成ボタンを押してから合成完了までの時間".equals(label)) {
@@ -3532,6 +4333,12 @@ public final class UpdatingControllerEvaluationRecorder {
             }
             if ("Traditional solveControlProblem / OTF generateDUC 実行時間".equals(label)) {
                 return "method_main_execution_time";
+            }
+            if ("Stepwise DUC 本体実行時間".equals(label)) {
+                return "stepwise_method_main_execution_time";
+            }
+            if ("Stepwise Delayed DUC 本体実行時間".equals(label)) {
+                return "stepwise_delayed_method_main_execution_time";
             }
             if ("Traditional DUC E_u 構築時間".equals(label)) {
                 return "traditional_eu_construction_time";
@@ -3652,9 +4459,95 @@ public final class UpdatingControllerEvaluationRecorder {
                 return "traditional_gr1_solving_time";
             }
         }
-        if ("TransitionSystemDispatcher".equals(section)
-                && "removeOldTransitions 実行時間".equals(label)) {
-            return "traditional_remove_old_transitions_time";
+        if ("Stepwise Delayed DUC".equals(section)) {
+            if ("safetyEnv を GR1 で解く時間".equals(label)) {
+                return "stepwise_delayed_gr1_solving_time";
+            }
+        }
+        if ("Traditional DUC 設定".equals(section)) {
+            return "traditional_config_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC 設定".equals(section)) {
+            return "stepwise_delayed_config_" + metricToken(label);
+        }
+        if ("Safety Backward Pruning".equals(section)) {
+            return "sbp_" + metricToken(label);
+        }
+        if ("Safety Backward Pruning 削減率".equals(section)) {
+            return "sbp_reduction_" + metricToken(label);
+        }
+        String gr1BreakdownPrefix = "";
+        if ("Traditional DUC GR1 時間内訳".equals(section)) {
+            gr1BreakdownPrefix = "traditional";
+        } else if ("Stepwise Delayed DUC GR1 時間内訳".equals(section)) {
+            gr1BreakdownPrefix = "stepwise_delayed";
+        }
+        if (!gr1BreakdownPrefix.isEmpty()) {
+            if ("synthesizeGR 全体時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_synthesize_total_time";
+            }
+            if ("非決定環境の subset construction 時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_subset_construction_time";
+            }
+            if ("Perfect-info game after subset construction".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_perfect_info_game";
+            }
+            if ("GR goal 構築時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_goal_build_time";
+            }
+            if ("GR assumption 数".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_assumptions";
+            }
+            if ("GR guarantee 数".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_guarantees";
+            }
+            if ("GR failure state 数".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_failure_states";
+            }
+            if ("GR permissive strategy 有効".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_permissive_strategy";
+            }
+            if ("GR game 構築時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_game_build_time";
+            }
+            if ("GR game".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_game";
+            }
+            if ("Knowledge GR game 構築時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_knowledge_game_build_time";
+            }
+            if ("Knowledge GR game".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_knowledge_game";
+            }
+            if ("Rank system 構築時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_rank_system_build_time";
+            }
+            if ("Winning region 計算時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_winning_region_time";
+            }
+            if ("Strategy 構築時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_strategy_build_time";
+            }
+            if ("Strategy から controller MTS を構築する時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_strategy_to_controller_mts_time";
+            }
+            if ("StrategyState controller を Long/String MTS に変換する時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_strategy_state_to_long_string_mts_time";
+            }
+            if ("Controller を CompactState に変換する時間".equals(label)) {
+                return gr1BreakdownPrefix + "_gr1_compact_state_conversion_time";
+            }
+        }
+        if ("TransitionSystemDispatcher".equals(section)) {
+            if ("removeOldTransitions 実行時間".equals(label)) {
+                return "traditional_remove_old_transitions_time";
+            }
+            if ("Stepwise DUC removeOldTransitions 実行時間".equals(label)) {
+                return "stepwise_remove_old_transitions_time";
+            }
+            if ("Stepwise Delayed DUC removeOldTransitions 実行時間".equals(label)) {
+                return "stepwise_delayed_remove_old_transitions_time";
+            }
         }
         if ("比較用時間集計".equals(section)) {
             if ("実測総時間".equals(label)) {
@@ -3665,6 +4558,12 @@ public final class UpdatingControllerEvaluationRecorder {
             }
             if ("評価用カウント時間（状態数・遷移数）".equals(label)) {
                 return "comparison_count_overhead_time";
+            }
+            if ("評価用カウント時間（合計）".equals(label)) {
+                return "comparison_count_overhead_total";
+            }
+            if ("評価用カウント時間（実測時間外）".equals(label)) {
+                return "comparison_count_overhead_after_observed_time";
             }
             if ("大枠比較用時間（構文解析・評価・描画除外）".equals(label)) {
                 return "comparison_observed_time_without_parse_count_evaluation_output_and_draw";
@@ -3720,6 +4619,12 @@ public final class UpdatingControllerEvaluationRecorder {
             }
             if ("Traditional DUC の.old後処理時間".equals(label)) {
                 return "comparison_traditional_old_action_postprocess_time";
+            }
+            if ("Stepwise Delayed DUC の最終コントローラ合成時間（中核）".equals(label)) {
+                return "comparison_stepwise_delayed_gr1_core_time";
+            }
+            if ("Stepwise Delayed DUC の removeOldTransitions 実行時間".equals(label)) {
+                return "comparison_stepwise_delayed_remove_old_transitions_time";
             }
         }
         if ("入力規模".equals(section)) {
@@ -3838,6 +4743,80 @@ public final class UpdatingControllerEvaluationRecorder {
                 return "traditional_final";
             }
         }
+        if ("Stepwise Delayed DUC 分類統計".equals(section)) {
+            if ("stage 数".equals(label)) {
+                return "stepwise_delayed_stage_count";
+            }
+            if ("goal 数".equals(label)) {
+                return "stepwise_delayed_goal_count";
+            }
+            if ("local goal 数".equals(label)) {
+                return "stepwise_delayed_local_goal_count";
+            }
+            if ("cross goal 数".equals(label)) {
+                return "stepwise_delayed_cross_goal_count";
+            }
+            if ("cross goal 比率（千分率）".equals(label)) {
+                return "stepwise_delayed_cross_goal_ratio_per_mille";
+            }
+            if ("local old safety goal 数".equals(label)) {
+                return "stepwise_delayed_local_old_safety_goal_count";
+            }
+            if ("local new safety goal 数".equals(label)) {
+                return "stepwise_delayed_local_new_safety_goal_count";
+            }
+            if ("local transition goal 数".equals(label)) {
+                return "stepwise_delayed_local_transition_goal_count";
+            }
+            if ("cross old safety goal 数".equals(label)) {
+                return "stepwise_delayed_cross_old_safety_goal_count";
+            }
+            if ("cross new safety goal 数".equals(label)) {
+                return "stepwise_delayed_cross_new_safety_goal_count";
+            }
+            if ("cross transition goal 数".equals(label)) {
+                return "stepwise_delayed_cross_transition_goal_count";
+            }
+            if ("cross component 数".equals(label)) {
+                return "stepwise_delayed_cross_component_count";
+            }
+            if ("cross goal 最大 scope size".equals(label)) {
+                return "stepwise_delayed_cross_goal_max_scope_size";
+            }
+            if ("cross component 最大 scope size".equals(label)) {
+                return "stepwise_delayed_cross_component_max_scope_size";
+            }
+            if ("all-stage cross goal 数".equals(label)) {
+                return "stepwise_delayed_all_stage_cross_goal_count";
+            }
+            if ("all-stage cross component 数".equals(label)) {
+                return "stepwise_delayed_all_stage_cross_component_count";
+            }
+            if ("all-stage cross goal あり".equals(label)) {
+                return "stepwise_delayed_has_all_stage_cross_goal";
+            }
+            if ("cross component 構築時間".equals(label)) {
+                return "stepwise_delayed_cross_component_build_time";
+            }
+            if ("分類統計計算・記録 CountTime".equals(label)) {
+                return "stepwise_delayed_classification_statistics_count_time";
+            }
+        }
+        if ("Stepwise Delayed DUC scope別要求数".equals(section)) {
+            return "stepwise_delayed_scope_requirements_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC scope別状態空間".equals(section)) {
+            return "stepwise_delayed_scope_state_space_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC cross scheduling".equals(section)) {
+            return "stepwise_delayed_cross_scheduling_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC cross scheduling detail".equals(section)) {
+            return "stepwise_delayed_cross_scheduling_detail_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC direct pruning 削減率".equals(section)) {
+            return "stepwise_delayed_direct_pruning_reduction_" + metricToken(label);
+        }
         if ("DCS (OTF-DUC)".equals(section)
                 && "DCS で探索した状態数と遷移数の最大値".equals(label)) {
             return "otf_dcs_peak";
@@ -3928,20 +4907,32 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static final class PeakCandidate {
         private final String key;
+        private final String pairedKey;
         private final String stage;
 
         private PeakCandidate(String key, String stage) {
+            this(key, "", stage);
+        }
+
+        private PeakCandidate(String key, String pairedKey, String stage) {
             this.key = key;
+            this.pairedKey = pairedKey;
             this.stage = stage;
         }
     }
 
     private static final class PeakValue {
         private final long value;
+        private final long pairedValue;
         private final String stage;
 
         private PeakValue(long value, String stage) {
+            this(value, -1, stage);
+        }
+
+        private PeakValue(long value, long pairedValue, String stage) {
             this.value = value;
+            this.pairedValue = pairedValue;
             this.stage = stage;
         }
     }

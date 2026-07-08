@@ -160,6 +160,19 @@ updatingController UpdCont_stepwise = {
 
 ||STEPWISE_UPDATE_CONTROLLER = UpdCont_stepwise.
 
+updatingController UpdCont_stepwise_delayed = {
+    oldController = OldCon,
+    oldEnvironment = {SIMPLE_OLD_1, SIMPLE_OLD_2, SIMPLE_OLD_3},
+	newEnvironment = {SIMPLE_NEW_1, SIMPLE_NEW_2, SIMPLE_NEW_3},
+	mapRelation = {R_SIMPLE_1, R_SIMPLE_2, R_SIMPLE_3},
+    oldGoal = OLD_SIMPLE,
+    newGoal = NEW_SIMPLE,
+    nonblocking,
+	stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
 updatingController UpdCont_1 = {
     oldController = OldCon_1,
     oldEnvironment = {SIMPLE_OLD_1},

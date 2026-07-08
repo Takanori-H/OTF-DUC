@@ -2437,6 +2437,26 @@ public class LTSCompiler {
                 ucDefinition.setStepwise();
                 next_symbol();
             }
+            else if(current.kind == Symbol.STEPWISE_DELAYED)
+            {
+                ucDefinition.setStepwiseDelayed();
+                next_symbol();
+            }
+            else if(current.kind == Symbol.INCREMENTAL_PRUNING)
+            {
+                ucDefinition.setIncrementalPruning();
+                next_symbol();
+            }
+            else if(current.kind == Symbol.INCREMENTAL_PRUNING_CLEANUP)
+            {
+                ucDefinition.setIncrementalPruningCleanup();
+                next_symbol();
+            }
+            else if(current.kind == Symbol.SAFETY_BACKWARD_PRUNING)
+            {
+                ucDefinition.setSafetyBackwardPruning();
+                next_symbol();
+            }
             else if(current.kind == Symbol.NEW_CONTROLLER)
             {
                 ucDefinition.setNewController(this.controllerSubUpdateController());

@@ -451,6 +451,14 @@ public class Symbol {
 			return "selective_fine_grained";
 		case STEPWISE:
 			return "stepwise";
+		case STEPWISE_DELAYED:
+			return "stepwise_delayed";
+			case INCREMENTAL_PRUNING:
+				return "incrementalPruning";
+			case INCREMENTAL_PRUNING_CLEANUP:
+				return "incrementalPruningCleanup";
+			case SAFETY_BACKWARD_PRUNING:
+				return "safetyBackwardPruning";
 
 		// _______________________________________________________________________________________
 		// Probabilistic
@@ -677,6 +685,10 @@ public class Symbol {
 	public static final int FINE_GRAINED = 3507;
 	public static final int SELECTIVE_FINE_GRAINED = 3508;
 	public static final int STEPWISE = 3509;
+		public static final int STEPWISE_DELAYED = 3510;
+		public static final int INCREMENTAL_PRUNING = 3511;
+		public static final int INCREMENTAL_PRUNING_CLEANUP = 3512;
+		public static final int SAFETY_BACKWARD_PRUNING = 3513;
 	
 	static {
 		blueSymbols.add(OPTIMISTIC);
@@ -747,7 +759,11 @@ public class Symbol {
 		blueSymbols.add(FINE_GRAINED);
 		blueSymbols.add(SELECTIVE_FINE_GRAINED);
 		blueSymbols.add(STEPWISE);
-		blueSymbols.add(NEW_CONTROLLER);
+			blueSymbols.add(STEPWISE_DELAYED);
+			blueSymbols.add(INCREMENTAL_PRUNING);
+			blueSymbols.add(INCREMENTAL_PRUNING_CLEANUP);
+			blueSymbols.add(SAFETY_BACKWARD_PRUNING);
+			blueSymbols.add(NEW_CONTROLLER);
 		blueSymbols.add(RELATION);
 		blueSymbols.add(OLD_ENVIRONMENT);
 		blueSymbols.add(NEW_ENVIRONMENT);

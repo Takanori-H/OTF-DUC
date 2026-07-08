@@ -1,6 +1,11 @@
 package ltsa.updatingControllers.stepwise;
 
 import ltsa.lts.CompactState;
+import ltsa.lts.MappingEnvironmentGenerator;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 public class StepwiseStage {
 
@@ -11,6 +16,7 @@ public class StepwiseStage {
     private final CompactState oldEnvironment;
     private final CompactState newEnvironment;
     private final CompactState mappingEnvironment;
+    private final Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata> mappingStateMetadata;
 
     public StepwiseStage(
             int index,
@@ -20,6 +26,20 @@ public class StepwiseStage {
             CompactState oldEnvironment,
             CompactState newEnvironment,
             CompactState mappingEnvironment) {
+        this(index, oldEnvironmentName, newEnvironmentName, mapRelationName,
+                oldEnvironment, newEnvironment, mappingEnvironment,
+                Collections.<Integer, MappingEnvironmentGenerator.MappingStateMetadata>emptyMap());
+    }
+
+    public StepwiseStage(
+            int index,
+            String oldEnvironmentName,
+            String newEnvironmentName,
+            String mapRelationName,
+            CompactState oldEnvironment,
+            CompactState newEnvironment,
+            CompactState mappingEnvironment,
+            Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata> mappingStateMetadata) {
         this.index = index;
         this.oldEnvironmentName = oldEnvironmentName;
         this.newEnvironmentName = newEnvironmentName;
@@ -27,6 +47,8 @@ public class StepwiseStage {
         this.oldEnvironment = oldEnvironment;
         this.newEnvironment = newEnvironment;
         this.mappingEnvironment = mappingEnvironment;
+        this.mappingStateMetadata =
+                new HashMap<Integer, MappingEnvironmentGenerator.MappingStateMetadata>(mappingStateMetadata);
     }
 
     public int getIndex() {
@@ -59,5 +81,9 @@ public class StepwiseStage {
 
     public CompactState getMappingEnvironment() {
         return mappingEnvironment;
+    }
+
+    public Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata> getMappingStateMetadata() {
+        return Collections.unmodifiableMap(mappingStateMetadata);
     }
 }

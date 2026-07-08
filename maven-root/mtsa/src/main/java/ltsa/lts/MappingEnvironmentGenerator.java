@@ -9,14 +9,50 @@ public class MappingEnvironmentGenerator {
 
     // 生成されたMappingEnvironmentの状態ID -> NewEnvironmentの状態ID の対応表
     private Map<Integer, Integer> stateMapping;
+    private Map<Integer, MappingStateMetadata> stateMetadata;
 
     public MappingEnvironmentGenerator() {
         this.stateMapping = new HashMap<>();
+        this.stateMetadata = new HashMap<>();
     }
 
     // 対応表を取得するためのゲッター
     public Map<Integer, Integer> getStateMapping() {
         return stateMapping;
+    }
+
+    public Map<Integer, MappingStateMetadata> getStateMetadata() {
+        return new HashMap<Integer, MappingStateMetadata>(stateMetadata);
+    }
+
+    public enum MappingStateSide {
+        OLD_SIDE,
+        NEW_SIDE,
+        INTERMEDIATE
+    }
+
+    public static class MappingStateMetadata {
+        private final MappingStateSide side;
+        private final Integer oldEnvState;
+        private final Integer newEnvState;
+
+        public MappingStateMetadata(MappingStateSide side, Integer oldEnvState, Integer newEnvState) {
+            this.side = side;
+            this.oldEnvState = oldEnvState;
+            this.newEnvState = newEnvState;
+        }
+
+        public MappingStateSide getSide() {
+            return side;
+        }
+
+        public Integer getOldEnvState() {
+            return oldEnvState;
+        }
+
+        public Integer getNewEnvState() {
+            return newEnvState;
+        }
     }
 
     // 内部処理用に展開されたルールを保持するクラス
@@ -44,6 +80,7 @@ public class MappingEnvironmentGenerator {
 
         // 生成のたびにマップを初期化
         this.stateMapping.clear();
+        this.stateMetadata.clear();
         String oldName = mapDef.oldProcess.toString();
         String newName = mapDef.newProcess.toString();
         String relName = mapDef.relationName.toString();
@@ -123,8 +160,10 @@ public class MappingEnvironmentGenerator {
 
         // 4. 既存遷移コピー
         Map<Integer, Integer> rawStateMapping = new HashMap<>();
+        Map<Integer, MappingStateMetadata> rawStateMetadata = new HashMap<Integer, MappingStateMetadata>();
         for (int i = 0; i < oldSize; i++) {
             res.states[i] = copyTransitions(oldM.states[i], oldM.alphabet, res.alphabet);
+            rawStateMetadata.put(i, new MappingStateMetadata(MappingStateSide.OLD_SIDE, i, null));
         }
         for (int i = 0; i < newSize; i++) {
             int mappingStateId = i + newOffset;
@@ -132,6 +171,7 @@ public class MappingEnvironmentGenerator {
             res.states[i + newOffset] = copyTransitionsWithOffset(newM.states[i], newM.alphabet, res.alphabet,
                     newOffset);
             rawStateMapping.put(mappingStateId, newEnvStateId);
+            rawStateMetadata.put(mappingStateId, new MappingStateMetadata(MappingStateSide.NEW_SIDE, null, newEnvStateId));
         }
 
         // ▼▼▼ 制約5に基づく推測の確認用デバッグ出力を追加 ▼▼▼
@@ -170,6 +210,8 @@ public class MappingEnvironmentGenerator {
                     nextNode = targetFinalNode;
                 } else {
                     nextNode = currentExtraState++;
+                    rawStateMetadata.put(nextNode,
+                            new MappingStateMetadata(MappingStateSide.INTERMEDIATE, startNode, endNode));
                 }
 
                 res.states[currentNode] = EventStateUtils.add(res.states[currentNode],
@@ -179,7 +221,7 @@ public class MappingEnvironmentGenerator {
         }
 
         // 6. 到達可能状態の計算とマッピングの修正
-        makeReachableAndFixMapping(res, rawStateMapping);
+        makeReachableAndFixMapping(res, rawStateMapping, rawStateMetadata);
 
         return res;
     }
@@ -189,7 +231,10 @@ public class MappingEnvironmentGenerator {
      * LTSA標準の EventStateUtils を使用して到達可能状態を計算し、
      * 状態IDの振り直しに合わせてマッピング情報(stateMapping)も更新する
      */
-    private void makeReachableAndFixMapping(CompactState machine, Map<Integer, Integer> rawMapping) {
+    private void makeReachableAndFixMapping(
+            CompactState machine,
+            Map<Integer, Integer> rawMapping,
+            Map<Integer, MappingStateMetadata> rawMetadata) {
         // 1. 到達可能状態の計算と、旧ID→新IDへの変換マップ(otn)の取得
         // EventStateUtils.reachable は LTSA の標準ロジックで到達可能性を判定します
         MyIntHash otn = EventStateUtils.reachable(machine.states);
@@ -203,6 +248,15 @@ public class MappingEnvironmentGenerator {
             if (otn.containsKey(oldId)) {
                 int newId = otn.get(oldId);
                 stateMapping.put(newId, newEnvId);
+            }
+        }
+
+        stateMetadata.clear();
+        for (Map.Entry<Integer, MappingStateMetadata> entry : rawMetadata.entrySet()) {
+            int oldId = entry.getKey();
+            if (otn.containsKey(oldId)) {
+                int newId = otn.get(oldId);
+                stateMetadata.put(newId, entry.getValue());
             }
         }
 

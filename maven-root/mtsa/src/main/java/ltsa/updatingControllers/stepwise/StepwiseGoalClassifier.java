@@ -79,24 +79,27 @@ public class StepwiseGoalClassifier {
     }
 
     private ClassificationTarget classifyTarget(String goalName, Set<Fluent> fluents) {
-        Map<String, Integer> ownerByAction = new LinkedHashMap<String, Integer>();
+        Map<String, Set<Integer>> ownersByAction = new LinkedHashMap<String, Set<Integer>>();
         for (Fluent fluent : fluents) {
-            collectOwners(goalName, ownerByAction, fluent.getInitiatingActions());
-            collectOwners(goalName, ownerByAction, fluent.getTerminatingActions());
+            collectOwners(goalName, ownersByAction, fluent.getInitiatingActions());
+            collectOwners(goalName, ownersByAction, fluent.getTerminatingActions());
         }
-        if (ownerByAction.isEmpty()) {
+        if (ownersByAction.isEmpty()) {
             return ClassificationTarget.cross(allStageScope(), "GOAL_UPDATE_EVENTS_ONLY");
         }
-        Set<Integer> owners = new HashSet<Integer>(ownerByAction.values());
-        if (owners.size() > 1) {
-            return ClassificationTarget.cross(owners, "GOAL_SPANS_MULTIPLE_STAGES actions=" + ownerByAction);
+        Set<Integer> stageScope = new TreeSet<Integer>();
+        for (Set<Integer> owners : ownersByAction.values()) {
+            stageScope.addAll(owners);
         }
-        return ClassificationTarget.local(owners.iterator().next());
+        if (stageScope.size() > 1) {
+            return ClassificationTarget.cross(stageScope, "GOAL_SPANS_MULTIPLE_STAGES actions=" + ownersByAction);
+        }
+        return ClassificationTarget.local(stageScope.iterator().next());
     }
 
     private void collectOwners(
             String goalName,
-            Map<String, Integer> ownerByAction,
+            Map<String, Set<Integer>> ownersByAction,
             Set<Symbol> symbols) {
         if (symbols == null) {
             return;
@@ -114,11 +117,12 @@ public class StepwiseGoalClassifier {
                 Diagnostics.fatal("Stepwise DUCS classification error: GOAL_ACTION_NOT_FOUND in "
                         + goalName + " action=" + action + ".");
             }
-            if (owners.size() > 1) {
-                Diagnostics.fatal("Stepwise DUCS cross goal detected: GOAL_HAS_SHARED_ACTION in "
-                        + goalName + " action=" + action + " owners=" + owners + ".");
+            Set<Integer> ownerSet = ownersByAction.get(action);
+            if (ownerSet == null) {
+                ownerSet = new TreeSet<Integer>();
+                ownersByAction.put(action, ownerSet);
             }
-            ownerByAction.put(action, owners.get(0));
+            ownerSet.addAll(owners);
         }
     }
 

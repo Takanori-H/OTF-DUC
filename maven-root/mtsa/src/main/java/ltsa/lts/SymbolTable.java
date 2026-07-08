@@ -125,6 +125,10 @@ public class SymbolTable {
         addSymbols("fine_grained", Symbol.FINE_GRAINED);
         addSymbols("selective_fine_grained", Symbol.SELECTIVE_FINE_GRAINED);
         addSymbols("stepwise", Symbol.STEPWISE);
+        addSymbols("stepwise_delayed", Symbol.STEPWISE_DELAYED);
+        addSymbols("incrementalPruning", Symbol.INCREMENTAL_PRUNING);
+        addSymbols("incrementalPruningCleanup", Symbol.INCREMENTAL_PRUNING_CLEANUP);
+        addSymbols("safetyBackwardPruning", Symbol.SAFETY_BACKWARD_PRUNING);
     }
 
     private static void addSymbols(String key, Integer elem) {

@@ -38,6 +38,7 @@ import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatu
 import ltsa.updatingControllers.structures.UpdateProtocolSpec;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 import ltsa.updatingControllers.stepwise.StepwiseUpdatingControllerSynthesizer;
+import ltsa.updatingControllers.stepwise.delayed.StepwiseDelayedUpdatingControllerSynthesizer;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisDUC;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisFineGrainedDUC;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.nonblocking.DirectedControllerSynthesisSelectiveFineGrainedDUC;
@@ -67,10 +68,12 @@ public class UpdatingControllerSynthesizer {
         long generateControllerStart = System.currentTimeMillis();
         long DUCTime = 0;
         long UpdatingEnvironmentGenerateTime = 0;
+        String methodMainExecutionLabel = null;
+        boolean recordTraditionalEnvironmentGenerationTime = false;
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 "UpdatingControllerSynthesizer",
                 "generateController の全体実行時間");
-        DUCHeartbeat.start(uccs.isStepwise() ? "Stepwise-DUC" : (uccs.isOTF() ? "OTF-DUC" : "Traditional-DUC"), uccs.getName());
+        DUCHeartbeat.start(uccs.isStepwiseDelayed() ? "Stepwise-Delayed-DUC" : (uccs.isStepwise() ? "Stepwise-DUC" : (uccs.isOTF() ? "OTF-DUC" : "Traditional-DUC")), uccs.getName());
         String heartbeatStatus = "completed";
 
         try {
@@ -82,9 +85,53 @@ public class UpdatingControllerSynthesizer {
             output.outln("Mode: Stepwise DUC (initial baseline)");
             output.outln("=========================================");
 
+            methodMainExecutionLabel = "Stepwise DUC 本体実行時間";
             long DUCStart = System.currentTimeMillis();
-            StepwiseUpdatingControllerSynthesizer.generateController(uccs, output);
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel);
+            UpdatingControllerEvaluationRecorder.beginCountScope(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel);
+            try {
+                StepwiseUpdatingControllerSynthesizer.generateController(uccs, output);
+            } finally {
+                UpdatingControllerEvaluationRecorder.endCountScope(
+                        "UpdatingControllerSynthesizer",
+                        methodMainExecutionLabel);
+            }
             DUCTime = System.currentTimeMillis() - DUCStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel);
+        }
+        else if(uccs.isStepwiseDelayed())
+        {
+            UpdatingControllerEvaluationRecorder.setMode("Stepwise Delayed DUC");
+            DUCHeartbeat.beginPhase("STEPWISE_DELAYED_DUC");
+            output.outln("=========================================");
+            output.outln("Mode: Stepwise Delayed DUC (local-only)");
+            output.outln("=========================================");
+
+            methodMainExecutionLabel = "Stepwise Delayed DUC 本体実行時間";
+            long DUCStart = System.currentTimeMillis();
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel);
+            UpdatingControllerEvaluationRecorder.beginCountScope(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel);
+            try {
+                StepwiseDelayedUpdatingControllerSynthesizer.generateController(uccs, output);
+            } finally {
+                UpdatingControllerEvaluationRecorder.endCountScope(
+                        "UpdatingControllerSynthesizer",
+                        methodMainExecutionLabel);
+            }
+            DUCTime = System.currentTimeMillis() - DUCStart;
+            UpdatingControllerEvaluationRecorder.endFailureTimer(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel);
         }
         else if(uccs.isOTF())
         {
@@ -97,13 +144,14 @@ public class UpdatingControllerSynthesizer {
             output.outln("=========================================");
 
             //評価実験用
+            methodMainExecutionLabel = "Traditional solveControlProblem / OTF generateDUC 実行時間";
             long DUCStart = System.currentTimeMillis();
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "UpdatingControllerSynthesizer",
-                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                    methodMainExecutionLabel);
             UpdatingControllerEvaluationRecorder.beginCountScope(
                     "UpdatingControllerSynthesizer",
-                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                    methodMainExecutionLabel);
 
             // OTF-DUCの実行メインロジック呼び出し
             try {
@@ -111,14 +159,14 @@ public class UpdatingControllerSynthesizer {
             } finally {
                 UpdatingControllerEvaluationRecorder.endCountScope(
                         "UpdatingControllerSynthesizer",
-                        "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                        methodMainExecutionLabel);
             }
 
             //評価実験用
             DUCTime = System.currentTimeMillis() - DUCStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     "UpdatingControllerSynthesizer",
-                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                    methodMainExecutionLabel);
         }
         else
         {
@@ -137,6 +185,7 @@ public class UpdatingControllerSynthesizer {
             output.outln("=========================================");
 
             //評価実験用
+            recordTraditionalEnvironmentGenerationTime = true;
             long UpdatingEnvironmentGenerateStart = System.currentTimeMillis();
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "UpdatingControllerSynthesizer",
@@ -165,27 +214,28 @@ public class UpdatingControllerSynthesizer {
                     "Traditional DUC E_u 構築時間");
 
             //評価実験用
+            methodMainExecutionLabel = "Traditional solveControlProblem / OTF generateDUC 実行時間";
             long DUCStart = System.currentTimeMillis();
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "UpdatingControllerSynthesizer",
-                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                    methodMainExecutionLabel);
             UpdatingControllerEvaluationRecorder.beginCountScope(
                     "UpdatingControllerSynthesizer",
-                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                    methodMainExecutionLabel);
 
             try {
                 solveControlProblem(uccs, updEnv, output);
             } finally {
                 UpdatingControllerEvaluationRecorder.endCountScope(
                         "UpdatingControllerSynthesizer",
-                        "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                        methodMainExecutionLabel);
             }
 
             //評価実験用
             DUCTime = System.currentTimeMillis() - DUCStart;
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     "UpdatingControllerSynthesizer",
-                    "Traditional solveControlProblem / OTF generateDUC 実行時間");
+                    methodMainExecutionLabel);
         }
 
         //評価実験用
@@ -197,14 +247,18 @@ public class UpdatingControllerSynthesizer {
                 "UpdatingControllerSynthesizer",
                 "generateController の全体実行時間",
                 generateControllerTime);
-        UpdatingControllerEvaluationRecorder.recordTime(
-                "UpdatingControllerSynthesizer",
-                "Traditional solveControlProblem / OTF generateDUC 実行時間",
-                DUCTime);
-        UpdatingControllerEvaluationRecorder.recordTime(
-                "UpdatingControllerSynthesizer",
-                "Traditional DUC E_u 構築時間",
-                UpdatingEnvironmentGenerateTime);
+        if (methodMainExecutionLabel != null) {
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "UpdatingControllerSynthesizer",
+                    methodMainExecutionLabel,
+                    DUCTime);
+        }
+        if (recordTraditionalEnvironmentGenerationTime) {
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "UpdatingControllerSynthesizer",
+                    "Traditional DUC E_u 構築時間",
+                    UpdatingEnvironmentGenerateTime);
+        }
         } catch (RuntimeException | Error e) {
             heartbeatStatus = "failed:" + e.getClass().getSimpleName();
             throw e;
@@ -223,6 +277,16 @@ public class UpdatingControllerSynthesizer {
                 "solveControlProblem (Traditional DUC)",
                 "solveControlProblem 全体時間");
         Set<String> controllableActions = uccs.getControllableActions();
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Traditional DUC 設定",
+                "safetyBackwardPruning 有効",
+                uccs.isSafetyBackwardPruning() ? 1 : 0,
+                "boolean");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Traditional DUC 設定",
+                "GR(1) permissive strategy 有効",
+                uccs.getUpdateGRGoal().isPermissive() ? 1 : 0,
+                "boolean");
 
         //UpdatingEnvironmentからMTSへ変換
         DUCHeartbeat.beginPhase("TRADITIONAL_CONVERT_EU_MTS");
@@ -437,6 +501,17 @@ public class UpdatingControllerSynthesizer {
                 "metaEnv からエラーを枝刈りして safetyEnv を構築する時間");
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional safetyEnv 構築後");
 
+        if (uccs.isSafetyBackwardPruning()) {
+            output.outln("[Traditional DUC] Safety backward pruning before GR(1)");
+            SafetyBackwardPruner.Result backwardPruning = SafetyBackwardPruner.prune(
+                    safetyEnv,
+                    uccs.getUpdateGRGoal().getControllableActions(),
+                    "traditional-final",
+                    output);
+            safetyEnv = backwardPruning.getEnvironment();
+            UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("Traditional safety backward pruning 後");
+        }
+
         // ▼▼▼ 評価実験用: [4] 最終 Safety Environment 生成直後 ▼▼▼
         long safeCountStart = 0;
         int safeStates = 0;
@@ -459,6 +534,14 @@ public class UpdatingControllerSynthesizer {
                 safeTrans,
                 safeCountTime,
                 "Pruned に DontDoTwice 制約を合成した、GR1 合成に渡す最終 safety 環境。");
+        UpdatingControllerEvaluationRecorder.recordFinalGrInputStateSpace(
+                "traditional",
+                "Traditional DUC",
+                safeStates,
+                safeTrans,
+                uccs.isSafetyBackwardPruning()
+                        ? "[4. Final] Safety Environment after SBP"
+                        : "[4. Final] Safety Environment");
         UpdatePhaseEvaluator.recordMtsUpdatePhaseStateSpace(
                 UpdatePhaseEvaluator.SECTION_TRADITIONAL,
                 "[4. Final] Safety Environment",

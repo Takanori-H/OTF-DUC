@@ -1,7 +1,6 @@
 package ltsa.updatingControllers.cli;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -14,6 +13,8 @@ import ltsa.lts.LTSInputString;
 import ltsa.lts.PrintTransitions;
 import ltsa.dispatcher.TransitionSystemDispatcher;
 import ltsa.updatingControllers.CompositionEvaluationRunner;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.checks.UpdateRequirementChecker;
 
 public final class SingleCompositionRunner {
 
@@ -45,7 +46,11 @@ public final class SingleCompositionRunner {
             String target = required(options, "target");
             File outputFile = requiredFile(options, "output");
             File transitionsFile = requiredFile(options, "transitions");
+            File minimizedTransitionsFile = optionalFile(options, "minimized-transitions");
+            File minimizedCountsFile = optionalFile(options, "minimized-counts");
+            File requirementsCheckFile = optionalFile(options, "requirements-check");
             boolean minimize = booleanOption(options, "minimize");
+            boolean writeSeparateMinimizedOutput = minimizedTransitionsFile != null || minimizedCountsFile != null;
 
             output = new CliFileLTSOutput(outputFile);
             String source = new String(Files.readAllBytes(ltsFile.toPath()), StandardCharsets.UTF_8);
@@ -83,11 +88,58 @@ public final class SingleCompositionRunner {
                 System.err.println("Transition target was not found: " + target);
                 return EXIT_NO_TRANSITION_OUTPUT;
             }
-            if (minimize) {
-                selected = TransitionSystemDispatcher.minimise(selected, output);
+
+            long rawStates = selected.maxStates;
+            long rawTransitions = selected.ntransitions();
+            if (!minimize || writeSeparateMinimizedOutput || requirementsCheckFile != null) {
+                writeTransitions(selected, transitionsFile);
+            }
+            if (requirementsCheckFile != null) {
+                writeRequirementsCheck(ltsFile, target, transitionsFile, requirementsCheckFile);
             }
 
-            writeTransitions(selected, transitionsFile);
+            if (minimize || writeSeparateMinimizedOutput) {
+                long minimizeStart = System.currentTimeMillis();
+                CompactState minimized = TransitionSystemDispatcher.minimise(selected, output);
+                long minimizeTimeMillis = System.currentTimeMillis() - minimizeStart;
+
+                long countStart = System.currentTimeMillis();
+                long minimizedStates = minimized.maxStates;
+                long minimizedTransitions = minimized.ntransitions();
+                long countTimeMillis = System.currentTimeMillis() - countStart;
+
+                UpdatingControllerEvaluationRecorder.recordMinimizedOutputController(
+                        minimizedStates,
+                        minimizedTransitions,
+                        countTimeMillis,
+                        minimizeTimeMillis);
+                output.outln("");
+                output.outln("[minimized 出力]");
+                output.outln("minimized 出力状態数 : " + minimizedStates + " states");
+                output.outln("minimized 出力遷移数 : " + minimizedTransitions + " transitions");
+                output.outln("minimize 時間 : " + Math.max(0, minimizeTimeMillis) + " ms");
+                UpdatingControllerEvaluationRecorder.writeDataCsvFileIfConfigured(output);
+
+                if (writeSeparateMinimizedOutput) {
+                    if (minimizedTransitionsFile != null) {
+                        writeTransitions(minimized, minimizedTransitionsFile);
+                    }
+                    if (minimizedCountsFile != null) {
+                        writeMinimizedCounts(
+                                minimizedCountsFile,
+                                target,
+                                rawStates,
+                                rawTransitions,
+                                minimizedStates,
+                                minimizedTransitions,
+                                countTimeMillis,
+                                minimizeTimeMillis);
+                    }
+                } else {
+                    writeTransitions(minimized, transitionsFile);
+                }
+            }
+
             return EXIT_SUCCESS;
         } catch (OutOfMemoryError e) {
             e.printStackTrace(System.err);
@@ -147,6 +199,77 @@ public final class SingleCompositionRunner {
         }
     }
 
+    private static void writeMinimizedCounts(
+            File countsFile,
+            String target,
+            long rawStates,
+            long rawTransitions,
+            long minimizedStates,
+            long minimizedTransitions,
+            long countTimeMillis,
+            long minimizeTimeMillis) throws Exception {
+        CliFileLTSOutput.ensureParentDirectory(countsFile);
+        StringBuilder builder = new StringBuilder();
+        builder.append("target,metric_key,metric_label,value,unit\n");
+        appendMinimizedCountRow(builder, target, "raw_output_update_controller_states",
+                "Raw output update controller states", rawStates, "states");
+        appendMinimizedCountRow(builder, target, "raw_output_update_controller_transitions",
+                "Raw output update controller transitions", rawTransitions, "transitions");
+        appendMinimizedCountRow(builder, target, "minimized_output_update_controller_states",
+                "Minimized output update controller states", minimizedStates, "states");
+        appendMinimizedCountRow(builder, target, "minimized_output_update_controller_transitions",
+                "Minimized output update controller transitions", minimizedTransitions, "transitions");
+        appendMinimizedCountRow(builder, target, "minimized_output_update_controller_count_time",
+                "Minimized output update controller count time", Math.max(0, countTimeMillis), "ms");
+        appendMinimizedCountRow(builder, target, "minimized_output_update_controller_minimize_time",
+                "Minimized output update controller minimize time", Math.max(0, minimizeTimeMillis), "ms");
+        Files.write(countsFile.toPath(), builder.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void appendMinimizedCountRow(
+            StringBuilder builder,
+            String target,
+            String metricKey,
+            String metricLabel,
+            long value,
+            String unit) {
+        builder.append(csv(target))
+                .append(',')
+                .append(csv(metricKey))
+                .append(',')
+                .append(csv(metricLabel))
+                .append(',')
+                .append(value)
+                .append(',')
+                .append(csv(unit))
+                .append('\n');
+    }
+
+    private static String csv(String value) {
+        if (value == null) {
+            return "";
+        }
+        boolean quote = value.indexOf(',') >= 0
+                || value.indexOf('"') >= 0
+                || value.indexOf('\n') >= 0
+                || value.indexOf('\r') >= 0;
+        if (!quote) {
+            return value;
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch == '"') {
+                builder.append("\"\"");
+            } else {
+                builder.append(ch);
+            }
+        }
+        builder.append('"');
+        return builder.toString();
+    }
+
     private static Map<String, String> parseArgs(String[] args) {
         Map<String, String> options = new HashMap<String, String>();
         for (int i = 0; i < args.length; i++) {
@@ -178,6 +301,14 @@ public final class SingleCompositionRunner {
         return new File(required(options, key));
     }
 
+    private static File optionalFile(Map<String, String> options, String key) {
+        String value = options.get(key);
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return new File(value);
+    }
+
     private static boolean booleanOption(Map<String, String> options, String key) {
         String value = options.get(key);
         return value != null
@@ -191,6 +322,20 @@ public final class SingleCompositionRunner {
                 + "ltsa.updatingControllers.cli.SingleCompositionRunner "
                 + "--lts file.lts --target Target "
                 + "--output output.txt --transitions transitions.txt "
-                + "[--minimize true]");
+                + "[--minimize true] "
+                + "[--minimized-transitions minimized_transitions.txt] "
+                + "[--minimized-counts minimized_counts.csv] "
+                + "[--requirements-check requirements_check.csv]");
+    }
+
+    private static void writeRequirementsCheck(
+            File ltsFile,
+            String target,
+            File transitionsFile,
+            File requirementsCheckFile) throws Exception {
+        UpdateRequirementChecker.Report report =
+                UpdateRequirementChecker.check(transitionsFile, ltsFile, target);
+        CliFileLTSOutput.ensureParentDirectory(requirementsCheckFile);
+        Files.write(requirementsCheckFile.toPath(), report.toCsv().getBytes(StandardCharsets.UTF_8));
     }
 }

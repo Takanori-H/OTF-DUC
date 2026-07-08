@@ -33,6 +33,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     private boolean fineGrained;
     private boolean selectiveFineGrained;
     private boolean stepwise;
+    private boolean stepwiseDelayed;
+    private boolean incrementalPruning;
+    private boolean incrementalPruningCleanup;
+    private boolean safetyBackwardPruning;
     private Symbol newController;
     // ▼▼▼ 追加: 新しい構文用のリストフィールド ▼▼▼
     private List<Symbol> oldEnvironmentList;
@@ -54,6 +58,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         fineGrained = false;
         selectiveFineGrained = false;
         stepwise = false;
+        stepwiseDelayed = false;
+        incrementalPruning = false;
+        incrementalPruningCleanup = false;
+        safetyBackwardPruning = false;
         this.output = output;
 
         // ▼▼▼ 追加: 初期化 ▼▼▼
@@ -95,6 +103,12 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
         String oldControllerName = this.getOldController().toString();
         CompositeState oldC = null;
+        boolean oldControllerMissing = oldControllerName == null
+                || oldControllerName.equals("unknown")
+                || oldControllerName.length() == 0;
+        if (stepwiseDelayed && oldControllerMissing) {
+            Diagnostics.fatal("stepwise_delayed mode requires oldController.");
+        }
         if (stepwise) {
             output.outln(" - Stepwise mode: oldController '" + oldControllerName + "' is not pre-composed.");
         } else {
@@ -130,6 +144,18 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         }
         if (stepwise && (isOTF || fineGrained || selectiveFineGrained)) {
             Diagnostics.fatal("stepwise cannot be combined with on_the_fly, fine_grained, or selective_fine_grained.");
+        }
+        if (stepwiseDelayed && (stepwise || isOTF || fineGrained || selectiveFineGrained)) {
+            Diagnostics.fatal("stepwise_delayed cannot be combined with stepwise, on_the_fly, fine_grained, or selective_fine_grained.");
+        }
+        if (incrementalPruning && !stepwiseDelayed) {
+            Diagnostics.fatal("incrementalPruning can only be used with stepwise_delayed.");
+        }
+        if (incrementalPruningCleanup && !incrementalPruning) {
+            Diagnostics.fatal("incrementalPruningCleanup requires incrementalPruning.");
+        }
+        if (safetyBackwardPruning && (isOTF || fineGrained || selectiveFineGrained || stepwise)) {
+            Diagnostics.fatal("safetyBackwardPruning can only be used with traditional DUCS or stepwise_delayed.");
         }
         boolean fineGrainedMode = fineGrained || selectiveFineGrained;
 
@@ -167,6 +193,9 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 && !this.getMapping().toString().isEmpty()) {
             if (stepwise) {
                 Diagnostics.fatal("stepwise mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
+            }
+            if (stepwiseDelayed) {
+                Diagnostics.fatal("stepwise_delayed mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
             }
             if (fineGrainedMode) {
                 Diagnostics.fatal("fine_grained/selective_fine_grained mode requires oldEnvironment/newEnvironment/mapRelation lists, not mapping = ...");
@@ -229,7 +258,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     CompactState oldComponent = compiledProcesses.get(oldName);
                     CompactState newComponent = compiledProcesses.get(newName);
                     stepwiseStages.add(new StepwiseStage(i, oldName, newName, relNameStr,
-                            oldComponent, newComponent, mapComp));
+                            oldComponent, newComponent, mapComp, generator.getStateMetadata()));
                     if (!compiledProcesses.containsKey(mapEnvName)) {
                         compiledProcesses.put(mapEnvName, mapComp);
                     }
@@ -328,6 +357,33 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             grGoalTime = 0;
             ucce = new UpdatingControllerCompositeState(null, oldControllerName, stepwiseStages, oldGoalDef, newGoalDef,
                     new ArrayList<Symbol>(this.getTransitionGoals()), grGoal, controllableSet, name.getName());
+        }
+        else if (this.stepwiseDelayed)
+        {
+            output.outln("Mode: Stepwise Delayed Updating Controller Synthesis"
+                    + (incrementalPruning
+                    ? (incrementalPruningCleanup ? " (incremental pruning + cleanup)" : " (incremental pruning)")
+                    : " (baseline)")
+                    + (safetyBackwardPruning ? " + safety backward pruning" : ""));
+            if (stepwiseStages.isEmpty()) {
+                Diagnostics.fatal("stepwise_delayed mode requires at least one oldEnvironment/newEnvironment/mapRelation stage.");
+            }
+
+            ControllerGoal<String> grGoal = UpdatingControllersUtils.generateGRUpdateGoal(this, oldGoalDef, newGoalDef,
+                    controllableSet);
+            grGoalTime = 0;
+            ucce = UpdatingControllerCompositeState.stepwiseDelayed(
+                    oldC,
+                    oldControllerName,
+                    stepwiseStages,
+                    oldGoalDef,
+                    newGoalDef,
+                    new ArrayList<Symbol>(this.getTransitionGoals()),
+                    grGoal,
+                    controllableSet,
+                    name.getName(),
+                    incrementalPruning,
+                    incrementalPruningCleanup);
         }
         else if (this.isOTF)
         {
@@ -727,7 +783,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         else
         {
             // Traditional Mode
-            output.outln("Mode: Traditional Updating Controller Synthesis");
+            output.outln("Mode: Traditional Updating Controller Synthesis"
+                    + (safetyBackwardPruning ? " + safety backward pruning" : ""));
 
             //評価実験用
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -798,6 +855,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             ucce = new UpdatingControllerCompositeState(oldC, mappingComposite, safetyGoal, grGoal,
                     name.getName(), fineGrainedMode, updateProtocolSpec);
         }
+        ucce.setSafetyBackwardPruning(safetyBackwardPruning);
 
         //評価実験用：UpdatingControllersDefinition.compose測定終了
         UpdatingControllerEvaluationRecorder.endCountScope(
@@ -843,12 +901,14 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 "UpdatingControllersDefinition", "Safety の tester 変換全体時間", safetyToTesterTime);
         UpdatingControllerEvaluationRecorder.recordTime(
                 "UpdatingControllersDefinition", "New Safety から Fluent を抽出する時間", newSafetyToFluentTime);
-        UpdatingControllerEvaluationRecorder.recordTime(
-                "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間", grGoalTime);
-        UpdatingControllerEvaluationRecorder.recordTime(
-                "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間", safetyGoalTime);
-        UpdatingControllerEvaluationRecorder.recordTime(
-                "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間", mapETime);
+        if (!this.stepwise && !this.stepwiseDelayed && !this.isOTF) {
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "UpdatingControllersDefinition", "Traditional DUC grGoal 生成時間", grGoalTime);
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間", safetyGoalTime);
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間", mapETime);
+        }
         UpdatingControllerEvaluationRecorder.recordTime(
                 "UpdatingControllersDefinition", "入力規模集計時間", inputScaleTime);
 
@@ -1312,6 +1372,22 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
     public void setStepwise() {
         this.stepwise = true;
+    }
+
+    public void setStepwiseDelayed() {
+        this.stepwiseDelayed = true;
+    }
+
+    public void setIncrementalPruning() {
+        this.incrementalPruning = true;
+    }
+
+    public void setIncrementalPruningCleanup() {
+        this.incrementalPruningCleanup = true;
+    }
+
+    public void setSafetyBackwardPruning() {
+        this.safetyBackwardPruning = true;
     }
 
     public boolean isFineGrained() {

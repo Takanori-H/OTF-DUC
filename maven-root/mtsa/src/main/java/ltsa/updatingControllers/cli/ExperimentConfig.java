@@ -18,6 +18,11 @@ final class ExperimentConfig {
     long timeoutMillis = DEFAULT_TIMEOUT_MILLIS;
     int runs = 1;
     boolean runsSpecified = false;
+    boolean requirementsCheck = false;
+    boolean traceCheck = false;
+    String slackWebhookUrl;
+    String notifyOn = "always";
+    int notifyTimeoutSeconds = 30;
     final List<String> javaOptions = new ArrayList<String>();
     final List<ExperimentCase> cases = new ArrayList<ExperimentCase>();
 
@@ -87,6 +92,21 @@ final class ExperimentConfig {
             config.timeoutMillis = hoursToMillis(keyValue.value);
         } else if ("timeoutMinutes".equals(keyValue.key)) {
             config.timeoutMillis = minutesToMillis(keyValue.value);
+        } else if ("requirementsCheck".equals(keyValue.key)
+                || "checkRequirements".equals(keyValue.key)) {
+            config.requirementsCheck = parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("traceCheck".equals(keyValue.key)
+                || "checkTraces".equals(keyValue.key)) {
+            config.traceCheck = parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("slackWebhookUrl".equals(keyValue.key)
+                || "slackIncomingWebhookUrl".equals(keyValue.key)
+                || "slackWebhook".equals(keyValue.key)) {
+            config.slackWebhookUrl = keyValue.value;
+        } else if ("notifyOn".equals(keyValue.key)) {
+            config.notifyOn = keyValue.value.toLowerCase(Locale.ROOT);
+        } else if ("notifyTimeoutSeconds".equals(keyValue.key)) {
+            config.notifyTimeoutSeconds =
+                    parsePositiveInt(keyValue.value, keyValue.key, lineNumber);
         } else {
             throw new IllegalArgumentException("Unknown config key at line "
                     + (lineNumber + 1) + ": " + keyValue.key);
@@ -112,6 +132,10 @@ final class ExperimentConfig {
             experimentCase.timeoutMillis = Long.valueOf(hoursToMillis(keyValue.value));
         } else if ("timeoutMinutes".equals(keyValue.key)) {
             experimentCase.timeoutMillis = Long.valueOf(minutesToMillis(keyValue.value));
+        } else if ("requirementsCheck".equals(keyValue.key)
+                || "checkRequirements".equals(keyValue.key)) {
+            experimentCase.requirementsCheck =
+                    Boolean.valueOf(parseBoolean(keyValue.value, keyValue.key, lineNumber));
         } else {
             throw new IllegalArgumentException("Unknown case key at line "
                     + (lineNumber + 1) + ": " + keyValue.key);
@@ -121,6 +145,12 @@ final class ExperimentConfig {
     private void validate() {
         if (cases.isEmpty()) {
             throw new IllegalArgumentException("No cases are defined in " + configFile);
+        }
+        if (!"always".equals(notifyOn)
+                && !"success".equals(notifyOn)
+                && !"failure".equals(notifyOn)
+                && !"never".equals(notifyOn)) {
+            throw new IllegalArgumentException("notifyOn must be one of always, success, failure, or never.");
         }
 
         for (int i = 0; i < cases.size(); i++) {
@@ -213,6 +243,21 @@ final class ExperimentConfig {
         }
     }
 
+    static boolean parseBoolean(String value, String key, int lineNumber) {
+        if ("true".equalsIgnoreCase(value)
+                || "yes".equalsIgnoreCase(value)
+                || "1".equals(value)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(value)
+                || "no".equalsIgnoreCase(value)
+                || "0".equals(value)) {
+            return false;
+        }
+        throw new IllegalArgumentException(key + " must be true or false at line "
+                + (lineNumber + 1) + ": " + value);
+    }
+
     private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
@@ -259,9 +304,14 @@ final class ExperimentConfig {
         File lts;
         String target;
         Long timeoutMillis;
+        Boolean requirementsCheck;
 
         long timeoutMillisOrDefault(long defaultValue) {
             return timeoutMillis == null ? defaultValue : timeoutMillis.longValue();
+        }
+
+        boolean requirementsCheckOrDefault(boolean defaultValue) {
+            return requirementsCheck == null ? defaultValue : requirementsCheck.booleanValue();
         }
 
         String methodFolderName() {
