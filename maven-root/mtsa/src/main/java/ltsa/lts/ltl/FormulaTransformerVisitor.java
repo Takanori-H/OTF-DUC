@@ -1,5 +1,7 @@
 package ltsa.lts.ltl;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
@@ -140,11 +142,19 @@ public class FormulaTransformerVisitor implements FormulaVisitor {
 
 	private Fluent createFluent(Proposition proposition) {
 		String name = proposition.toString();
+		if (proposition.isActionPredicate()) {
+			Fluent resultantFluent = generateFluentFromEvent(
+					name, proposition.getActionPredicateActions());
+			this.actionFluentsForUpdate.add(resultantFluent);
+			return resultantFluent;
+		}
+
 		PredicateDefinition predicateDefinition = PredicateDefinition.get(name);
 
 		// the predicate definition is an event. Create a fluent.
 		if (predicateDefinition == null){
-			Fluent resultantFluent = generateFluentFromEvent(name);
+			Fluent resultantFluent = generateFluentFromEvent(
+					name, Collections.singleton(name.trim()));
 			this.actionFluentsForUpdate.add(resultantFluent);
 			return resultantFluent;
 		}
@@ -160,45 +170,17 @@ public class FormulaTransformerVisitor implements FormulaVisitor {
 		return new FluentImpl(name, initiatingActions, terminatingActions, initialValue);
 	}
 
-	private Fluent generateFluentFromEvent(String name) {
+	private Fluent generateFluentFromEvent(String name, Collection<String> actions) {
 		HashSet<Symbol> initiating = new HashSet<>();
-		String fluentName = name + "_a";
-		String normalizedName = name.trim();
-
-		if (isActionSet(normalizedName)) {
-			for (String action : normalizedName.substring(1, normalizedName.length() - 1).split(",")) {
-				addActionSymbol(initiating, action.trim());
+		for (String action : actions) {
+			if (action != null && !action.trim().isEmpty()) {
+				initiating.add(new SingleSymbol(action.trim()));
 			}
-			fluentName = normalizedName.replaceAll("[^A-Za-z0-9_]", "_") + "_a";
-		} else if (normalizedName.contains(new String("[")) || normalizedName.contains(new String("["))){
-			String[] splited = normalizedName.split(new String("\\["));
-			String value = splited[1].split(new String("\\]"))[0];
-			initiating.add(new SingleSymbol(splited[0] + "." +value));
-			fluentName = splited[0] + "." +value + "_a";
-		} else {
-			initiating.add(new SingleSymbol(normalizedName));
 		}
 
 		HashSet<Symbol> terminating = new HashSet<>();
 		terminating.add(new SingleSymbol("*"));
-		return new FluentImpl(fluentName, initiating, terminating, false);
-	}
-
-	private boolean isActionSet(String name) {
-		return name.startsWith("{") && name.endsWith("}") && name.length() > 2;
-	}
-
-	private void addActionSymbol(HashSet<Symbol> symbols, String action) {
-		if (action.isEmpty()) {
-			return;
-		}
-		if (action.contains(new String("["))) {
-			String[] splited = action.split(new String("\\["));
-			String value = splited[1].split(new String("\\]"))[0];
-			symbols.add(new SingleSymbol(splited[0] + "." + value));
-		} else {
-			symbols.add(new SingleSymbol(action));
-		}
+		return new FluentImpl(name.trim() + "_a", initiating, terminating, false);
 	}
 
 	private Set<Symbol> transformFluentActions(Vector fluentActions) {

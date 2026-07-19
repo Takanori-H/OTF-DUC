@@ -1,5 +1,9 @@
 package ltsa.lts.ltl;
 import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import ltsa.lts.Symbol;
 
@@ -156,7 +160,27 @@ class False extends Formula {
 
 class Proposition extends Formula {
 	 Symbol sym;
-	 Proposition(Symbol s) {sym = s;}
+	 private final Set<String> actionPredicateActions;
+
+	 Proposition(Symbol s) {
+		 this(s, null);
+	 }
+
+	 Proposition(Symbol s, Collection<String> actionPredicateActions) {
+		 sym = s;
+		 this.actionPredicateActions = actionPredicateActions == null
+				 ? null
+				 : Collections.unmodifiableSet(new LinkedHashSet<String>(actionPredicateActions));
+	 }
+
+	 boolean isActionPredicate() {
+		 return actionPredicateActions != null;
+	 }
+
+	 Set<String> getActionPredicateActions() {
+		 return actionPredicateActions;
+	 }
+
 	 public String toString() { return sym.toString();}
 	 public Formula accept(FormulaVisitor v) {return v.visit(this);}
 	 boolean isLiteral() {return true;}

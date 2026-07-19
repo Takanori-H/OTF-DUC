@@ -1,0 +1,452 @@
+// Drone Stepwise DUCS diagnostic model: exact source requirements and no old/new change.
+//
+// Conversion source (left unchanged):
+//   Drone_new/Drone(N, 2 drone).lts
+//   SHA-256: dc6ed6c4c59badee8250b35bed62dd39c68b8b4cc1878621e1785860876f8834
+//
+// Direct base of this file (left unchanged):
+//   Drone_new/Drone_2x2x2_No_Geofence_No_Change_Update.lts
+//   SHA-256: 895d2ef4c3ea859c6f918a51bede67ce530d063b89332b2c28dff4cb847b6d56
+//
+// Purpose:
+// - Isolate the DUCS update mechanism from any old/new specification change.
+// - The OLD and NEW process definitions have identical transition structures
+//   and alphabets; only their process names distinguish the two versions.
+// - OLD_REQ and NEW_REQ contain semantically identical safety formulas.
+// - Reconfiguration maps every represented old state to the corresponding new
+//   state without changing the battery, position, or pending-arrival meaning.
+// - The additional per-drone geofence requirements used by the geofence-shift
+//   scenario are absent from both OLD_REQ and NEW_REQ.
+// - P_MOVE_LIMIT_1 and P_MOVE_LIMIT_2 are retained because they belong to the
+//   shared source requirements and are not the added geofence under diagnosis.
+// - The additional low-battery takeoff prohibition is also absent. OLD_REQ and
+//   NEW_REQ therefore contain exactly the 26 safety requirements of the shared
+//   conversion source (with OLD/NEW suffixes only).
+// - Consequently, this isolates the DUCS structure without changing either the
+//   normal environment behavior or the source safety policy.
+//
+// Design decisions for this model:
+// - N=2 and MaxX=MaxY=MaxH=2; this file is not a scaling model.
+// - The old and new environments have the same behavior and alphabet.
+// - There are four mapping components: battery and movement for each drone.
+// - WAIT_TAKEOFF and WAIT_MOVE[x][y][h] name the states in which an
+//   uncontrollable arrive event is pending after a controllable command.
+// - Both old and new requirements are exactly the 26 shared source rules.
+// - There is no additional P_GEOFENCE requirement in either version.
+// - Three transition variants are provided: no_tr, T1, and T2.
+
+// =============================================================================
+// Constants and actions
+// =============================================================================
+
+const N = 2
+const S = 2
+
+range DroneID = 1..N
+set Drones = {drone[DroneID]}
+
+const MaxX = 2
+const MaxY = 2
+const MaxH = S
+
+range X = 1..MaxX
+range Y = 1..MaxY
+range H = 1..MaxH
+set Direction = {n,s,e,w}
+
+set ControllableActions = {
+    [Drones].battery['safe],
+    [Drones].takeoff,
+    [Drones].land,
+    [Drones].up,
+    [Drones].down,
+    [Drones].move[Direction]
+}
+
+// =============================================================================
+// Old and new environments
+// =============================================================================
+
+// Battery behavior is identical to the source model.
+BATTERY_OLD(D=1) = (drone[D].battery['low] -> LOW),
+LOW = (drone[D].battery['safe] -> BATTERY_OLD).
+
+BATTERY_NEW(D=1) = (drone[D].battery['low] -> LOW),
+LOW = (drone[D].battery['safe] -> BATTERY_NEW).
+
+// Movement behavior is identical to the source model:
+// command (controllable) -> arrive (uncontrollable) -> destination state.
+MOVE_OLD(D=1) = (drone[D].takeoff -> WAIT_TAKEOFF),
+WAIT_TAKEOFF = (drone[D].arrive[1][1][1] -> ACTION[1][1][1]),
+WAIT_MOVE[x:X][y:Y][h:H] = (drone[D].arrive[x][y][h] -> ACTION[x][y][h]),
+ACTION[x:X][y:Y][h:H] = (
+      when(x > 1)    drone[D].move['w] -> WAIT_MOVE[x-1][y][h]
+    | when(x < MaxX) drone[D].move['e] -> WAIT_MOVE[x+1][y][h]
+    | when(y > 1)    drone[D].move['s] -> WAIT_MOVE[x][y-1][h]
+    | when(y < MaxY) drone[D].move['n] -> WAIT_MOVE[x][y+1][h]
+    | when(h > 1)    drone[D].down      -> WAIT_MOVE[x][y][h-1]
+    | when(h < MaxH) drone[D].up        -> WAIT_MOVE[x][y][h+1]
+    | when(h == 1)   drone[D].land      -> MOVE_OLD
+).
+
+MOVE_NEW(D=1) = (drone[D].takeoff -> WAIT_TAKEOFF),
+WAIT_TAKEOFF = (drone[D].arrive[1][1][1] -> ACTION[1][1][1]),
+WAIT_MOVE[x:X][y:Y][h:H] = (drone[D].arrive[x][y][h] -> ACTION[x][y][h]),
+ACTION[x:X][y:Y][h:H] = (
+      when(x > 1)    drone[D].move['w] -> WAIT_MOVE[x-1][y][h]
+    | when(x < MaxX) drone[D].move['e] -> WAIT_MOVE[x+1][y][h]
+    | when(y > 1)    drone[D].move['s] -> WAIT_MOVE[x][y-1][h]
+    | when(y < MaxY) drone[D].move['n] -> WAIT_MOVE[x][y+1][h]
+    | when(h > 1)    drone[D].down      -> WAIT_MOVE[x][y][h-1]
+    | when(h < MaxH) drone[D].up        -> WAIT_MOVE[x][y][h+1]
+    | when(h == 1)   drone[D].land      -> MOVE_NEW
+).
+
+||OLD_ENV = (
+    BATTERY_OLD(1) || MOVE_OLD(1) ||
+    BATTERY_OLD(2) || MOVE_OLD(2)
+).
+
+||NEW_ENV = (
+    BATTERY_NEW(1) || MOVE_NEW(1) ||
+    BATTERY_NEW(2) || MOVE_NEW(2)
+).
+
+// =============================================================================
+// State correspondence and four mapping components
+// =============================================================================
+
+relation R_BATTERY(D) = {
+    BATTERY_OLD@BATTERY_OLD(D) = reconfigure -> BATTERY_NEW@BATTERY_NEW(D),
+    LOW@BATTERY_OLD(D) = reconfigure -> LOW@BATTERY_NEW(D)
+}
+
+relation R_MOVE(D) = {
+    MOVE_OLD@MOVE_OLD(D) = reconfigure -> MOVE_NEW@MOVE_NEW(D),
+    WAIT_TAKEOFF@MOVE_OLD(D) = reconfigure -> WAIT_TAKEOFF@MOVE_NEW(D),
+
+    WAIT_MOVE[1][1][1]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[1][1][1]@MOVE_NEW(D),
+    WAIT_MOVE[1][1][2]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[1][1][2]@MOVE_NEW(D),
+    WAIT_MOVE[1][2][1]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[1][2][1]@MOVE_NEW(D),
+    WAIT_MOVE[1][2][2]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[1][2][2]@MOVE_NEW(D),
+    WAIT_MOVE[2][1][1]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[2][1][1]@MOVE_NEW(D),
+    WAIT_MOVE[2][1][2]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[2][1][2]@MOVE_NEW(D),
+    WAIT_MOVE[2][2][1]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[2][2][1]@MOVE_NEW(D),
+    WAIT_MOVE[2][2][2]@MOVE_OLD(D) = reconfigure -> WAIT_MOVE[2][2][2]@MOVE_NEW(D),
+
+    ACTION[1][1][1]@MOVE_OLD(D) = reconfigure -> ACTION[1][1][1]@MOVE_NEW(D),
+    ACTION[1][1][2]@MOVE_OLD(D) = reconfigure -> ACTION[1][1][2]@MOVE_NEW(D),
+    ACTION[1][2][1]@MOVE_OLD(D) = reconfigure -> ACTION[1][2][1]@MOVE_NEW(D),
+    ACTION[1][2][2]@MOVE_OLD(D) = reconfigure -> ACTION[1][2][2]@MOVE_NEW(D),
+    ACTION[2][1][1]@MOVE_OLD(D) = reconfigure -> ACTION[2][1][1]@MOVE_NEW(D),
+    ACTION[2][1][2]@MOVE_OLD(D) = reconfigure -> ACTION[2][1][2]@MOVE_NEW(D),
+    ACTION[2][2][1]@MOVE_OLD(D) = reconfigure -> ACTION[2][2][1]@MOVE_NEW(D),
+    ACTION[2][2][2]@MOVE_OLD(D) = reconfigure -> ACTION[2][2][2]@MOVE_NEW(D)
+}
+
+map MAP_BATTERY_1 = {BATTERY_OLD(1), BATTERY_NEW(1), R_BATTERY(1)}
+map MAP_MOVE_1 = {MOVE_OLD(1), MOVE_NEW(1), R_MOVE(1)}
+map MAP_BATTERY_2 = {BATTERY_OLD(2), BATTERY_NEW(2), R_BATTERY(2)}
+map MAP_MOVE_2 = {MOVE_OLD(2), MOVE_NEW(2), R_MOVE(2)}
+
+||MAPPING_ENV = (
+    MAP_BATTERY_1 || MAP_MOVE_1 ||
+    MAP_BATTERY_2 || MAP_MOVE_2
+).
+
+// =============================================================================
+// Fluents shared by the old and new requirements
+// =============================================================================
+
+const LIMIT_X = 2
+const LIMIT_Y = 2
+const LIMIT_H = 3 // Retained from the source; it is not referenced there or here.
+
+fluent LANDING[drone:Drones] = <[drone].land,[drone].takeoff> initially 1
+fluent LOW_BATTERY[drone:Drones] = <[drone].battery['low],[drone].battery['safe]> initially 0
+
+fluent WAITING_H1[drone:Drones][x:X][y:Y] =
+    <[drone].arrive[x][y][1],{[drone].arrive[X][Y][H],[drone].land}\{[drone].arrive[x][y][1]}> initially 0
+fluent WAITING_H2[drone:Drones][x:X][y:Y] =
+    <[drone].arrive[x][y][2],{[drone].arrive[X][Y][H],[drone].land}\{[drone].arrive[x][y][2]}> initially 0
+
+// =============================================================================
+// Old requirements: shared source rules without an added geofence
+// =============================================================================
+
+ltl_property P_MOVE_LIMIT_1_OLD         = [](!['drone.[1]].arrive[LIMIT_X][Y][H])
+ltl_property P_LOW_BATTERY_LAND_1_OLD   = [](!LANDING['drone.[1]] -> !['drone.[1]].battery['safe])
+ltl_property P_LOW_BATTERY_UP_1_OLD     = [](LOW_BATTERY['drone.[1]] -> !['drone.[1]].up)
+ltl_property P_LOW_BATTERY_MOVE_X_1_OLD = [](LOW_BATTERY['drone.[1]] -> !['drone.[1]].move['e])
+ltl_property P_LOW_BATTERY_MOVE_Y_1_OLD = [](LOW_BATTERY['drone.[1]] -> !['drone.[1]].move['n])
+
+ltl_property P_MOVE_LIMIT_2_OLD         = [](!['drone.[2]].arrive[X][LIMIT_Y][H])
+ltl_property P_LOW_BATTERY_LAND_2_OLD   = [](!LANDING['drone.[2]] -> !['drone.[2]].battery['safe])
+ltl_property P_LOW_BATTERY_UP_2_OLD     = [](LOW_BATTERY['drone.[2]] -> !['drone.[2]].up)
+ltl_property P_LOW_BATTERY_MOVE_X_2_OLD = [](LOW_BATTERY['drone.[2]] -> !['drone.[2]].move['e])
+ltl_property P_LOW_BATTERY_MOVE_Y_2_OLD = [](LOW_BATTERY['drone.[2]] -> !['drone.[2]].move['n])
+
+ltl_property P_NO_COLLISON1_111_OLD = [](WAITING_H1['drone.[1]][1][1] -> !['drone.[2]].arrive[1][1][1])
+ltl_property P_NO_COLLISON1_112_OLD = [](WAITING_H1['drone.[1]][1][2] -> !['drone.[2]].arrive[1][2][1])
+ltl_property P_NO_COLLISON1_121_OLD = [](WAITING_H1['drone.[1]][2][1] -> !['drone.[2]].arrive[2][1][1])
+ltl_property P_NO_COLLISON1_122_OLD = [](WAITING_H1['drone.[1]][2][2] -> !['drone.[2]].arrive[2][2][1])
+ltl_property P_NO_COLLISON2_111_OLD = [](WAITING_H2['drone.[1]][1][1] -> !['drone.[2]].arrive[1][1][2])
+ltl_property P_NO_COLLISON2_112_OLD = [](WAITING_H2['drone.[1]][1][2] -> !['drone.[2]].arrive[1][2][2])
+ltl_property P_NO_COLLISON2_121_OLD = [](WAITING_H2['drone.[1]][2][1] -> !['drone.[2]].arrive[2][1][2])
+ltl_property P_NO_COLLISON2_122_OLD = [](WAITING_H2['drone.[1]][2][2] -> !['drone.[2]].arrive[2][2][2])
+ltl_property P_NO_COLLISON1_211_OLD = [](WAITING_H1['drone.[2]][1][1] -> !['drone.[1]].arrive[1][1][1])
+ltl_property P_NO_COLLISON1_212_OLD = [](WAITING_H1['drone.[2]][1][2] -> !['drone.[1]].arrive[1][2][1])
+ltl_property P_NO_COLLISON1_221_OLD = [](WAITING_H1['drone.[2]][2][1] -> !['drone.[1]].arrive[2][1][1])
+ltl_property P_NO_COLLISON1_222_OLD = [](WAITING_H1['drone.[2]][2][2] -> !['drone.[1]].arrive[2][2][1])
+ltl_property P_NO_COLLISON2_211_OLD = [](WAITING_H2['drone.[2]][1][1] -> !['drone.[1]].arrive[1][1][2])
+ltl_property P_NO_COLLISON2_212_OLD = [](WAITING_H2['drone.[2]][1][2] -> !['drone.[1]].arrive[1][2][2])
+ltl_property P_NO_COLLISON2_221_OLD = [](WAITING_H2['drone.[2]][2][1] -> !['drone.[1]].arrive[2][1][2])
+ltl_property P_NO_COLLISON2_222_OLD = [](WAITING_H2['drone.[2]][2][2] -> !['drone.[1]].arrive[2][2][2])
+
+controllerSpec OLD_REQ = {
+    safety = {
+        P_MOVE_LIMIT_1_OLD,
+        P_LOW_BATTERY_LAND_1_OLD,
+        P_LOW_BATTERY_UP_1_OLD,
+        P_LOW_BATTERY_MOVE_X_1_OLD,
+        P_LOW_BATTERY_MOVE_Y_1_OLD,
+        P_MOVE_LIMIT_2_OLD,
+        P_LOW_BATTERY_LAND_2_OLD,
+        P_LOW_BATTERY_UP_2_OLD,
+        P_LOW_BATTERY_MOVE_X_2_OLD,
+        P_LOW_BATTERY_MOVE_Y_2_OLD,
+        P_NO_COLLISON1_111_OLD,
+        P_NO_COLLISON1_112_OLD,
+        P_NO_COLLISON1_121_OLD,
+        P_NO_COLLISON1_122_OLD,
+        P_NO_COLLISON2_111_OLD,
+        P_NO_COLLISON2_112_OLD,
+        P_NO_COLLISON2_121_OLD,
+        P_NO_COLLISON2_122_OLD,
+        P_NO_COLLISON1_211_OLD,
+        P_NO_COLLISON1_212_OLD,
+        P_NO_COLLISON1_221_OLD,
+        P_NO_COLLISON1_222_OLD,
+        P_NO_COLLISON2_211_OLD,
+        P_NO_COLLISON2_212_OLD,
+        P_NO_COLLISON2_221_OLD,
+        P_NO_COLLISON2_222_OLD
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+// =============================================================================
+// New requirements: exact semantic copy of the old requirements, without geofence
+// =============================================================================
+
+ltl_property P_MOVE_LIMIT_1_NEW         = [](!['drone.[1]].arrive[LIMIT_X][Y][H])
+ltl_property P_LOW_BATTERY_LAND_1_NEW   = [](!LANDING['drone.[1]] -> !['drone.[1]].battery['safe])
+ltl_property P_LOW_BATTERY_UP_1_NEW     = [](LOW_BATTERY['drone.[1]] -> !['drone.[1]].up)
+ltl_property P_LOW_BATTERY_MOVE_X_1_NEW = [](LOW_BATTERY['drone.[1]] -> !['drone.[1]].move['e])
+ltl_property P_LOW_BATTERY_MOVE_Y_1_NEW = [](LOW_BATTERY['drone.[1]] -> !['drone.[1]].move['n])
+
+ltl_property P_MOVE_LIMIT_2_NEW         = [](!['drone.[2]].arrive[X][LIMIT_Y][H])
+ltl_property P_LOW_BATTERY_LAND_2_NEW   = [](!LANDING['drone.[2]] -> !['drone.[2]].battery['safe])
+ltl_property P_LOW_BATTERY_UP_2_NEW     = [](LOW_BATTERY['drone.[2]] -> !['drone.[2]].up)
+ltl_property P_LOW_BATTERY_MOVE_X_2_NEW = [](LOW_BATTERY['drone.[2]] -> !['drone.[2]].move['e])
+ltl_property P_LOW_BATTERY_MOVE_Y_2_NEW = [](LOW_BATTERY['drone.[2]] -> !['drone.[2]].move['n])
+
+ltl_property P_NO_COLLISON1_111_NEW = [](WAITING_H1['drone.[1]][1][1] -> !['drone.[2]].arrive[1][1][1])
+ltl_property P_NO_COLLISON1_112_NEW = [](WAITING_H1['drone.[1]][1][2] -> !['drone.[2]].arrive[1][2][1])
+ltl_property P_NO_COLLISON1_121_NEW = [](WAITING_H1['drone.[1]][2][1] -> !['drone.[2]].arrive[2][1][1])
+ltl_property P_NO_COLLISON1_122_NEW = [](WAITING_H1['drone.[1]][2][2] -> !['drone.[2]].arrive[2][2][1])
+ltl_property P_NO_COLLISON2_111_NEW = [](WAITING_H2['drone.[1]][1][1] -> !['drone.[2]].arrive[1][1][2])
+ltl_property P_NO_COLLISON2_112_NEW = [](WAITING_H2['drone.[1]][1][2] -> !['drone.[2]].arrive[1][2][2])
+ltl_property P_NO_COLLISON2_121_NEW = [](WAITING_H2['drone.[1]][2][1] -> !['drone.[2]].arrive[2][1][2])
+ltl_property P_NO_COLLISON2_122_NEW = [](WAITING_H2['drone.[1]][2][2] -> !['drone.[2]].arrive[2][2][2])
+ltl_property P_NO_COLLISON1_211_NEW = [](WAITING_H1['drone.[2]][1][1] -> !['drone.[1]].arrive[1][1][1])
+ltl_property P_NO_COLLISON1_212_NEW = [](WAITING_H1['drone.[2]][1][2] -> !['drone.[1]].arrive[1][2][1])
+ltl_property P_NO_COLLISON1_221_NEW = [](WAITING_H1['drone.[2]][2][1] -> !['drone.[1]].arrive[2][1][1])
+ltl_property P_NO_COLLISON1_222_NEW = [](WAITING_H1['drone.[2]][2][2] -> !['drone.[1]].arrive[2][2][1])
+ltl_property P_NO_COLLISON2_211_NEW = [](WAITING_H2['drone.[2]][1][1] -> !['drone.[1]].arrive[1][1][2])
+ltl_property P_NO_COLLISON2_212_NEW = [](WAITING_H2['drone.[2]][1][2] -> !['drone.[1]].arrive[1][2][2])
+ltl_property P_NO_COLLISON2_221_NEW = [](WAITING_H2['drone.[2]][2][1] -> !['drone.[1]].arrive[2][1][2])
+ltl_property P_NO_COLLISON2_222_NEW = [](WAITING_H2['drone.[2]][2][2] -> !['drone.[1]].arrive[2][2][2])
+
+controllerSpec NEW_REQ = {
+    safety = {
+        P_MOVE_LIMIT_1_NEW,
+        P_LOW_BATTERY_LAND_1_NEW,
+        P_LOW_BATTERY_UP_1_NEW,
+        P_LOW_BATTERY_MOVE_X_1_NEW,
+        P_LOW_BATTERY_MOVE_Y_1_NEW,
+        P_MOVE_LIMIT_2_NEW,
+        P_LOW_BATTERY_LAND_2_NEW,
+        P_LOW_BATTERY_UP_2_NEW,
+        P_LOW_BATTERY_MOVE_X_2_NEW,
+        P_LOW_BATTERY_MOVE_Y_2_NEW,
+        P_NO_COLLISON1_111_NEW,
+        P_NO_COLLISON1_112_NEW,
+        P_NO_COLLISON1_121_NEW,
+        P_NO_COLLISON1_122_NEW,
+        P_NO_COLLISON2_111_NEW,
+        P_NO_COLLISON2_112_NEW,
+        P_NO_COLLISON2_121_NEW,
+        P_NO_COLLISON2_122_NEW,
+        P_NO_COLLISON1_211_NEW,
+        P_NO_COLLISON1_212_NEW,
+        P_NO_COLLISON1_221_NEW,
+        P_NO_COLLISON1_222_NEW,
+        P_NO_COLLISON2_211_NEW,
+        P_NO_COLLISON2_212_NEW,
+        P_NO_COLLISON2_221_NEW,
+        P_NO_COLLISON2_222_NEW
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// =============================================================================
+// Transition requirements
+// =============================================================================
+
+// Update-phase history. hotSwapIn resets these fluents before the gap begins.
+fluent StopOldSpec = <stopOldSpec, hotSwapIn> initially 0
+fluent StartNewSpec = <startNewSpec, hotSwapIn> initially 0
+fluent Reconfigured = <reconfigure, hotSwapIn> initially 0
+
+// T1 is component-local. During the gap, each component prohibits all of its
+// normal controllable actions. Uncontrollable battery.low and arrive actions
+// remain enabled.
+assert NO_CONTROLLABLE_DURING_GAP_BATTERY_1 = (
+    (StopOldSpec && !StartNewSpec) -> !['drone.[1]].battery['safe]
+)
+assert NO_CONTROLLABLE_DURING_GAP_MOVE_1 = (
+    (StopOldSpec && !StartNewSpec) -> !(
+        ['drone.[1]].takeoff || ['drone.[1]].land ||
+        ['drone.[1]].up || ['drone.[1]].down ||
+        ['drone.[1]].move['n] || ['drone.[1]].move['s] ||
+        ['drone.[1]].move['e] || ['drone.[1]].move['w]
+    )
+)
+assert NO_CONTROLLABLE_DURING_GAP_BATTERY_2 = (
+    (StopOldSpec && !StartNewSpec) -> !['drone.[2]].battery['safe]
+)
+assert NO_CONTROLLABLE_DURING_GAP_MOVE_2 = (
+    (StopOldSpec && !StartNewSpec) -> !(
+        ['drone.[2]].takeoff || ['drone.[2]].land ||
+        ['drone.[2]].up || ['drone.[2]].down ||
+        ['drone.[2]].move['n] || ['drone.[2]].move['s] ||
+        ['drone.[2]].move['e] || ['drone.[2]].move['w]
+    )
+)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1 = NO_CONTROLLABLE_DURING_GAP_BATTERY_1
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1 = NO_CONTROLLABLE_DURING_GAP_MOVE_1
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2 = NO_CONTROLLABLE_DURING_GAP_BATTERY_2
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2 = NO_CONTROLLABLE_DURING_GAP_MOVE_2
+
+// T2 is an update-event-only requirement, so its Stepwise scope is all four
+// mapping components.
+assert START_AFTER_STOP_AND_RECONFIGURE = (
+    startNewSpec -> (StopOldSpec && Reconfigured)
+)
+ltl_property T2_START_AFTER_STOP_AND_RECONFIGURE = START_AFTER_STOP_AND_RECONFIGURE
+
+// =============================================================================
+// Updating-controller targets (all variants use the same model and goals)
+// =============================================================================
+
+// no_tr: Traditional DUCS
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {BATTERY_OLD(1), MOVE_OLD(1), BATTERY_OLD(2), MOVE_OLD(2)},
+    newEnvironment = {BATTERY_NEW(1), MOVE_NEW(1), BATTERY_NEW(2), MOVE_NEW(2)},
+    mapRelation = {R_BATTERY(1), R_MOVE(1), R_BATTERY(2), R_MOVE(2)},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking
+}
+
+||DRONE_EXACT_SOURCE_NO_CHANGE_TRADITIONAL = UpdCont.
+
+// no_tr: Stepwise DUCS
+updatingController Stepwise_UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {BATTERY_OLD(1), MOVE_OLD(1), BATTERY_OLD(2), MOVE_OLD(2)},
+    newEnvironment = {BATTERY_NEW(1), MOVE_NEW(1), BATTERY_NEW(2), MOVE_NEW(2)},
+    mapRelation = {R_BATTERY(1), R_MOVE(1), R_BATTERY(2), R_MOVE(2)},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||DRONE_EXACT_SOURCE_NO_CHANGE_STEPWISE = Stepwise_UpdCont.
+
+// T1: Traditional DUCS
+updatingController UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {BATTERY_OLD(1), MOVE_OLD(1), BATTERY_OLD(2), MOVE_OLD(2)},
+    newEnvironment = {BATTERY_NEW(1), MOVE_NEW(1), BATTERY_NEW(2), MOVE_NEW(2)},
+    mapRelation = {R_BATTERY(1), R_MOVE(1), R_BATTERY(2), R_MOVE(2)},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2,
+    nonblocking
+}
+
+||DRONE_EXACT_SOURCE_NO_CHANGE_TRADITIONAL_T1 = UpdCont_T1.
+
+// T1: Stepwise DUCS
+updatingController Stepwise_UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {BATTERY_OLD(1), MOVE_OLD(1), BATTERY_OLD(2), MOVE_OLD(2)},
+    newEnvironment = {BATTERY_NEW(1), MOVE_NEW(1), BATTERY_NEW(2), MOVE_NEW(2)},
+    mapRelation = {R_BATTERY(1), R_MOVE(1), R_BATTERY(2), R_MOVE(2)},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||DRONE_EXACT_SOURCE_NO_CHANGE_STEPWISE_T1 = Stepwise_UpdCont_T1.
+
+// T2: Traditional DUCS
+updatingController UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {BATTERY_OLD(1), MOVE_OLD(1), BATTERY_OLD(2), MOVE_OLD(2)},
+    newEnvironment = {BATTERY_NEW(1), MOVE_NEW(1), BATTERY_NEW(2), MOVE_NEW(2)},
+    mapRelation = {R_BATTERY(1), R_MOVE(1), R_BATTERY(2), R_MOVE(2)},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking
+}
+
+||DRONE_EXACT_SOURCE_NO_CHANGE_TRADITIONAL_T2 = UpdCont_T2.
+
+// T2: Stepwise DUCS
+updatingController Stepwise_UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {BATTERY_OLD(1), MOVE_OLD(1), BATTERY_OLD(2), MOVE_OLD(2)},
+    newEnvironment = {BATTERY_NEW(1), MOVE_NEW(1), BATTERY_NEW(2), MOVE_NEW(2)},
+    mapRelation = {R_BATTERY(1), R_MOVE(1), R_BATTERY(2), R_MOVE(2)},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||DRONE_EXACT_SOURCE_NO_CHANGE_STEPWISE_T2 = Stepwise_UpdCont_T2.

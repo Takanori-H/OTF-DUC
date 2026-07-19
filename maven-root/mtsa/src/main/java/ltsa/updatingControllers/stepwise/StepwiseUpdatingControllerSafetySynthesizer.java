@@ -1,7 +1,6 @@
 package ltsa.updatingControllers.stepwise;
 
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
-import MTSSynthesis.ar.dc.uba.model.condition.FluentImpl;
 import MTSSynthesis.ar.dc.uba.model.condition.FluentUtils;
 import MTSSynthesis.ar.dc.uba.model.condition.Formula;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
@@ -122,20 +121,10 @@ public class StepwiseUpdatingControllerSafetySynthesizer {
         for (Fluent fluent : actionFluents) {
             goalFluents.remove(fluent);
 
-            Set<MTSSynthesis.ar.dc.uba.model.language.Symbol> terminating =
-                    new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
-            String actionName = fluent.getName().split("_a")[0];
-            for (String action : actions) {
-                if (!action.equals(actionName) && !"tau".equals(action)) {
-                    terminating.add(new SingleSymbol(action));
-                }
-            }
-
-            Fluent resultantFluent = new FluentImpl(
-                    fluent.getName(),
-                    fluent.getInitiatingActions(),
-                    terminating,
-                    fluent.getInitialValue());
+            Fluent resultantFluent =
+                    UpdatingControllersUtils.completeActionFluentTerminatingActions(
+                            actions,
+                            fluent);
             resultantFluents.add(resultantFluent);
             goalFluents.add(resultantFluent);
         }

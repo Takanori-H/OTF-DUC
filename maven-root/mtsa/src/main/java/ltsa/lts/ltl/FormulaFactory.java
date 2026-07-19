@@ -77,21 +77,21 @@ public class FormulaFactory {
 	
 	public Formula make(ActionLabels act, Hashtable locals, Hashtable globals)  {
 		if(actionPredicates==null) actionPredicates = new Hashtable();
-		Vector av = act.getActions(locals,globals);
+		Vector<String> av = act.getActions(locals,globals);
 		String name = (new Alphabet(av)).toString();
 		if (!actionPredicates.containsKey(name))
 			actionPredicates.put(name, av);
-		return unique(new Proposition(new Symbol(Symbol.UPPERIDENT,name)));
+		return unique(new Proposition(new Symbol(Symbol.UPPERIDENT,name), av));
 	}
-	
+
 	public Formula makeTick()  {
 		if(actionPredicates==null) actionPredicates = new Hashtable();
-		Vector av = new Vector(1);
+		Vector<String> av = new Vector<String>(1);
 		av.add("tick");
 		String name = (new Alphabet(av)).toString();
 		if (!actionPredicates.containsKey(name))
 			actionPredicates.put(name, av);
-		return unique(new Proposition(new Symbol(Symbol.UPPERIDENT,name)));
+		return unique(new Proposition(new Symbol(Symbol.UPPERIDENT,name), av));
 	}
 
 	

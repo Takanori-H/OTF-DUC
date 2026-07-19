@@ -1,0 +1,149 @@
+//******************************************************************************
+//*  Sample-1.lts (for MTSA)
+//*  Create Date      : 2021/4/8
+//*  Creator Name     : 
+//*  MTSA run command : [java -jar -Xmx8G mtsa.jar] メモリサイズに応じて8Gは要変更
+//*****************************************************************************/
+
+
+//*****************************************************************************
+// Environment
+//*****************************************************************************
+
+/* set variable */
+const MaxHeight = 5 //ドローンは前後の数字の高さにしか移動できない
+const MaxX = 10 //ドローンは前後の数字の行先にしか移動できない
+const MaxY = 10 //ドローンは前後の数字の行先にしか移動できない
+
+range Height = 1..MaxHeight
+range X = 1..MaxX
+range Y = 1..MaxY
+
+/* set Actions (事象の集合) */
+set ControllerbleActions = {battery['low], battery['safe], stop_rec, takeoff, land, up[2..MaxHeight], down[1..MaxHeight-1], move[X][Y]}
+
+
+/* Drone モデル */
+
+//電池残量管理
+BATTERY = SAFE,
+SAFE = (battery['low] -> LOW),
+LOW  = (battery['safe] -> SAFE).
+
+//移動管理(こいつを高度flyだけと移動moveだけ分割したい)
+ALTITUDE  = (takeoff -> ACTION[1]),
+ACTION[h:Height] = (when(h == 1) land-> ALTITUDE
+                   |when(h > 1) down[h-1] -> ACTION[h-1]
+				   |when(h < MaxHeight) up[h+1] -> ACTION[h+1]).
+
+AREA      = (takeoff -> ACTION[1][1]),
+ACTION[x:X][y:Y] = (land-> AREA
+　　　　　　　　　　　|when(x > 1) move[x-1][y] -> ACTION[x-1][y]
+				   |when(x < MaxX) move[x+1][y] -> ACTION[x+1][y]
+				   |when(y > 1) move[x][y-1] -> ACTION[x][y-1]
+				   |when(y < MaxY) move[x][y+1] -> ACTION[x][y+1]).
+
+|| DroneEnvironment = (BATTERY || ALTITUDE || AREA).
+
+
+
+//*****************************************************************************
+// Requirement
+//*****************************************************************************
+
+const LimitHeight = 3 //高度制限：(MaxHeight/2)+1とかしてもいいかも
+const LimitX = 3 //移動制限：(LimitDestination/2)+1とかしてもいいかも
+const LimitY = 3 //移動制限：(LimitDestination/2)+1とかしてもいいかも
+
+fluent LOW_BATTERY = <battery['low],battery['safe]>
+fluent FLYING = <takeoff,land>
+
+ltl_property P_DO_NOT_UP = [](!up[LimitHeight])
+ltl_property P_DO_NOT_MOVE_X = [](!move[LimitX][Y])
+ltl_property P_DO_NOT_MOVE_Y = [](!move[X][LimitY])
+ltl_property P_LOW_BATTERY   = [](LOW_BATTERY -> !up[2..MaxHeight])
+
+
+//*****************************************************************************
+// Controller
+//*****************************************************************************
+
+/* 従来の離散制御器合成 */
+controllerSpec Specification =
+{
+	safety       = {
+					P_DO_NOT_UP,
+					P_DO_NOT_MOVE_X,
+					P_DO_NOT_MOVE_Y,
+                    P_LOW_BATTERY,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllerbleActions}
+}
+controller ||Controller = (DroneEnvironment)~{Specification}.
+//controller ||Controller = (BATTERY || ALTITUDE || AREA)~{Specification}.
+
+
+/* 段階的制御器合成（good case） */
+controllerSpec SpecG1 =
+{
+	safety       = {
+					P_DO_NOT_UP,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllerbleActions}
+}
+
+controllerSpec SpecG2 =
+{
+	safety       = {
+					P_DO_NOT_MOVE_X,
+					P_DO_NOT_MOVE_Y,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllerbleActions}
+}
+
+controllerSpec SpecG3 =
+{
+	safety       = {
+					P_LOW_BATTERY,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllerbleActions}
+}
+
+||PartEnvironmentG1 = (ALTITUDE).
+controller ||PartControllerG1 = (PartEnvironmentG1)~{SpecG1}.
+||PartEnvironmentG2 = (AREA).
+controller ||PartControllerG2 = (PartEnvironmentG2)~{SpecG2}.
+||PartEnvironmentG3 = (PartControllerG1 || PartControllerG2 || BATTERY).
+controller ||Controller_STEPWISED_GOOD = (PartEnvironmentG3)~{SpecG3}.
+
+
+/* 段階的制御器合成（bad case）  */
+controllerSpec SpecB1 =
+{
+	safety       = {
+					P_LOW_BATTERY,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllerbleActions}
+}
+
+controllerSpec SpecB2 =
+{
+	safety       = {
+					P_DO_NOT_UP,
+                    P_DO_NOT_MOVE_X,
+					P_DO_NOT_MOVE_Y,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllerbleActions}
+}
+
+||PartEnvironmentB1 = (BATTERY || ALTITUDE).
+controller ||PartControllerB1 = (PartEnvironmentB1)~{SpecB1}.
+||PartEnvironment2 = (PartControllerB1 || AREA).
+controller ||Controller_STEPWISE_BAD = (PartEnvironment2)~{SpecB2}.
+

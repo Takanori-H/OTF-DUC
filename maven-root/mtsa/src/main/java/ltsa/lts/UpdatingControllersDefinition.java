@@ -814,6 +814,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     "UpdatingControllersDefinition", "Traditional DUC safetyGoal 生成時間");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                    "Traditional DUC", "GR(1)入力 safetyEnv 構築時間");
+            UpdatingControllerEvaluationRecorder.beginCountScope(
+                    "Traditional DUC", "GR(1)入力 safetyEnv 構築時間");
+            UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間");
             long mapEStart = System.currentTimeMillis();
 
@@ -1165,10 +1169,6 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
             return;
         }
-        long totalStates = 0;
-        long totalTransitions = 0;
-        long maxStates = 0;
-        long maxTransitions = 0;
 
         if (mappingComponents != null) {
             for (int i = 0; i < mappingComponents.size(); i++) {
@@ -1177,11 +1177,6 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 long states = compactStateCount(component);
                 long transitions = countTransitions(component);
                 long countTime = System.currentTimeMillis() - countStart;
-
-                totalStates += states;
-                totalTransitions += transitions;
-                maxStates = Math.max(maxStates, states);
-                maxTransitions = Math.max(maxTransitions, transitions);
 
                 UpdatingControllerEvaluationRecorder.recordStateSpace(
                         "入力規模 / Mapping Environment Component",
@@ -1192,15 +1187,6 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                         "Mapping Environment を構成する個別 component の状態数・遷移数。");
             }
         }
-
-        UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "mapping component 状態数合計", totalStates, "states");
-        UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "mapping component 遷移数合計", totalTransitions, "transitions");
-        UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "mapping component 最大状態数", maxStates, "states");
-        UpdatingControllerEvaluationRecorder.recordCount(
-                "入力規模", "mapping component 最大遷移数", maxTransitions, "transitions");
     }
 
     private static String componentDisplayName(String declaredName, CompactState component) {

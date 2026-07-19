@@ -75,6 +75,15 @@ ltl_property R8 = (StartNewSpec -> !EncriptionDone64)
 // For overlapping updates
 ltl_property R9 = (StopOldSpec -> StartNewSpec)
 
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_IO =
+	((StopOldSpec && !StartNewSpec) -> !output)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_DES =
+	((StopOldSpec && !StartNewSpec) -> !(des64 || des128))
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_IO = NO_CONTROLLABLE_ACTION_DURING_GAP_IO
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_DES = NO_CONTROLLABLE_ACTION_DURING_GAP_DES
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 // For avoiding overlapping
 ltl_property R8_OTF = [](StartNewSpec -> !EncriptionDone64)
 
@@ -98,6 +107,33 @@ updatingController UpdCont = {
 }
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_IO,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_DES,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = {
     oldController = CONTROLLER_ENVIRONMENT_64,
@@ -113,6 +149,37 @@ updatingController UpdCont_stepwise_delayed = {
 }
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_IO,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_DES,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = CONTROLLER_ENVIRONMENT_64,
+	oldEnvironment = {IO_OLD, DES64},
+	newEnvironment = {IO_NEW, DES128},
+	mapRelation = {R_IO, R_64_128},
+	oldGoal = DES64_SPEC,
+	newGoal = DES128_SPEC,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = {
     oldController = CONTROLLER_ENVIRONMENT_64,

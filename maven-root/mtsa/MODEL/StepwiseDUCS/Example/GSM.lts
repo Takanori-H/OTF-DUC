@@ -119,6 +119,9 @@ assert AnyAction = (shiftX || shiftY || shiftZ || shiftT || encode || send || re
 ltl_property R1 = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
 ltl_property R2 = ((startNewSpec || reconfigure || stopOldSpec) -> (!Sending && !Receiving))
 
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 ltl_property R1_OTF = []((StopOldSpec && !StartNewSpec) -> !{shiftX, shiftY, shiftZ, shiftT, encode, send, receive,
 																	decode[2], decode[3], output})
 ltl_property R2_OTF = []((startNewSpec || reconfigure || stopOldSpec) -> (!Sending && !Receiving))
@@ -138,6 +141,32 @@ updatingController UpdCont = {
 
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = { 
     oldController = OldEnvironmentController,
@@ -155,6 +184,36 @@ updatingController UpdCont_stepwise_delayed = {
 
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = { 
     oldController = OldEnvironmentController,
@@ -221,4 +280,3 @@ assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
 assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
 assert TEST_FORMULA3 = [](hotSwapIn -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))
 assert T_NO_UPDATE_WHILE_SEND = [](Sending -> (!startNewSpec && !stopOldSpec))
-

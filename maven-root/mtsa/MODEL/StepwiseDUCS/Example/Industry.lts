@@ -182,6 +182,18 @@ assert AnyAction = (validateTOR || validateDSD1 || validateQA || validateGF1 || 
 ltl_property R1 = ((StopOldSpec && !StartNewSpec) -> (!AnyAction))
 ltl_property R3 = ((StopOldSpec && TORDone) -> (!cancelGF1 && !approveGF1 && !startNewSpec))
 
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_TOR =
+	((StopOldSpec && !StartNewSpec) -> !(validateTOR || reviewTOR || readyTOR))
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_DSD1 =
+	((StopOldSpec && !StartNewSpec) -> !(validateDSD1 || validateQA || reviewDSD1 || readyDSD1))
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_GATEFORM1 =
+	((StopOldSpec && !StartNewSpec) -> !validateGF1)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_TOR = NO_CONTROLLABLE_ACTION_DURING_GAP_TOR
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_DSD1 = NO_CONTROLLABLE_ACTION_DURING_GAP_DSD1
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_GATEFORM1 = NO_CONTROLLABLE_ACTION_DURING_GAP_GATEFORM1
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 ltl_property R1_OTF = []((StopOldSpec && !StartNewSpec) -> (!{validateTOR, validateDSD1, validateQA, validateGF1, reviewTOR, reviewDSD1, readyTOR, readyDSD1}))
 ltl_property R3_OTF = []((StopOldSpec && TORDone) -> (!cancelGF1 && !approveGF1 && !startNewSpec))
 
@@ -201,6 +213,34 @@ updatingController UpdCont = {
 
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {TOR_OLD, DSD1_OLD, GATEFORM1_OLD},
+	newEnvironment = {TOR_NEW, DSD1_NEW, GATEFORM1_NEW},
+	mapRelation = {R_TOR, R_DSD1, R_GATEFORM1},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP_TOR,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP_DSD1,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP_GATEFORM1,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {TOR_OLD, DSD1_OLD, GATEFORM1_OLD},
+	newEnvironment = {TOR_NEW, DSD1_NEW, GATEFORM1_NEW},
+	mapRelation = {R_TOR, R_DSD1, R_GATEFORM1},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = {
     oldController = EnvironmentAndController,
@@ -219,6 +259,38 @@ updatingController UpdCont_stepwise_delayed = {
 
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {TOR_OLD, DSD1_OLD, GATEFORM1_OLD},
+	newEnvironment = {TOR_NEW, DSD1_NEW, GATEFORM1_NEW},
+	mapRelation = {R_TOR, R_DSD1, R_GATEFORM1},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP_TOR,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP_DSD1,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP_GATEFORM1,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {TOR_OLD, DSD1_OLD, GATEFORM1_OLD},
+	newEnvironment = {TOR_NEW, DSD1_NEW, GATEFORM1_NEW},
+	mapRelation = {R_TOR, R_DSD1, R_GATEFORM1},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = {
     oldController = EnvironmentAndController,
@@ -283,4 +355,3 @@ assert S_NEW = (NEW_TOR_POLICY && NEW_DSD1_POLICY && NEW_DO_NOT_SEND_TWICE)
 assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
 assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
 assert TEST_FORMULA3 = [](hotSwapIn -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))
-

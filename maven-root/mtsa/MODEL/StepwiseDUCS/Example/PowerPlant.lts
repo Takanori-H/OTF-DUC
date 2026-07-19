@@ -130,6 +130,15 @@ assert EMPTY_TRANSITION = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
 ltl_property R1 = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
 ltl_property R5 = (EMPTY_TRANSITION && (startNewSpec -> !PumpOff))
 
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_MAINTENANCE =
+	((StopOldSpec && !StartNewSpec) -> !endProcedure)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_ENV =
+	((StopOldSpec && !StartNewSpec) -> !(stopPump || startPump || procedure || endProcedure))
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MAINTENANCE = NO_CONTROLLABLE_ACTION_DURING_GAP_MAINTENANCE
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_ENV = NO_CONTROLLABLE_ACTION_DURING_GAP_ENV
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 assert EMPTY_TRANSITION_OTF = ((StopOldSpec && !StartNewSpec) -> !{stopPump, startPump, procedure, endProcedure, request})
 
 ltl_property R1_OTF = []((StopOldSpec && !StartNewSpec) -> !{stopPump, startPump, procedure, endProcedure, request})
@@ -150,6 +159,33 @@ updatingController UpdCont = {
 
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = EnvironmentAndController,
+    oldEnvironment = {MAINTENANCE_OLD, ENV_OLD},
+	newEnvironment = {MAINTENANCE_NEW, ENV_NEW},
+	mapRelation = {R_MAINTENANCE, R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MAINTENANCE,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_ENV,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = EnvironmentAndController,
+    oldEnvironment = {MAINTENANCE_OLD, ENV_OLD},
+	newEnvironment = {MAINTENANCE_NEW, ENV_NEW},
+	mapRelation = {R_MAINTENANCE, R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = {
     oldController = EnvironmentAndController,
@@ -167,6 +203,37 @@ updatingController UpdCont_stepwise_delayed = {
 
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = EnvironmentAndController,
+    oldEnvironment = {MAINTENANCE_OLD, ENV_OLD},
+	newEnvironment = {MAINTENANCE_NEW, ENV_NEW},
+	mapRelation = {R_MAINTENANCE, R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MAINTENANCE,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_ENV,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = EnvironmentAndController,
+    oldEnvironment = {MAINTENANCE_OLD, ENV_OLD},
+	newEnvironment = {MAINTENANCE_NEW, ENV_NEW},
+	mapRelation = {R_MAINTENANCE, R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = {
     oldController = EnvironmentAndController,

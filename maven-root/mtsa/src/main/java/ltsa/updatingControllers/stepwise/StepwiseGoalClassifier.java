@@ -3,15 +3,12 @@ package ltsa.updatingControllers.stepwise;
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.ar.dc.uba.model.language.Symbol;
 import ltsa.control.ControllerGoalDefinition;
-import ltsa.lts.CompactState;
 import ltsa.lts.Diagnostics;
 import ltsa.lts.LTSOutput;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,16 +20,20 @@ public class StepwiseGoalClassifier {
     private static final int CROSS_STAGE_INDEX = -1;
 
     private final List<StepwiseStage> stages;
-    private final List<Set<String>> stageAlphabets;
+    private final StepwiseActionOwnership actionOwnership;
     private final LTSOutput output;
 
     public StepwiseGoalClassifier(List<StepwiseStage> stages, LTSOutput output) {
+        this(stages, new StepwiseActionOwnership(stages), output);
+    }
+
+    public StepwiseGoalClassifier(
+            List<StepwiseStage> stages,
+            StepwiseActionOwnership actionOwnership,
+            LTSOutput output) {
         this.stages = stages;
+        this.actionOwnership = actionOwnership;
         this.output = output;
-        this.stageAlphabets = new ArrayList<Set<String>>();
-        for (StepwiseStage stage : stages) {
-            this.stageAlphabets.add(alphabet(stage.getMappingEnvironment()));
-        }
     }
 
     public Classification classify(
@@ -112,7 +113,7 @@ public class StepwiseGoalClassifier {
             if (isUpdateAction(action)) {
                 continue;
             }
-            List<Integer> owners = ownersOf(action);
+            Set<Integer> owners = actionOwnership.ownersOf(action);
             if (owners.isEmpty()) {
                 Diagnostics.fatal("Stepwise DUCS classification error: GOAL_ACTION_NOT_FOUND in "
                         + goalName + " action=" + action + ".");
@@ -124,16 +125,6 @@ public class StepwiseGoalClassifier {
             }
             ownerSet.addAll(owners);
         }
-    }
-
-    private List<Integer> ownersOf(String action) {
-        List<Integer> owners = new ArrayList<Integer>();
-        for (int i = 0; i < stageAlphabets.size(); i++) {
-            if (stageAlphabets.get(i).contains(action)) {
-                owners.add(i);
-            }
-        }
-        return owners;
     }
 
     private String normalizeAction(String action) {
@@ -152,14 +143,6 @@ public class StepwiseGoalClassifier {
                 || action.startsWith(UpdateConstants.STOP_OLD_SPEC_PREFIX)
                 || action.startsWith(UpdateConstants.RECONFIGURE_PREFIX)
                 || action.startsWith(UpdateConstants.START_NEW_SPEC_PREFIX);
-    }
-
-    private Set<String> alphabet(CompactState machine) {
-        Set<String> result = new HashSet<String>();
-        if (machine != null && machine.alphabet != null) {
-            result.addAll(Arrays.asList(machine.alphabet));
-        }
-        return result;
     }
 
     private Set<Integer> allStageScope() {

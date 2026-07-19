@@ -195,6 +195,23 @@ fluent Ebrake = <emergencyBrake, endOfTS>
 ltl_property R1 = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
 ltl_property R4 = ((StopOldSpec && !StartNewSpec) -> ((NoReturn || Ebrake) -> LastEmergencyBrake))
 
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_MILESTONES =
+	((StopOldSpec && !StartNewSpec) -> !(brake || emergencyBrake))
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_REQUEST =
+	((StopOldSpec && !StartNewSpec) -> !requestEnter)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_TURNS =
+	((StopOldSpec && !StartNewSpec) ->
+	 !(requestEnter || brake || emergencyBrake || idle_c || checkCrossingStatus))
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_ANOTHER_REQUEST =
+	((StopOldSpec && !StartNewSpec) ->
+	 !(requestEnter || brake || emergencyBrake || idle_c || checkCrossingStatus))
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MILESTONES = NO_CONTROLLABLE_ACTION_DURING_GAP_MILESTONES
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_REQUEST = NO_CONTROLLABLE_ACTION_DURING_GAP_REQUEST
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_TURNS = NO_CONTROLLABLE_ACTION_DURING_GAP_TURNS
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_ANOTHER_REQUEST = NO_CONTROLLABLE_ACTION_DURING_GAP_ANOTHER_REQUEST
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 ltl_property R1_OTF = []((StopOldSpec && !StartNewSpec) -> 
 										!{requestEnter, brake, emergencyBrake, idle_c, checkCrossingStatus, endOfTS, approachingCrossing,
 										lastBrake, lastEmergencyBrake, noReturn, enterCrossing, enterAllowed[1], enterAllowed[0], working, notWorking})
@@ -215,6 +232,35 @@ updatingController UpdCont = {
 
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = OldEnvAndCont,
+    oldEnvironment = {MILESTONES_OLD, REQUEST_ATOMIC_OLD, TURNS_OLD, ANOTHER_REQUEST_OLD},
+	newEnvironment = {MILESTONES_NEW, REQUEST_ATOMIC_NEW, TURNS_NEW, ANOTHER_REQUEST},
+	mapRelation = {R_MILESTONES, R_REQUEST_ATOMIC, R_TURNS, R_ANOTHER_REQUEST},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MILESTONES,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_REQUEST,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_TURNS,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_ANOTHER_REQUEST,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = OldEnvAndCont,
+    oldEnvironment = {MILESTONES_OLD, REQUEST_ATOMIC_OLD, TURNS_OLD, ANOTHER_REQUEST_OLD},
+	newEnvironment = {MILESTONES_NEW, REQUEST_ATOMIC_NEW, TURNS_NEW, ANOTHER_REQUEST},
+	mapRelation = {R_MILESTONES, R_REQUEST_ATOMIC, R_TURNS, R_ANOTHER_REQUEST},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = {
     oldController = OldEnvAndCont,
@@ -232,6 +278,39 @@ updatingController UpdCont_stepwise_delayed = {
 
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = OldEnvAndCont,
+    oldEnvironment = {MILESTONES_OLD, REQUEST_ATOMIC_OLD, TURNS_OLD, ANOTHER_REQUEST_OLD},
+	newEnvironment = {MILESTONES_NEW, REQUEST_ATOMIC_NEW, TURNS_NEW, ANOTHER_REQUEST},
+	mapRelation = {R_MILESTONES, R_REQUEST_ATOMIC, R_TURNS, R_ANOTHER_REQUEST},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MILESTONES,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_REQUEST,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_TURNS,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_ANOTHER_REQUEST,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = OldEnvAndCont,
+    oldEnvironment = {MILESTONES_OLD, REQUEST_ATOMIC_OLD, TURNS_OLD, ANOTHER_REQUEST_OLD},
+	newEnvironment = {MILESTONES_NEW, REQUEST_ATOMIC_NEW, TURNS_NEW, ANOTHER_REQUEST},
+	mapRelation = {R_MILESTONES, R_REQUEST_ATOMIC, R_TURNS, R_ANOTHER_REQUEST},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = {
     oldController = OldEnvAndCont,
@@ -295,4 +374,3 @@ assert S_NEW = (BRAKE_DURING_LASTBRAKE && EBRAKE_DURING_ELASTBRAKE && NEW_NOT_CR
 assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
 assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
 assert TEST_FORMULA3 = [](hotSwapIn -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))
-

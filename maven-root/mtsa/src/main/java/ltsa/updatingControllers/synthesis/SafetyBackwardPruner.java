@@ -107,6 +107,214 @@ public final class SafetyBackwardPruner {
         return result;
     }
 
+    public static DeferredResult pruneDeferred(
+            MTS<Long, String> environment,
+            Set<Long> errorStates,
+            Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
+            Set<Integer> currentScope,
+            String scope,
+            LTSOutput output) {
+        long start = System.currentTimeMillis();
+        long beforeStates = environment.getStates().size();
+        long beforeTransitions = countTransitions(environment);
+        Map<Long, Map<String, Set<Long>>> transitionsByAction = groupTransitions(environment);
+
+        // A partial fragment can have ordinary dead ends that disappear after composition.
+        // Only states explicitly marked as Error are losing seeds at this point.
+        Set<Long> losingStates = new LinkedHashSet<Long>();
+        if (errorStates != null) {
+            losingStates.addAll(errorStates);
+            losingStates.retainAll(environment.getStates());
+        }
+        int explicitErrorSeeds = losingStates.size();
+
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (Long state : environment.getStates()) {
+                if (losingStates.contains(state)) {
+                    continue;
+                }
+                if (isLosingByCompleteUncontrollablePredecessor(
+                        transitionsByAction.get(state),
+                        controllableActions,
+                        ownersByAction,
+                        currentScope,
+                        losingStates)) {
+                    losingStates.add(state);
+                    changed = true;
+                }
+            }
+        }
+
+        boolean initialLosing = losingStates.contains(environment.getInitialState());
+        DeferredBuild build = buildDeferredPrunedEnvironment(
+                environment,
+                transitionsByAction,
+                controllableActions,
+                ownersByAction,
+                currentScope,
+                losingStates,
+                errorStates,
+                initialLosing);
+        build.environment.removeUnreachableStates();
+        build.errorStates.retainAll(build.environment.getStates());
+
+        DeferredResult result = new DeferredResult(
+                build.environment,
+                build.errorStates,
+                initialLosing,
+                beforeStates,
+                beforeTransitions,
+                build.environment.getStates().size(),
+                countTransitions(build.environment),
+                losingStates.size(),
+                explicitErrorSeeds,
+                build.deferredActionGroups,
+                build.removedControllableActionGroups,
+                System.currentTimeMillis() - start);
+        logDeferred(output, scope, currentScope, result);
+        return result;
+    }
+
+    private static boolean isLosingByCompleteUncontrollablePredecessor(
+            Map<String, Set<Long>> actionTargets,
+            Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
+            Set<Integer> currentScope,
+            Set<Long> losingStates) {
+        if (actionTargets == null || actionTargets.isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<String, Set<Long>> entry : actionTargets.entrySet()) {
+            String action = entry.getKey();
+            if (!controllableActions.contains(action)
+                    && reachesLosing(entry.getValue(), losingStates)
+                    && ownersComplete(action, ownersByAction, currentScope)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static DeferredBuild buildDeferredPrunedEnvironment(
+            MTS<Long, String> environment,
+            Map<Long, Map<String, Set<Long>>> transitionsByAction,
+            Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
+            Set<Integer> currentScope,
+            Set<Long> losingStates,
+            Set<Long> explicitErrorStates,
+            boolean initialLosing) {
+        MTS<Long, String> result = new MTSImpl<Long, String>(environment.getInitialState());
+        result.addActions(environment.getActions());
+        Set<Long> resultErrorStates = new LinkedHashSet<Long>();
+        if (initialLosing) {
+            return new DeferredBuild(result, resultErrorStates, 0L, 0L);
+        }
+
+        for (Long state : environment.getStates()) {
+            if (!losingStates.contains(state)) {
+                result.addState(state);
+            }
+        }
+
+        Long representativeError = representativeError(explicitErrorStates, losingStates);
+        long deferredActionGroups = 0L;
+        long removedControllableActionGroups = 0L;
+        for (Long state : environment.getStates()) {
+            if (losingStates.contains(state)) {
+                continue;
+            }
+            Map<String, Set<Long>> actionTargets = transitionsByAction.get(state);
+            if (actionTargets == null) {
+                continue;
+            }
+            for (Map.Entry<String, Set<Long>> entry : actionTargets.entrySet()) {
+                String action = entry.getKey();
+                Set<Long> targets = entry.getValue();
+                boolean reachesLosing = reachesLosing(targets, losingStates);
+                if (controllableActions.contains(action) && reachesLosing) {
+                    removedControllableActionGroups++;
+                    continue;
+                }
+
+                boolean deferred = reachesLosing
+                        && !ownersComplete(action, ownersByAction, currentScope);
+                for (Long target : targets) {
+                    if (!losingStates.contains(target)) {
+                        result.addRequired(state, action, target);
+                    }
+                }
+                if (deferred && representativeError != null) {
+                    // Keep the boundary observable so a later owner can disable or enable it.
+                    result.addState(representativeError);
+                    result.addRequired(state, action, representativeError);
+                    resultErrorStates.add(representativeError);
+                    deferredActionGroups++;
+                }
+            }
+        }
+        return new DeferredBuild(
+                result,
+                resultErrorStates,
+                deferredActionGroups,
+                removedControllableActionGroups);
+    }
+
+    private static Long representativeError(
+            Set<Long> explicitErrorStates,
+            Set<Long> losingStates) {
+        if (explicitErrorStates != null) {
+            for (Long state : explicitErrorStates) {
+                if (losingStates.contains(state)) {
+                    return state;
+                }
+            }
+        }
+        for (Long state : losingStates) {
+            return state;
+        }
+        return null;
+    }
+
+    private static boolean ownersComplete(
+            String action,
+            Map<String, Set<Integer>> ownersByAction,
+            Set<Integer> currentScope) {
+        String normalizedAction = UpdatingControllersUtils.isOld(action)
+                ? UpdatingControllersUtils.withoutOld(action)
+                : action;
+        Set<Integer> owners = ownersByAction == null ? null : ownersByAction.get(normalizedAction);
+        return owners == null || owners.isEmpty()
+                || (currentScope != null && currentScope.containsAll(owners));
+    }
+
+    private static void logDeferred(
+            LTSOutput output,
+            String scope,
+            Set<Integer> currentScope,
+            DeferredResult result) {
+        if (output == null) {
+            return;
+        }
+        output.outln("  deferred safety backward pruning scope: " + scope);
+        output.outln("    component scope: " + currentScope);
+        output.outln("    before states: " + result.beforeStates
+                + " transitions: " + result.beforeTransitions);
+        output.outln("    explicit Error seeds: " + result.explicitErrorSeeds);
+        output.outln("    definite losing states: " + result.losingStates);
+        output.outln("    deferred uncontrollable action groups: " + result.deferredActionGroups);
+        output.outln("    removed controllable action groups: " + result.removedControllableActionGroups);
+        output.outln("    after states: " + result.afterStates
+                + " transitions: " + result.afterTransitions);
+        output.outln("    elapsed: " + result.elapsedMillis + " ms");
+        if (result.initialLosing) {
+            output.outln("    initial state is definitely losing.");
+        }
+    }
+
     private static void recordEvaluationMetrics(
             String scope,
             Result result,
@@ -122,6 +330,17 @@ public final class SafetyBackwardPruner {
                 section,
                 safeScope + " / SBP 全体時間",
                 pruneTime);
+        UpdatingControllerEvaluationRecorder.addTime(
+                section,
+                "SBP 全体時間合計",
+                pruneTime);
+        String modeSection = sbpModeSection(safeScope);
+        if (!modeSection.isEmpty()) {
+            UpdatingControllerEvaluationRecorder.addTime(
+                    modeSection,
+                    "SBP 全体時間合計",
+                    pruneTime);
+        }
         UpdatingControllerEvaluationRecorder.recordTime(
                 section,
                 safeScope + " / backward losing propagation 時間",
@@ -176,6 +395,19 @@ public final class SafetyBackwardPruner {
                 safeScope + " / initial state losing",
                 result.initialLosing ? 1 : 0,
                 "boolean");
+    }
+
+    private static String sbpModeSection(String scope) {
+        String normalized = scope == null ? "" : scope.toLowerCase();
+        if (normalized.startsWith("traditional")) {
+            return "Traditional DUC";
+        }
+        if (normalized.startsWith("stepwise")
+                || normalized.startsWith("local ")
+                || normalized.startsWith("cross ")) {
+            return "Stepwise Delayed DUC";
+        }
+        return "";
     }
 
     private static boolean isLosingByPredecessorRule(
@@ -365,6 +597,82 @@ public final class SafetyBackwardPruner {
 
         public boolean isInitialLosing() {
             return initialLosing;
+        }
+    }
+
+    private static final class DeferredBuild {
+        private final MTS<Long, String> environment;
+        private final Set<Long> errorStates;
+        private final long deferredActionGroups;
+        private final long removedControllableActionGroups;
+
+        private DeferredBuild(
+                MTS<Long, String> environment,
+                Set<Long> errorStates,
+                long deferredActionGroups,
+                long removedControllableActionGroups) {
+            this.environment = environment;
+            this.errorStates = errorStates;
+            this.deferredActionGroups = deferredActionGroups;
+            this.removedControllableActionGroups = removedControllableActionGroups;
+        }
+    }
+
+    public static final class DeferredResult {
+        private final MTS<Long, String> environment;
+        private final Set<Long> errorStates;
+        private final boolean initialLosing;
+        private final long beforeStates;
+        private final long beforeTransitions;
+        private final long afterStates;
+        private final long afterTransitions;
+        private final long losingStates;
+        private final long explicitErrorSeeds;
+        private final long deferredActionGroups;
+        private final long removedControllableActionGroups;
+        private final long elapsedMillis;
+
+        private DeferredResult(
+                MTS<Long, String> environment,
+                Set<Long> errorStates,
+                boolean initialLosing,
+                long beforeStates,
+                long beforeTransitions,
+                long afterStates,
+                long afterTransitions,
+                long losingStates,
+                long explicitErrorSeeds,
+                long deferredActionGroups,
+                long removedControllableActionGroups,
+                long elapsedMillis) {
+            this.environment = environment;
+            this.errorStates = new LinkedHashSet<Long>(errorStates);
+            this.initialLosing = initialLosing;
+            this.beforeStates = beforeStates;
+            this.beforeTransitions = beforeTransitions;
+            this.afterStates = afterStates;
+            this.afterTransitions = afterTransitions;
+            this.losingStates = losingStates;
+            this.explicitErrorSeeds = explicitErrorSeeds;
+            this.deferredActionGroups = deferredActionGroups;
+            this.removedControllableActionGroups = removedControllableActionGroups;
+            this.elapsedMillis = elapsedMillis;
+        }
+
+        public MTS<Long, String> getEnvironment() {
+            return environment;
+        }
+
+        public Set<Long> getErrorStates() {
+            return new LinkedHashSet<Long>(errorStates);
+        }
+
+        public boolean isInitialLosing() {
+            return initialLosing;
+        }
+
+        public long getDeferredActionGroups() {
+            return deferredActionGroups;
         }
     }
 }

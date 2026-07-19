@@ -1,0 +1,143 @@
+/******************************************************************************
+
+An airport control tower receives requests from planes trying to land.
+The tower needs to signal them when it is safe to approach the ramps and at
+which height they must perform holding maneuvers. If two airplanes enter
+the same height space or ramp there is a chance a crash may occur.
+
+We want a controller that automatically responds to airplanes requests and
+ensures safe usage of the airport space.
+
+The case study can be scaled in the following dimensions:
+1- Planes: maximum number of simultaneous land requests.
+2- Height: number of spaces above the ground where a plane can hold safely.
+
+******************************************************************************/
+
+const N = 5
+const K = 5
+
+const Planes  = N
+const Heights = K
+
+range Plane  = 0..(Planes-1)
+range Height = 0..(Heights-1)
+
+/*****************************************************************************/
+
+
+Airplane(P=0) = (
+    requestLand[P] -> descend[P][h:Height] -> Holding[h] |
+    extendFlight[P] -> End),
+  Holding[h:Height] =
+    if (h>0) then (descend[P][h-1] -> Holding[h-1])
+             else (approach[P] -> land[P] -> End),
+  End = (control.all -> Airplane).
+
+ResponseMonitor = (
+  requestLand[p:Plane] -> descend[p][Height] -> ResponseMonitor |
+  {extendFlight[Plane],descend[Plane][Height], approach[Plane]}  -> ResponseMonitor ).
+
+/*
+P_HeightMonitor(H=0) = Empty,
+  Empty = (
+    descend[p:Plane][H] -> Occupied[p] |
+    when (H>0) descend[Plane][H-1] -> Empty ),
+  Occupied[p:Plane] = (
+    foreach [o:Plane]
+      when (p != o) descend[o][H] -> air.crash[H] -> ERROR |
+      when (p != o && H>0) descend[o][H-1] -> Occupied[p]  |
+      when (p == o && H>0) descend[p][H-1] -> Empty |
+      when (p == o && H==0) land[Plane]    -> Empty ).
+
+
+RampMonitor(R=0) = Empty,
+  Empty = (
+    approach[Plane] -> Occupied ),
+  Occupied = (
+    approach[Plane] -> land.crash -> ERROR |
+    land[Plane]     -> Empty ).
+*/
+
+/*****************************************************************************/
+
+fluent PROCESS_REQUESTLAND[p:Plane] = <requestLand[p], descend[p][Height]> 
+
+ltl_property P_HeightMonitor_00	= [](descend[0][0] -> X(!descend[Plane][0] W land[0]))
+ltl_property P_HeightMonitor_01	= [](descend[0][1] -> X(!descend[Plane][1] W descend[0][Height]))
+ltl_property P_HeightMonitor_02	= [](descend[0][2] -> X(!descend[Plane][2] W descend[0][Height]))
+ltl_property P_HeightMonitor_03	= [](descend[0][3] -> X(!descend[Plane][3] W descend[0][Height]))
+ltl_property P_HeightMonitor_04	= [](descend[0][4] -> X(!descend[Plane][4] W descend[0][Height]))
+ltl_property P_HeightMonitor_05	= [](descend[0][5] -> X(!descend[Plane][5] W descend[0][Height]))
+ltl_property P_HeightMonitor_06	= [](descend[0][6] -> X(!descend[Plane][6] W descend[0][Height]))
+ltl_property P_HeightMonitor_07	= [](descend[0][7] -> X(!descend[Plane][7] W descend[0][Height]))
+ltl_property P_HeightMonitor_08	= [](descend[0][8] -> X(!descend[Plane][8] W descend[0][Height]))
+ltl_property P_HeightMonitor_09	= [](descend[0][9] -> X(!descend[Plane][9] W descend[0][Height]))
+ltl_property P_HeightMonitor_10	= [](descend[1][0] -> X(!descend[Plane][0] W land[1]))
+ltl_property P_HeightMonitor_11	= [](descend[1][1] -> X(!descend[Plane][1] W descend[1][Height]))
+ltl_property P_HeightMonitor_12	= [](descend[1][2] -> X(!descend[Plane][2] W descend[1][Height]))
+ltl_property P_HeightMonitor_13	= [](descend[1][3] -> X(!descend[Plane][3] W descend[1][Height]))
+ltl_property P_HeightMonitor_14	= [](descend[1][4] -> X(!descend[Plane][4] W descend[1][Height]))
+ltl_property P_HeightMonitor_15	= [](descend[1][5] -> X(!descend[Plane][5] W descend[1][Height]))
+ltl_property P_HeightMonitor_16	= [](descend[1][6] -> X(!descend[Plane][6] W descend[1][Height]))
+ltl_property P_HeightMonitor_17	= [](descend[1][7] -> X(!descend[Plane][7] W descend[1][Height]))
+ltl_property P_HeightMonitor_18	= [](descend[1][8] -> X(!descend[Plane][8] W descend[1][Height]))
+ltl_property P_HeightMonitor_19	= [](descend[1][9] -> X(!descend[Plane][9] W descend[1][Height]))
+ltl_property P_HeightMonitor_20	= [](descend[2][0] -> X(!descend[Plane][0] W land[2]))
+ltl_property P_HeightMonitor_21	= [](descend[2][1] -> X(!descend[Plane][1] W descend[2][Height]))
+ltl_property P_HeightMonitor_22	= [](descend[2][2] -> X(!descend[Plane][2] W descend[2][Height]))
+ltl_property P_HeightMonitor_23	= [](descend[2][3] -> X(!descend[Plane][3] W descend[2][Height]))
+ltl_property P_HeightMonitor_24	= [](descend[2][4] -> X(!descend[Plane][4] W descend[2][Height]))
+ltl_property P_HeightMonitor_25	= [](descend[2][5] -> X(!descend[Plane][5] W descend[2][Height]))
+ltl_property P_HeightMonitor_26	= [](descend[2][6] -> X(!descend[Plane][6] W descend[2][Height]))
+ltl_property P_HeightMonitor_27	= [](descend[2][7] -> X(!descend[Plane][7] W descend[2][Height]))
+ltl_property P_HeightMonitor_28	= [](descend[2][8] -> X(!descend[Plane][8] W descend[2][Height]))
+ltl_property P_HeightMonitor_29	= [](descend[2][9] -> X(!descend[Plane][9] W descend[2][Height]))
+ltl_property P_HeightMonitor_30	= [](descend[3][0] -> X(!descend[Plane][0] W land[3]))
+ltl_property P_HeightMonitor_31   = [](descend[3][1] -> X(!descend[Plane][1] W descend[3][Height]))
+ltl_property P_HeightMonitor_32   = [](descend[3][2] -> X(!descend[Plane][2] W descend[3][Height]))
+ltl_property P_HeightMonitor_33   = [](descend[3][3] -> X(!descend[Plane][3] W descend[3][Height]))
+ltl_property P_HeightMonitor_34   = [](descend[3][4] -> X(!descend[Plane][4] W descend[3][Height]))
+ltl_property P_HeightMonitor_35   = [](descend[3][5] -> X(!descend[Plane][5] W descend[3][Height]))
+ltl_property P_HeightMonitor_36   = [](descend[3][6] -> X(!descend[Plane][6] W descend[3][Height]))
+ltl_property P_HeightMonitor_37   = [](descend[3][7] -> X(!descend[Plane][7] W descend[3][Height]))
+ltl_property P_HeightMonitor_38   = [](descend[3][8] -> X(!descend[Plane][8] W descend[3][Height]))
+ltl_property P_HeightMonitor_39   = [](descend[3][9] -> X(!descend[Plane][9] W descend[3][Height]))
+ltl_property P_HeightMonitor_40   = [](descend[4][0] -> X(!descend[Plane][0] W land[4]))
+ltl_property P_HeightMonitor_41   = [](descend[4][1] -> X(!descend[Plane][1] W descend[4][Height]))
+ltl_property P_HeightMonitor_42   = [](descend[4][2] -> X(!descend[Plane][2] W descend[4][Height]))
+ltl_property P_HeightMonitor_43   = [](descend[4][3] -> X(!descend[Plane][3] W descend[4][Height]))
+ltl_property P_HeightMonitor_44   = [](descend[4][4] -> X(!descend[Plane][4] W descend[4][Height]))
+ltl_property P_HeightMonitor_45   = [](descend[4][5] -> X(!descend[Plane][5] W descend[4][Height]))
+ltl_property P_HeightMonitor_46   = [](descend[4][6] -> X(!descend[Plane][6] W descend[4][Height]))
+ltl_property P_HeightMonitor_47   = [](descend[4][7] -> X(!descend[Plane][7] W descend[4][Height]))
+ltl_property P_HeightMonitor_48   = [](descend[4][8] -> X(!descend[Plane][8] W descend[4][Height]))
+ltl_property P_HeightMonitor_49   = [](descend[4][9] -> X(!descend[Plane][9] W descend[4][Height]))
+
+ltl_property P_RampMonitor 		= [](approach[Plane] -> X(!approach[Plane] W land[Plane]))
+
+//ltl_property P_ResponseMonitor 	= [](PROCESS_REQUESTLAND[Plane] -> !{extendFlight[Plane],descend[Plane][Height], approach[Plane]})
+//ltl_property P_ResponseMonitor_0 	= [](PROCESS_REQUESTLAND[0] -> !{extendFlight[Plane],descend[Plane][Height], approach[Plane]})
+//ltl_property P_ResponseMonitor_1 	= [](PROCESS_REQUESTLAND[1] -> !{extendFlight[Plane],descend[Plane][Height], approach[Plane]})
+//ltl_property P_ResponseMonitor_2 	= [](PROCESS_REQUESTLAND[2] -> !{extendFlight[Plane],descend[Plane][Height], approach[Plane]})
+
+controllerSpec Goal = {
+	safety = 	{
+				P_HeightMonitor_00,P_HeightMonitor_01,P_HeightMonitor_02,P_HeightMonitor_03,P_HeightMonitor_04,
+				P_HeightMonitor_10,P_HeightMonitor_11,P_HeightMonitor_12,P_HeightMonitor_13,P_HeightMonitor_14,
+				P_HeightMonitor_20,P_HeightMonitor_21,P_HeightMonitor_22,P_HeightMonitor_23,P_HeightMonitor_24,
+				P_HeightMonitor_30,P_HeightMonitor_31,P_HeightMonitor_32,P_HeightMonitor_33,P_HeightMonitor_34,
+				P_HeightMonitor_40,P_HeightMonitor_41,P_HeightMonitor_42,P_HeightMonitor_43,P_HeightMonitor_44,
+				P_RampMonitor,
+				}
+	controllable = {descend[Plane][Height], approach[Plane]}
+	marking = {control.all}
+	nonblocking
+}
+
+||Environment = (forall [p:Plane]  Airplane(p) || ResponseMonitor).
+
+controller ||TraditionalController = (Environment)~{Goal}.
+controller ||MonolithicController = (forall [p:Plane]  Airplane(p) || ResponseMonitor)~{Goal}.
+heuristic ||DirectedController = (forall [p:Plane]  Airplane(p) || ResponseMonitor)~{Goal}.
+

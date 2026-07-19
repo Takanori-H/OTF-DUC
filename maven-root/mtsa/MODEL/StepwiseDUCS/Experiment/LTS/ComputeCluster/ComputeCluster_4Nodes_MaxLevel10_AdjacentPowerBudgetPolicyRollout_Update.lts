@@ -1,0 +1,404 @@
+// ComputeCluster Stepwise DUCS model: adjacent-node power-budget policy rollout.
+//
+// Direct structural base (left unchanged):
+//   ComputeCluster_4Nodes_PowerBudgetPolicyRollout_Update.lts
+//   SHA-256: eea86269ba732433f80cd09c76bfc7408d90baab132bb433465edbf0b596e814
+//
+// This N=4, MaxLevel=10 model keeps the node behaviour and mapping semantics of
+// the PowerBudgetPolicyRollout family while increasing each node's level range.
+//
+// System and update meaning:
+// - Four compute nodes execute jobs at levels 1..10.
+// - request and finish are uncontrollable; start, setLevel, and stop are
+//   controllable.
+// - OLD and NEW environments are behaviorally identical.
+// - Each node is one mapping component with a total identity relation.
+// - The OLD controller permits levels 1..4 independently on every node and
+//   forbids levels 5..10.
+// - A newly deployed rack-allocation policy restricts every node to levels
+//   1..2 and imposes a pairwise combined-running-level budget on adjacent
+//   nodes: {1,2}, {2,3}, and {3,4}.
+// - These are overlapping adjacent-node budgets, not independent power
+//   domains.  Inside every adjacent pair, the combined running level must be
+//   at most 2.  Thus (1,1) is allowed and (1,2), (2,1), and (2,2) are
+//   forbidden.
+// - The corresponding N-node family has exactly N-1 cross requirements, one
+//   for each adjacent pair {i,i+1}; every cross requirement has scope size 2.
+//
+// Expected scopes:
+// - P_OLD_NODE_POWER_CAP_i and P_NEW_NODE_POWER_CAP_i: {i}
+// - P_NEW_ADJACENT_POWER_BUDGET_1_2: {1,2}
+// - P_NEW_ADJACENT_POWER_BUDGET_2_3: {2,3}
+// - P_NEW_ADJACENT_POWER_BUDGET_3_4: {3,4}
+//
+// The model includes no_tr, component-local T1, and all-component T2 for both
+// Traditional DUCS and non-incremental Stepwise DUCS + SBP.
+
+// =============================================================================
+// Constants and action classification
+// =============================================================================
+
+const N = 4
+const MaxLevel = 10
+
+range NodeID = 1..N
+range Level = 1..MaxLevel
+set Nodes = {node[NodeID]}
+
+set ControllableActions = {
+    [Nodes].start[Level],
+    [Nodes].setLevel[Level],
+    [Nodes].stop
+}
+
+// =============================================================================
+// Old and new environments
+// =============================================================================
+
+NODE_OLD(I=1) = IDLE_OLD,
+IDLE_OLD = (
+    node[I].request -> READY_OLD
+),
+READY_OLD = (
+      node[I].start[level:Level] -> RUN_OLD[level]
+    | node[I].stop -> IDLE_OLD
+),
+RUN_OLD[current:Level] = (
+      node[I].setLevel[next:Level] -> RUN_OLD[next]
+    | node[I].finish -> IDLE_OLD
+    | node[I].stop -> IDLE_OLD
+).
+
+NODE_NEW(I=1) = IDLE_NEW,
+IDLE_NEW = (
+    node[I].request -> READY_NEW
+),
+READY_NEW = (
+      node[I].start[level:Level] -> RUN_NEW[level]
+    | node[I].stop -> IDLE_NEW
+),
+RUN_NEW[current:Level] = (
+      node[I].setLevel[next:Level] -> RUN_NEW[next]
+    | node[I].finish -> IDLE_NEW
+    | node[I].stop -> IDLE_NEW
+).
+
+||OLD_ENV = (NODE_OLD(1) || NODE_OLD(2) || NODE_OLD(3) || NODE_OLD(4)).
+||NEW_ENV = (NODE_NEW(1) || NODE_NEW(2) || NODE_NEW(3) || NODE_NEW(4)).
+
+// =============================================================================
+// Total identity state correspondence: one mapping component per node
+// =============================================================================
+
+relation R_NODE_1 = {
+    IDLE_OLD@NODE_OLD(1) = reconfigure -> IDLE_NEW@NODE_NEW(1),
+    READY_OLD@NODE_OLD(1) = reconfigure -> READY_NEW@NODE_NEW(1),
+    RUN_OLD[1]@NODE_OLD(1) = reconfigure -> RUN_NEW[1]@NODE_NEW(1),
+    RUN_OLD[2]@NODE_OLD(1) = reconfigure -> RUN_NEW[2]@NODE_NEW(1),
+    RUN_OLD[3]@NODE_OLD(1) = reconfigure -> RUN_NEW[3]@NODE_NEW(1),
+    RUN_OLD[4]@NODE_OLD(1) = reconfigure -> RUN_NEW[4]@NODE_NEW(1),
+    RUN_OLD[5]@NODE_OLD(1) = reconfigure -> RUN_NEW[5]@NODE_NEW(1),
+    RUN_OLD[6]@NODE_OLD(1) = reconfigure -> RUN_NEW[6]@NODE_NEW(1),
+    RUN_OLD[7]@NODE_OLD(1) = reconfigure -> RUN_NEW[7]@NODE_NEW(1),
+    RUN_OLD[8]@NODE_OLD(1) = reconfigure -> RUN_NEW[8]@NODE_NEW(1),
+    RUN_OLD[9]@NODE_OLD(1) = reconfigure -> RUN_NEW[9]@NODE_NEW(1),
+    RUN_OLD[10]@NODE_OLD(1) = reconfigure -> RUN_NEW[10]@NODE_NEW(1)
+}
+
+relation R_NODE_2 = {
+    IDLE_OLD@NODE_OLD(2) = reconfigure -> IDLE_NEW@NODE_NEW(2),
+    READY_OLD@NODE_OLD(2) = reconfigure -> READY_NEW@NODE_NEW(2),
+    RUN_OLD[1]@NODE_OLD(2) = reconfigure -> RUN_NEW[1]@NODE_NEW(2),
+    RUN_OLD[2]@NODE_OLD(2) = reconfigure -> RUN_NEW[2]@NODE_NEW(2),
+    RUN_OLD[3]@NODE_OLD(2) = reconfigure -> RUN_NEW[3]@NODE_NEW(2),
+    RUN_OLD[4]@NODE_OLD(2) = reconfigure -> RUN_NEW[4]@NODE_NEW(2),
+    RUN_OLD[5]@NODE_OLD(2) = reconfigure -> RUN_NEW[5]@NODE_NEW(2),
+    RUN_OLD[6]@NODE_OLD(2) = reconfigure -> RUN_NEW[6]@NODE_NEW(2),
+    RUN_OLD[7]@NODE_OLD(2) = reconfigure -> RUN_NEW[7]@NODE_NEW(2),
+    RUN_OLD[8]@NODE_OLD(2) = reconfigure -> RUN_NEW[8]@NODE_NEW(2),
+    RUN_OLD[9]@NODE_OLD(2) = reconfigure -> RUN_NEW[9]@NODE_NEW(2),
+    RUN_OLD[10]@NODE_OLD(2) = reconfigure -> RUN_NEW[10]@NODE_NEW(2)
+}
+
+relation R_NODE_3 = {
+    IDLE_OLD@NODE_OLD(3) = reconfigure -> IDLE_NEW@NODE_NEW(3),
+    READY_OLD@NODE_OLD(3) = reconfigure -> READY_NEW@NODE_NEW(3),
+    RUN_OLD[1]@NODE_OLD(3) = reconfigure -> RUN_NEW[1]@NODE_NEW(3),
+    RUN_OLD[2]@NODE_OLD(3) = reconfigure -> RUN_NEW[2]@NODE_NEW(3),
+    RUN_OLD[3]@NODE_OLD(3) = reconfigure -> RUN_NEW[3]@NODE_NEW(3),
+    RUN_OLD[4]@NODE_OLD(3) = reconfigure -> RUN_NEW[4]@NODE_NEW(3),
+    RUN_OLD[5]@NODE_OLD(3) = reconfigure -> RUN_NEW[5]@NODE_NEW(3),
+    RUN_OLD[6]@NODE_OLD(3) = reconfigure -> RUN_NEW[6]@NODE_NEW(3),
+    RUN_OLD[7]@NODE_OLD(3) = reconfigure -> RUN_NEW[7]@NODE_NEW(3),
+    RUN_OLD[8]@NODE_OLD(3) = reconfigure -> RUN_NEW[8]@NODE_NEW(3),
+    RUN_OLD[9]@NODE_OLD(3) = reconfigure -> RUN_NEW[9]@NODE_NEW(3),
+    RUN_OLD[10]@NODE_OLD(3) = reconfigure -> RUN_NEW[10]@NODE_NEW(3)
+}
+
+relation R_NODE_4 = {
+    IDLE_OLD@NODE_OLD(4) = reconfigure -> IDLE_NEW@NODE_NEW(4),
+    READY_OLD@NODE_OLD(4) = reconfigure -> READY_NEW@NODE_NEW(4),
+    RUN_OLD[1]@NODE_OLD(4) = reconfigure -> RUN_NEW[1]@NODE_NEW(4),
+    RUN_OLD[2]@NODE_OLD(4) = reconfigure -> RUN_NEW[2]@NODE_NEW(4),
+    RUN_OLD[3]@NODE_OLD(4) = reconfigure -> RUN_NEW[3]@NODE_NEW(4),
+    RUN_OLD[4]@NODE_OLD(4) = reconfigure -> RUN_NEW[4]@NODE_NEW(4),
+    RUN_OLD[5]@NODE_OLD(4) = reconfigure -> RUN_NEW[5]@NODE_NEW(4),
+    RUN_OLD[6]@NODE_OLD(4) = reconfigure -> RUN_NEW[6]@NODE_NEW(4),
+    RUN_OLD[7]@NODE_OLD(4) = reconfigure -> RUN_NEW[7]@NODE_NEW(4),
+    RUN_OLD[8]@NODE_OLD(4) = reconfigure -> RUN_NEW[8]@NODE_NEW(4),
+    RUN_OLD[9]@NODE_OLD(4) = reconfigure -> RUN_NEW[9]@NODE_NEW(4),
+    RUN_OLD[10]@NODE_OLD(4) = reconfigure -> RUN_NEW[10]@NODE_NEW(4)
+}
+
+// =============================================================================
+// Power-policy fluents and safety requirements
+// =============================================================================
+
+fluent ABOVE_OLD_NODE_POWER_CAP[node:Nodes] =
+    <{[node].start[5], [node].start[6], [node].start[7],
+       [node].start[8], [node].start[9], [node].start[10],
+       [node].setLevel[5], [node].setLevel[6], [node].setLevel[7],
+       [node].setLevel[8], [node].setLevel[9], [node].setLevel[10]},
+     {[node].setLevel[1], [node].setLevel[2],
+       [node].setLevel[3], [node].setLevel[4],
+       [node].finish, [node].stop}> initially 0
+
+fluent ABOVE_NEW_NODE_POWER_CAP[node:Nodes] =
+    <{[node].start[3], [node].start[4], [node].start[5],
+       [node].start[6], [node].start[7], [node].start[8],
+       [node].start[9], [node].start[10],
+       [node].setLevel[3], [node].setLevel[4], [node].setLevel[5],
+       [node].setLevel[6], [node].setLevel[7], [node].setLevel[8],
+       [node].setLevel[9], [node].setLevel[10]},
+     {[node].setLevel[1], [node].setLevel[2],
+       [node].finish, [node].stop}> initially 0
+
+fluent RUNNING[node:Nodes] =
+    <{[node].start[1], [node].start[2], [node].start[3],
+       [node].start[4], [node].start[5], [node].start[6],
+       [node].start[7], [node].start[8], [node].start[9],
+       [node].start[10]},
+     {[node].finish, [node].stop}> initially 0
+
+fluent AT_LEVEL_2[node:Nodes] =
+    <{[node].start[2], [node].setLevel[2]},
+     {[node].setLevel[1], [node].setLevel[3],
+       [node].setLevel[4], [node].setLevel[5], [node].setLevel[6],
+       [node].setLevel[7], [node].setLevel[8], [node].setLevel[9],
+       [node].setLevel[10], [node].finish, [node].stop}> initially 0
+
+ltl_property P_OLD_NODE_POWER_CAP_1 = [](!ABOVE_OLD_NODE_POWER_CAP['node.[1]])
+ltl_property P_OLD_NODE_POWER_CAP_2 = [](!ABOVE_OLD_NODE_POWER_CAP['node.[2]])
+ltl_property P_OLD_NODE_POWER_CAP_3 = [](!ABOVE_OLD_NODE_POWER_CAP['node.[3]])
+ltl_property P_OLD_NODE_POWER_CAP_4 = [](!ABOVE_OLD_NODE_POWER_CAP['node.[4]])
+
+controllerSpec OLD_REQ = {
+    safety = {
+        P_OLD_NODE_POWER_CAP_1,
+        P_OLD_NODE_POWER_CAP_2,
+        P_OLD_NODE_POWER_CAP_3,
+        P_OLD_NODE_POWER_CAP_4
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+ltl_property P_NEW_NODE_POWER_CAP_1 = [](!ABOVE_NEW_NODE_POWER_CAP['node.[1]])
+ltl_property P_NEW_NODE_POWER_CAP_2 = [](!ABOVE_NEW_NODE_POWER_CAP['node.[2]])
+ltl_property P_NEW_NODE_POWER_CAP_3 = [](!ABOVE_NEW_NODE_POWER_CAP['node.[3]])
+ltl_property P_NEW_NODE_POWER_CAP_4 = [](!ABOVE_NEW_NODE_POWER_CAP['node.[4]])
+
+ltl_property P_NEW_ADJACENT_POWER_BUDGET_1_2 =
+    [](!(
+        (AT_LEVEL_2['node.[1]] && RUNNING['node.[2]]) ||
+        (RUNNING['node.[1]] && AT_LEVEL_2['node.[2]])
+    ))
+
+ltl_property P_NEW_ADJACENT_POWER_BUDGET_2_3 =
+    [](!(
+        (AT_LEVEL_2['node.[2]] && RUNNING['node.[3]]) ||
+        (RUNNING['node.[2]] && AT_LEVEL_2['node.[3]])
+    ))
+
+ltl_property P_NEW_ADJACENT_POWER_BUDGET_3_4 =
+    [](!(
+        (AT_LEVEL_2['node.[3]] && RUNNING['node.[4]]) ||
+        (RUNNING['node.[3]] && AT_LEVEL_2['node.[4]])
+    ))
+
+controllerSpec NEW_REQ = {
+    safety = {
+        P_NEW_NODE_POWER_CAP_1,
+        P_NEW_NODE_POWER_CAP_2,
+        P_NEW_NODE_POWER_CAP_3,
+        P_NEW_NODE_POWER_CAP_4,
+        P_NEW_ADJACENT_POWER_BUDGET_1_2,
+        P_NEW_ADJACENT_POWER_BUDGET_2_3,
+        P_NEW_ADJACENT_POWER_BUDGET_3_4
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// =============================================================================
+// Transition requirements
+// =============================================================================
+
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+fluent Reconfigure = <reconfigure, hotSwapIn>
+
+assert ANY_CONTROLLABLE_ACTION_NODE_1 = (
+    node[1].start[1] || node[1].start[2] || node[1].start[3] || node[1].start[4] ||
+    node[1].start[5] || node[1].start[6] || node[1].start[7] || node[1].start[8] ||
+    node[1].start[9] || node[1].start[10] ||
+    node[1].setLevel[1] || node[1].setLevel[2] || node[1].setLevel[3] || node[1].setLevel[4] ||
+    node[1].setLevel[5] || node[1].setLevel[6] || node[1].setLevel[7] || node[1].setLevel[8] ||
+    node[1].setLevel[9] || node[1].setLevel[10] || node[1].stop
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_1 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_NODE_1)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_NODE_1 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_1
+
+assert ANY_CONTROLLABLE_ACTION_NODE_2 = (
+    node[2].start[1] || node[2].start[2] || node[2].start[3] || node[2].start[4] ||
+    node[2].start[5] || node[2].start[6] || node[2].start[7] || node[2].start[8] ||
+    node[2].start[9] || node[2].start[10] ||
+    node[2].setLevel[1] || node[2].setLevel[2] || node[2].setLevel[3] || node[2].setLevel[4] ||
+    node[2].setLevel[5] || node[2].setLevel[6] || node[2].setLevel[7] || node[2].setLevel[8] ||
+    node[2].setLevel[9] || node[2].setLevel[10] || node[2].stop
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_2 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_NODE_2)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_NODE_2 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_2
+
+assert ANY_CONTROLLABLE_ACTION_NODE_3 = (
+    node[3].start[1] || node[3].start[2] || node[3].start[3] || node[3].start[4] ||
+    node[3].start[5] || node[3].start[6] || node[3].start[7] || node[3].start[8] ||
+    node[3].start[9] || node[3].start[10] ||
+    node[3].setLevel[1] || node[3].setLevel[2] || node[3].setLevel[3] || node[3].setLevel[4] ||
+    node[3].setLevel[5] || node[3].setLevel[6] || node[3].setLevel[7] || node[3].setLevel[8] ||
+    node[3].setLevel[9] || node[3].setLevel[10] || node[3].stop
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_3 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_NODE_3)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_NODE_3 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_3
+
+assert ANY_CONTROLLABLE_ACTION_NODE_4 = (
+    node[4].start[1] || node[4].start[2] || node[4].start[3] || node[4].start[4] ||
+    node[4].start[5] || node[4].start[6] || node[4].start[7] || node[4].start[8] ||
+    node[4].start[9] || node[4].start[10] ||
+    node[4].setLevel[1] || node[4].setLevel[2] || node[4].setLevel[3] || node[4].setLevel[4] ||
+    node[4].setLevel[5] || node[4].setLevel[6] || node[4].setLevel[7] || node[4].setLevel[8] ||
+    node[4].setLevel[9] || node[4].setLevel[10] || node[4].stop
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_4 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_NODE_4)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_NODE_4 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_NODE_4
+
+ltl_property T2_START_AFTER_STOP_AND_RECONFIGURE =
+    (startNewSpec -> (StopOldSpec && Reconfigure))
+
+// =============================================================================
+// Updating-controller targets: no_tr, T1, and T2
+// =============================================================================
+
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2), NODE_OLD(3), NODE_OLD(4)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2), NODE_NEW(3), NODE_NEW(4)},
+    mapRelation = {R_NODE_1, R_NODE_2, R_NODE_3, R_NODE_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking
+}
+
+||COMPUTE_CLUSTER_ADJACENT_POWER_BUDGET_POLICY_ROLLOUT_TRADITIONAL = UpdCont.
+
+updatingController UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2), NODE_OLD(3), NODE_OLD(4)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2), NODE_NEW(3), NODE_NEW(4)},
+    mapRelation = {R_NODE_1, R_NODE_2, R_NODE_3, R_NODE_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_3,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_4,
+    nonblocking
+}
+
+||COMPUTE_CLUSTER_ADJACENT_POWER_BUDGET_POLICY_ROLLOUT_T1_TRADITIONAL = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2), NODE_OLD(3), NODE_OLD(4)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2), NODE_NEW(3), NODE_NEW(4)},
+    mapRelation = {R_NODE_1, R_NODE_2, R_NODE_3, R_NODE_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking
+}
+
+||COMPUTE_CLUSTER_ADJACENT_POWER_BUDGET_POLICY_ROLLOUT_T2_TRADITIONAL = UpdCont_T2.
+
+updatingController Stepwise_UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2), NODE_OLD(3), NODE_OLD(4)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2), NODE_NEW(3), NODE_NEW(4)},
+    mapRelation = {R_NODE_1, R_NODE_2, R_NODE_3, R_NODE_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||COMPUTE_CLUSTER_ADJACENT_POWER_BUDGET_POLICY_ROLLOUT_STEPWISE = Stepwise_UpdCont.
+
+updatingController Stepwise_UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2), NODE_OLD(3), NODE_OLD(4)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2), NODE_NEW(3), NODE_NEW(4)},
+    mapRelation = {R_NODE_1, R_NODE_2, R_NODE_3, R_NODE_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_3,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_NODE_4,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||COMPUTE_CLUSTER_ADJACENT_POWER_BUDGET_POLICY_ROLLOUT_T1_STEPWISE = Stepwise_UpdCont_T1.
+
+updatingController Stepwise_UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2), NODE_OLD(3), NODE_OLD(4)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2), NODE_NEW(3), NODE_NEW(4)},
+    mapRelation = {R_NODE_1, R_NODE_2, R_NODE_3, R_NODE_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||COMPUTE_CLUSTER_ADJACENT_POWER_BUDGET_POLICY_ROLLOUT_T2_STEPWISE = Stepwise_UpdCont_T2.

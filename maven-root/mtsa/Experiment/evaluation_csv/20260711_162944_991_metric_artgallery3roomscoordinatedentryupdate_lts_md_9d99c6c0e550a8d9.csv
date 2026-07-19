@@ -1,0 +1,64 @@
+mode,result,failure_reason,section,metric_key,metric_label,value,unit,formula,metric_schema_version,metric_description_id,section_readable_ja,metric_readable_ja,metric_category,artifact,phase,action,event,stat
+未記録,SUCCESS,,Run,mode,mode,未記録,text,,2026-05-19,metric.mode.md_70337b7cb07dd883,実行情報,mode,その他,,,,,mode
+未記録,SUCCESS,,Run,result,result,SUCCESS,text,,2026-05-19,metric.result.md_0c414c8064ab8182,実行情報,result,その他,,,,,result
+未記録,SUCCESS,,Run,failure_reason,failure reason,,text,,2026-05-19,metric.failure_reason.md_815f14cd21eae305,実行情報,failure reason,その他,,,,,failure reason
+未記録,SUCCESS,,Run,run_allowed_threads,allowed threads,8,threads,,2026-05-19,metric.threads.md_64a2797876e1dc6f,実行情報,threads,その他,,,,,threads
+未記録,SUCCESS,,Run,run_available_processors,available processors,8,processors,,2026-05-19,metric.processors.md_11c4b765ca1b141f,実行情報,processors,その他,,,,,processors
+未記録,SUCCESS,,Run,run_jvm_max_heap,JVM max heap,2147483648,B,,2026-05-19,metric.max_value.md_fb1bc5150f4ba5ce,実行情報,最大値,その他,,,,,最大値
+未記録,SUCCESS,,Run,run_java_version,Java version,16.0.1,text,,2026-05-19,metric.java_version.md_778a99db4ec06ae3,実行情報,Java version,その他,,,,,Java version
+未記録,SUCCESS,,Run,run_evaluation_profile,evaluation profile,paper,text,,2026-05-19,metric.evaluation_profile.md_9fe12345148d9139,実行情報,evaluation profile,その他,,,,,evaluation profile
+未記録,SUCCESS,,Run,run_java_vm_name,Java VM name,OpenJDK 64-Bit Server VM,text,,2026-05-19,metric.java_vm_name.md_fa9441aade153734,実行情報,Java VM name,その他,,,,,Java VM name
+未記録,SUCCESS,,Run,run_os_name,OS name,Mac OS X,text,,2026-05-19,metric.os_name.md_7c64673fe737e493,実行情報,OS name,その他,,,,,OS name
+未記録,SUCCESS,,Run,run_os_arch,OS arch,x86_64,text,,2026-05-19,metric.os_arch.md_10a960f2075adcd3,実行情報,OS arch,その他,,,,,OS arch
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_36bd60e5_current_heap,合成開始時 / 現在ヒープ,7013128,B,,2026-05-19,memory.b.md_abd14cc7ae7c1dff,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_36bd60e5_peak_heap,合成開始時 / ピークヒープ,7013128,B,,2026-05-19,memory.b.md_d3dea4dfef07c752,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_36bd60e5_delta_from_start,合成開始時 / 開始時からの増減,0,B,,2026-05-19,memory.b.md_12151c737afda83a,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_36bd60e5_delta_from_previous,合成開始時 / 直前からの増減,0,B,,2026-05-19,memory.b.md_4cdd4f855ac33a41,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,共通 / HPWindow,parse_time,構文解析時間,345,ms,,2026-05-19,time.time.md_5a12e4996edb45da,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,共通 / HPWindow,synthesis_problem_preparation_time,合成問題準備時間,482,ms,,2026-05-19,time.time.md_b4df1f61400d401c,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_9960e47_current_heap,構文解析・合成問題準備後 / 現在ヒープ,11010632,B,,2026-05-19,memory.b.md_ea0d40bd7d88de85,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_9960e47_peak_heap,構文解析・合成問題準備後 / ピークヒープ,20447816,B,,2026-05-19,memory.b.md_1859b00c4f53f6f5,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_9960e47_delta_from_start,構文解析・合成問題準備後 / 開始時からの増減,3997504,B,,2026-05-19,memory.b.md_ac0587068845fec5,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_9960e47_delta_from_previous,構文解析・合成問題準備後 / 直前からの増減,3997504,B,,2026-05-19,memory.b.md_eb88cf3a0d671d99,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,共通 / HPWindow,total_time,合成ボタンを押してから合成完了までの時間,1652,ms,,2026-05-19,time.time.md_3df7030b03125f0a,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,共通 / HPWindow,compile_if_change_total_time,compileIfChange 全体時間（参考）,888,ms,,2026-05-19,time.time.md_371762bfd09c03b0,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,共通 / HPWindow,update_controller_generation_time,update controller 生成時間,467,ms,,2026-05-19,time.time.md_602479d66b25f3a3,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,共通 / HPWindow,controller_synthesis_related_time,コントローラ合成時間,949,ms,,2026-05-19,time.time.md_ff807b7383fb28b1,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,共通 / HPWindow,controller_draw_time,コントローラ描画時間,0,ms,,2026-05-19,time.time.md_ba649f253a5cba61,共通処理: GUI/全体計測,時間,時間,,,,,時間
+未記録,SUCCESS,,共通 / HPWindow,controller_synthesis_base_memory,コントローラ合成のベースラインメモリ,7013128,B,,2026-05-19,memory.b.md_e49829114ac1c321,共通処理: GUI/全体計測,B,メモリ,,,,,B
+未記録,SUCCESS,,共通 / HPWindow,controller_synthesis_peak_memory,コントローラ合成全体のピークメモリ,78555232,B,,2026-05-19,memory.b.md_56c94326eccc5d6b,共通処理: GUI/全体計測,B,メモリ,,,,,B
+未記録,SUCCESS,,共通 / HPWindow,controller_synthesis_memory_increase,コントローラ合成により増えたメモリ,71542104,B,コントローラ合成全体のピークメモリ - コントローラ合成のベースラインメモリ。,2026-05-19,memory.b.md_3fb518f5ba33c824,共通処理: GUI/全体計測,B,メモリ,,,,,B
+未記録,SUCCESS,,Output Update Controller,output_update_controller_states,States,28160,states,,2026-05-19,states.states.md_9917972a691f6455,出力UC: 最終結果の状態空間サイズ,出力Update Controller / 状態数,状態数,出力Update Controller,,,,状態数
+未記録,SUCCESS,,Output Update Controller,output_update_controller_transitions,Transitions,137280,transitions,,2026-05-19,transitions.transitions.md_2f22c6f933daad30,出力UC: 最終結果の状態空間サイズ,出力Update Controller / 遷移数,遷移数,出力Update Controller,,,,遷移数
+未記録,SUCCESS,,Output Update Controller,output_update_controller_count_time,CountTime,8,ms,,2026-05-19,time.count_time.md_600d789b40e5cd45,出力UC: 最終結果の状態空間サイズ,出力Update Controller / 評価用カウント時間,時間,出力Update Controller,,,,評価用カウント時間
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_3660d981_current_heap,合成終了時 / 現在ヒープ,67020896,B,,2026-05-19,memory.b.md_52a28c11161f09ff,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_3660d981_peak_heap,合成終了時 / ピークヒープ,78555232,B,,2026-05-19,memory.b.md_60b55cd4eac93ce1,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_3660d981_delta_from_start,合成終了時 / 開始時からの増減,60007768,B,,2026-05-19,memory.b.md_5995d2ebc5ea7d90,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,メモリ使用量チェックポイント,auto_3660d981_delta_from_previous,合成終了時 / 直前からの増減,56010264,B,,2026-05-19,memory.b.md_6726efd7633df1a4,メモリ使用量,B,メモリ,,,,,B
+未記録,SUCCESS,,Evaluation Summary,state_transition_count_overhead_total,State/transition count overhead total,8,ms,,2026-05-19,time.time.md_600de7999c8e9b5f,評価サマリ,時間,時間,,,,,時間
+未記録,SUCCESS,,Evaluation Summary,state_transition_count_overhead_in_observed_time,State/transition count overhead in observed time,0,ms,,2026-05-19,time.time.md_773f39eab36c62f2,評価サマリ,時間,時間,,,,,時間
+未記録,SUCCESS,,Evaluation Summary,state_transition_count_overhead_after_observed_time,State/transition count overhead after observed time,8,ms,,2026-05-19,time.time.md_5c3f61ce672e0e10,評価サマリ,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_count_overhead_time,評価用カウント時間（状態数・遷移数）,0,ms,実測総時間に含まれる状態数・遷移数 CountTime。合成本来の処理ではない評価用オーバーヘッドで、比較用時間から差し引く。,2026-05-19,time.count_time.md_f7f68238a375ae2c,比較用時間集計,評価用カウント時間,時間,,,,,評価用カウント時間
+未記録,SUCCESS,,比較用時間集計,comparison_count_overhead_total,評価用カウント時間（合計）,8,ms,実測総時間内と実測総時間外の状態数・遷移数 CountTime の合計。診断用の総量であり、実測総時間から丸ごとは差し引かない。,2026-05-19,time.count_time.md_55f1ffc456df43c4,比較用時間集計,評価用カウント時間,時間,,,,,評価用カウント時間
+未記録,SUCCESS,,比較用時間集計,comparison_count_overhead_after_observed_time,評価用カウント時間（実測時間外）,8,ms,実測総時間を確定した後に、出力 controller や post-synthesis 診断のために数えた CountTime。主比較用時間からは差し引かない。,2026-05-19,time.count_time.md_5607dd22dee2f60f,比較用時間集計,評価用カウント時間,時間,,,,,評価用カウント時間
+未記録,SUCCESS,,Evaluation Summary / 全体,auto_703f0222,カウントによるオーバーヘッド（実測時間内）,0,ms,実測総時間に含まれる状態数・遷移数 CountTime。比較用時間から差し引く対象。,2026-05-19,time.time.md_29bb77b9bf72c962,評価サマリ,時間,時間,,,,,時間
+未記録,SUCCESS,,Evaluation Summary / 全体,auto_703fecb1,カウントによるオーバーヘッド（実測時間外）,8,ms,実測総時間確定後に出力 controller や post-synthesis 診断のために数えた CountTime。比較用時間からは差し引かない。,2026-05-19,time.time.md_cf2ede33312215c2,評価サマリ,時間,時間,,,,,時間
+未記録,SUCCESS,,Evaluation Summary / 全体,auto_7131b49,カウントによるオーバーヘッド（合計）,8,ms,実測時間内と実測時間外の状態数・遷移数 CountTime の合計。,2026-05-19,time.time.md_f3e8eec33d815c4a,評価サマリ,時間,時間,,,,,時間
+未記録,SUCCESS,,Evaluation Summary / 結果,auto_63f2a5f5,比較用時間（合成全体-CountTime-描画）,1652,ms,合成の全体時間 - 実測時間内のカウントによるオーバーヘッド - コントローラ描画時間。,2026-05-19,time.count_time.md_99d452359eb5f811,評価サマリ,評価用カウント時間,時間,,,,,評価用カウント時間
+未記録,SUCCESS,,評価出力時間,evaluation_output_header_time,評価ヘッダ出力時間,0,ms,通常表示では出力しない評価ヘッダ部分の時間。,2026-05-19,time.time.md_7f6e747e605c6e37,評価出力時間,時間,時間,,,,,時間
+未記録,SUCCESS,,評価出力時間,evaluation_output_detailed_report_time,詳細評価レポート出力時間,0,ms,詳細評価レポート本文を Output に出す時間。デフォルトでは出力しない。,2026-05-19,time.time.md_ed17f59a37fab6c7,評価出力時間,時間,時間,,,,,時間
+未記録,SUCCESS,,評価出力時間,evaluation_output_summary_time,評価サマリ出力時間,47,ms,EVALUATION SUMMARY を Output に出す時間。,2026-05-19,time.time.md_908b138142aa2e4a,評価出力時間,時間,時間,,,,,時間
+未記録,SUCCESS,,評価出力時間,evaluation_output_overhead_before_csv,評価出力時間（CSV出力前まで）,47,ms,評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間。CSV出力時間はCSV出力後に別途記録する。,2026-05-19,time.time.md_4f2430f46383956c,評価出力時間,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_observed_total_time,実測総時間,1652,ms,HPWindow の「合成ボタンを押してから合成完了までの時間」または runner の「合成全体実行時間」。,2026-05-19,time.time.md_de81868baaff600d,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_common_preprocess_time,除外する共通前処理時間,0,ms,Old Controller 合成時間 + Goal 定義と controllable action 集合生成時間 + Mapping Environment Component 合成時間。,2026-05-19,time.time.md_416ce7476eeea5d6,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_evaluation_output_time,評価結果出力時間（比較から除外）,47,ms,評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間。 CSV 出力時間は CSV 出力後に追加行として記録する。,2026-05-19,time.time.md_b136d705ada2cd14,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,auto_a6c340b0,入力規模集計時間（評価用・参考）,0,ms,入力規模セクションを作る時間。状態数・遷移数 CountTime と重なる可能性があるため、差し引き式には入れない参考値。,2026-05-19,time.time.md_d6223668efaf82b9,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,auto_d7845043,GUI描画時間（比較から除外候補）,0,ms,HPWindow の「コントローラ描画時間」。アルゴリズム比較からは除外する候補。,2026-05-19,time.time.md_f7fe9178321deaf8,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_observed_time_without_parse_count_evaluation_output_and_draw,大枠比較用時間（構文解析・評価・描画除外）,1260,ms,実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - 評価結果出力時間 - GUI描画時間。共通前処理は差し引かない。,2026-05-19,time.time.md_d2c3e5b1e0ae59dc,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw,厳密比較用時間（共通前処理も除外）,1260,ms,大枠比較用時間 - 除外する共通前処理時間。,2026-05-19,time.time.md_a17a7491b59e3e1d,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_observed_total_based_unclassified_time,実測総時間ベースの未分類時間（参考）,1260,ms,厳密比較用時間 - 手法固有として個別計測できた時間。 GUI 周辺なども含むため参考値。,2026-05-19,time.time.md_93ad2e31a8ee0d4a,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_method_specific_time,手法固有として個別計測できた時間,0,ms,手法が未記録のため 0。,2026-05-19,time.time.md_c2f27da421943dd5,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_controller_synthesis_time_without_common,共通処理を除いたコントローラ合成時間,949,ms,コントローラ合成時間 - 除外する共通前処理時間。,2026-05-19,time.time.md_3c7bd760590e0ca8,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_unclassified_non_common_time,未分類の非共通時間,949,ms,共通処理を除いたコントローラ合成時間 - 手法固有として個別計測できた時間。,2026-05-19,time.time.md_0b6c03d68c185076,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,比較用時間集計,comparison_core_synthesis_time,内部計測の中核処理時間（参考）,0,ms,手法が未記録のため 0。,2026-05-19,time.time.md_d59ec09b54f749eb,比較用時間集計,時間,時間,,,,,時間
+未記録,SUCCESS,,Run,evaluation_csv_file,evaluation CSV file,Experiment/evaluation_csv/20260711_162944_991_metric_artgallery3roomscoordinatedentryupdate_lts_md_9d99c6c0e550a8d9.csv,path,,2026-05-19,metric.path.md_1df910948b95adba,実行情報,path,その他,,,,,path

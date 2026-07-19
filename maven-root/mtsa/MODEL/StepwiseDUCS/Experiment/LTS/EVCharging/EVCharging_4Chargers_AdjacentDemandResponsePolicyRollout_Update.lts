@@ -1,0 +1,510 @@
+// EV-charging Stepwise DUCS model: adjacent demand-response policy rollout.
+//
+// Direct transformation source (left unchanged):
+//   EVCharging_2Chargers_DemandResponsePolicyRollout_Update.lts
+//   SHA-256: cba6087f6faa8012be9fbc69bb92d7b33f978d6ee84e1804e6b7c394acad4cc0
+//
+// This N=4 model changes only the number/topology of charger components from
+// the N=2 source.  MaxSOC, MaxRate, charger behavior, action controllability,
+// OLD/NEW local policies, release-then-disconnect behavior, and total identity
+// state correspondence are unchanged.
+//
+// System meaning:
+// - Four EV chargers serve independently connected vehicles.
+// - connect, socIncrease, complete, and disconnect are uncontrollable events.
+// - startCharge, setRate, pause, and release are controllable events.
+// - A charging-rate level is an abstract power unit, not elapsed time.
+// - socIncrease raises the vehicle SOC while preserving the selected rate.
+// - complete finishes the last charging step and leaves the vehicle connected.
+// - release opens the charger-side latch/contactor; the subsequent physical
+//   disconnect remains uncontrollable.
+// - OLD and NEW environments have exactly the same behavior.
+// - Each charger is one mapping component with a total identity relation.
+//
+// Dynamic update meaning:
+// - The OLD policy permits rate levels 1..4 independently at each charger.
+// - The NEW policy restricts every charger locally to rate levels 1..2.
+// - Adjacent charger pairs {1,2}, {2,3}, and {3,4} each have a combined active
+//   rate budget of at most 2.  Therefore (1,1) is allowed within a pair,
+//   whereas (1,2), (2,1), and (2,2) are not.
+// - A charger that is connected but paused contributes no active rate.
+//
+// Expected Stepwise scopes:
+// - P_OLD_CHARGER_RATE_CAP_i: {i}
+// - P_NEW_CHARGER_RATE_CAP_i: {i}
+// - P_NEW_ADJACENT_FEEDER_BUDGET_1_2: {1,2}
+// - P_NEW_ADJACENT_FEEDER_BUDGET_2_3: {2,3}
+// - P_NEW_ADJACENT_FEEDER_BUDGET_3_4: {3,4}
+// - T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_i: {i}
+// - T2_START_AFTER_STOP_AND_RECONFIGURE: {1,2,3,4} (update events only)
+//
+// MaxSOC=2 remains the source model's validation value.  Each charger has 17
+// states: VACANT, RELEASED, three CONNECTED states, and twelve CHARGING states.
+
+// =============================================================================
+// Constants and action classification
+// =============================================================================
+
+const N = 4
+const MaxSOC = 2
+const MaxRate = 6
+const LastChargeableSOC = MaxSOC - 1
+
+range ChargerID = 1..N
+range SOC = 0..MaxSOC
+range ChargeableSOC = 0..LastChargeableSOC
+range Rate = 1..MaxRate
+
+set Chargers = {charger[ChargerID]}
+
+set ControllableActions = {
+    [Chargers].startCharge[Rate],
+    [Chargers].setRate[Rate],
+    [Chargers].pause,
+    [Chargers].release
+}
+
+// =============================================================================
+// OLD and NEW environments
+// =============================================================================
+
+EV_CHARGER_OLD(I=1) = VACANT_OLD,
+VACANT_OLD = (
+    charger[I].connect -> CONNECTED_OLD[0]
+),
+CONNECTED_OLD[s:SOC] = (
+      when (s < MaxSOC)
+          charger[I].startCharge[rate:Rate] -> CHARGING_OLD[s][rate]
+    | charger[I].release -> RELEASED_OLD
+),
+CHARGING_OLD[s:ChargeableSOC][current:Rate] = (
+      when (s < LastChargeableSOC)
+          charger[I].socIncrease -> CHARGING_OLD[s+1][current]
+    | when (s == LastChargeableSOC)
+          charger[I].complete -> CONNECTED_OLD[MaxSOC]
+    | charger[I].setRate[next:Rate] -> CHARGING_OLD[s][next]
+    | charger[I].pause -> CONNECTED_OLD[s]
+    | charger[I].release -> RELEASED_OLD
+),
+RELEASED_OLD = (
+    charger[I].disconnect -> VACANT_OLD
+).
+
+EV_CHARGER_NEW(I=1) = VACANT_NEW,
+VACANT_NEW = (
+    charger[I].connect -> CONNECTED_NEW[0]
+),
+CONNECTED_NEW[s:SOC] = (
+      when (s < MaxSOC)
+          charger[I].startCharge[rate:Rate] -> CHARGING_NEW[s][rate]
+    | charger[I].release -> RELEASED_NEW
+),
+CHARGING_NEW[s:ChargeableSOC][current:Rate] = (
+      when (s < LastChargeableSOC)
+          charger[I].socIncrease -> CHARGING_NEW[s+1][current]
+    | when (s == LastChargeableSOC)
+          charger[I].complete -> CONNECTED_NEW[MaxSOC]
+    | charger[I].setRate[next:Rate] -> CHARGING_NEW[s][next]
+    | charger[I].pause -> CONNECTED_NEW[s]
+    | charger[I].release -> RELEASED_NEW
+),
+RELEASED_NEW = (
+    charger[I].disconnect -> VACANT_NEW
+).
+
+||OLD_ENV = (
+    EV_CHARGER_OLD(1) || EV_CHARGER_OLD(2) ||
+    EV_CHARGER_OLD(3) || EV_CHARGER_OLD(4)
+).
+
+||NEW_ENV = (
+    EV_CHARGER_NEW(1) || EV_CHARGER_NEW(2) ||
+    EV_CHARGER_NEW(3) || EV_CHARGER_NEW(4)
+).
+
+// =============================================================================
+// Total identity state correspondence: one mapping component per charger
+// =============================================================================
+
+relation R_CHARGER_1 = {
+    VACANT_OLD@EV_CHARGER_OLD(1) = reconfigure -> VACANT_NEW@EV_CHARGER_NEW(1),
+    RELEASED_OLD@EV_CHARGER_OLD(1) = reconfigure -> RELEASED_NEW@EV_CHARGER_NEW(1),
+    CONNECTED_OLD[0]@EV_CHARGER_OLD(1) = reconfigure -> CONNECTED_NEW[0]@EV_CHARGER_NEW(1),
+    CONNECTED_OLD[1]@EV_CHARGER_OLD(1) = reconfigure -> CONNECTED_NEW[1]@EV_CHARGER_NEW(1),
+    CONNECTED_OLD[2]@EV_CHARGER_OLD(1) = reconfigure -> CONNECTED_NEW[2]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[0][1]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[0][1]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[0][2]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[0][2]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[0][3]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[0][3]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[0][4]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[0][4]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[0][5]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[0][5]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[0][6]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[0][6]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[1][1]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[1][1]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[1][2]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[1][2]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[1][3]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[1][3]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[1][4]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[1][4]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[1][5]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[1][5]@EV_CHARGER_NEW(1),
+    CHARGING_OLD[1][6]@EV_CHARGER_OLD(1) = reconfigure -> CHARGING_NEW[1][6]@EV_CHARGER_NEW(1)
+}
+
+relation R_CHARGER_2 = {
+    VACANT_OLD@EV_CHARGER_OLD(2) = reconfigure -> VACANT_NEW@EV_CHARGER_NEW(2),
+    RELEASED_OLD@EV_CHARGER_OLD(2) = reconfigure -> RELEASED_NEW@EV_CHARGER_NEW(2),
+    CONNECTED_OLD[0]@EV_CHARGER_OLD(2) = reconfigure -> CONNECTED_NEW[0]@EV_CHARGER_NEW(2),
+    CONNECTED_OLD[1]@EV_CHARGER_OLD(2) = reconfigure -> CONNECTED_NEW[1]@EV_CHARGER_NEW(2),
+    CONNECTED_OLD[2]@EV_CHARGER_OLD(2) = reconfigure -> CONNECTED_NEW[2]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[0][1]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[0][1]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[0][2]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[0][2]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[0][3]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[0][3]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[0][4]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[0][4]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[0][5]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[0][5]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[0][6]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[0][6]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[1][1]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[1][1]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[1][2]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[1][2]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[1][3]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[1][3]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[1][4]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[1][4]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[1][5]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[1][5]@EV_CHARGER_NEW(2),
+    CHARGING_OLD[1][6]@EV_CHARGER_OLD(2) = reconfigure -> CHARGING_NEW[1][6]@EV_CHARGER_NEW(2)
+}
+
+relation R_CHARGER_3 = {
+    VACANT_OLD@EV_CHARGER_OLD(3) = reconfigure -> VACANT_NEW@EV_CHARGER_NEW(3),
+    RELEASED_OLD@EV_CHARGER_OLD(3) = reconfigure -> RELEASED_NEW@EV_CHARGER_NEW(3),
+    CONNECTED_OLD[0]@EV_CHARGER_OLD(3) = reconfigure -> CONNECTED_NEW[0]@EV_CHARGER_NEW(3),
+    CONNECTED_OLD[1]@EV_CHARGER_OLD(3) = reconfigure -> CONNECTED_NEW[1]@EV_CHARGER_NEW(3),
+    CONNECTED_OLD[2]@EV_CHARGER_OLD(3) = reconfigure -> CONNECTED_NEW[2]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[0][1]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[0][1]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[0][2]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[0][2]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[0][3]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[0][3]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[0][4]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[0][4]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[0][5]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[0][5]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[0][6]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[0][6]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[1][1]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[1][1]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[1][2]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[1][2]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[1][3]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[1][3]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[1][4]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[1][4]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[1][5]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[1][5]@EV_CHARGER_NEW(3),
+    CHARGING_OLD[1][6]@EV_CHARGER_OLD(3) = reconfigure -> CHARGING_NEW[1][6]@EV_CHARGER_NEW(3)
+}
+
+relation R_CHARGER_4 = {
+    VACANT_OLD@EV_CHARGER_OLD(4) = reconfigure -> VACANT_NEW@EV_CHARGER_NEW(4),
+    RELEASED_OLD@EV_CHARGER_OLD(4) = reconfigure -> RELEASED_NEW@EV_CHARGER_NEW(4),
+    CONNECTED_OLD[0]@EV_CHARGER_OLD(4) = reconfigure -> CONNECTED_NEW[0]@EV_CHARGER_NEW(4),
+    CONNECTED_OLD[1]@EV_CHARGER_OLD(4) = reconfigure -> CONNECTED_NEW[1]@EV_CHARGER_NEW(4),
+    CONNECTED_OLD[2]@EV_CHARGER_OLD(4) = reconfigure -> CONNECTED_NEW[2]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[0][1]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[0][1]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[0][2]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[0][2]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[0][3]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[0][3]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[0][4]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[0][4]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[0][5]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[0][5]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[0][6]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[0][6]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[1][1]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[1][1]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[1][2]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[1][2]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[1][3]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[1][3]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[1][4]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[1][4]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[1][5]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[1][5]@EV_CHARGER_NEW(4),
+    CHARGING_OLD[1][6]@EV_CHARGER_OLD(4) = reconfigure -> CHARGING_NEW[1][6]@EV_CHARGER_NEW(4)
+}
+
+// =============================================================================
+// Demand-response fluents and safety requirements
+// =============================================================================
+
+fluent ABOVE_OLD_CHARGER_RATE_CAP[charger:Chargers] =
+    <{[charger].startCharge[5], [charger].startCharge[6],
+       [charger].setRate[5], [charger].setRate[6]},
+     {[charger].setRate[1], [charger].setRate[2],
+       [charger].setRate[3], [charger].setRate[4],
+       [charger].pause, [charger].release,
+       [charger].complete, [charger].disconnect}> initially 0
+
+fluent ABOVE_NEW_CHARGER_RATE_CAP[charger:Chargers] =
+    <{[charger].startCharge[3], [charger].startCharge[4],
+       [charger].startCharge[5], [charger].startCharge[6],
+       [charger].setRate[3], [charger].setRate[4],
+       [charger].setRate[5], [charger].setRate[6]},
+     {[charger].setRate[1], [charger].setRate[2],
+       [charger].pause, [charger].release,
+       [charger].complete, [charger].disconnect}> initially 0
+
+fluent CHARGING[charger:Chargers] =
+    <{[charger].startCharge[1], [charger].startCharge[2],
+       [charger].startCharge[3], [charger].startCharge[4],
+       [charger].startCharge[5], [charger].startCharge[6]},
+     {[charger].pause, [charger].release,
+       [charger].complete, [charger].disconnect}> initially 0
+
+fluent AT_RATE_2[charger:Chargers] =
+    <{[charger].startCharge[2], [charger].setRate[2]},
+     {[charger].setRate[1], [charger].setRate[3],
+       [charger].setRate[4], [charger].setRate[5], [charger].setRate[6],
+       [charger].pause, [charger].release,
+       [charger].complete, [charger].disconnect}> initially 0
+
+ltl_property P_OLD_CHARGER_RATE_CAP_1 =
+    [](!ABOVE_OLD_CHARGER_RATE_CAP['charger.[1]])
+ltl_property P_OLD_CHARGER_RATE_CAP_2 =
+    [](!ABOVE_OLD_CHARGER_RATE_CAP['charger.[2]])
+ltl_property P_OLD_CHARGER_RATE_CAP_3 =
+    [](!ABOVE_OLD_CHARGER_RATE_CAP['charger.[3]])
+ltl_property P_OLD_CHARGER_RATE_CAP_4 =
+    [](!ABOVE_OLD_CHARGER_RATE_CAP['charger.[4]])
+
+controllerSpec OLD_REQ = {
+    safety = {
+        P_OLD_CHARGER_RATE_CAP_1,
+        P_OLD_CHARGER_RATE_CAP_2,
+        P_OLD_CHARGER_RATE_CAP_3,
+        P_OLD_CHARGER_RATE_CAP_4
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+ltl_property P_NEW_CHARGER_RATE_CAP_1 =
+    [](!ABOVE_NEW_CHARGER_RATE_CAP['charger.[1]])
+ltl_property P_NEW_CHARGER_RATE_CAP_2 =
+    [](!ABOVE_NEW_CHARGER_RATE_CAP['charger.[2]])
+ltl_property P_NEW_CHARGER_RATE_CAP_3 =
+    [](!ABOVE_NEW_CHARGER_RATE_CAP['charger.[3]])
+ltl_property P_NEW_CHARGER_RATE_CAP_4 =
+    [](!ABOVE_NEW_CHARGER_RATE_CAP['charger.[4]])
+
+ltl_property P_NEW_ADJACENT_FEEDER_BUDGET_1_2 =
+    [](!(
+        (AT_RATE_2['charger.[1]] && CHARGING['charger.[2]]) ||
+        (CHARGING['charger.[1]] && AT_RATE_2['charger.[2]])
+    ))
+
+ltl_property P_NEW_ADJACENT_FEEDER_BUDGET_2_3 =
+    [](!(
+        (AT_RATE_2['charger.[2]] && CHARGING['charger.[3]]) ||
+        (CHARGING['charger.[2]] && AT_RATE_2['charger.[3]])
+    ))
+
+ltl_property P_NEW_ADJACENT_FEEDER_BUDGET_3_4 =
+    [](!(
+        (AT_RATE_2['charger.[3]] && CHARGING['charger.[4]]) ||
+        (CHARGING['charger.[3]] && AT_RATE_2['charger.[4]])
+    ))
+
+controllerSpec NEW_REQ = {
+    safety = {
+        P_NEW_CHARGER_RATE_CAP_1,
+        P_NEW_CHARGER_RATE_CAP_2,
+        P_NEW_CHARGER_RATE_CAP_3,
+        P_NEW_CHARGER_RATE_CAP_4,
+        P_NEW_ADJACENT_FEEDER_BUDGET_1_2,
+        P_NEW_ADJACENT_FEEDER_BUDGET_2_3,
+        P_NEW_ADJACENT_FEEDER_BUDGET_3_4
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// =============================================================================
+// Transition requirements
+// =============================================================================
+
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+fluent Reconfigure = <reconfigure, hotSwapIn>
+
+assert ANY_CONTROLLABLE_ACTION_CHARGER_1 = (
+    charger[1].startCharge[1] || charger[1].startCharge[2] ||
+    charger[1].startCharge[3] || charger[1].startCharge[4] ||
+    charger[1].startCharge[5] || charger[1].startCharge[6] ||
+    charger[1].setRate[1] || charger[1].setRate[2] ||
+    charger[1].setRate[3] || charger[1].setRate[4] ||
+    charger[1].setRate[5] || charger[1].setRate[6] ||
+    charger[1].pause || charger[1].release
+)
+
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_1 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_CHARGER_1)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_1 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_1
+
+assert ANY_CONTROLLABLE_ACTION_CHARGER_2 = (
+    charger[2].startCharge[1] || charger[2].startCharge[2] ||
+    charger[2].startCharge[3] || charger[2].startCharge[4] ||
+    charger[2].startCharge[5] || charger[2].startCharge[6] ||
+    charger[2].setRate[1] || charger[2].setRate[2] ||
+    charger[2].setRate[3] || charger[2].setRate[4] ||
+    charger[2].setRate[5] || charger[2].setRate[6] ||
+    charger[2].pause || charger[2].release
+)
+
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_2 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_CHARGER_2)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_2 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_2
+
+assert ANY_CONTROLLABLE_ACTION_CHARGER_3 = (
+    charger[3].startCharge[1] || charger[3].startCharge[2] ||
+    charger[3].startCharge[3] || charger[3].startCharge[4] ||
+    charger[3].startCharge[5] || charger[3].startCharge[6] ||
+    charger[3].setRate[1] || charger[3].setRate[2] ||
+    charger[3].setRate[3] || charger[3].setRate[4] ||
+    charger[3].setRate[5] || charger[3].setRate[6] ||
+    charger[3].pause || charger[3].release
+)
+
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_3 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_CHARGER_3)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_3 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_3
+
+assert ANY_CONTROLLABLE_ACTION_CHARGER_4 = (
+    charger[4].startCharge[1] || charger[4].startCharge[2] ||
+    charger[4].startCharge[3] || charger[4].startCharge[4] ||
+    charger[4].startCharge[5] || charger[4].startCharge[6] ||
+    charger[4].setRate[1] || charger[4].setRate[2] ||
+    charger[4].setRate[3] || charger[4].setRate[4] ||
+    charger[4].setRate[5] || charger[4].setRate[6] ||
+    charger[4].pause || charger[4].release
+)
+
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_4 =
+    ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_CHARGER_4)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_4 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_CHARGER_4
+
+ltl_property T2_START_AFTER_STOP_AND_RECONFIGURE =
+    (startNewSpec -> (StopOldSpec && Reconfigure))
+
+// =============================================================================
+// Updating-controller targets: no_tr, T1, and T2
+// =============================================================================
+
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {
+        EV_CHARGER_OLD(1), EV_CHARGER_OLD(2),
+        EV_CHARGER_OLD(3), EV_CHARGER_OLD(4)
+    },
+    newEnvironment = {
+        EV_CHARGER_NEW(1), EV_CHARGER_NEW(2),
+        EV_CHARGER_NEW(3), EV_CHARGER_NEW(4)
+    },
+    mapRelation = {R_CHARGER_1, R_CHARGER_2, R_CHARGER_3, R_CHARGER_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking
+}
+
+||EV_CHARGING_DEMAND_RESPONSE_TRADITIONAL = UpdCont.
+
+updatingController UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        EV_CHARGER_OLD(1), EV_CHARGER_OLD(2),
+        EV_CHARGER_OLD(3), EV_CHARGER_OLD(4)
+    },
+    newEnvironment = {
+        EV_CHARGER_NEW(1), EV_CHARGER_NEW(2),
+        EV_CHARGER_NEW(3), EV_CHARGER_NEW(4)
+    },
+    mapRelation = {R_CHARGER_1, R_CHARGER_2, R_CHARGER_3, R_CHARGER_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_3,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_4,
+    nonblocking
+}
+
+||EV_CHARGING_DEMAND_RESPONSE_T1_TRADITIONAL = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        EV_CHARGER_OLD(1), EV_CHARGER_OLD(2),
+        EV_CHARGER_OLD(3), EV_CHARGER_OLD(4)
+    },
+    newEnvironment = {
+        EV_CHARGER_NEW(1), EV_CHARGER_NEW(2),
+        EV_CHARGER_NEW(3), EV_CHARGER_NEW(4)
+    },
+    mapRelation = {R_CHARGER_1, R_CHARGER_2, R_CHARGER_3, R_CHARGER_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking
+}
+
+||EV_CHARGING_DEMAND_RESPONSE_T2_TRADITIONAL = UpdCont_T2.
+
+updatingController Stepwise_UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {
+        EV_CHARGER_OLD(1), EV_CHARGER_OLD(2),
+        EV_CHARGER_OLD(3), EV_CHARGER_OLD(4)
+    },
+    newEnvironment = {
+        EV_CHARGER_NEW(1), EV_CHARGER_NEW(2),
+        EV_CHARGER_NEW(3), EV_CHARGER_NEW(4)
+    },
+    mapRelation = {R_CHARGER_1, R_CHARGER_2, R_CHARGER_3, R_CHARGER_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||EV_CHARGING_DEMAND_RESPONSE_STEPWISE = Stepwise_UpdCont.
+
+updatingController Stepwise_UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        EV_CHARGER_OLD(1), EV_CHARGER_OLD(2),
+        EV_CHARGER_OLD(3), EV_CHARGER_OLD(4)
+    },
+    newEnvironment = {
+        EV_CHARGER_NEW(1), EV_CHARGER_NEW(2),
+        EV_CHARGER_NEW(3), EV_CHARGER_NEW(4)
+    },
+    mapRelation = {R_CHARGER_1, R_CHARGER_2, R_CHARGER_3, R_CHARGER_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_3,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_4,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||EV_CHARGING_DEMAND_RESPONSE_T1_STEPWISE = Stepwise_UpdCont_T1.
+
+updatingController Stepwise_UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        EV_CHARGER_OLD(1), EV_CHARGER_OLD(2),
+        EV_CHARGER_OLD(3), EV_CHARGER_OLD(4)
+    },
+    newEnvironment = {
+        EV_CHARGER_NEW(1), EV_CHARGER_NEW(2),
+        EV_CHARGER_NEW(3), EV_CHARGER_NEW(4)
+    },
+    mapRelation = {R_CHARGER_1, R_CHARGER_2, R_CHARGER_3, R_CHARGER_4},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||EV_CHARGING_DEMAND_RESPONSE_T2_STEPWISE = Stepwise_UpdCont_T2.

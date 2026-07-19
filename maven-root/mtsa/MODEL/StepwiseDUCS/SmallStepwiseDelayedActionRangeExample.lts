@@ -1,0 +1,161 @@
+// Small two-stage regression example for compact multi-index action predicates.
+// P_OLD_RANGE_REFERENCE refers to four concrete actions as one range expression:
+// agent[1].arrive[2][1..2][1..2].
+
+range GridX = 1..2
+range GridY = 1..2
+range GridH = 1..2
+
+set OldControllableActions_1 = {
+    e1_start, e1_work, agent[1].arrive[GridX][GridY][GridH]
+}
+set OldControllableActions_2 = {e2_start}
+set OldControllableActions = {OldControllableActions_1, OldControllableActions_2}
+
+set NewControllableActions_1 = {
+    e1_start, e1_work, agent[1].arrive[GridX][GridY][GridH]
+}
+set NewControllableActions_2 = {e2_start, e2_work}
+set NewControllableActions = {NewControllableActions_1, NewControllableActions_2}
+
+// ---------------------------OLD ENVIRONMENTS-----------------------------
+E1_old = (
+        e1_start -> E1_old_busy
+      | e1_work -> E1_old
+    ),
+    E1_old_busy = (
+        e1_work -> E1_old_busy
+      | e1_done -> E1_old
+      | agent[1].arrive[x:GridX][y:GridY][h:GridH] -> E1_old_busy
+    ).
+
+E2_old = (e2_start -> E2_old_busy),
+    E2_old_busy = (e2_done -> E2_old).
+
+// ---------------------------NEW ENVIRONMENTS-----------------------------
+E1_new = (
+        e1_start -> E1_new_busy
+      | e1_work -> E1_new
+    ),
+    E1_new_busy = (
+        e1_work -> E1_new_busy
+      | e1_done -> E1_new
+      | agent[1].arrive[x:GridX][y:GridY][h:GridH] -> E1_new_busy
+    ).
+
+E2_new = (e2_start -> E2_new_busy | e2_work -> E2_new),
+    E2_new_busy = (e2_work -> E2_new_busy | e2_done -> E2_new).
+
+// ---------------------------MAP RELATIONS-----------------------------
+relation R_E1 = {
+    E1_old@E1_old = reconfigure -> E1_new@E1_new,
+    E1_old_busy@E1_old = reconfigure -> E1_new_busy@E1_new
+}
+
+relation R_E2 = {
+    E2_old@E2_old = reconfigure -> E2_new@E2_new,
+    E2_old_busy@E2_old = reconfigure -> E2_new_busy@E2_new
+}
+
+map MAP_E1 = {E1_old, E1_new, R_E1}
+map MAP_E2 = {E2_old, E2_new, R_E2}
+
+||OLD_ENV = (E1_old || E2_old).
+||NEW_ENV = (E1_new || E2_new).
+||MAPPING_ENV = (MAP_E1 || MAP_E2).
+||MapEnvironment = (MAP_E1 || MAP_E2).
+
+// ---------------------------FLUENTS-----------------------------
+fluent E1Busy = <e1_start, e1_done>
+fluent E2Busy = <e2_start, e2_done>
+
+// ---------------------------OLD REQUIREMENTS-----------------------------
+ltl_property R1_old = [](e1_work -> E1Busy)
+ltl_property R12_old = []!(E1Busy && E2Busy)
+
+// Before the fix, the direct event below was extracted as the nonexistent
+// action "agent.1" instead of its four concrete arrive actions.
+assert OLD_RANGE_REFERENCE = (E1Busy || !agent[1].arrive[2][GridY][GridH])
+ltl_property P_OLD_RANGE_REFERENCE = []OLD_RANGE_REFERENCE
+
+controllerSpec OLD_REQ = {
+    safety = {
+        R1_old,
+        R12_old,
+        P_OLD_RANGE_REFERENCE
+    }
+    controllable = {OldControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+// ---------------------------NEW REQUIREMENTS-----------------------------
+ltl_property R1_new = [](e1_work -> E1Busy)
+ltl_property R2_new = [](e2_work -> E2Busy)
+ltl_property R12_new = []!(E1Busy && E2Busy)
+
+controllerSpec NEW_REQ = {
+    safety = {
+        R1_new,
+        R2_new,
+        R12_new
+    }
+    controllable = {NewControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// ---------------------------UPDATING CONTROLLERS-----------------------------
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {E1_old, E2_old},
+    newEnvironment = {E1_new, E2_new},
+    mapRelation = {R_E1, R_E2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_SBP = {
+    oldController = OldCon,
+    oldEnvironment = {E1_old, E2_old},
+    newEnvironment = {E1_new, E2_new},
+    mapRelation = {R_E1, R_E2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+||UPDATE_CONTROLLER_SBP = UpdCont_SBP.
+
+updatingController UpdCont_stepwise_delayed = {
+    oldController = OldCon,
+    oldEnvironment = {E1_old, E2_old},
+    newEnvironment = {E1_new, E2_new},
+    mapRelation = {R_E1, R_E2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP = {
+    oldController = OldCon,
+    oldEnvironment = {E1_old, E2_old},
+    newEnvironment = {E1_new, E2_new},
+    mapRelation = {R_E1, R_E2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP = UpdCont_stepwise_delayed_SBP.

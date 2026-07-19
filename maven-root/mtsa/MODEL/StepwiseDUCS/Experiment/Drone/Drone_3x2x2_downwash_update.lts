@@ -1,0 +1,323 @@
+//******************************************************************************
+//* Drone policy update in a fixed 3x2x2 airspace: downwash separation
+//*
+//* Old policy : two drones may share an (x,y) column when their heights differ;
+//*              only exact-voxel collisions are forbidden.
+//* New policy : two airborne drones may not share an (x,y) column at any
+//*              heights, protecting the lower drone from rotor downwash.
+//*
+//* hotSwapIn is intentionally available in every pre-update state, including
+//* states in which the drones are vertically stacked.  After hotSwapIn, the
+//* update controller separates the drones before startNewSpec.
+//******************************************************************************
+
+//******************************************************************************
+//* Constants and action sets
+//******************************************************************************
+
+const N = 2
+const MaxX = 3
+const MaxY = 2
+const MaxH = 2
+
+range DroneID = 1..N
+set Drones = {drone[DroneID]}
+range X = 1..MaxX
+range Y = 1..MaxY
+range H = 1..MaxH
+
+set Direction = {n,s,e,w}
+set DroneActions = {drone[DroneID].takeoff, drone[DroneID].land, drone[DroneID].up, drone[DroneID].down, drone[DroneID].move[Direction]}
+set ControllableActions = {DroneActions}
+
+// This focused benchmark omits the unchanged battery subsystem so that the
+// measured difference comes from the policy update and local/cross pruning.
+
+//******************************************************************************
+//* Old and new environments.  Their transition structures are identical.
+//******************************************************************************
+
+MOVE_OLD(I=1) =
+	(drone[I].takeoff -> drone[I].arrive[1][1][1] -> ACTION_OLD[1][1][1]),
+ACTION_OLD[x:X][y:Y][h:H] =
+	(when(x > 1)    drone[I].move['w] -> drone[I].arrive[x-1][y][h] -> ACTION_OLD[x-1][y][h]
+	|when(x < MaxX) drone[I].move['e] -> drone[I].arrive[x+1][y][h] -> ACTION_OLD[x+1][y][h]
+	|when(y > 1)    drone[I].move['s] -> drone[I].arrive[x][y-1][h] -> ACTION_OLD[x][y-1][h]
+	|when(y < MaxY) drone[I].move['n] -> drone[I].arrive[x][y+1][h] -> ACTION_OLD[x][y+1][h]
+	|when(h > 1)    drone[I].down      -> drone[I].arrive[x][y][h-1] -> ACTION_OLD[x][y][h-1]
+	|when(h < MaxH) drone[I].up        -> drone[I].arrive[x][y][h+1] -> ACTION_OLD[x][y][h+1]
+	|when(h == 1)   drone[I].land      -> MOVE_OLD).
+
+MOVE_NEW(I=1) =
+	(drone[I].takeoff -> drone[I].arrive[1][1][1] -> ACTION_NEW[1][1][1]),
+ACTION_NEW[x:X][y:Y][h:H] =
+	(when(x > 1)    drone[I].move['w] -> drone[I].arrive[x-1][y][h] -> ACTION_NEW[x-1][y][h]
+	|when(x < MaxX) drone[I].move['e] -> drone[I].arrive[x+1][y][h] -> ACTION_NEW[x+1][y][h]
+	|when(y > 1)    drone[I].move['s] -> drone[I].arrive[x][y-1][h] -> ACTION_NEW[x][y-1][h]
+	|when(y < MaxY) drone[I].move['n] -> drone[I].arrive[x][y+1][h] -> ACTION_NEW[x][y+1][h]
+	|when(h > 1)    drone[I].down      -> drone[I].arrive[x][y][h-1] -> ACTION_NEW[x][y][h-1]
+	|when(h < MaxH) drone[I].up        -> drone[I].arrive[x][y][h+1] -> ACTION_NEW[x][y][h+1]
+	|when(h == 1)   drone[I].land      -> MOVE_NEW).
+
+||OLD_MOVE_ENV = (forall[i:DroneID] MOVE_OLD(i)).
+||OLD_ENV = OLD_MOVE_ENV.
+
+||NEW_MOVE_ENV = (forall[i:DroneID] MOVE_NEW(i)).
+||NEW_ENV = NEW_MOVE_ENV.
+
+//******************************************************************************
+//* Identity mapping: the current flight/position state is preserved.
+//******************************************************************************
+
+relation R_MOVE(I) = {
+	MOVE_OLD@MOVE_OLD(I) = reconfigure -> MOVE_NEW@MOVE_NEW(I),
+	forall[x:X][y:Y][h:H]
+		ACTION_OLD[x][y][h]@MOVE_OLD(I) = reconfigure -> ACTION_NEW[x][y][h]@MOVE_NEW(I)
+}
+
+//******************************************************************************
+//* Old policy: exact-voxel collision avoidance
+//******************************************************************************
+
+fluent VOXEL_1_1_1_1 = <drone[1].arrive[1][1][1], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_1_1_2 = <drone[1].arrive[1][1][2], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_1_2_1 = <drone[1].arrive[1][2][1], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_1_2_2 = <drone[1].arrive[1][2][2], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_2_1_1 = <drone[1].arrive[2][1][1], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_2_1_2 = <drone[1].arrive[2][1][2], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_2_2_1 = <drone[1].arrive[2][2][1], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_2_2_2 = <drone[1].arrive[2][2][2], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_3_1_1 = <drone[1].arrive[3][1][1], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_3_1_2 = <drone[1].arrive[3][1][2], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_3_2_1 = <drone[1].arrive[3][2][1], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+fluent VOXEL_1_3_2_2 = <drone[1].arrive[3][2][2], {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].up, drone[1].down, drone[1].land}>
+
+fluent VOXEL_2_1_1_1 = <drone[2].arrive[1][1][1], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_1_1_2 = <drone[2].arrive[1][1][2], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_1_2_1 = <drone[2].arrive[1][2][1], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_1_2_2 = <drone[2].arrive[1][2][2], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_2_1_1 = <drone[2].arrive[2][1][1], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_2_1_2 = <drone[2].arrive[2][1][2], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_2_2_1 = <drone[2].arrive[2][2][1], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_2_2_2 = <drone[2].arrive[2][2][2], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_3_1_1 = <drone[2].arrive[3][1][1], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_3_1_2 = <drone[2].arrive[3][1][2], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_3_2_1 = <drone[2].arrive[3][2][1], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+fluent VOXEL_2_3_2_2 = <drone[2].arrive[3][2][2], {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].up, drone[2].down, drone[2].land}>
+
+assert OLD_NO_COLLISION_1_TO_2_H1 = (
+	(VOXEL_1_1_1_1 -> !drone[2].arrive[1][1][1])
+	&& (VOXEL_1_1_2_1 -> !drone[2].arrive[1][2][1])
+	&& (VOXEL_1_2_1_1 -> !drone[2].arrive[2][1][1])
+	&& (VOXEL_1_2_2_1 -> !drone[2].arrive[2][2][1])
+	&& (VOXEL_1_3_1_1 -> !drone[2].arrive[3][1][1])
+	&& (VOXEL_1_3_2_1 -> !drone[2].arrive[3][2][1])
+)
+assert OLD_NO_COLLISION_1_TO_2_H2 = (
+	(VOXEL_1_1_1_2 -> !drone[2].arrive[1][1][2])
+	&& (VOXEL_1_1_2_2 -> !drone[2].arrive[1][2][2])
+	&& (VOXEL_1_2_1_2 -> !drone[2].arrive[2][1][2])
+	&& (VOXEL_1_2_2_2 -> !drone[2].arrive[2][2][2])
+	&& (VOXEL_1_3_1_2 -> !drone[2].arrive[3][1][2])
+	&& (VOXEL_1_3_2_2 -> !drone[2].arrive[3][2][2])
+)
+
+assert OLD_NO_COLLISION_2_TO_1_H1 = (
+	(VOXEL_2_1_1_1 -> !drone[1].arrive[1][1][1])
+	&& (VOXEL_2_1_2_1 -> !drone[1].arrive[1][2][1])
+	&& (VOXEL_2_2_1_1 -> !drone[1].arrive[2][1][1])
+	&& (VOXEL_2_2_2_1 -> !drone[1].arrive[2][2][1])
+	&& (VOXEL_2_3_1_1 -> !drone[1].arrive[3][1][1])
+	&& (VOXEL_2_3_2_1 -> !drone[1].arrive[3][2][1])
+)
+assert OLD_NO_COLLISION_2_TO_1_H2 = (
+	(VOXEL_2_1_1_2 -> !drone[1].arrive[1][1][2])
+	&& (VOXEL_2_1_2_2 -> !drone[1].arrive[1][2][2])
+	&& (VOXEL_2_2_1_2 -> !drone[1].arrive[2][1][2])
+	&& (VOXEL_2_2_2_2 -> !drone[1].arrive[2][2][2])
+	&& (VOXEL_2_3_1_2 -> !drone[1].arrive[3][1][2])
+	&& (VOXEL_2_3_2_2 -> !drone[1].arrive[3][2][2])
+)
+
+ltl_property P_OLD_NO_COLLISION_1_TO_2_H1 = []OLD_NO_COLLISION_1_TO_2_H1
+ltl_property P_OLD_NO_COLLISION_1_TO_2_H2 = []OLD_NO_COLLISION_1_TO_2_H2
+ltl_property P_OLD_NO_COLLISION_2_TO_1_H1 = []OLD_NO_COLLISION_2_TO_1_H1
+ltl_property P_OLD_NO_COLLISION_2_TO_1_H2 = []OLD_NO_COLLISION_2_TO_1_H2
+
+//******************************************************************************
+//* New policy: no shared vertical column
+//******************************************************************************
+
+// Vertical moves do not terminate a column fluent; horizontal moves and land do.
+fluent COLUMN_1_1_1 = <{drone[1].arrive[1][1][1], drone[1].arrive[1][1][2]}, {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].land}>
+fluent COLUMN_1_1_2 = <{drone[1].arrive[1][2][1], drone[1].arrive[1][2][2]}, {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].land}>
+fluent COLUMN_1_2_1 = <{drone[1].arrive[2][1][1], drone[1].arrive[2][1][2]}, {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].land}>
+fluent COLUMN_1_2_2 = <{drone[1].arrive[2][2][1], drone[1].arrive[2][2][2]}, {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].land}>
+fluent COLUMN_1_3_1 = <{drone[1].arrive[3][1][1], drone[1].arrive[3][1][2]}, {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].land}>
+fluent COLUMN_1_3_2 = <{drone[1].arrive[3][2][1], drone[1].arrive[3][2][2]}, {drone[1].move['n], drone[1].move['s], drone[1].move['e], drone[1].move['w], drone[1].land}>
+
+fluent COLUMN_2_1_1 = <{drone[2].arrive[1][1][1], drone[2].arrive[1][1][2]}, {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].land}>
+fluent COLUMN_2_1_2 = <{drone[2].arrive[1][2][1], drone[2].arrive[1][2][2]}, {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].land}>
+fluent COLUMN_2_2_1 = <{drone[2].arrive[2][1][1], drone[2].arrive[2][1][2]}, {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].land}>
+fluent COLUMN_2_2_2 = <{drone[2].arrive[2][2][1], drone[2].arrive[2][2][2]}, {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].land}>
+fluent COLUMN_2_3_1 = <{drone[2].arrive[3][1][1], drone[2].arrive[3][1][2]}, {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].land}>
+fluent COLUMN_2_3_2 = <{drone[2].arrive[3][2][1], drone[2].arrive[3][2][2]}, {drone[2].move['n], drone[2].move['s], drone[2].move['e], drone[2].move['w], drone[2].land}>
+
+assert NEW_NO_DOWNWASH_1_TO_2_11 =
+	(COLUMN_1_1_1 -> !(drone[2].arrive[1][1][1] || drone[2].arrive[1][1][2]))
+assert NEW_NO_DOWNWASH_1_TO_2_12 =
+	(COLUMN_1_1_2 -> !(drone[2].arrive[1][2][1] || drone[2].arrive[1][2][2]))
+assert NEW_NO_DOWNWASH_1_TO_2_21 =
+	(COLUMN_1_2_1 -> !(drone[2].arrive[2][1][1] || drone[2].arrive[2][1][2]))
+assert NEW_NO_DOWNWASH_1_TO_2_22 =
+	(COLUMN_1_2_2 -> !(drone[2].arrive[2][2][1] || drone[2].arrive[2][2][2]))
+assert NEW_NO_DOWNWASH_1_TO_2_31 =
+	(COLUMN_1_3_1 -> !(drone[2].arrive[3][1][1] || drone[2].arrive[3][1][2]))
+assert NEW_NO_DOWNWASH_1_TO_2_32 =
+	(COLUMN_1_3_2 -> !(drone[2].arrive[3][2][1] || drone[2].arrive[3][2][2]))
+
+assert NEW_NO_DOWNWASH_2_TO_1_11 =
+	(COLUMN_2_1_1 -> !(drone[1].arrive[1][1][1] || drone[1].arrive[1][1][2]))
+assert NEW_NO_DOWNWASH_2_TO_1_12 =
+	(COLUMN_2_1_2 -> !(drone[1].arrive[1][2][1] || drone[1].arrive[1][2][2]))
+assert NEW_NO_DOWNWASH_2_TO_1_21 =
+	(COLUMN_2_2_1 -> !(drone[1].arrive[2][1][1] || drone[1].arrive[2][1][2]))
+assert NEW_NO_DOWNWASH_2_TO_1_22 =
+	(COLUMN_2_2_2 -> !(drone[1].arrive[2][2][1] || drone[1].arrive[2][2][2]))
+assert NEW_NO_DOWNWASH_2_TO_1_31 =
+	(COLUMN_2_3_1 -> !(drone[1].arrive[3][1][1] || drone[1].arrive[3][1][2]))
+assert NEW_NO_DOWNWASH_2_TO_1_32 =
+	(COLUMN_2_3_2 -> !(drone[1].arrive[3][2][1] || drone[1].arrive[3][2][2]))
+
+ltl_property P_NEW_NO_DOWNWASH_1_TO_2_11 = []NEW_NO_DOWNWASH_1_TO_2_11
+ltl_property P_NEW_NO_DOWNWASH_1_TO_2_12 = []NEW_NO_DOWNWASH_1_TO_2_12
+ltl_property P_NEW_NO_DOWNWASH_1_TO_2_21 = []NEW_NO_DOWNWASH_1_TO_2_21
+ltl_property P_NEW_NO_DOWNWASH_1_TO_2_22 = []NEW_NO_DOWNWASH_1_TO_2_22
+ltl_property P_NEW_NO_DOWNWASH_1_TO_2_31 = []NEW_NO_DOWNWASH_1_TO_2_31
+ltl_property P_NEW_NO_DOWNWASH_1_TO_2_32 = []NEW_NO_DOWNWASH_1_TO_2_32
+ltl_property P_NEW_NO_DOWNWASH_2_TO_1_11 = []NEW_NO_DOWNWASH_2_TO_1_11
+ltl_property P_NEW_NO_DOWNWASH_2_TO_1_12 = []NEW_NO_DOWNWASH_2_TO_1_12
+ltl_property P_NEW_NO_DOWNWASH_2_TO_1_21 = []NEW_NO_DOWNWASH_2_TO_1_21
+ltl_property P_NEW_NO_DOWNWASH_2_TO_1_22 = []NEW_NO_DOWNWASH_2_TO_1_22
+ltl_property P_NEW_NO_DOWNWASH_2_TO_1_31 = []NEW_NO_DOWNWASH_2_TO_1_31
+ltl_property P_NEW_NO_DOWNWASH_2_TO_1_32 = []NEW_NO_DOWNWASH_2_TO_1_32
+
+//******************************************************************************
+//* Static old and new controllers
+//******************************************************************************
+
+controllerSpec OLD_SPEC = {
+	safety = {
+		P_OLD_NO_COLLISION_1_TO_2_H1,
+		P_OLD_NO_COLLISION_1_TO_2_H2,
+		P_OLD_NO_COLLISION_2_TO_1_H1,
+		P_OLD_NO_COLLISION_2_TO_1_H2
+	}
+	controllable = {ControllableActions}
+}
+
+controllerSpec NEW_SPEC = {
+	safety = {
+		P_NEW_NO_DOWNWASH_1_TO_2_11,
+		P_NEW_NO_DOWNWASH_1_TO_2_12,
+		P_NEW_NO_DOWNWASH_1_TO_2_21,
+		P_NEW_NO_DOWNWASH_1_TO_2_22,
+		P_NEW_NO_DOWNWASH_1_TO_2_31,
+		P_NEW_NO_DOWNWASH_1_TO_2_32,
+		P_NEW_NO_DOWNWASH_2_TO_1_11,
+		P_NEW_NO_DOWNWASH_2_TO_1_12,
+		P_NEW_NO_DOWNWASH_2_TO_1_21,
+		P_NEW_NO_DOWNWASH_2_TO_1_22,
+		P_NEW_NO_DOWNWASH_2_TO_1_31,
+		P_NEW_NO_DOWNWASH_2_TO_1_32
+	}
+	controllable = {ControllableActions}
+}
+
+controller ||C_OLD_DRONE = (OLD_ENV)~{OLD_SPEC}.
+||OldDrone = (C_OLD_DRONE || OLD_ENV).
+
+controller ||C_NEW_DRONE = (NEW_ENV)~{NEW_SPEC}.
+||NewDrone = (C_NEW_DRONE || NEW_ENV).
+
+//******************************************************************************
+//* Transition requirements
+//******************************************************************************
+
+assert DOWNWASH_READY = !(
+	(COLUMN_1_1_1 && COLUMN_2_1_1)
+	|| (COLUMN_1_1_2 && COLUMN_2_1_2)
+	|| (COLUMN_1_2_1 && COLUMN_2_2_1)
+	|| (COLUMN_1_2_2 && COLUMN_2_2_2)
+	|| (COLUMN_1_3_1 && COLUMN_2_3_1)
+	|| (COLUMN_1_3_2 && COLUMN_2_3_2)
+)
+
+// Readiness constrains startNewSpec, never hotSwapIn.
+// It does not impose an order on the update events; DUCS chooses that order.
+assert START_WHEN_DOWNWASH_READY = (startNewSpec -> DOWNWASH_READY)
+
+ltl_property T_START_WHEN_DOWNWASH_READY = START_WHEN_DOWNWASH_READY
+
+//******************************************************************************
+//* Updating controllers
+//******************************************************************************
+
+updatingController UpdCont = {
+	oldController = OldDrone,
+	oldEnvironment = {MOVE_OLD(1), MOVE_OLD(2)},
+	newEnvironment = {MOVE_NEW(1), MOVE_NEW(2)},
+	mapRelation = {R_MOVE(1), R_MOVE(2)},
+	oldGoal = OLD_SPEC,
+	newGoal = NEW_SPEC,
+	transition = T_START_WHEN_DOWNWASH_READY,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_SBP = {
+	oldController = OldDrone,
+	oldEnvironment = {MOVE_OLD(1), MOVE_OLD(2)},
+	newEnvironment = {MOVE_NEW(1), MOVE_NEW(2)},
+	mapRelation = {R_MOVE(1), R_MOVE(2)},
+	oldGoal = OLD_SPEC,
+	newGoal = NEW_SPEC,
+	transition = T_START_WHEN_DOWNWASH_READY,
+	nonblocking,
+	safetyBackwardPruning
+}
+
+||UPDATE_CONTROLLER_SBP = UpdCont_SBP.
+
+updatingController UpdCont_stepwise_delayed = {
+	oldController = OldDrone,
+	oldEnvironment = {MOVE_OLD(1), MOVE_OLD(2)},
+	newEnvironment = {MOVE_NEW(1), MOVE_NEW(2)},
+	mapRelation = {R_MOVE(1), R_MOVE(2)},
+	oldGoal = OLD_SPEC,
+	newGoal = NEW_SPEC,
+	transition = T_START_WHEN_DOWNWASH_READY,
+	nonblocking,
+	stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP = {
+	oldController = OldDrone,
+	oldEnvironment = {MOVE_OLD(1), MOVE_OLD(2)},
+	newEnvironment = {MOVE_NEW(1), MOVE_NEW(2)},
+	mapRelation = {R_MOVE(1), R_MOVE(2)},
+	oldGoal = OLD_SPEC,
+	newGoal = NEW_SPEC,
+	transition = T_START_WHEN_DOWNWASH_READY,
+	nonblocking,
+	stepwise_delayed,
+	safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP = UpdCont_stepwise_delayed_SBP.
+
+// The CLI UpdateRequirementChecker can be used after synthesis to verify R1:
+// hotSwapIn_enabled_in_all_pre_update_states.

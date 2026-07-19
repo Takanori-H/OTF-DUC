@@ -63,6 +63,32 @@ public class UpdatingControllersUtils {
 		UpdatingControllersUtils.UPDATE_FLUENTS.add(startFluent);
 	}
 
+	/**
+	 * Completes an action proposition fluent so that every non-initiating event
+	 * in the synthesis alphabet terminates it. The fluent name is only a display
+	 * name (for example, indexed actions use bracket notation), so the concrete
+	 * initiating-action set must be used when constructing the terminating set.
+	 */
+	public static Fluent completeActionFluentTerminatingActions(
+			Set<String> actions,
+			Fluent fluent) {
+		Set<MTSSynthesis.ar.dc.uba.model.language.Symbol> terminating =
+				new HashSet<MTSSynthesis.ar.dc.uba.model.language.Symbol>();
+		for (String action : actions) {
+			SingleSymbol actionSymbol = new SingleSymbol(action);
+			if (!"tau".equals(action)
+					&& !fluent.getInitiatingActions().contains(actionSymbol)) {
+				terminating.add(actionSymbol);
+			}
+		}
+
+		return new FluentImpl(
+				fluent.getName(),
+				fluent.getInitiatingActions(),
+				terminating,
+				fluent.getInitialValue());
+	}
+
 
 	public static Set<Fluent> compileFluents(List<Symbol> updPropertyDef) {
 		Set<Fluent> compiledFluents = new HashSet<Fluent>();

@@ -6,6 +6,7 @@ import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.controller.util.FluentStateValuation;
 import MTSTools.ac.ic.doc.commons.relations.Pair;
 import MTSTools.ac.ic.doc.mtstools.model.MTS;
+import MTSTools.ac.ic.doc.mtstools.model.MTSConstants;
 import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 import ltsa.ac.ic.doc.mtstools.util.fsp.AutomataToMTSConverter;
 import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
@@ -17,6 +18,7 @@ import ltsa.lts.MappingEnvironmentGenerator;
 import ltsa.updatingControllers.DUCHeartbeat;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.stepwise.StepwiseActionOwnership;
 import ltsa.updatingControllers.stepwise.StepwiseClassifiedGoal;
 import ltsa.updatingControllers.stepwise.StepwiseGoalClassifier;
 import ltsa.updatingControllers.stepwise.StepwiseRequirementKind;
@@ -35,6 +37,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -49,16 +52,6 @@ import java.util.logging.Logger;
 
 public class StepwiseDelayedUpdatingControllerSynthesizer {
 
-    private static final String SCOPE_REQUIREMENT_SECTION = "Stepwise Delayed DUC scope別要求数";
-    private static final String SCOPE_STATE_SPACE_SECTION = "Stepwise Delayed DUC scope別状態空間";
-    private static final String CROSS_SCHEDULING_SECTION =
-            "Stepwise Delayed DUC cross scheduling";
-    private static final String CROSS_SCHEDULING_DETAIL_SECTION =
-            "Stepwise Delayed DUC cross scheduling detail";
-    private static final String DIRECT_PRUNING_REDUCTION_SECTION =
-            "Stepwise Delayed DUC direct pruning 削減率";
-    private static final String HOT_SWAP_IN_CONNECTION_SECTION =
-            "Stepwise Delayed DUC hotSwapIn connection";
     private static final boolean COST_GUIDED_STAGED_CROSS_SCHEDULING =
             Boolean.parseBoolean(System.getProperty(
                     "stepwise.delayed.costGuidedCrossScheduling",
@@ -67,11 +60,33 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Boolean.parseBoolean(System.getProperty(
                     "stepwise.delayed.indexedHotSwapInConnection",
                     "false"));
+    // Diagnostic-only instrumentation. It is deliberately disabled by default so
+    // paper/evaluation runs do not perform extra graph traversals or emit extra logs.
+    private static final boolean DEBUG_ACTION_DIAGNOSTICS =
+            Boolean.parseBoolean(System.getProperty(
+                    "stepwise.delayed.debugActionDiagnostics",
+                    "false"));
+    // Focused hotSwapIn lineage diagnostics. Kept separate from the broader
+    // action diagnostics so this tracing can be enabled without their graph scans.
+    private static final boolean DEBUG_HOT_SWAP_LINEAGE =
+            Boolean.parseBoolean(System.getProperty(
+                    "stepwise.delayed.debugHotSwapLineage",
+                    "false"));
+    private static final Map<MTS<Long, String>, Map<Long, long[]>> DEBUG_LOCAL_STATE_VECTORS =
+            new IdentityHashMap<MTS<Long, String>, Map<Long, long[]>>();
+    private static final Map<MTS<Long, String>, Map<Long, Long>> DEBUG_FLUENT_PRODUCT_BASE_STATES =
+            new IdentityHashMap<MTS<Long, String>, Map<Long, Long>>();
+    private static final Map<Integer, DelayedEnv> DEBUG_LOCAL_ENVIRONMENTS =
+            new HashMap<Integer, DelayedEnv>();
+    private static int debugLineageStageCount;
 
     public static void generateController(UpdatingControllerCompositeState uccs, LTSOutput output) {
         List<StepwiseStage> stages = uccs.getStepwiseStages();
         if (stages == null || stages.isEmpty()) {
             Diagnostics.fatal("stepwise_delayed requires at least one stage.");
+        }
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugResetHotSwapLineage(stages.size());
         }
 
         MTS<Long, String> oldController = uccs.getOldController();
@@ -87,7 +102,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         validateSupportedGoal("oldGoal", oldGoal);
         validateSupportedGoal("newGoal", newGoal);
 
-        StepwiseGoalClassifier classifier = new StepwiseGoalClassifier(stages, output);
+        UpdatingControllerEvaluationRecorder.beginFailureTimer(
+                "Stepwise Delayed DUC",
+                "GR(1)入力 safetyEnv 構築時間");
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                "Stepwise Delayed DUC",
+                "GR(1)入力 safetyEnv 構築時間");
+        StepwiseActionOwnership actionOwnership = new StepwiseActionOwnership(stages);
+        StepwiseGoalClassifier classifier = new StepwiseGoalClassifier(stages, actionOwnership, output);
         StepwiseGoalClassifier.Classification classification =
                 classifier.classify(oldGoal, newGoal, uccs.getStepwiseTransitionGoals());
         List<StepwiseClassifiedGoal> crossGoals = classification.getCrossGoals();
@@ -96,7 +118,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         sortCrossComponentsByStageSet(crossComponents);
         long crossComponentBuildTime = System.currentTimeMillis() - crossComponentBuildStart;
         UpdatingControllerEvaluationRecorder.recordTime(
-                "Stepwise Delayed DUC 分類統計",
+                StepwiseDelayedEvaluationMetrics.CLASSIFICATION_SECTION,
                 "cross component 構築時間",
                 crossComponentBuildTime);
 
@@ -111,11 +133,12 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> metadata =
                     initialStageMetadata(stage);
             addMappingRegionUpdateSelfLoops(mapping);
-            Set<String> realActions = new HashSet<String>(mapping.getActions());
+            Set<String> realActions = mappingRealActions(mapping);
             globalActions.addAll(mapping.getActions());
             bases.add(new StageBase(stage, mapping, metadata, realActions));
         }
         globalActions.remove(UpdateConstants.BEGIN_UPDATE);
+        globalActions.remove(MTSConstants.TAU);
 
         output.outln("[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true"
                 + " incrementalPruning=" + uccs.isIncrementalPruning()
@@ -164,7 +187,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 crossComponents);
         long classificationStatsCountTime = System.currentTimeMillis() - classificationStatsStart;
         UpdatingControllerEvaluationRecorder.recordEvaluationCountTime(
-                "Stepwise Delayed DUC 分類統計",
+                StepwiseDelayedEvaluationMetrics.CLASSIFICATION_SECTION,
                 "分類統計計算・記録 CountTime",
                 classificationStatsCountTime,
                 "stepwise_delayed の stage/local/cross goal 数、cross 比率、cross component scope 統計を計算し、ログと評価 recorder に記録する時間。");
@@ -222,32 +245,55 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                                 localGoals,
                                 globalActions);
                 addPhaseComparisonFluents(trackedFluents);
-                DelayedEnv meta = buildFluentProduct(
+                Set<Integer> localScope = singletonStageScope(stageIndex);
+                recordScopedFluentCount(
+                        "local stage " + stage.getDisplayIndex() + " tracked fluent 数",
+                        localScope,
+                        trackedFluents);
+                DelayedEnv meta = timedBuildFluentProduct(
                         base.mapping,
                         base.stageMetadata,
                         Collections.<Long, Long>emptyMap(),
-                        trackedFluents);
-                Set<Integer> localScope = singletonStageScope(stageIndex);
+                        trackedFluents,
+                        localScope,
+                        "local stage " + stage.getDisplayIndex() + " mapping component から local metaEnv 構築時間");
                 StateSpaceStats localMetaStats = outputStateSpace(output, "  mapping meta", meta.env);
                 recordScopedStateSpace("local metaEnv", localScope, localMetaStats);
 
-                DelayedEnv safety = pruneSafety(meta, localGoals, "local stage " + stage.getDisplayIndex(), output);
+                DelayedEnv safety = timedPruneSafety(
+                        meta,
+                        localGoals,
+                        "local stage " + stage.getDisplayIndex(),
+                        localScope,
+                        "local stage " + stage.getDisplayIndex() + " local metaEnv から local safetyEnv 構築時間",
+                        output);
                 if (uccs.isSafetyBackwardPruning()) {
-                    safety = applySafetyBackwardPruning(
+                    safety = applyDeferredSafetyBackwardPruning(
                             safety,
                             uccs.getUpdateGRGoal().getControllableActions(),
+                            actionOwnership.asMap(),
+                            localScope,
                             "local stage " + stage.getDisplayIndex(),
                             output);
                 }
                 StateSpaceStats localSafetyStats = outputStateSpace(output, "  mapping safety", safety.env);
                 recordScopedStateSpace("local safetyEnv", localScope, localSafetyStats);
-                localSafetyEnvironments.add(new DelayedEnv(
+                DelayedEnv localSafetyEnvironment = new DelayedEnv(
                         safety.env,
                         safety.trackedFluents,
                         safety.valuation,
                         safety.stageMetadata,
                         safety.oldControllerOrigin,
-                        base.realActions));
+                        base.realActions,
+                        safety.errorStates);
+                if (DEBUG_HOT_SWAP_LINEAGE) {
+                    debugRegisterLocalSafetyEnvironment(localSafetyEnvironment, stageIndex);
+                    debugSemanticMultiplicity(
+                            "local_stage_" + stage.getDisplayIndex() + "_safety",
+                            localSafetyEnvironment,
+                            output);
+                }
+                localSafetyEnvironments.add(localSafetyEnvironment);
             }
 
             outputCrossComponents(output, crossComponents);
@@ -265,6 +311,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                                 stages,
                                 uccs.isSafetyBackwardPruning(),
                                 uccs.getUpdateGRGoal().getControllableActions(),
+                                actionOwnership.asMap(),
                                 totalSchedulingStats,
                                 output);
                 finalProductInputs.add(componentSafetyEnv);
@@ -282,16 +329,63 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
             output.outln("");
             output.outln("[Stepwise Delayed DUCS] Final product inputs: " + finalProductLabels);
-            mappingProduct = composeProduct(finalProductInputs, "STEPWISE_DELAYED_MAPPING_PRODUCT", output);
+            mappingProduct = timedComposeProduct(
+                    finalProductInputs,
+                    "STEPWISE_DELAYED_MAPPING_PRODUCT",
+                    allStageScope(stages.size()),
+                    "final product 並列合成時間",
+                    output);
+        }
+        if (uccs.isSafetyBackwardPruning() && !uccs.isIncrementalPruning()) {
+            SafetyBackwardPruner.Result finalMappingPruning = SafetyBackwardPruner.prune(
+                    mappingProduct.env,
+                    uccs.getUpdateGRGoal().getControllableActions(),
+                    "stepwise-delayed-final-mapping",
+                    output);
+            failIfInitialLosing(finalMappingPruning, "stepwise-delayed-final-mapping");
+            mappingProduct = rebuildMetadata(mappingProduct, finalMappingPruning.getEnvironment());
+            if (!mappingProduct.errorStates.isEmpty()) {
+                Diagnostics.fatal("stepwise_delayed final mapping product retained unresolved Error states: "
+                        + mappingProduct.errorStates + ".");
+            }
+            outputStateSpace(
+                    output,
+                    "[Stepwise Delayed DUCS] Product after final mapping safety backward pruning",
+                    mappingProduct.env);
         }
         outputStateSpace(output, "[Stepwise Delayed DUCS] Product before delayed connection", mappingProduct.env);
+        if (DEBUG_ACTION_DIAGNOSTICS) {
+            debugActionStatistics(
+                    "final_mapping_before_connection",
+                    mappingProduct,
+                    allStageScope(stages.size()),
+                    uccs.getUpdateGRGoal().getControllableActions(),
+                    actionOwnership.asMap(),
+                    output);
+        }
 
         Set<Fluent> allTrackedFluents = new LinkedHashSet<Fluent>(mappingProduct.trackedFluents);
         addPhaseComparisonFluents(allTrackedFluents);
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "final tracked fluent 数",
+                allTrackedFluents.size(),
+                "fluents");
+        long oldMetaStart = System.currentTimeMillis();
         DelayedEnv oldMeta = buildOldControllerMeta(oldController, allTrackedFluents);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Stepwise Delayed DUC",
+                "old controller meta 構築時間",
+                System.currentTimeMillis() - oldMetaStart);
         outputStateSpace(output, "[Stepwise Delayed DUCS] OldCon fluent meta", oldMeta.env);
 
         ConnectionPlan connectionPlan = buildConnections(oldMeta, mappingProduct, allTrackedFluents, output);
+        if (DEBUG_ACTION_DIAGNOSTICS) {
+            debugConnectionMultiplicity(connectionPlan, oldMeta, mappingProduct, output);
+        }
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugHotSwapLineage(connectionPlan, oldMeta, mappingProduct, allTrackedFluents, output);
+        }
         output.outln("[Stepwise Delayed DUCS] all old-controller states: " + oldMeta.env.getStates().size());
         output.outln("[Stepwise Delayed DUCS] reachable old-controller states: " + oldMeta.env.getStates().size());
         output.outln("[Stepwise Delayed DUCS] hotSwapIn connections: " + connectionPlan.connections.size());
@@ -307,10 +401,20 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         MTS<Long, String> relabeledOld = relabelOldControllableActions(
                 oldMeta.env,
                 uccs.getUpdateGRGoal().getControllableActions());
+        long connectionEnvironmentStart = System.currentTimeMillis();
         MTS<Long, String> connected = connectOldAndMapping(relabeledOld, mappingProduct.env, connectionPlan.connections);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Stepwise Delayed DUC",
+                "hotSwapIn connection 後 environment 構築時間",
+                System.currentTimeMillis() - connectionEnvironmentStart);
         outputStateSpace(output, "[Stepwise Delayed DUCS] After delayed hotSwapIn connection", connected);
 
+        long dontDoTwiceStart = System.currentTimeMillis();
         MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.getDontDoTwiceGoals(connected);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Stepwise Delayed DUC",
+                "global DontDoTwice 構築時間",
+                System.currentTimeMillis() - dontDoTwiceStart);
         StateSpaceStats finalSafetyStats =
                 outputStateSpace(output, "[Stepwise Delayed DUCS] After global DontDoTwice", safetyEnv);
         String finalSafetySourceStage = "[Stepwise Delayed DUCS] After global DontDoTwice";
@@ -336,14 +440,25 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 finalSafetySourceStage);
 
         uccs.setUpdateEnvironment(safetyEnv);
+        long compactSafetyEnvStart = System.currentTimeMillis();
         CompactState compactSafetyEnv = MTSToAutomataConverter.getInstance()
                 .convert(safetyEnv, "stepwise_delayed_E_u||G(safety)", false, true);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Stepwise Delayed DUC",
+                "safetyEnv から CompactState への変換時間",
+                System.currentTimeMillis() - compactSafetyEnvStart);
         Vector<CompactState> machines = new Vector<CompactState>();
         machines.add(compactSafetyEnv);
         uccs.setMachines(machines);
 
         output.outln("");
         output.outln("[Stepwise Delayed DUCS] GR(1)");
+        UpdatingControllerEvaluationRecorder.endCountScope(
+                "Stepwise Delayed DUC",
+                "GR(1)入力 safetyEnv 構築時間");
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Stepwise Delayed DUC",
+                "GR(1)入力 safetyEnv 構築時間");
         long synthesizeGRStart = System.currentTimeMillis();
         DUCHeartbeat.beginPhase("STEPWISE_DELAYED_GR1_SYNTHESIS");
         DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
@@ -396,6 +511,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         int allStageCrossGoalCount = countAllStageCrossGoals(crossGoals, stageCount);
         int maxComponentScopeSize = maxComponentScopeSize(crossComponents);
         int allStageCrossComponentCount = countAllStageCrossComponents(crossComponents, stageCount);
+        int requirementFluentCount = uniqueRequirementFluents(stageCount, classification, crossGoals).size();
 
         output.outln("");
         output.outln("[Stepwise Delayed DUCS] Requirement classification summary");
@@ -415,8 +531,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 + " maxComponentScopeSize=" + maxComponentScopeSize
                 + " allStageCrossGoals=" + allStageCrossGoalCount
                 + " allStageCrossComponents=" + allStageCrossComponentCount);
+        output.outln("  requirement fluents: unique=" + requirementFluentCount);
 
-        String section = "Stepwise Delayed DUC 分類統計";
+        String section = StepwiseDelayedEvaluationMetrics.CLASSIFICATION_SECTION;
         UpdatingControllerEvaluationRecorder.recordCount(section, "stage 数", stageCount, "stages");
         UpdatingControllerEvaluationRecorder.recordCount(section, "goal 数", totalGoals, "goals");
         UpdatingControllerEvaluationRecorder.recordCount(section, "local goal 数", localGoals, "goals");
@@ -434,7 +551,34 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordCount(section, "all-stage cross goal 数", allStageCrossGoalCount, "goals");
         UpdatingControllerEvaluationRecorder.recordCount(section, "all-stage cross component 数", allStageCrossComponentCount, "components");
         UpdatingControllerEvaluationRecorder.recordCount(section, "all-stage cross goal あり", allStageCrossGoalCount > 0 ? 1 : 0, "boolean");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                section,
+                "requirement fluent 数（重複排除後）",
+                requirementFluentCount,
+                "fluents");
         recordScopeRequirementCounts(output, stageCount, classification, crossGoals);
+    }
+
+    private static Set<Fluent> uniqueRequirementFluents(
+            int stageCount,
+            StepwiseGoalClassifier.Classification classification,
+            List<StepwiseClassifiedGoal> crossGoals) {
+        Set<Fluent> fluents = new LinkedHashSet<Fluent>();
+        for (int stageIndex = 0; stageIndex < stageCount; stageIndex++) {
+            addRequirementFluents(fluents, classification.getOldSafety(stageIndex));
+            addRequirementFluents(fluents, classification.getNewSafety(stageIndex));
+            addRequirementFluents(fluents, classification.getTransitions(stageIndex));
+        }
+        addRequirementFluents(fluents, crossGoals);
+        return fluents;
+    }
+
+    private static void addRequirementFluents(
+            Set<Fluent> fluents,
+            List<StepwiseClassifiedGoal> goals) {
+        for (StepwiseClassifiedGoal goal : goals) {
+            fluents.addAll(goal.getFluents());
+        }
     }
 
     private static void recordScopeRequirementCounts(
@@ -467,27 +611,33 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     + "total=" + count.totalGoals()
                     + " oldSafety=" + count.oldSafetyGoals
                     + " newSafety=" + count.newSafetyGoals
-                    + " transition=" + count.transitionGoals);
+                    + " transition=" + count.transitionGoals
+                    + " requirementFluents=" + count.requirementFluentCount());
             UpdatingControllerEvaluationRecorder.recordCount(
-                    SCOPE_REQUIREMENT_SECTION,
+                    StepwiseDelayedEvaluationMetrics.SCOPE_REQUIREMENT_SECTION,
                     prefix + "goal 数",
                     count.totalGoals(),
                     "goals");
             UpdatingControllerEvaluationRecorder.recordCount(
-                    SCOPE_REQUIREMENT_SECTION,
+                    StepwiseDelayedEvaluationMetrics.SCOPE_REQUIREMENT_SECTION,
                     prefix + "old safety goal 数",
                     count.oldSafetyGoals,
                     "goals");
             UpdatingControllerEvaluationRecorder.recordCount(
-                    SCOPE_REQUIREMENT_SECTION,
+                    StepwiseDelayedEvaluationMetrics.SCOPE_REQUIREMENT_SECTION,
                     prefix + "new safety goal 数",
                     count.newSafetyGoals,
                     "goals");
             UpdatingControllerEvaluationRecorder.recordCount(
-                    SCOPE_REQUIREMENT_SECTION,
+                    StepwiseDelayedEvaluationMetrics.SCOPE_REQUIREMENT_SECTION,
                     prefix + "transition goal 数",
                     count.transitionGoals,
                     "goals");
+            UpdatingControllerEvaluationRecorder.recordCount(
+                    StepwiseDelayedEvaluationMetrics.SCOPE_FLUENT_SECTION,
+                    prefix + "requirement fluent 数（重複排除後）",
+                    count.requirementFluentCount(),
+                    "fluents");
         }
     }
 
@@ -593,11 +743,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             addPassiveSelfLoopsForMissingActions(base.mapping, globalActions);
             Set<Fluent> phaseFluents = new LinkedHashSet<Fluent>();
             addPhaseComparisonFluents(phaseFluents);
-            DelayedEnv phaseMeta = buildFluentProduct(
+            Set<Integer> localScope = singletonStageScope(stageIndex);
+            recordScopedFluentCount(
+                    "incremental local stage " + stage.getDisplayIndex() + " phase tracked fluent 数",
+                    localScope,
+                    phaseFluents);
+            DelayedEnv phaseMeta = timedBuildFluentProduct(
                     base.mapping,
                     base.stageMetadata,
                     Collections.<Long, Long>emptyMap(),
-                    phaseFluents);
+                    phaseFluents,
+                    localScope,
+                    "incremental local stage " + stage.getDisplayIndex() + " phase metaEnv 構築時間");
             DelayedEnv current = new DelayedEnv(
                     phaseMeta.env,
                     phaseMeta.trackedFluents,
@@ -605,7 +762,6 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     phaseMeta.stageMetadata,
                     phaseMeta.oldControllerOrigin,
                     base.realActions);
-            Set<Integer> localScope = singletonStageScope(stageIndex);
             StateSpaceStats phaseMetaStats = outputStateSpace(output, "  mapping phase meta", current.env);
             recordScopedStateSpace("incremental local phase metaEnv", localScope, phaseMetaStats);
             currentByStage.add(current);
@@ -684,7 +840,12 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
         output.outln("");
         output.outln("[Stepwise Delayed DUCS] Final product inputs: " + finalProductLabels);
-        return composeProduct(finalProductInputs, "STEPWISE_DELAYED_INCREMENTAL_MAPPING_PRODUCT", output);
+        return timedComposeProduct(
+                finalProductInputs,
+                "STEPWISE_DELAYED_INCREMENTAL_MAPPING_PRODUCT",
+                allStageScope(stages.size()),
+                "incremental final product 並列合成時間",
+                output);
     }
 
     private static DelayedEnv buildIncrementalCrossComponentEnvironment(
@@ -737,10 +898,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                             + stages.get(stageIndex).getDisplayIndex(),
                             localSafetyEnvironments.get(stageIndex).env);
                 }
-                current = composeProduct(
+                Set<Integer> mergedScope = new java.util.TreeSet<Integer>(currentScope);
+                mergedScope.addAll(addedStages);
+                current = timedComposeProduct(
                         productInputs,
                         "STEPWISE_DELAYED_INCREMENTAL_CROSS_COMPONENT_" + component.getId()
                                 + "_ADD_" + displayStageScope(addedStages),
+                        mergedScope,
+                        "incremental cross component " + component.getId() + " stage 追加 product 並列合成時間",
                         output);
                 currentScope.addAll(addedStages);
             }
@@ -750,14 +915,17 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                         + goal.getName() + " scope=" + displayStageScope(goalScope)
                         + " productScope=" + displayStageScope(currentScope) + ".");
             }
-            addPassiveSelfLoopsForMissingActions(current.env, outOfScopeActionsForScope(currentScope, bases));
+            addPassiveSelfLoopsForMissingActions(
+                    current,
+                    outOfScopeActionsForScope(currentScope, bases));
             current = new DelayedEnv(
                     current.env,
                     current.trackedFluents,
                     current.valuation,
                     current.stageMetadata,
                     current.oldControllerOrigin,
-                    realActionsForScope(currentScope, bases));
+                    realActionsForScope(currentScope, bases),
+                    current.errorStates);
             current = pruneIncrementalGoal(
                     current,
                     goal,
@@ -775,7 +943,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         if (current == null) {
             Diagnostics.fatal("stepwise_delayed incremental cross component has no goals.");
         }
-        addPassiveSelfLoopsForMissingActions(current.env, outOfScopeActionsForScope(component.getStageScope(), bases));
+        addPassiveSelfLoopsForMissingActions(
+                current,
+                outOfScopeActionsForScope(component.getStageScope(), bases));
         StateSpaceStats componentSafetyStats =
                 outputStateSpace(output, "  incremental cross component safety", current.env);
         recordScopedStateSpace(
@@ -788,7 +958,8 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 current.valuation,
                 current.stageMetadata,
                 current.oldControllerOrigin,
-                realActionsForScope(component.getStageScope(), bases));
+                realActionsForScope(component.getStageScope(), bases),
+                current.errorStates);
     }
 
     private static DelayedEnv buildStagedCrossComponentEnvironment(
@@ -798,6 +969,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             List<StepwiseStage> stages,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
             CrossSchedulingStats totalSchedulingStats,
             LTSOutput output) {
         output.outln("");
@@ -847,6 +1019,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     step,
                     output);
 
+            if (DEBUG_ACTION_DIAGNOSTICS) {
+                debugActionStatistics(
+                        "cross_component_" + component.getId() + "_step_" + step + "_after_merge",
+                        merged.env,
+                        merged.stageScope,
+                        controllableActions,
+                        ownersByAction,
+                        output);
+            }
+
             List<StepwiseClassifiedGoal> batch = goalsCoveredByScope(remaining, merged.stageScope);
             if (batch.isEmpty()) {
                 Diagnostics.fatal("stepwise_delayed staged cross goal scope is not covered: "
@@ -855,14 +1037,33 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             }
             remaining.removeAll(batch);
 
-            addPassiveSelfLoopsForMissingActions(merged.env.env, outOfScopeActionsForScope(merged.stageScope, bases));
+            Set<String> outOfScopeActions = outOfScopeActionsForScope(merged.stageScope, bases);
+            addPassiveSelfLoopsForMissingActions(merged.env, outOfScopeActions);
+            if (DEBUG_ACTION_DIAGNOSTICS) {
+                String checkpoint = "cross_component_" + component.getId()
+                        + "_step_" + step + "_after_passive";
+                debugPassiveSelfLoopInvariant(
+                        checkpoint,
+                        merged.env,
+                        merged.stageScope,
+                        outOfScopeActions,
+                        output);
+                debugActionStatistics(
+                        checkpoint,
+                        merged.env,
+                        merged.stageScope,
+                        controllableActions,
+                        ownersByAction,
+                        output);
+            }
             DelayedEnv scopedEnv = new DelayedEnv(
                     merged.env.env,
                     merged.env.trackedFluents,
                     merged.env.valuation,
                     merged.env.stageMetadata,
                     merged.env.oldControllerOrigin,
-                    realActionsForScope(merged.stageScope, bases));
+                    realActionsForScope(merged.stageScope, bases),
+                    merged.env.errorStates);
             DelayedEnv pruned = pruneStagedCrossGoals(
                     scopedEnv,
                     batch,
@@ -872,6 +1073,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     merged.addedStageScope,
                     safetyBackwardPruning,
                     controllableActions,
+                    ownersByAction,
                     output);
             fragments.removeAll(selected);
             fragments.add(new ScopedDelayedEnv(merged.stageScope, pruned, merged.stageScope));
@@ -893,20 +1095,33 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 component.getId(),
                 step,
                 output);
-        addPassiveSelfLoopsForMissingActions(finalFragment.env.env, outOfScopeActionsForScope(component.getStageScope(), bases));
+        addPassiveSelfLoopsForMissingActions(
+                finalFragment.env,
+                outOfScopeActionsForScope(component.getStageScope(), bases));
+        DelayedEnv finalComponent = finalFragment.env;
+        if (safetyBackwardPruning) {
+            finalComponent = applyDeferredSafetyBackwardPruning(
+                    finalComponent,
+                    controllableActions,
+                    ownersByAction,
+                    component.getStageScope(),
+                    "cross component " + component.getId() + " final merge",
+                    output);
+        }
         StateSpaceStats finalComponentSafetyStats =
-                outputStateSpace(output, "  staged cross component safety", finalFragment.env.env);
+                outputStateSpace(output, "  staged cross component safety", finalComponent.env);
         recordScopedStateSpace(
                 "cross component " + component.getId() + " final safetyEnv",
                 component.getStageScope(),
                 finalComponentSafetyStats);
         return new DelayedEnv(
-                finalFragment.env.env,
-                finalFragment.env.trackedFluents,
-                finalFragment.env.valuation,
-                finalFragment.env.stageMetadata,
-                finalFragment.env.oldControllerOrigin,
-                realActionsForScope(component.getStageScope(), bases));
+                finalComponent.env,
+                finalComponent.trackedFluents,
+                finalComponent.valuation,
+                finalComponent.stageMetadata,
+                finalComponent.oldControllerOrigin,
+                realActionsForScope(component.getStageScope(), bases),
+                finalComponent.errorStates);
     }
 
     private static List<ScopedDelayedEnv> initialFragmentsForScope(
@@ -967,10 +1182,12 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             mergedScope.addAll(fragment.stageScope);
             inputs.add(fragment.env);
         }
-        DelayedEnv merged = composeProduct(
+        DelayedEnv merged = timedComposeProduct(
                 inputs,
                 "STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_" + componentId
                         + "_STEP_" + step + "_MERGE_" + displayStageScope(mergedScope),
+                mergedScope,
+                "cross component " + componentId + " step " + step + " safetyEnv fragment 並列合成時間",
                 output);
         return new ScopedDelayedEnv(mergedScope, merged, mergedScope);
     }
@@ -1095,67 +1312,67 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         long recordStart = System.currentTimeMillis();
         String label = "component " + componentId + " step " + step;
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / scheduler mode",
                 COST_GUIDED_STAGED_CROSS_SCHEDULING ? "cost-guided" : "fixed-order",
                 "text");
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / selected goal",
                 schedule.goal.getName(),
                 "goal");
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / selected goal kind",
                 schedule.goal.getKind().toString(),
                 "kind");
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / selected goal scope",
                 displayStageScope(schedule.goal.getStageScope()),
                 "scope");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / fixed order index",
                 schedule.fixedOrderIndex,
                 "index");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / candidate evaluations",
                 schedule.candidateEvaluationCount,
                 "candidates");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / selected fragment count",
                 schedule.selectedFragments.size(),
                 "fragments");
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / merged scope",
                 displayStageScope(schedule.mergedScope),
                 "scope");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / merged scope size",
                 schedule.mergedScope.size(),
                 "stages");
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / selected cost",
                 schedule.cost.toString(),
                 "state_product");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / selected cost log10",
                 log10(schedule.cost),
                 "log10_state_product");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / batch goal count",
                 schedule.batchGoalCount,
                 "goals");
         UpdatingControllerEvaluationRecorder.recordNanoTime(
-                CROSS_SCHEDULING_DETAIL_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_DETAIL_SECTION,
                 label + " / scheduler selection time",
                 schedulingNanos);
         return System.currentTimeMillis() - recordStart;
@@ -1167,97 +1384,97 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
         long recordStart = System.currentTimeMillis();
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / scheduler mode",
                 COST_GUIDED_STAGED_CROSS_SCHEDULING ? "cost-guided" : "fixed-order",
                 "text");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / component count",
                 stats.componentCount,
                 "components");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / scheduling step count",
                 stats.stepCount,
                 "steps");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / candidate evaluations total",
                 stats.candidateEvaluations,
                 "candidates");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / non-first selections",
                 stats.nonFirstSelections,
                 "selections");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / non-first selection rate",
                 stats.stepCount == 0 ? 0.0 : ((double) stats.nonFirstSelections) / stats.stepCount,
                 "ratio");
         UpdatingControllerEvaluationRecorder.recordNanoTime(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / scheduler selection time total",
                 stats.selectionNanos);
         UpdatingControllerEvaluationRecorder.recordAverageNanoTime(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / scheduler selection time average",
                 stats.selectionNanos,
                 stats.stepCount);
         UpdatingControllerEvaluationRecorder.recordText(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / selected cost max",
                 stats.maxCost.toString(),
                 "state_product");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / selected cost log10 max",
                 stats.maxCostLog10,
                 "log10_state_product");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / selected cost log10 average",
                 stats.stepCount == 0 ? 0.0 : stats.costLog10Total / stats.stepCount,
                 "log10_state_product");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / batch goal count total",
                 stats.batchGoalCountTotal,
                 "goals");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / batch goal count max",
                 stats.batchGoalCountMax,
                 "goals");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / batch goal count average",
                 stats.stepCount == 0 ? 0.0 : ((double) stats.batchGoalCountTotal) / stats.stepCount,
                 "goals/step");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / merged scope size max",
                 stats.mergedScopeSizeMax,
                 "stages");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / merged scope size average",
                 stats.stepCount == 0 ? 0.0 : ((double) stats.mergedScopeSizeTotal) / stats.stepCount,
                 "stages/step");
         UpdatingControllerEvaluationRecorder.recordCount(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / selected fragment count max",
                 stats.selectedFragmentCountMax,
                 "fragments");
         UpdatingControllerEvaluationRecorder.recordDouble(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / selected fragment count average",
                 stats.stepCount == 0 ? 0.0 : ((double) stats.selectedFragmentCountTotal) / stats.stepCount,
                 "fragments/step");
         stats.metricRecordingCountTimeMillis += System.currentTimeMillis() - recordStart;
         UpdatingControllerEvaluationRecorder.recordEvaluationCountTime(
-                CROSS_SCHEDULING_SECTION,
+                StepwiseDelayedEvaluationMetrics.CROSS_SCHEDULING_SECTION,
                 label + " / scheduling metric recording CountTime",
                 stats.metricRecordingCountTimeMillis,
                 "cross goal scheduling の step 詳細・集計を CSV に記録するための評価用 CountTime。");
@@ -1282,25 +1499,58 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Set<Integer> addedStages,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
             LTSOutput output) {
         Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(current.trackedFluents);
         trackedFluents.addAll(StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
                 goals,
                 current.env.getActions()));
         addPhaseComparisonFluents(trackedFluents);
+        recordScopedFluentCount(
+                "cross component " + componentId + " step " + step + " tracked fluent 数",
+                productScope,
+                trackedFluents);
 
-        DelayedEnv metaRaw = buildFluentProduct(
+        DelayedEnv metaRaw = timedBuildFluentProduct(
                 current.env,
                 current.stageMetadata,
                 current.oldControllerOrigin,
-                trackedFluents);
+                current.errorStates,
+                trackedFluents,
+                productScope,
+                "cross component " + componentId + " step " + step + " product から cross metaEnv 構築時間");
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugFluentProductConsistency(
+                    "cross_component_" + componentId + "_step_" + step,
+                    current,
+                    metaRaw,
+                    output);
+        }
         DelayedEnv meta = new DelayedEnv(
                 metaRaw.env,
                 metaRaw.trackedFluents,
                 metaRaw.valuation,
                 metaRaw.stageMetadata,
                 metaRaw.oldControllerOrigin,
-                current.realActions);
+                current.realActions,
+                metaRaw.errorStates);
+
+        if (DEBUG_ACTION_DIAGNOSTICS) {
+            debugActionStatistics(
+                    "cross_component_" + componentId + "_step_" + step + "_after_fluent_product",
+                    meta,
+                    productScope,
+                    controllableActions,
+                    ownersByAction,
+                    output);
+        }
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugSemanticMultiplicity(
+                    "cross_component_" + componentId + "_step_" + step
+                            + "_after_fluent_product",
+                    meta,
+                    output);
+        }
 
         String scope = "cross component " + componentId + " staged step " + step
                 + " productScope=" + displayStageScope(productScope);
@@ -1315,12 +1565,51 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 productScope,
                 metaStats);
 
-        DelayedEnv pruned = pruneSafety(meta, goals, scope, output);
+        DelayedEnv pruned = timedPruneSafety(
+                meta,
+                goals,
+                scope,
+                productScope,
+                "cross component " + componentId + " step " + step + " cross metaEnv から cross safetyEnv 構築時間",
+                output);
+        if (DEBUG_ACTION_DIAGNOSTICS) {
+            debugActionStatistics(
+                    "cross_component_" + componentId + "_step_" + step + "_after_direct_pruning",
+                    pruned,
+                    productScope,
+                    controllableActions,
+                    ownersByAction,
+                    output);
+        }
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugSemanticMultiplicity(
+                    "cross_component_" + componentId + "_step_" + step
+                            + "_after_direct_pruning",
+                    pruned,
+                    output);
+        }
         if (safetyBackwardPruning) {
-            pruned = applySafetyBackwardPruning(
+            pruned = applyDeferredSafetyBackwardPruning(
                     pruned,
                     controllableActions,
+                    ownersByAction,
+                    productScope,
                     scope,
+                    output);
+        }
+        if (DEBUG_ACTION_DIAGNOSTICS) {
+            debugActionStatistics(
+                    "cross_component_" + componentId + "_step_" + step + "_after_sbp",
+                    pruned,
+                    productScope,
+                    controllableActions,
+                    ownersByAction,
+                    output);
+        }
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugSemanticMultiplicity(
+                    "cross_component_" + componentId + "_step_" + step + "_after_sbp",
+                    pruned,
                     output);
         }
         StateSpaceStats safetyStats = outputStateSpace(output, "  after staged cross pruning", pruned.env);
@@ -1340,7 +1629,12 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         for (Integer stageIndex : scope) {
             inputs.add(localSafetyEnvironments.get(stageIndex));
         }
-        return composeProduct(inputs, productName, output);
+        return timedComposeProduct(
+                inputs,
+                productName,
+                scope,
+                productName + " 並列合成時間",
+                output);
     }
 
     private static DelayedEnv pruneIncrementalGoal(
@@ -1355,26 +1649,33 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Set<String> controllableActions,
             IncrementalPruningCounter counter,
             LTSOutput output) {
+        int step = counter.next();
         Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(current.trackedFluents);
         trackedFluents.addAll(StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
                 Collections.singletonList(goal),
                 current.env.getActions()));
         addPhaseComparisonFluents(trackedFluents);
 
-        DelayedEnv metaRaw = buildFluentProduct(
+        String stepLabel = "incremental " + localOrCross + " step " + step
+                + " " + goal.getKind() + " " + goal.getName();
+        recordScopedFluentCount(stepLabel + " tracked fluent 数", productScope, trackedFluents);
+        DelayedEnv metaRaw = timedBuildFluentProduct(
                 current.env,
                 current.stageMetadata,
                 current.oldControllerOrigin,
-                trackedFluents);
+                current.errorStates,
+                trackedFluents,
+                productScope,
+                stepLabel + " metaEnv 構築時間");
         DelayedEnv meta = new DelayedEnv(
                 metaRaw.env,
                 metaRaw.trackedFluents,
                 metaRaw.valuation,
                 metaRaw.stageMetadata,
                 metaRaw.oldControllerOrigin,
-                current.realActions);
+                current.realActions,
+                metaRaw.errorStates);
 
-        int step = counter.next();
         output.outln("");
         output.outln("[Stepwise Delayed DUCS] incremental step " + step);
         output.outln("  local/cross: " + localOrCross);
@@ -1382,13 +1683,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         output.outln("  product scope: " + displayStageScope(productScope));
         output.outln("  requirement: " + goal.getKind() + " " + goal.getName());
         output.outln("  added stages: " + displayStageScope(addedStages));
-        String stepLabel = "incremental " + localOrCross + " step " + step
-                + " " + goal.getKind() + " " + goal.getName();
         StateSpaceStats metaStats = outputStateSpace(output, "  before pruning", meta.env);
         recordScopedStateSpace(stepLabel + " metaEnv", productScope, metaStats);
 
         String pruningScope = "incremental " + localOrCross + " " + goal.getKind() + " " + goal.getName();
-        DelayedEnv pruned = pruneSafety(meta, Collections.singletonList(goal), pruningScope, null, false);
+        DelayedEnv pruned = timedPruneSafety(
+                meta,
+                Collections.singletonList(goal),
+                pruningScope,
+                productScope,
+                stepLabel + " safetyEnv 構築時間",
+                null,
+                false);
         StateSpaceStats safetyStats = outputStateSpace(output, "  after pruning", pruned.env);
         recordScopedStateSpace(stepLabel + " safetyEnv", productScope, safetyStats);
         if (safetyBackwardPruning) {
@@ -1404,7 +1710,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             return pruned;
         }
 
+        long cleanupStart = System.currentTimeMillis();
         DelayedEnv cleaned = cleanupReachable(pruned);
+        recordScopedTime(stepLabel + " reachable cleanup 時間",
+                productScope,
+                System.currentTimeMillis() - cleanupStart);
         StateSpaceStats cleanupStats = outputStateSpace(output, "  after cleanup", cleaned.env);
         recordScopedStateSpace(stepLabel + " safetyEnv after cleanup", productScope, cleanupStats);
         return cleaned;
@@ -1424,9 +1734,37 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         return rebuildMetadata(env, result.getEnvironment());
     }
 
+    private static DelayedEnv applyDeferredSafetyBackwardPruning(
+            DelayedEnv env,
+            Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
+            Set<Integer> currentScope,
+            String scope,
+            LTSOutput output) {
+        SafetyBackwardPruner.DeferredResult result = SafetyBackwardPruner.pruneDeferred(
+                env.env,
+                env.errorStates,
+                controllableActions,
+                ownersByAction,
+                currentScope,
+                scope,
+                output);
+        failIfInitialLosing(result, scope);
+        return rebuildMetadata(env, result.getEnvironment(), result.getErrorStates());
+    }
+
     private static void failIfInitialLosing(SafetyBackwardPruner.Result result, String scope) {
         if (result.isInitialLosing()) {
             Diagnostics.fatal("stepwise_delayed safety backward pruning found initial state losing in "
+                    + scope + ".");
+        }
+    }
+
+    private static void failIfInitialLosing(
+            SafetyBackwardPruner.DeferredResult result,
+            String scope) {
+        if (result.isInitialLosing()) {
+            Diagnostics.fatal("stepwise_delayed deferred safety backward pruning found initial state losing in "
                     + scope + ".");
         }
     }
@@ -1456,13 +1794,23 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     }
 
     private static DelayedEnv rebuildMetadata(DelayedEnv source, MTS<Long, String> result) {
+        return rebuildMetadata(source, result, source.errorStates);
+    }
+
+    private static DelayedEnv rebuildMetadata(
+            DelayedEnv source,
+            MTS<Long, String> result,
+            Set<Long> errorStates) {
         FluentStateValuation<Long> valuation = new FluentStateValuation<Long>(result.getStates());
         Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> metadata =
                 new HashMap<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>>();
         Map<Long, Long> oldOrigins = new HashMap<Long, Long>();
         for (Long state : result.getStates()) {
-            for (Fluent fluent : source.valuation.getFluentsFromState(state)) {
-                valuation.addHoldingFluent(state, fluent);
+            Set<Fluent> stateFluents = source.valuation.getFluentsFromState(state);
+            if (stateFluents != null) {
+                for (Fluent fluent : stateFluents) {
+                    valuation.addHoldingFluent(state, fluent);
+                }
             }
             if (source.stageMetadata.containsKey(state)) {
                 metadata.put(state,
@@ -1473,7 +1821,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 oldOrigins.put(state, source.oldControllerOrigin.get(state));
             }
         }
-        return new DelayedEnv(result, source.trackedFluents, valuation, metadata, oldOrigins, source.realActions);
+        DelayedEnv rebuilt = new DelayedEnv(
+                result,
+                source.trackedFluents,
+                valuation,
+                metadata,
+                oldOrigins,
+                source.realActions,
+                errorStates);
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugCopyLocalStateVectors(source.env, result);
+        }
+        return rebuilt;
     }
 
     private static List<StepwiseClassifiedGoal> sortedLocalGoals(
@@ -1595,18 +1954,36 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
             Map<Long, Long> oldOrigins,
             Set<Fluent> fluents) {
+        return buildFluentProduct(
+                base,
+                stageMetadata,
+                oldOrigins,
+                Collections.<Long>emptySet(),
+                fluents);
+    }
+
+    private static DelayedEnv buildFluentProduct(
+            MTS<Long, String> base,
+            Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
+            Map<Long, Long> oldOrigins,
+            Set<Long> baseErrorStates,
+            Set<Fluent> fluents) {
         MTS<Long, String> result = new MTSImpl<Long, String>(0L);
         Map<ProductStateKey, Long> keyToState = new HashMap<ProductStateKey, Long>();
         Map<Long, Set<Fluent>> trueFluentsByState = new HashMap<Long, Set<Fluent>>();
         Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> resultMetadata =
                 new HashMap<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>>();
         Map<Long, Long> resultOldOrigins = new HashMap<Long, Long>();
+        Set<Long> resultErrorStates = new LinkedHashSet<Long>();
         Queue<ProductStateKey> pending = new LinkedList<ProductStateKey>();
 
         ProductStateKey initial = new ProductStateKey(base.getInitialState(), initialTrueFluents(fluents));
         keyToState.put(initial, 0L);
         trueFluentsByState.put(0L, initial.trueFluents);
         copyMetadata(initial.baseState, 0L, stageMetadata, oldOrigins, resultMetadata, resultOldOrigins);
+        if (baseErrorStates.contains(initial.baseState)) {
+            resultErrorStates.add(0L);
+        }
         pending.add(initial);
         long nextStateId = 1L;
 
@@ -1614,6 +1991,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             ProductStateKey current = pending.remove();
             Long fromState = keyToState.get(current);
             result.addState(fromState);
+            if (resultErrorStates.contains(fromState)) {
+                continue;
+            }
             for (Pair<String, Long> transition : base.getTransitions(current.baseState, MTS.TransitionType.REQUIRED)) {
                 Set<Fluent> nextFluents = nextTrueFluents(current.trueFluents, fluents, transition.getFirst());
                 ProductStateKey targetKey = new ProductStateKey(transition.getSecond(), nextFluents);
@@ -1625,7 +2005,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     trueFluentsByState.put(targetState, targetKey.trueFluents);
                     copyMetadata(targetKey.baseState, targetState, stageMetadata, oldOrigins,
                             resultMetadata, resultOldOrigins);
-                    pending.add(targetKey);
+                    if (baseErrorStates.contains(targetKey.baseState)) {
+                        resultErrorStates.add(targetState);
+                    } else {
+                        pending.add(targetKey);
+                    }
                 }
                 result.addAction(transition.getFirst());
                 result.addRequired(fromState, transition.getFirst(), targetState);
@@ -1638,8 +2022,54 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 valuation.addHoldingFluent(entry.getKey(), fluent);
             }
         }
-        return new DelayedEnv(result, fluents, valuation, resultMetadata, resultOldOrigins,
-                new HashSet<String>(base.getActions()));
+        DelayedEnv fluentProduct = new DelayedEnv(
+                result,
+                fluents,
+                valuation,
+                resultMetadata,
+                resultOldOrigins,
+                new HashSet<String>(base.getActions()),
+                resultErrorStates);
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugPropagateLocalStateVectorsThroughFluentProduct(base, result, keyToState);
+        }
+        return fluentProduct;
+    }
+
+    private static DelayedEnv timedBuildFluentProduct(
+            MTS<Long, String> base,
+            Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
+            Map<Long, Long> oldOrigins,
+            Set<Fluent> fluents,
+            Set<Integer> scope,
+            String label) {
+        return timedBuildFluentProduct(
+                base,
+                stageMetadata,
+                oldOrigins,
+                Collections.<Long>emptySet(),
+                fluents,
+                scope,
+                label);
+    }
+
+    private static DelayedEnv timedBuildFluentProduct(
+            MTS<Long, String> base,
+            Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
+            Map<Long, Long> oldOrigins,
+            Set<Long> baseErrorStates,
+            Set<Fluent> fluents,
+            Set<Integer> scope,
+            String label) {
+        long start = System.currentTimeMillis();
+        DelayedEnv result = buildFluentProduct(
+                base,
+                stageMetadata,
+                oldOrigins,
+                baseErrorStates,
+                fluents);
+        recordScopedTime(label, scope, System.currentTimeMillis() - start);
+        return result;
     }
 
     private static void copyMetadata(
@@ -1727,15 +2157,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 Logger.getAnonymousLogger().log(Level.WARNING, "No state satisfies formula: " + formula);
             }
         }
-        if (violating.contains(meta.env.getInitialState())) {
+        Set<Long> errorStates = new LinkedHashSet<Long>(meta.errorStates);
+        errorStates.addAll(violating);
+        if (errorStates.contains(meta.env.getInitialState())) {
             Diagnostics.fatal("stepwise_delayed safety pruning found initial state violating in "
                     + scope + ".");
         }
 
         MTS<Long, String> result = new MTSImpl<Long, String>(meta.env.getInitialState());
+        result.addActions(meta.env.getActions());
         for (Long state : meta.env.getStates()) {
             result.addState(state);
-            if (!violating.contains(state)) {
+            if (!errorStates.contains(state)) {
                 for (Pair<String, Long> transition : meta.env.getTransitions(state, MTS.TransitionType.REQUIRED)) {
                     result.addState(transition.getSecond());
                     result.addAction(transition.getFirst());
@@ -1757,20 +2190,20 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             long reductionCountTime = System.currentTimeMillis() - reductionCountStart;
             String safeScope = scope == null || scope.isEmpty() ? "unknown" : scope;
             UpdatingControllerEvaluationRecorder.recordStateTransitionReduction(
-                    DIRECT_PRUNING_REDUCTION_SECTION,
+                    StepwiseDelayedEvaluationMetrics.DIRECT_PRUNING_REDUCTION_SECTION,
                     safeScope + " / before -> after direct pruning",
                     beforeStates,
                     beforeTransitions,
                     afterStates,
                     afterTransitions);
             UpdatingControllerEvaluationRecorder.recordEvaluationCountTime(
-                    DIRECT_PRUNING_REDUCTION_SECTION,
+                    StepwiseDelayedEvaluationMetrics.DIRECT_PRUNING_REDUCTION_SECTION,
                     safeScope + " / direct pruning reduction CountTime",
                     reductionCountTime,
                     "direct safety pruning の削減率を記録するために before/after の遷移数を数える評価用 CountTime。");
         }
 
-        DelayedEnv pruned = rebuildMetadata(meta, result);
+        DelayedEnv pruned = rebuildMetadata(meta, result, errorStates);
         if (output != null) {
             if (afterTransitions < 0) {
                 afterTransitions = countTransitions(result);
@@ -1781,74 +2214,41 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         return pruned;
     }
 
-    private static DelayedEnv buildCrossComponentEnvironment(
-            CrossComponent component,
-            List<DelayedEnv> localSafetyEnvironments,
-            List<StageBase> bases,
-            List<StepwiseStage> stages,
-            boolean safetyBackwardPruning,
-            Set<String> controllableActions,
+    private static DelayedEnv timedPruneSafety(
+            DelayedEnv meta,
+            Collection<StepwiseClassifiedGoal> goals,
+            String pruningScope,
+            Set<Integer> stageScope,
+            String timeLabel,
             LTSOutput output) {
-        output.outln("");
-        output.outln("[Stepwise Delayed DUCS] Cross component " + component.getId());
-        output.outln("  stages: " + displayStageScope(component.getStageScope()));
-        outputGoalNames(output, "goals", component.getGoals());
+        return timedPruneSafety(meta, goals, pruningScope, stageScope, timeLabel, output, true);
+    }
 
-        List<DelayedEnv> componentInputs = new ArrayList<DelayedEnv>();
-        for (Integer stageIndex : component.getStageScope()) {
-            DelayedEnv safetyEnv = localSafetyEnvironments.get(stageIndex);
-            outputStateSpace(output, "  input mapping safety stage "
-                    + stages.get(stageIndex).getDisplayIndex(), safetyEnv.env);
-            componentInputs.add(safetyEnv);
+    private static DelayedEnv timedPruneSafety(
+            DelayedEnv meta,
+            Collection<StepwiseClassifiedGoal> goals,
+            String pruningScope,
+            Set<Integer> stageScope,
+            String timeLabel,
+            LTSOutput output,
+            boolean cleanup) {
+        String scopedLabel = StepwiseDelayedEvaluationMetrics.scopedMetricLabel(timeLabel, stageScope);
+        long start = System.currentTimeMillis();
+        UpdatingControllerEvaluationRecorder.beginCountScope(
+                StepwiseDelayedEvaluationMetrics.SCOPE_TIME_SECTION,
+                scopedLabel);
+        try {
+            return pruneSafety(meta, goals, pruningScope, output, cleanup);
+        } finally {
+            long elapsed = System.currentTimeMillis() - start;
+            UpdatingControllerEvaluationRecorder.endCountScope(
+                    StepwiseDelayedEvaluationMetrics.SCOPE_TIME_SECTION,
+                    scopedLabel);
+            UpdatingControllerEvaluationRecorder.recordTime(
+                    StepwiseDelayedEvaluationMetrics.SCOPE_TIME_SECTION,
+                    scopedLabel,
+                    elapsed);
         }
-
-        DelayedEnv componentProduct = composeProduct(
-                componentInputs,
-                "STEPWISE_DELAYED_CROSS_COMPONENT_" + component.getId() + "_PRODUCT",
-                output);
-        outputStateSpace(output, "  component product", componentProduct.env);
-
-        Set<String> outOfScopeActions = outOfScopeActionsForScope(component.getStageScope(), bases);
-        addPassiveSelfLoopsForMissingActions(componentProduct.env, outOfScopeActions);
-        outputStateSpace(output, "  component product with out-of-scope passive actions", componentProduct.env);
-        Set<String> componentRealActions = realActionsForScope(component.getStageScope(), bases);
-        output.outln("  realActions count: " + componentRealActions.size());
-        output.outln("  outOfScope passive action count: " + outOfScopeActions.size());
-        output.outln("  action alphabet count: " + componentProduct.env.getActions().size());
-
-        Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(componentProduct.trackedFluents);
-        trackedFluents.addAll(StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
-                component.getGoals(),
-                componentProduct.env.getActions()));
-        addPhaseComparisonFluents(trackedFluents);
-
-        DelayedEnv crossMeta = buildFluentProduct(
-                componentProduct.env,
-                componentProduct.stageMetadata,
-                Collections.<Long, Long>emptyMap(),
-                trackedFluents);
-        outputStateSpace(output, "  cross meta", crossMeta.env);
-
-        DelayedEnv crossSafety = pruneSafety(
-                crossMeta,
-                component.getGoals(),
-                "cross component " + component.getId(),
-                output);
-        if (safetyBackwardPruning) {
-            crossSafety = applySafetyBackwardPruning(
-                    crossSafety,
-                    controllableActions,
-                    "cross component " + component.getId(),
-                    output);
-        }
-        outputStateSpace(output, "  after cross safety pruning", crossSafety.env);
-        return new DelayedEnv(
-                crossSafety.env,
-                crossSafety.trackedFluents,
-                crossSafety.valuation,
-                crossSafety.stageMetadata,
-                crossSafety.oldControllerOrigin,
-                componentRealActions);
     }
 
     private static DelayedEnv composeProduct(List<DelayedEnv> inputs, String productName, LTSOutput output) {
@@ -1860,6 +2260,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         MTS<Long, String> product = new MTSImpl<Long, String>(0L);
         Map<List<Long>, Long> tupleToState = new HashMap<List<Long>, Long>();
         Map<Long, List<Long>> stateToTuple = new HashMap<Long, List<Long>>();
+        Set<Long> productErrorStates = new LinkedHashSet<Long>();
         Queue<List<Long>> pending = new LinkedList<List<Long>>();
 
         List<Long> initialTuple = new ArrayList<Long>();
@@ -1868,6 +2269,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
         tupleToState.put(initialTuple, 0L);
         stateToTuple.put(0L, initialTuple);
+        if (isErrorTuple(inputs, initialTuple)) {
+            productErrorStates.add(0L);
+        }
         pending.add(initialTuple);
 
         long nextStateId = 1L;
@@ -1875,6 +2279,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             List<Long> tuple = pending.remove();
             Long fromState = tupleToState.get(tuple);
             product.addState(fromState);
+            if (productErrorStates.contains(fromState)) {
+                continue;
+            }
 
             Set<String> enabledActions = enabledActions(inputs, tuple);
             for (String action : enabledActions) {
@@ -1892,7 +2299,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                         tupleToState.put(targetTuple, targetState);
                         stateToTuple.put(targetState, targetTuple);
                         product.addState(targetState);
-                        pending.add(targetTuple);
+                        if (isErrorTuple(inputs, targetTuple)) {
+                            productErrorStates.add(targetState);
+                        } else {
+                            pending.add(targetTuple);
+                        }
                     }
                     product.addAction(action);
                     product.addRequired(fromState, action, targetState);
@@ -1928,8 +2339,31 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             }
             metadata.put(productState, stateMetadata);
         }
-        return new DelayedEnv(product, trackedFluents, valuation, metadata,
-                Collections.<Long, Long>emptyMap(), realActions);
+        DelayedEnv composed = new DelayedEnv(
+                product,
+                trackedFluents,
+                valuation,
+                metadata,
+                Collections.<Long, Long>emptyMap(),
+                realActions,
+                productErrorStates);
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugPropagateLocalStateVectorsThroughComposition(inputs, product, stateToTuple);
+            debugSemanticMultiplicity(productName, composed, output);
+        }
+        return composed;
+    }
+
+    private static DelayedEnv timedComposeProduct(
+            List<DelayedEnv> inputs,
+            String productName,
+            Set<Integer> scope,
+            String label,
+            LTSOutput output) {
+        long start = System.currentTimeMillis();
+        DelayedEnv result = composeProduct(inputs, productName, output);
+        recordScopedTime(label, scope, System.currentTimeMillis() - start);
+        return result;
     }
 
     private static ConnectionPlan buildConnections(
@@ -2179,133 +2613,734 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             }
         }
 
+        String section = StepwiseDelayedEvaluationMetrics.HOT_SWAP_IN_CONNECTION_SECTION;
         UpdatingControllerEvaluationRecorder.recordNanoTime(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "total time",
                 stats.totalNanos);
         UpdatingControllerEvaluationRecorder.recordNanoTime(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "setup time",
                 stats.setupNanos);
         UpdatingControllerEvaluationRecorder.recordNanoTime(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "traversal time",
                 stats.traversalNanos);
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "mode indexed",
                 "indexed".equals(stats.mode) ? 1 : 0,
                 "bool");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "old states",
                 stats.oldStates,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "mapping states",
                 stats.mappingStates,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "comparison fluents",
                 stats.comparisonFluents,
                 "fluents");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "visited synchronized pairs",
                 stats.visitedPairs,
                 "pairs");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "enqueued synchronized pairs",
                 stats.enqueuedPairs,
                 "pairs");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "duplicate skipped pairs",
                 stats.duplicatePairs,
                 "pairs");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "synchronized successor pairs",
                 stats.synchronizedSuccessorPairs,
                 "pairs");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "visited unique old states",
                 stats.visitedOldStates,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "visited unique mapping states",
                 stats.visitedMappingStates,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "visited eligible mapping states",
                 stats.visitedEligibleMappingStates,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "eligible mapping states total",
                 stats.eligibleMappingStatesTotal,
                 "states");
         UpdatingControllerEvaluationRecorder.recordEvaluationCountTime(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "eligible mapping states total CountTime",
                 stats.eligibleMappingStatesCountTimeMillis,
                 "hotSwapIn connection の診断用に mapping product 全状態を走査し、OLD_SIDE かつ phase-initial な state 数を数える評価用 CountTime。");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "eligibility checks",
                 stats.eligibilityChecks,
                 "checks");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "valuation checks",
                 stats.valuationChecks,
                 "checks");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "eligibility computations",
                 stats.eligibilityComputations,
                 "computations");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "signature builds",
                 stats.signatureBuilds,
                 "signatures");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "transition index state builds",
                 stats.transitionIndexStateBuilds,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "connections",
                 stats.connectionCount,
                 "transitions");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "old states without targets",
                 stats.oldStatesWithoutTargets,
                 "states");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "indexed action entries scanned",
                 stats.indexedActionEntriesScanned,
                 "entries");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "action matches",
                 stats.indexedActionMatches,
                 "matches");
         UpdatingControllerEvaluationRecorder.recordCount(
-                HOT_SWAP_IN_CONNECTION_SECTION,
+                section,
                 "legacy transition comparisons",
                 stats.legacyTransitionComparisons,
                 "comparisons");
+    }
+
+    private static void debugResetHotSwapLineage(int stageCount) {
+        DEBUG_LOCAL_STATE_VECTORS.clear();
+        DEBUG_FLUENT_PRODUCT_BASE_STATES.clear();
+        DEBUG_LOCAL_ENVIRONMENTS.clear();
+        debugLineageStageCount = stageCount;
+    }
+
+    private static void debugRegisterLocalSafetyEnvironment(
+            DelayedEnv environment,
+            int stageIndex) {
+        if (!DEBUG_HOT_SWAP_LINEAGE) {
+            return;
+        }
+        Map<Long, long[]> vectors = new HashMap<Long, long[]>();
+        for (Long state : environment.env.getStates()) {
+            long[] vector = debugEmptyLocalStateVector();
+            vector[stageIndex] = state.longValue();
+            vectors.put(state, vector);
+        }
+        DEBUG_LOCAL_STATE_VECTORS.put(environment.env, vectors);
+        DEBUG_LOCAL_ENVIRONMENTS.put(Integer.valueOf(stageIndex), environment);
+    }
+
+    private static void debugCopyLocalStateVectors(
+            MTS<Long, String> source,
+            MTS<Long, String> result) {
+        if (!DEBUG_HOT_SWAP_LINEAGE) {
+            return;
+        }
+        Map<Long, long[]> sourceVectors = DEBUG_LOCAL_STATE_VECTORS.get(source);
+        if (sourceVectors == null) {
+            return;
+        }
+        Map<Long, long[]> resultVectors = new HashMap<Long, long[]>();
+        for (Long state : result.getStates()) {
+            long[] sourceVector = sourceVectors.get(state);
+            if (sourceVector != null) {
+                resultVectors.put(state, copyLocalStateVector(sourceVector));
+            }
+        }
+        DEBUG_LOCAL_STATE_VECTORS.put(result, resultVectors);
+    }
+
+    private static void debugPropagateLocalStateVectorsThroughFluentProduct(
+            MTS<Long, String> base,
+            MTS<Long, String> result,
+            Map<ProductStateKey, Long> keyToState) {
+        if (!DEBUG_HOT_SWAP_LINEAGE) {
+            return;
+        }
+        Map<Long, Long> outputToBase = new HashMap<Long, Long>();
+        for (Map.Entry<ProductStateKey, Long> entry : keyToState.entrySet()) {
+            outputToBase.put(entry.getValue(), entry.getKey().baseState);
+        }
+        DEBUG_FLUENT_PRODUCT_BASE_STATES.put(result, outputToBase);
+        Map<Long, long[]> baseVectors = DEBUG_LOCAL_STATE_VECTORS.get(base);
+        if (baseVectors == null) {
+            return;
+        }
+        Map<Long, long[]> resultVectors = new HashMap<Long, long[]>();
+        for (Map.Entry<ProductStateKey, Long> entry : keyToState.entrySet()) {
+            long[] baseVector = baseVectors.get(entry.getKey().baseState);
+            if (baseVector != null) {
+                resultVectors.put(entry.getValue(), copyLocalStateVector(baseVector));
+            }
+        }
+        DEBUG_LOCAL_STATE_VECTORS.put(result, resultVectors);
+    }
+
+    private static void debugFluentProductConsistency(
+            String checkpoint,
+            DelayedEnv base,
+            DelayedEnv fluentProduct,
+            LTSOutput output) {
+        if (!DEBUG_HOT_SWAP_LINEAGE || output == null) {
+            return;
+        }
+        Map<Long, Long> outputToBase = DEBUG_FLUENT_PRODUCT_BASE_STATES.get(fluentProduct.env);
+        if (outputToBase == null) {
+            output.outln("[StepwiseLineage] FLUENT_REPRODUCT checkpoint=" + checkpoint
+                    + " baseLineage=<missing>");
+            return;
+        }
+        int statesWithMismatch = 0;
+        Map<String, Integer> mismatchCounts = new LinkedHashMap<String, Integer>();
+        int samples = 0;
+        for (Map.Entry<Long, Long> entry : outputToBase.entrySet()) {
+            Long outputState = entry.getKey();
+            Long baseState = entry.getValue();
+            List<String> stateMismatches = new ArrayList<String>();
+            for (Fluent fluent : base.trackedFluents) {
+                boolean before = base.valuation.isTrue(baseState, fluent);
+                boolean after = fluentProduct.valuation.isTrue(outputState, fluent);
+                if (before == after) {
+                    continue;
+                }
+                String key = fluent.getName() + ":" + (before ? "1" : "0")
+                        + "->" + (after ? "1" : "0");
+                stateMismatches.add(key);
+                Integer count = mismatchCounts.get(key);
+                mismatchCounts.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+            }
+            if (!stateMismatches.isEmpty()) {
+                statesWithMismatch++;
+                if (samples < 8) {
+                    output.outln("[StepwiseLineage] FLUENT_REPRODUCT_SAMPLE checkpoint="
+                            + checkpoint + " outputState=" + outputState
+                            + " baseState=" + baseState
+                            + " mismatches=" + stateMismatches
+                            + " outputTrace=" + debugShortestActionTrace(
+                                    fluentProduct.env,
+                                    outputState)
+                            + " baseTrace=" + debugShortestActionTrace(
+                                    base.env,
+                                    baseState));
+                    samples++;
+                }
+            }
+        }
+        output.outln("[StepwiseLineage] FLUENT_REPRODUCT checkpoint=" + checkpoint
+                + " outputStates=" + fluentProduct.env.getStates().size()
+                + " statesWithPriorFluentMismatch=" + statesWithMismatch
+                + " mismatchCounts=" + mismatchCounts);
+    }
+
+    private static List<String> debugShortestActionTrace(
+            MTS<Long, String> environment,
+            Long target) {
+        Long initial = environment.getInitialState();
+        if (initial.equals(target)) {
+            return Collections.emptyList();
+        }
+        Queue<Long> pending = new LinkedList<Long>();
+        Set<Long> discovered = new HashSet<Long>();
+        Map<Long, Long> predecessor = new HashMap<Long, Long>();
+        Map<Long, String> predecessorAction = new HashMap<Long, String>();
+        pending.add(initial);
+        discovered.add(initial);
+        while (!pending.isEmpty()) {
+            Long state = pending.remove();
+            for (Pair<String, Long> transition :
+                    environment.getTransitions(state, MTS.TransitionType.REQUIRED)) {
+                Long successor = transition.getSecond();
+                if (!discovered.add(successor)) {
+                    continue;
+                }
+                predecessor.put(successor, state);
+                predecessorAction.put(successor, transition.getFirst());
+                if (successor.equals(target)) {
+                    LinkedList<String> result = new LinkedList<String>();
+                    Long cursor = target;
+                    while (!initial.equals(cursor)) {
+                        result.addFirst(predecessorAction.get(cursor));
+                        cursor = predecessor.get(cursor);
+                    }
+                    return result;
+                }
+                pending.add(successor);
+            }
+        }
+        return Collections.singletonList("<unreachable>");
+    }
+
+    private static void debugPropagateLocalStateVectorsThroughComposition(
+            List<DelayedEnv> inputs,
+            MTS<Long, String> product,
+            Map<Long, List<Long>> stateToTuple) {
+        if (!DEBUG_HOT_SWAP_LINEAGE) {
+            return;
+        }
+        Map<Long, long[]> productVectors = new HashMap<Long, long[]>();
+        for (Map.Entry<Long, List<Long>> entry : stateToTuple.entrySet()) {
+            long[] merged = debugEmptyLocalStateVector();
+            List<Long> tuple = entry.getValue();
+            for (int inputIndex = 0; inputIndex < inputs.size(); inputIndex++) {
+                Map<Long, long[]> inputVectors = DEBUG_LOCAL_STATE_VECTORS.get(inputs.get(inputIndex).env);
+                if (inputVectors == null) {
+                    continue;
+                }
+                long[] inputVector = inputVectors.get(tuple.get(inputIndex));
+                if (inputVector == null) {
+                    continue;
+                }
+                for (int stageIndex = 0; stageIndex < merged.length; stageIndex++) {
+                    if (inputVector[stageIndex] < 0L) {
+                        continue;
+                    }
+                    if (merged[stageIndex] >= 0L
+                            && merged[stageIndex] != inputVector[stageIndex]) {
+                        // Overlapping fragments should have synchronized the same local state.
+                        // Preserve an explicit conflict marker for the diagnostic instead of
+                        // silently choosing one side.
+                        merged[stageIndex] = Long.MIN_VALUE;
+                    } else {
+                        merged[stageIndex] = inputVector[stageIndex];
+                    }
+                }
+            }
+            productVectors.put(entry.getKey(), merged);
+        }
+        DEBUG_LOCAL_STATE_VECTORS.put(product, productVectors);
+    }
+
+    private static long[] debugEmptyLocalStateVector() {
+        long[] vector = new long[debugLineageStageCount];
+        java.util.Arrays.fill(vector, -1L);
+        return vector;
+    }
+
+    private static long[] copyLocalStateVector(long[] source) {
+        long[] copy = new long[source.length];
+        System.arraycopy(source, 0, copy, 0, source.length);
+        return copy;
+    }
+
+    private static void debugSemanticMultiplicity(
+            String checkpoint,
+            DelayedEnv environment,
+            LTSOutput output) {
+        if (!DEBUG_HOT_SWAP_LINEAGE || output == null) {
+            return;
+        }
+        Map<String, List<Long>> statesBySemanticSignature =
+                new LinkedHashMap<String, List<Long>>();
+        for (Long state : environment.env.getStates()) {
+            String signature = mappingMetadataFingerprint(environment, state)
+                    + "|" + debugValuationFingerprint(environment, state, environment.trackedFluents);
+            List<Long> states = statesBySemanticSignature.get(signature);
+            if (states == null) {
+                states = new ArrayList<Long>();
+                statesBySemanticSignature.put(signature, states);
+            }
+            states.add(state);
+        }
+
+        int duplicateGroups = 0;
+        int statesInDuplicateGroups = 0;
+        int maxGroupSize = 0;
+        int groupsWithMultipleLocalStates = 0;
+        int groupsWithMultipleLocalValuations = 0;
+        Map<Long, long[]> vectors = DEBUG_LOCAL_STATE_VECTORS.get(environment.env);
+        for (List<Long> states : statesBySemanticSignature.values()) {
+            if (states.size() <= 1) {
+                continue;
+            }
+            duplicateGroups++;
+            statesInDuplicateGroups += states.size();
+            maxGroupSize = Math.max(maxGroupSize, states.size());
+            Set<String> localStates = new LinkedHashSet<String>();
+            Set<String> localValuations = new LinkedHashSet<String>();
+            for (Long state : states) {
+                long[] vector = vectors == null ? null : vectors.get(state);
+                localStates.add(debugLocalStateVectorFingerprint(vector));
+                localValuations.add(debugLocalValuationFingerprint(vector));
+            }
+            if (localStates.size() > 1) {
+                groupsWithMultipleLocalStates++;
+            }
+            if (localValuations.size() > 1) {
+                groupsWithMultipleLocalValuations++;
+            }
+        }
+        output.outln("[StepwiseLineage] PRODUCT checkpoint=" + checkpoint
+                + " states=" + environment.env.getStates().size()
+                + " semanticDuplicateGroups=" + duplicateGroups
+                + " statesInDuplicateGroups=" + statesInDuplicateGroups
+                + " maxGroupSize=" + maxGroupSize
+                + " groupsWithMultipleLocalStates=" + groupsWithMultipleLocalStates
+                + " groupsWithMultipleLocalValuations=" + groupsWithMultipleLocalValuations);
+    }
+
+    private static void debugHotSwapLineage(
+            ConnectionPlan connectionPlan,
+            DelayedEnv oldMeta,
+            DelayedEnv mappingProduct,
+            Set<Fluent> comparisonFluents,
+            LTSOutput output) {
+        if (!DEBUG_HOT_SWAP_LINEAGE || output == null) {
+            return;
+        }
+
+        debugSemanticMultiplicity("final_mapping_before_connection", mappingProduct, output);
+        debugFluentDefinitionConsistency(output);
+
+        Map<Long, List<Long>> targetsByOldState = new LinkedHashMap<Long, List<Long>>();
+        for (Connection connection : connectionPlan.connections) {
+            List<Long> targets = targetsByOldState.get(connection.oldState);
+            if (targets == null) {
+                targets = new ArrayList<Long>();
+                targetsByOldState.put(connection.oldState, targets);
+            }
+            targets.add(connection.mappingState);
+        }
+
+        Map<Long, long[]> finalVectors = DEBUG_LOCAL_STATE_VECTORS.get(mappingProduct.env);
+        int multiTargetSources = 0;
+        int sameLocalStateVector = 0;
+        int multipleLocalStatesSameValuation = 0;
+        int multipleLocalValuations = 0;
+        int missingLocalLineage = 0;
+        Map<String, Integer> differingLocalFluentSources = new LinkedHashMap<String, Integer>();
+        int samples = 0;
+        output.outln("[StepwiseLineage] hotSwapIn target comparison");
+        for (Map.Entry<Long, List<Long>> entry : targetsByOldState.entrySet()) {
+            List<Long> targets = entry.getValue();
+            if (targets.size() <= 1) {
+                continue;
+            }
+            multiTargetSources++;
+            Set<String> metadataFingerprints = new LinkedHashSet<String>();
+            Set<String> finalValuations = new LinkedHashSet<String>();
+            Set<String> localStateVectors = new LinkedHashSet<String>();
+            Set<String> localValuations = new LinkedHashSet<String>();
+            boolean missing = false;
+            for (Long target : targets) {
+                metadataFingerprints.add(mappingMetadataFingerprint(mappingProduct, target));
+                finalValuations.add(debugValuationFingerprint(
+                        mappingProduct,
+                        target,
+                        comparisonFluents));
+                long[] vector = finalVectors == null ? null : finalVectors.get(target);
+                if (vector == null) {
+                    missing = true;
+                }
+                localStateVectors.add(debugLocalStateVectorFingerprint(vector));
+                localValuations.add(debugLocalValuationFingerprint(vector));
+            }
+            if (missing) {
+                missingLocalLineage++;
+            } else if (localStateVectors.size() == 1) {
+                sameLocalStateVector++;
+            } else if (localValuations.size() == 1) {
+                multipleLocalStatesSameValuation++;
+            } else {
+                multipleLocalValuations++;
+            }
+            for (String differingFluent : debugDifferingLocalFluentKeys(targets, finalVectors)) {
+                Integer count = differingLocalFluentSources.get(differingFluent);
+                differingLocalFluentSources.put(
+                        differingFluent,
+                        Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+            }
+
+            if (samples < 8) {
+                output.outln("  oldMeta=" + entry.getKey()
+                        + " oldControllerOrigin=" + oldMeta.oldControllerOrigin.get(entry.getKey())
+                        + " targets=" + targets
+                        + " distinctMetadata=" + metadataFingerprints.size()
+                        + " distinctFinalValuations=" + finalValuations.size()
+                        + " distinctLocalStateVectors=" + localStateVectors.size()
+                        + " distinctLocalValuations=" + localValuations.size());
+                for (Long target : targets) {
+                    long[] vector = finalVectors == null ? null : finalVectors.get(target);
+                    output.outln("    target=" + target
+                            + " localStates=" + debugLocalStateVectorFingerprint(vector)
+                            + " localValuationHash="
+                            + Integer.toHexString(debugLocalValuationFingerprint(vector).hashCode()));
+                }
+                output.outln("    differingLocalFluents="
+                        + debugDifferingLocalFluents(targets, finalVectors));
+                samples++;
+            }
+        }
+        output.outln("[StepwiseLineage] SUMMARY multiTargetSources=" + multiTargetSources
+                + " sameLocalStateVector=" + sameLocalStateVector
+                + " multipleLocalStatesSameValuation=" + multipleLocalStatesSameValuation
+                + " multipleLocalValuations=" + multipleLocalValuations
+                + " missingLocalLineage=" + missingLocalLineage);
+        output.outln("[StepwiseLineage] differing local fluent source counts="
+                + differingLocalFluentSources);
+    }
+
+    private static String debugLocalStateVectorFingerprint(long[] vector) {
+        return vector == null ? "<missing>" : java.util.Arrays.toString(vector);
+    }
+
+    private static String debugLocalValuationFingerprint(long[] vector) {
+        if (vector == null) {
+            return "<missing>";
+        }
+        StringBuilder result = new StringBuilder();
+        for (int stageIndex = 0; stageIndex < vector.length; stageIndex++) {
+            if (stageIndex > 0) {
+                result.append('|');
+            }
+            DelayedEnv local = DEBUG_LOCAL_ENVIRONMENTS.get(Integer.valueOf(stageIndex));
+            long localState = vector[stageIndex];
+            result.append(stageIndex).append(':');
+            if (local == null || localState < 0L || !local.env.getStates().contains(Long.valueOf(localState))) {
+                result.append("<missing>");
+            } else {
+                result.append(debugValuationFingerprint(
+                        local,
+                        Long.valueOf(localState),
+                        local.trackedFluents));
+            }
+        }
+        return result.toString();
+    }
+
+    private static String debugValuationFingerprint(
+            DelayedEnv environment,
+            Long state,
+            Collection<Fluent> fluents) {
+        List<Fluent> ordered = new ArrayList<Fluent>(fluents);
+        Collections.sort(ordered, new java.util.Comparator<Fluent>() {
+            public int compare(Fluent left, Fluent right) {
+                return left.getName().compareTo(right.getName());
+            }
+        });
+        StringBuilder result = new StringBuilder();
+        for (Fluent fluent : ordered) {
+            result.append(fluent.getName())
+                    .append('=')
+                    .append(environment.valuation.isTrue(state, fluent) ? '1' : '0')
+                    .append(';');
+        }
+        return result.toString();
+    }
+
+    private static String debugDifferingLocalFluents(
+            List<Long> targets,
+            Map<Long, long[]> finalVectors) {
+        return debugDifferingLocalFluentKeys(targets, finalVectors).toString();
+    }
+
+    private static List<String> debugDifferingLocalFluentKeys(
+            List<Long> targets,
+            Map<Long, long[]> finalVectors) {
+        if (finalVectors == null) {
+            return Collections.singletonList("<missing>");
+        }
+        List<String> differences = new ArrayList<String>();
+        for (int stageIndex = 0; stageIndex < debugLineageStageCount; stageIndex++) {
+            DelayedEnv local = DEBUG_LOCAL_ENVIRONMENTS.get(Integer.valueOf(stageIndex));
+            if (local == null) {
+                continue;
+            }
+            List<Fluent> fluents = new ArrayList<Fluent>(local.trackedFluents);
+            Collections.sort(fluents, new java.util.Comparator<Fluent>() {
+                public int compare(Fluent left, Fluent right) {
+                    return left.getName().compareTo(right.getName());
+                }
+            });
+            for (Fluent fluent : fluents) {
+                Set<Boolean> values = new LinkedHashSet<Boolean>();
+                for (Long target : targets) {
+                    long[] vector = finalVectors.get(target);
+                    if (vector == null || vector[stageIndex] < 0L) {
+                        continue;
+                    }
+                    values.add(Boolean.valueOf(local.valuation.isTrue(
+                            Long.valueOf(vector[stageIndex]),
+                            fluent)));
+                }
+                if (values.size() > 1) {
+                    differences.add("stage" + (stageIndex + 1)
+                            + ":" + fluent.getName());
+                }
+            }
+        }
+        return differences;
+    }
+
+    private static void debugFluentDefinitionConsistency(LTSOutput output) {
+        Map<String, Set<String>> definitionsByName = new LinkedHashMap<String, Set<String>>();
+        Map<String, Integer> occurrencesByName = new LinkedHashMap<String, Integer>();
+        for (DelayedEnv local : DEBUG_LOCAL_ENVIRONMENTS.values()) {
+            for (Fluent fluent : local.trackedFluents) {
+                Set<String> definitions = definitionsByName.get(fluent.getName());
+                if (definitions == null) {
+                    definitions = new LinkedHashSet<String>();
+                    definitionsByName.put(fluent.getName(), definitions);
+                }
+                definitions.add(debugFluentDefinitionFingerprint(fluent));
+                Integer occurrences = occurrencesByName.get(fluent.getName());
+                occurrencesByName.put(fluent.getName(),
+                        Integer.valueOf(occurrences == null ? 1 : occurrences.intValue() + 1));
+            }
+        }
+        int sharedNames = 0;
+        int mismatchedNames = 0;
+        int samples = 0;
+        for (Map.Entry<String, Set<String>> entry : definitionsByName.entrySet()) {
+            Integer occurrences = occurrencesByName.get(entry.getKey());
+            if (occurrences != null && occurrences.intValue() > 1) {
+                sharedNames++;
+            }
+            if (entry.getValue().size() > 1) {
+                mismatchedNames++;
+                if (samples < 8) {
+                    output.outln("[StepwiseLineage] FLUENT_DEFINITION_MISMATCH name="
+                            + entry.getKey() + " definitions=" + entry.getValue());
+                    samples++;
+                }
+            }
+        }
+        output.outln("[StepwiseLineage] fluent definitions sharedNames=" + sharedNames
+                + " mismatchedNames=" + mismatchedNames);
+    }
+
+    private static String debugFluentDefinitionFingerprint(Fluent fluent) {
+        List<String> initiating = new ArrayList<String>();
+        for (Object symbol : fluent.getInitiatingActions()) {
+            initiating.add(String.valueOf(symbol));
+        }
+        Collections.sort(initiating);
+        List<String> terminating = new ArrayList<String>();
+        for (Object symbol : fluent.getTerminatingActions()) {
+            terminating.add(String.valueOf(symbol));
+        }
+        Collections.sort(terminating);
+        return "initial=" + fluent.getInitialValue()
+                + ",initiating=" + initiating
+                + ",terminating=" + terminating;
+    }
+
+    private static void debugConnectionMultiplicity(
+            ConnectionPlan connectionPlan,
+            DelayedEnv oldMeta,
+            DelayedEnv mappingProduct,
+            LTSOutput output) {
+        if (!DEBUG_ACTION_DIAGNOSTICS || output == null) {
+            return;
+        }
+
+        Map<Long, List<Long>> targetsByOldState = new LinkedHashMap<Long, List<Long>>();
+        for (Connection connection : connectionPlan.connections) {
+            List<Long> targets = targetsByOldState.get(connection.oldState);
+            if (targets == null) {
+                targets = new ArrayList<Long>();
+                targetsByOldState.put(connection.oldState, targets);
+            }
+            targets.add(connection.mappingState);
+        }
+
+        int multiTargetSources = 0;
+        int maxTargets = 0;
+        int multiTargetSourcesWithOneMetadata = 0;
+        int multiTargetSourcesWithMultipleMetadata = 0;
+        int samples = 0;
+        output.outln("[Stepwise Delayed DUCS][Debug] hotSwapIn multiplicity");
+        for (Map.Entry<Long, List<Long>> entry : targetsByOldState.entrySet()) {
+            List<Long> targets = entry.getValue();
+            if (targets.size() <= 1) {
+                continue;
+            }
+            multiTargetSources++;
+            maxTargets = Math.max(maxTargets, targets.size());
+            Set<String> metadataFingerprints = new LinkedHashSet<String>();
+            for (Long target : targets) {
+                metadataFingerprints.add(mappingMetadataFingerprint(mappingProduct, target));
+            }
+            if (metadataFingerprints.size() == 1) {
+                multiTargetSourcesWithOneMetadata++;
+            } else {
+                multiTargetSourcesWithMultipleMetadata++;
+            }
+            if (samples < 8) {
+                output.outln("  oldMeta=" + entry.getKey()
+                        + " oldControllerOrigin=" + oldMeta.oldControllerOrigin.get(entry.getKey())
+                        + " targets=" + targets.size()
+                        + " distinctMappingMetadata=" + metadataFingerprints.size()
+                        + " metadata=" + metadataFingerprints);
+                samples++;
+            }
+        }
+        output.outln("  multiTargetSources=" + multiTargetSources
+                + " maxTargetsPerSource=" + maxTargets
+                + " oneMetadata=" + multiTargetSourcesWithOneMetadata
+                + " multipleMetadata=" + multiTargetSourcesWithMultipleMetadata);
+    }
+
+    private static String mappingMetadataFingerprint(DelayedEnv mappingProduct, Long state) {
+        Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata> metadata =
+                mappingProduct.stageMetadata.get(state);
+        if (metadata == null || metadata.isEmpty()) {
+            return "{}";
+        }
+        List<Integer> stages = new ArrayList<Integer>(metadata.keySet());
+        Collections.sort(stages);
+        StringBuilder result = new StringBuilder("{");
+        for (int i = 0; i < stages.size(); i++) {
+            if (i > 0) {
+                result.append(",");
+            }
+            Integer stage = stages.get(i);
+            MappingEnvironmentGenerator.MappingStateMetadata stageMetadata = metadata.get(stage);
+            result.append(stage)
+                    .append(":")
+                    .append(stageMetadata.getSide())
+                    .append("(")
+                    .append(stageMetadata.getOldEnvState())
+                    .append(",")
+                    .append(stageMetadata.getNewEnvState())
+                    .append(")");
+        }
+        return result.append("}").toString();
     }
 
     private static String formatNanosAsMillis(long nanos) {
@@ -2520,6 +3555,25 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     }
 
     private static void addPassiveSelfLoopsForMissingActions(MTS<Long, String> environment, Set<String> globalActions) {
+        addPassiveSelfLoopsForMissingActions(
+                environment,
+                globalActions,
+                Collections.<Long>emptySet());
+    }
+
+    private static void addPassiveSelfLoopsForMissingActions(
+            DelayedEnv environment,
+            Set<String> globalActions) {
+        addPassiveSelfLoopsForMissingActions(
+                environment.env,
+                globalActions,
+                environment.errorStates);
+    }
+
+    private static void addPassiveSelfLoopsForMissingActions(
+            MTS<Long, String> environment,
+            Set<String> globalActions,
+            Set<Long> errorStates) {
         Set<String> localActions = new HashSet<String>(environment.getActions());
         for (String action : globalActions) {
             if (UpdateConstants.BEGIN_UPDATE.equals(action)) {
@@ -2528,9 +3582,123 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             if (!localActions.contains(action)) {
                 environment.addAction(action);
                 for (Long state : environment.getStates()) {
-                    environment.addRequired(state, action, state);
+                    if (!errorStates.contains(state)) {
+                        environment.addRequired(state, action, state);
+                    }
                 }
             }
+        }
+    }
+
+    private static void debugActionStatistics(
+            String checkpoint,
+            DelayedEnv environment,
+            Set<Integer> stageScope,
+            Set<String> controllableActions,
+            Map<String, Set<Integer>> ownersByAction,
+            LTSOutput output) {
+        if (!DEBUG_ACTION_DIAGNOSTICS || output == null) {
+            return;
+        }
+
+        Map<String, DebugActionStats> statsByAction =
+                new HashMap<String, DebugActionStats>();
+        for (Long state : environment.env.getStates()) {
+            for (Pair<String, Long> transition :
+                    environment.env.getTransitions(state, MTS.TransitionType.REQUIRED)) {
+                DebugActionStats stats = statsByAction.get(transition.getFirst());
+                if (stats == null) {
+                    stats = new DebugActionStats();
+                    statsByAction.put(transition.getFirst(), stats);
+                }
+                stats.transitions++;
+                if (state.equals(transition.getSecond())) {
+                    stats.selfLoops++;
+                } else {
+                    stats.nonSelfTransitions++;
+                }
+            }
+        }
+
+        List<String> actions = new ArrayList<String>(statsByAction.keySet());
+        Collections.sort(actions);
+        output.outln("[StepwiseDebug] CHECKPOINT name=" + checkpoint
+                + " scope=" + displayStageScope(stageScope)
+                + " states=" + environment.env.getStates().size()
+                + " transitions=" + countTransitions(environment.env)
+                + " errors=" + environment.errorStates.size());
+        for (String action : actions) {
+            DebugActionStats stats = statsByAction.get(action);
+            String normalizedAction = normalizeOldAction(action);
+            Set<Integer> owners = ownersByAction.get(normalizedAction);
+            if (owners == null) {
+                owners = ownersByAction.get(action);
+            }
+            if (owners == null) {
+                owners = Collections.emptySet();
+            }
+            boolean controllable = controllableActions.contains(action);
+            boolean realInFragment = environment.realActions.contains(normalizedAction)
+                    || environment.realActions.contains(action);
+            output.outln("[StepwiseDebug] ACTION checkpoint=" + checkpoint
+                    + " scope=" + displayStageScope(stageScope)
+                    + " action=" + action
+                    + " transitions=" + stats.transitions
+                    + " selfLoops=" + stats.selfLoops
+                    + " nonSelf=" + stats.nonSelfTransitions
+                    + " controllable=" + controllable
+                    + " realInFragment=" + realInFragment
+                    + " owners=" + displayStageScope(owners));
+        }
+    }
+
+    private static void debugPassiveSelfLoopInvariant(
+            String checkpoint,
+            DelayedEnv environment,
+            Set<Integer> stageScope,
+            Set<String> passiveActions,
+            LTSOutput output) {
+        if (!DEBUG_ACTION_DIAGNOSTICS || output == null) {
+            return;
+        }
+
+        List<String> actions = new ArrayList<String>(passiveActions);
+        Collections.sort(actions);
+        for (String action : actions) {
+            long checkedStates = 0L;
+            long missingSelfLoopStates = 0L;
+            long multipleSelfLoopStates = 0L;
+            long nonSelfTransitions = 0L;
+            for (Long state : environment.env.getStates()) {
+                if (environment.errorStates.contains(state)) {
+                    continue;
+                }
+                checkedStates++;
+                int selfLoops = 0;
+                for (Pair<String, Long> transition :
+                        environment.env.getTransitions(state, MTS.TransitionType.REQUIRED)) {
+                    if (!action.equals(transition.getFirst())) {
+                        continue;
+                    }
+                    if (state.equals(transition.getSecond())) {
+                        selfLoops++;
+                    } else {
+                        nonSelfTransitions++;
+                    }
+                }
+                if (selfLoops == 0) {
+                    missingSelfLoopStates++;
+                } else if (selfLoops > 1) {
+                    multipleSelfLoopStates++;
+                }
+            }
+            output.outln("[StepwiseDebug] PASSIVE checkpoint=" + checkpoint
+                    + " scope=" + displayStageScope(stageScope)
+                    + " action=" + action
+                    + " checkedStates=" + checkedStates
+                    + " missingSelfLoopStates=" + missingSelfLoopStates
+                    + " multipleSelfLoopStates=" + multipleSelfLoopStates
+                    + " nonSelfTransitions=" + nonSelfTransitions);
         }
     }
 
@@ -2595,6 +3763,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
     }
 
+    static Set<String> mappingRealActions(MTS<Long, String> mapping) {
+        Set<String> realActions = new HashSet<String>(mapping.getActions());
+        // CompactState reserves alphabet slot 0 for tau even when the model has
+        // no tau transition. Tau is internal, not a component-owned event.
+        realActions.remove(MTSConstants.TAU);
+        return realActions;
+    }
+
     private static Set<String> realActionsForScope(Set<Integer> stageScope, List<StageBase> bases) {
         Set<String> result = new HashSet<String>();
         for (Integer stageIndex : stageScope) {
@@ -2634,6 +3810,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         return scope;
     }
 
+    private static Set<Integer> allStageScope(int stageCount) {
+        Set<Integer> scope = new java.util.TreeSet<Integer>();
+        for (int i = 0; i < stageCount; i++) {
+            scope.add(i);
+        }
+        return scope;
+    }
+
     private static Set<String> enabledActions(List<DelayedEnv> inputs, List<Long> tuple) {
         Set<String> actions = new HashSet<String>();
         for (int i = 0; i < inputs.size(); i++) {
@@ -2643,6 +3827,15 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             }
         }
         return actions;
+    }
+
+    private static boolean isErrorTuple(List<DelayedEnv> inputs, List<Long> tuple) {
+        for (int i = 0; i < inputs.size(); i++) {
+            if (inputs.get(i).errorStates.contains(tuple.get(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasRealOwnerEnabled(String action, List<Long> tuple, List<DelayedEnv> inputs) {
@@ -2797,22 +3990,20 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             String label,
             Set<Integer> scope,
             StateSpaceStats stats) {
-        String scopedLabel = "scope " + displayStageScope(scope) + " " + label;
-        UpdatingControllerEvaluationRecorder.recordCount(
-                SCOPE_STATE_SPACE_SECTION,
-                scopedLabel + " / States",
+        StepwiseDelayedEvaluationMetrics.recordScopedStateSpace(
+                label,
+                scope,
                 stats.states,
-                "states");
-        UpdatingControllerEvaluationRecorder.recordCount(
-                SCOPE_STATE_SPACE_SECTION,
-                scopedLabel + " / Transitions",
                 stats.transitions,
-                "transitions");
-        UpdatingControllerEvaluationRecorder.recordCount(
-                SCOPE_STATE_SPACE_SECTION,
-                scopedLabel + " / CountTime",
-                stats.countTime,
-                "ms");
+                stats.countTime);
+    }
+
+    private static void recordScopedTime(String label, Set<Integer> scope, long timeMillis) {
+        StepwiseDelayedEvaluationMetrics.recordScopedTime(label, scope, timeMillis);
+    }
+
+    private static void recordScopedFluentCount(String label, Set<Integer> scope, Set<Fluent> fluents) {
+        StepwiseDelayedEvaluationMetrics.recordScopedFluentCount(label, scope, fluents);
     }
 
     private static int countTransitions(MTS<Long, String> mts) {
@@ -2838,6 +4029,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
     private static final class ScopeRequirementCounts {
         private final Set<Integer> scope;
+        private final Set<Fluent> requirementFluents = new LinkedHashSet<Fluent>();
         private int oldSafetyGoals;
         private int newSafetyGoals;
         private int transitionGoals;
@@ -2854,10 +4046,15 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             } else {
                 transitionGoals++;
             }
+            requirementFluents.addAll(goal.getFluents());
         }
 
         private int totalGoals() {
             return oldSafetyGoals + newSafetyGoals + transitionGoals;
+        }
+
+        private int requirementFluentCount() {
+            return requirementFluents.size();
         }
     }
 
@@ -3022,6 +4219,12 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
     }
 
+    private static final class DebugActionStats {
+        private long transitions;
+        private long selfLoops;
+        private long nonSelfTransitions;
+    }
+
     private static final class StageBase {
         private final StepwiseStage stage;
         private final MTS<Long, String> mapping;
@@ -3047,6 +4250,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         private final Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata;
         private final Map<Long, Long> oldControllerOrigin;
         private final Set<String> realActions;
+        private final Set<Long> errorStates;
 
         private DelayedEnv(
                 MTS<Long, String> env,
@@ -3055,12 +4259,26 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
                 Map<Long, Long> oldControllerOrigin,
                 Set<String> realActions) {
+            this(env, trackedFluents, valuation, stageMetadata, oldControllerOrigin,
+                    realActions, Collections.<Long>emptySet());
+        }
+
+        private DelayedEnv(
+                MTS<Long, String> env,
+                Set<Fluent> trackedFluents,
+                FluentStateValuation<Long> valuation,
+                Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
+                Map<Long, Long> oldControllerOrigin,
+                Set<String> realActions,
+                Set<Long> errorStates) {
             this.env = env;
             this.trackedFluents = new LinkedHashSet<Fluent>(trackedFluents);
             this.valuation = valuation;
             this.stageMetadata = stageMetadata;
             this.oldControllerOrigin = oldControllerOrigin;
             this.realActions = new HashSet<String>(realActions);
+            this.errorStates = new LinkedHashSet<Long>(errorStates);
+            this.errorStates.retainAll(env.getStates());
         }
     }
 

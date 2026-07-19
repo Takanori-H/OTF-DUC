@@ -1,0 +1,519 @@
+//******************************************************************************
+//* Kiva2RobotsStateBasedBase.lts
+//*
+//* State-based static baseline derived from
+//* MODEL/ExperimentModels/KIVA_system（N, 2 robot）.lts.
+//*
+//* This file is intentionally not a DUCS scenario yet.  It prepares a clean
+//* old/new baseline for stepwise_delayed by removing nested X / W operators.
+//* Directed Controller Synthesis definitions are intentionally omitted.
+//*
+//* Rewrite policy:
+//*   - 32 temporal requirements are rewritten with pending fluents.
+//*   - 16 requirements whose trigger is also forbidden while pending cannot be
+//*     represented exactly by a post-event fluent valuation alone.  They are
+//*     intentionally deferred in this first lightweight baseline instead of
+//*     being moved into the plant and inflating its state space.
+//*
+//* Deferred original properties:
+//*   P_ROBOT1_ARM_RULE_2, P_ROBOT1_ARM_RULE_3,
+//*   P_ROBOT2_ARM_RULE_2, P_ROBOT2_ARM_RULE_3,
+//*   P_AREA_RULE_7, P_AREA_RULE_8,
+//*   P_REPLENISH_ITEM_RULE_4, P_REPLENISH_ITEM_RULE_6,
+//*   P_REPLENISH_ITEM_RULE_9, P_REPLENISH_ITEM_RULE_12,
+//*   P_BRING_ITEM_RULE_4, P_BRING_ITEM_RULE_6,
+//*   P_BRING_ITEM_RULE_9, P_BRING_ITEM_RULE_12,
+//*   P_BRING_BOX_RULE_4, P_SHIP_RULE_5.
+//*
+//* N=2 regression (2026-07-11): every finite trace of the original controller
+//* is accepted by this baseline.  The inclusion is strict; the shortest found
+//* additional trace is:
+//*   reqBringBox, robot1.move.boxGettingArea, supplyBox, supplyBox
+//******************************************************************************
+
+const PodNum = 2
+
+range PodID = 1..PodNum
+
+set Robot = {robot1,robot2}
+set Area = {shippingArea,boxGettingArea,itemGettingArea,packingArea}
+
+set MoveActions = {[Robot].move[PodID],[Robot].move[Area]}
+set AreaActions = {ship,supplyBox,supplyItem,getItem,pack}
+set PickActions = {[Robot].pick[PodID],[Robot].pick[Area]}
+set PutActions = {[Robot].put[PodID],[Robot].put[Area]}
+set ArmActions = {PickActions,PutActions}
+
+set Robot1_PickActions = {['robot1].pick[PodID],['robot1].pick[Area]}
+set Robot1_PutActions = {['robot1].put[PodID],['robot1].put[Area]}
+set Robot1_ArmActions = {Robot1_PickActions,Robot1_PutActions}
+
+set Robot2_PickActions = {['robot2].pick[PodID],['robot2].pick[Area]}
+set Robot2_PutActions = {['robot2].put[PodID],['robot2].put[Area]}
+set Robot2_ArmActions = {Robot2_PickActions,Robot2_PutActions}
+
+set Robot2_PodPutActions = {['robot2].put[PodID]}
+
+set RequestActions = {
+	reqReplenishItem,reqBringItem,reqBringBox,reqShip,
+	replenish[PodID],bring[PodID]
+}
+set DoneActions = {doneReplenishItem,doneBringItem,doneBringBox,doneShip}
+
+set ShippingRobotActions = {
+	['robot1].move[PodID],['robot1].pick[PodID],['robot1].put[PodID],
+	['robot1].move[Area],['robot1].pick[Area],['robot1].put[Area]
+}
+set ReplenishRobotActions = {
+	['robot2].move[PodID],['robot2].pick[PodID],['robot2].put[PodID],
+	['robot2].move[Area],['robot2].pick[Area],['robot2].put[Area]
+}
+
+set ControllableActions = {
+	MoveActions,AreaActions,ArmActions,DoneActions,
+	reqReplenishItem,reqBringItem,reqBringBox,reqShip
+}
+
+//******************************************************************************
+//* Base warehouse environment
+//******************************************************************************
+
+INITIAL(N=1) = MOVEMENT[N],
+MOVEMENT[i:PodID] =
+(
+	move[ii:PodID] -> MOVEMENT[ii]
+	|move['shippingArea] -> SHIP_AREA
+	|move['boxGettingArea] -> BOX_GET_AREA
+	|move['itemGettingArea] -> ITEM_GET_AREA
+	|move['packingArea] -> PACK_AREA
+	|pick[i] -> MOVEMENT[i]
+	|put[i] -> MOVEMENT[i]
+),
+SHIP_AREA =
+(
+	move[ii:PodID] -> MOVEMENT[ii]
+	|move['boxGettingArea] -> BOX_GET_AREA
+	|move['itemGettingArea] -> ITEM_GET_AREA
+	|move['packingArea] -> PACK_AREA
+	|pick['shippingArea] -> SHIP_AREA
+	|put['shippingArea] -> SHIP_AREA
+),
+BOX_GET_AREA =
+(
+	move[ii:PodID] -> MOVEMENT[ii]
+	|move['shippingArea] -> SHIP_AREA
+	|move['itemGettingArea] -> ITEM_GET_AREA
+	|move['packingArea] -> PACK_AREA
+	|pick['boxGettingArea] -> BOX_GET_AREA
+	|put['boxGettingArea] -> BOX_GET_AREA
+),
+ITEM_GET_AREA =
+(
+	move[ii:PodID] -> MOVEMENT[ii]
+	|move['shippingArea] -> SHIP_AREA
+	|move['boxGettingArea] -> BOX_GET_AREA
+	|move['packingArea] -> PACK_AREA
+	|pick['itemGettingArea] -> ITEM_GET_AREA
+	|put['itemGettingArea] -> ITEM_GET_AREA
+),
+PACK_AREA =
+(
+	move[ii:PodID] -> MOVEMENT[ii]
+	|move['shippingArea] -> SHIP_AREA
+	|move['boxGettingArea] -> BOX_GET_AREA
+	|move['itemGettingArea] -> ITEM_GET_AREA
+	|pick['packingArea] -> PACK_AREA
+	|put['packingArea] -> PACK_AREA
+).
+
+SHIP_ACTION = (ship -> SHIP_ACTION).
+BOX_ACTION = (supplyBox -> BOX_ACTION).
+ITEM_ACTION = ({supplyItem,getItem} -> ITEM_ACTION).
+PACK_ACTION = (pack -> PACK_ACTION).
+
+REQUEST_1 =
+	(reqReplenishItem -> replenish[PodID] -> doneReplenishItem -> REQUEST_1).
+REQUEST_2 =
+	(reqBringItem -> bring[PodID] -> doneBringItem -> REQUEST_2).
+REQUEST_3 = (reqBringBox -> doneBringBox -> REQUEST_3).
+REQUEST_4 = (reqShip -> doneShip -> REQUEST_4).
+
+||KIVA_STATE_BASED_SYSTEM =
+(
+	['robot1]:INITIAL(1)
+	|| ['robot2]:INITIAL(PodNum)
+	|| SHIP_ACTION
+	|| BOX_ACTION
+	|| ITEM_ACTION
+	|| PACK_ACTION
+	|| REQUEST_1
+	|| REQUEST_2
+	|| REQUEST_3
+	|| REQUEST_4
+).
+
+//******************************************************************************
+//* Fluents
+//******************************************************************************
+
+fluent REPLENISH[i:PodID] = <replenish[i],['robot2].move[i]>
+fluent BRING[i:PodID] = <bring[i],['robot2].move[i]>
+
+fluent PROCESS_REPLENISH_ITEM = <reqReplenishItem,doneReplenishItem>
+fluent PROCESS_BRING_ITEM = <reqBringItem,doneBringItem>
+fluent PROCESS_BRING_BOX = <reqBringBox,doneBringBox>
+fluent PROCESS_SHIP = <reqShip,doneShip>
+
+fluent REQ_SHIP_TIMING = <pack,doneShip>
+fluent SHIP_TIMING = <['robot1].put['shippingArea],doneShip>
+fluent BOX_TIMING =
+	<['robot1].move['boxGettingArea],['robot1].pick['boxGettingArea]>
+fluent ITEM_TIMING =
+	<['robot2].put['itemGettingArea],['robot2].pick['itemGettingArea]>
+fluent GET_TIMING_1 =
+	<['robot2].put['packingArea],['robot2].pick['packingArea]>
+fluent GET_TIMING_2 = <doneBringBox,['robot2].put['packingArea]>
+fluent PACK_TIMING_1 = <doneBringBox,reqShip>
+fluent PACK_TIMING_2 = <doneBringItem,reqShip>
+
+// General command-to-first-move obligations.
+fluent REPLENISH_MOVE_PENDING =
+	<replenish[PodID],['robot2].move[PodID]>
+fluent BRING_MOVE_PENDING = <bring[PodID],['robot2].move[PodID]>
+
+// Replenish-item workflow obligations.
+fluent REPLENISH_COMMAND_PENDING = <reqReplenishItem,replenish[PodID]>
+fluent REPLENISH_FIRST_MOVE_PENDING =
+	<reqReplenishItem,['robot2].move[PodID]>
+fluent REPLENISH_POD_PICK_PENDING =
+	<reqReplenishItem,['robot2].pick[PodID]>
+fluent REPLENISH_AREA_PICK_PENDING =
+	<['robot2].move['itemGettingArea],['robot2].pick['itemGettingArea]>
+fluent REPLENISH_SUPPLY_PENDING =
+	<['robot2].move['itemGettingArea],supplyItem>
+fluent REPLENISH_DONE_PENDING =
+	<['robot2].pick['itemGettingArea],doneReplenishItem>
+fluent REPLENISH_PUT_BACK_PENDING =
+	<reqReplenishItem,['robot2].put[PodID]>
+
+// Bring-item workflow obligations.
+fluent BRING_COMMAND_PENDING = <reqBringItem,bring[PodID]>
+fluent BRING_FIRST_MOVE_PENDING = <reqBringItem,['robot2].move[PodID]>
+fluent BRING_POD_PICK_PENDING = <reqBringItem,['robot2].pick[PodID]>
+fluent BRING_AREA_PICK_PENDING =
+	<['robot2].move['packingArea],['robot2].pick['packingArea]>
+fluent BRING_GET_PENDING = <['robot2].move['packingArea],getItem>
+fluent BRING_DONE_PENDING =
+	<['robot2].pick['packingArea],doneBringItem>
+fluent BRING_PUT_BACK_PENDING = <reqBringItem,['robot2].put[PodID]>
+
+// Bring-box workflow obligations.
+fluent BOX_PICK_PENDING =
+	<reqBringBox,['robot1].pick['boxGettingArea]>
+fluent BOX_SUPPLY_PENDING = <reqBringBox,supplyBox>
+fluent BOX_DONE_PENDING =
+	<['robot1].pick['boxGettingArea],doneBringBox>
+fluent BOX_PUT_PENDING =
+	<reqBringBox,['robot1].put['packingArea]>
+
+// Shipping workflow obligations.
+fluent SHIP_PICK_PENDING = <reqShip,['robot1].pick['packingArea]>
+fluent SHIP_DONE_MOVE_PENDING =
+	<['robot1].move['shippingArea],doneShip>
+fluent SHIP_PUT_PENDING = <reqShip,['robot1].put['shippingArea]>
+fluent SHIP_ACTION_PENDING = <reqShip,ship>
+
+// Per-pod obligations that remain active until the request completes.
+fluent REPLENISH_CHOICE_1 = <replenish[1],doneReplenishItem>
+fluent REPLENISH_CHOICE_2 = <replenish[2],doneReplenishItem>
+fluent BRING_CHOICE_1 = <bring[1],doneBringItem>
+fluent BRING_CHOICE_2 = <bring[2],doneBringItem>
+
+//******************************************************************************
+//* State-based safety requirements
+//******************************************************************************
+
+assert SHIP_ROBOT_RULE = !{['robot1].move['itemGettingArea]}
+assert REPLENISH_ROBOT_RULE =
+	!{['robot2].move['shippingArea],['robot2].move['boxGettingArea]}
+
+assert REQUEST_TIMING_1 = (PROCESS_BRING_BOX -> !reqShip)
+assert REQUEST_TIMING_2 = (PROCESS_SHIP -> !reqBringBox)
+assert REQUEST_TIMING_3 = (PROCESS_REPLENISH_ITEM -> !reqBringItem)
+assert REQUEST_TIMING_4 = (PROCESS_BRING_ITEM -> !reqReplenishItem)
+
+assert REQUEST_ONLY_1 =
+(
+	!(PROCESS_SHIP || PROCESS_BRING_BOX)
+	-> !{
+		['robot1].move[PodID],['robot1].move[Area],
+		['robot1].pick[PodID],['robot1].put[PodID],
+		['robot1].pick[Area],['robot1].put[Area]
+	}
+)
+assert REQUEST_ONLY_2 =
+(
+	!(PROCESS_REPLENISH_ITEM || PROCESS_BRING_ITEM)
+	-> !{
+		['robot2].move[PodID],['robot2].move[Area],
+		['robot2].pick[PodID],['robot2].put[PodID],
+		['robot2].pick[Area],['robot2].put[Area]
+	}
+)
+
+assert ROBOT1_ARM_RULE_1 =
+	(!(PROCESS_SHIP || PROCESS_BRING_BOX) -> !{Robot1_ArmActions})
+assert ROBOT2_ARM_RULE_1 =
+	(!(PROCESS_REPLENISH_ITEM || PROCESS_BRING_ITEM) -> !{Robot2_ArmActions})
+
+assert REPLENISH_RULE_2 =
+(
+	REPLENISH_MOVE_PENDING
+	-> !{{ReplenishRobotActions}\{['robot2].move[PodID]}}
+)
+assert BRING_RULE_2 =
+(
+	BRING_MOVE_PENDING
+	-> !{{ReplenishRobotActions}\{['robot2].move[PodID]}}
+)
+
+assert AREA_RULE_1 = (!SHIP_TIMING -> !ship)
+assert AREA_RULE_2 = (!BOX_TIMING -> !supplyBox)
+assert AREA_RULE_3 = (!ITEM_TIMING -> !supplyItem)
+assert AREA_RULE_4 =
+	(!(GET_TIMING_1 && !GET_TIMING_2 && PROCESS_BRING_ITEM) -> !getItem)
+assert AREA_RULE_5 = (!PACK_TIMING_1 -> !pack)
+assert AREA_RULE_6 = (!PACK_TIMING_2 -> !pack)
+
+set ReplenishItemActions = {
+	reqReplenishItem,replenish[PodID],
+	['robot2].move[PodID],['robot2].pick[PodID],
+	['robot2].move['itemGettingArea],['robot2].put['itemGettingArea],
+	supplyItem,['robot2].pick['itemGettingArea],
+	['robot2].put[PodID],doneReplenishItem
+}
+
+assert REPLENISH_ITEM_RULE_1 =
+	(PROCESS_REPLENISH_ITEM -> !{{ReplenishRobotActions}\{ReplenishItemActions}})
+assert REPLENISH_ITEM_RULE_2 =
+	(REPLENISH_COMMAND_PENDING -> !{ReplenishRobotActions})
+assert REPLENISH_ITEM_RULE_3 =
+	(REPLENISH_FIRST_MOVE_PENDING -> !{Robot2_PickActions})
+assert REPLENISH_ITEM_RULE_5 =
+	(REPLENISH_POD_PICK_PENDING -> !{Robot2_PodPutActions})
+assert REPLENISH_ITEM_RULE_7 =
+	(REPLENISH_AREA_PICK_PENDING -> !{['robot2].move[PodID]})
+assert REPLENISH_ITEM_RULE_8 =
+	(REPLENISH_SUPPLY_PENDING -> !['robot2].pick['itemGettingArea])
+assert REPLENISH_ITEM_RULE_10 =
+	(REPLENISH_DONE_PENDING -> !['robot2].put['itemGettingArea])
+assert REPLENISH_ITEM_RULE_13 =
+	(REPLENISH_PUT_BACK_PENDING -> !doneReplenishItem)
+
+set BringItemActions = {
+	reqBringItem,bring[PodID],
+	['robot2].move[PodID],['robot2].pick[PodID],
+	['robot2].move['packingArea],['robot2].put['packingArea],
+	getItem,['robot2].pick['packingArea],
+	['robot2].put[PodID],doneBringItem
+}
+
+assert BRING_ITEM_RULE_1 =
+	(PROCESS_BRING_ITEM -> !{{ReplenishRobotActions}\{BringItemActions}})
+assert BRING_ITEM_RULE_2 =
+	(BRING_COMMAND_PENDING -> !{ReplenishRobotActions})
+assert BRING_ITEM_RULE_3 =
+	(BRING_FIRST_MOVE_PENDING -> !{Robot2_PickActions})
+assert BRING_ITEM_RULE_5 =
+	(BRING_POD_PICK_PENDING -> !{Robot2_PodPutActions})
+assert BRING_ITEM_RULE_7 =
+	(BRING_AREA_PICK_PENDING -> !{['robot2].move[PodID]})
+assert BRING_ITEM_RULE_8 =
+	(BRING_GET_PENDING -> !['robot2].pick['packingArea])
+assert BRING_ITEM_RULE_10 =
+	(BRING_DONE_PENDING -> !['robot2].put['packingArea])
+assert BRING_ITEM_RULE_13 =
+	(BRING_PUT_BACK_PENDING -> !doneBringItem)
+
+set BringBoxActions = {
+	reqBringBox,['robot1].move['boxGettingArea],supplyBox,
+	['robot1].pick['boxGettingArea],['robot1].move['packingArea],
+	['robot1].put['packingArea],doneBringBox
+}
+
+assert BRING_BOX_RULE_1 =
+	(PROCESS_BRING_BOX -> !{{ShippingRobotActions}\{BringBoxActions}})
+assert BRING_BOX_RULE_2 =
+	(BOX_PICK_PENDING -> !['robot1].move['packingArea])
+assert BRING_BOX_RULE_3 =
+	(BOX_SUPPLY_PENDING -> !['robot1].pick['boxGettingArea])
+assert BRING_BOX_RULE_5 =
+	(BOX_DONE_PENDING -> !['robot1].move['boxGettingArea])
+assert BRING_BOX_RULE_6 = (BOX_PUT_PENDING -> !doneBringBox)
+
+set ShipActions = {
+	reqShip,['robot1].move['packingArea],['robot1].pick['packingArea],
+	['robot1].move['shippingArea],['robot1].put['shippingArea],
+	ship,doneShip
+}
+
+assert SHIP_RULE_0 = (!REQ_SHIP_TIMING -> !reqShip)
+assert SHIP_RULE_1 =
+	(PROCESS_SHIP -> !{{ShippingRobotActions}\{ShipActions}})
+assert SHIP_RULE_2 =
+	(SHIP_PICK_PENDING -> !['robot1].move['shippingArea])
+assert SHIP_RULE_3 =
+	(SHIP_DONE_MOVE_PENDING -> !['robot1].move['packingArea])
+assert SHIP_RULE_4 = (SHIP_PUT_PENDING -> !ship)
+assert SHIP_RULE_6 = (SHIP_ACTION_PENDING -> !doneShip)
+
+assert REPLENISH_RULE01 =
+	(REPLENISH[1] -> !['robot2].move[PodID])
+assert REPLENISH_RULE02 =
+	(REPLENISH[2] -> !['robot2].move[PodID])
+assert BRING_RULE01 = (BRING[1] -> !['robot2].move[PodID])
+assert BRING_RULE02 = (BRING[2] -> !['robot2].move[PodID])
+
+assert REPLENISH_ITEM_RULE01_11 =
+	(REPLENISH_CHOICE_1 -> !['robot2].move[2])
+assert REPLENISH_ITEM_RULE02_11 =
+	(REPLENISH_CHOICE_2 -> !['robot2].move[1])
+assert BRING_ITEM_RULE01_11 =
+	(BRING_CHOICE_1 -> !['robot2].move[2])
+assert BRING_ITEM_RULE02_11 =
+	(BRING_CHOICE_2 -> !['robot2].move[1])
+
+//******************************************************************************
+//* State-based LTL property wrappers
+//******************************************************************************
+
+ltl_property P_SHIP_ROBOT_RULE = []SHIP_ROBOT_RULE
+ltl_property P_REPLENISH_ROBOT_RULE = []REPLENISH_ROBOT_RULE
+
+ltl_property P_REQUEST_TIMING_1 = []REQUEST_TIMING_1
+ltl_property P_REQUEST_TIMING_2 = []REQUEST_TIMING_2
+ltl_property P_REQUEST_TIMING_3 = []REQUEST_TIMING_3
+ltl_property P_REQUEST_TIMING_4 = []REQUEST_TIMING_4
+
+ltl_property P_REQUEST_ONLY_1 = []REQUEST_ONLY_1
+ltl_property P_REQUEST_ONLY_2 = []REQUEST_ONLY_2
+ltl_property P_ROBOT1_ARM_RULE_1 = []ROBOT1_ARM_RULE_1
+ltl_property P_ROBOT2_ARM_RULE_1 = []ROBOT2_ARM_RULE_1
+
+ltl_property P_REPLENISH_RULE_2 = []REPLENISH_RULE_2
+ltl_property P_BRING_RULE_2 = []BRING_RULE_2
+
+ltl_property P_AREA_RULE_1 = []AREA_RULE_1
+ltl_property P_AREA_RULE_2 = []AREA_RULE_2
+ltl_property P_AREA_RULE_3 = []AREA_RULE_3
+ltl_property P_AREA_RULE_4 = []AREA_RULE_4
+ltl_property P_AREA_RULE_5 = []AREA_RULE_5
+ltl_property P_AREA_RULE_6 = []AREA_RULE_6
+
+ltl_property P_REPLENISH_ITEM_RULE_1 = []REPLENISH_ITEM_RULE_1
+ltl_property P_REPLENISH_ITEM_RULE_2 = []REPLENISH_ITEM_RULE_2
+ltl_property P_REPLENISH_ITEM_RULE_3 = []REPLENISH_ITEM_RULE_3
+ltl_property P_REPLENISH_ITEM_RULE_5 = []REPLENISH_ITEM_RULE_5
+ltl_property P_REPLENISH_ITEM_RULE_7 = []REPLENISH_ITEM_RULE_7
+ltl_property P_REPLENISH_ITEM_RULE_8 = []REPLENISH_ITEM_RULE_8
+ltl_property P_REPLENISH_ITEM_RULE_10 = []REPLENISH_ITEM_RULE_10
+ltl_property P_REPLENISH_ITEM_RULE_13 = []REPLENISH_ITEM_RULE_13
+
+ltl_property P_BRING_ITEM_RULE_1 = []BRING_ITEM_RULE_1
+ltl_property P_BRING_ITEM_RULE_2 = []BRING_ITEM_RULE_2
+ltl_property P_BRING_ITEM_RULE_3 = []BRING_ITEM_RULE_3
+ltl_property P_BRING_ITEM_RULE_5 = []BRING_ITEM_RULE_5
+ltl_property P_BRING_ITEM_RULE_7 = []BRING_ITEM_RULE_7
+ltl_property P_BRING_ITEM_RULE_8 = []BRING_ITEM_RULE_8
+ltl_property P_BRING_ITEM_RULE_10 = []BRING_ITEM_RULE_10
+ltl_property P_BRING_ITEM_RULE_13 = []BRING_ITEM_RULE_13
+
+ltl_property P_BRING_BOX_RULE_1 = []BRING_BOX_RULE_1
+ltl_property P_BRING_BOX_RULE_2 = []BRING_BOX_RULE_2
+ltl_property P_BRING_BOX_RULE_3 = []BRING_BOX_RULE_3
+ltl_property P_BRING_BOX_RULE_5 = []BRING_BOX_RULE_5
+ltl_property P_BRING_BOX_RULE_6 = []BRING_BOX_RULE_6
+
+ltl_property P_SHIP_RULE_0 = []SHIP_RULE_0
+ltl_property P_SHIP_RULE_1 = []SHIP_RULE_1
+ltl_property P_SHIP_RULE_2 = []SHIP_RULE_2
+ltl_property P_SHIP_RULE_3 = []SHIP_RULE_3
+ltl_property P_SHIP_RULE_4 = []SHIP_RULE_4
+ltl_property P_SHIP_RULE_6 = []SHIP_RULE_6
+
+ltl_property P_REPLENISH_RULE01 = []REPLENISH_RULE01
+ltl_property P_REPLENISH_RULE02 = []REPLENISH_RULE02
+ltl_property P_BRING_RULE01 = []BRING_RULE01
+ltl_property P_BRING_RULE02 = []BRING_RULE02
+ltl_property P_REPLENISH_ITEM_RULE01_11 = []REPLENISH_ITEM_RULE01_11
+ltl_property P_REPLENISH_ITEM_RULE02_11 = []REPLENISH_ITEM_RULE02_11
+ltl_property P_BRING_ITEM_RULE01_11 = []BRING_ITEM_RULE01_11
+ltl_property P_BRING_ITEM_RULE02_11 = []BRING_ITEM_RULE02_11
+
+controllerSpec KIVA_STATE_BASED_SPEC =
+{
+	safety = {
+		P_REPLENISH_ROBOT_RULE,
+		P_SHIP_ROBOT_RULE,
+		P_REQUEST_TIMING_1,
+		P_REQUEST_TIMING_2,
+		P_REQUEST_TIMING_3,
+		P_REQUEST_TIMING_4,
+		P_REQUEST_ONLY_1,
+		P_REQUEST_ONLY_2,
+		P_ROBOT1_ARM_RULE_1,
+		P_ROBOT2_ARM_RULE_1,
+		P_REPLENISH_RULE_2,
+		P_BRING_RULE_2,
+		P_AREA_RULE_1,
+		P_AREA_RULE_2,
+		P_AREA_RULE_3,
+		P_AREA_RULE_4,
+		P_AREA_RULE_5,
+		P_AREA_RULE_6,
+		P_REPLENISH_ITEM_RULE_1,
+		P_REPLENISH_ITEM_RULE_2,
+		P_REPLENISH_ITEM_RULE_3,
+		P_REPLENISH_ITEM_RULE_5,
+		P_REPLENISH_ITEM_RULE_7,
+		P_REPLENISH_ITEM_RULE_8,
+		P_REPLENISH_ITEM_RULE_10,
+		P_REPLENISH_ITEM_RULE_13,
+		P_BRING_ITEM_RULE_1,
+		P_BRING_ITEM_RULE_2,
+		P_BRING_ITEM_RULE_3,
+		P_BRING_ITEM_RULE_5,
+		P_BRING_ITEM_RULE_7,
+		P_BRING_ITEM_RULE_8,
+		P_BRING_ITEM_RULE_10,
+		P_BRING_ITEM_RULE_13,
+		P_BRING_BOX_RULE_1,
+		P_BRING_BOX_RULE_2,
+		P_BRING_BOX_RULE_3,
+		P_BRING_BOX_RULE_5,
+		P_BRING_BOX_RULE_6,
+		P_SHIP_RULE_0,
+		P_SHIP_RULE_1,
+		P_SHIP_RULE_2,
+		P_SHIP_RULE_3,
+		P_SHIP_RULE_4,
+		P_SHIP_RULE_6,
+		P_REPLENISH_RULE01,
+		P_BRING_RULE01,
+		P_REPLENISH_ITEM_RULE01_11,
+		P_BRING_ITEM_RULE01_11,
+		P_REPLENISH_RULE02,
+		P_BRING_RULE02,
+		P_REPLENISH_ITEM_RULE02_11,
+		P_BRING_ITEM_RULE02_11
+	}
+	controllable = {ControllableActions}
+}
+
+//******************************************************************************
+//* Static regression targets only.  No Directed Controller target is included.
+//******************************************************************************
+
+||Environment = KIVA_STATE_BASED_SYSTEM.
+controller ||StateBasedController = (Environment)~{KIVA_STATE_BASED_SPEC}.
+||Controller = StateBasedController.

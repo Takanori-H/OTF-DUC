@@ -1,0 +1,191 @@
+// -----------------------------COMMENTS-------------------------------
+
+// - To execute the solution for update controllers select in the dropdown menu 
+// the "UPDATE_CONTROLLER" label, and then press the compose button (||).
+// - In the section of UPDATING CONTROLLER SPEC, in this file, you can spec
+// different transition requeriments presented in the paper.
+// - You can animate the controller obtained pressing the blue A in the top bar
+// - After composing, you can validate that the controller obtained satisfy 
+// each updating controller goal formula by modelchecking.
+// In the top menu go to Check >> LTL property >> TEST_FORMULA1/2/3
+
+// ---------------------------ENVIRONMENTS-----------------------------
+
+set OldControllableActions = {shiftX, shiftY, shiftZ, encode, send, receive, decode[2..3], output}
+set NewControllableActions = {shiftX, shiftY, shiftZ, shiftT, encode, send, receive, decode[2..3], output}
+set AlphabetOld = {OldControllableActions}
+set AlphabetNew = {NewControllableActions}
+
+OLD_ENV = SENDER,
+SENDER = (shiftX -> X),
+X = (shiftY -> Y),
+Y = (shiftZ -> Z),
+Z = (encode -> ENCODED),
+ENCODED = (send -> SENT),
+SENT = (receive -> RECEIVED),
+RECEIVED = (decode[2..3] -> DECODED),
+DECODED = (output -> SENDER).
+
+NEW_ENV = SENDER,
+SENDER = (shiftX -> X),
+X = (shiftY -> Y),
+Y = (shiftZ -> Z),
+Z = (shiftT -> T),
+T = (encode -> ENCODED),
+ENCODED = (send -> SENT),
+SENT = (receive -> RECEIVED),
+RECEIVED = (decode[2..3] -> DECODED),
+DECODED = (output -> SENDER).
+
+||OldEnvironment = (OLD_ENV).
+||NewEnvironment = (NEW_ENV).
+
+relation R_ENV = {SENDER@OLD_ENV = reconfigure -> SENDER@NEW_ENV,
+					X@OLD_ENV = reconfigure -> X@NEW_ENV,
+					Y@OLD_ENV = reconfigure -> Y@NEW_ENV,
+					Z@OLD_ENV = reconfigure -> Z@NEW_ENV,
+					ENCODED@OLD_ENV = reconfigure -> ENCODED@NEW_ENV,
+					SENT@OLD_ENV = reconfigure -> SENT@NEW_ENV,
+					RECEIVED@OLD_ENV = reconfigure -> RECEIVED@NEW_ENV,
+					DECODED@OLD_ENV = reconfigure -> DECODED@NEW_ENV}
+
+map MAP_ENV = {OLD_ENV, NEW_ENV, R_ENV}.
+
+||MapEnv = (MAP_ENV).
+
+//Fluents declaration
+fluent ReadX = <shiftX,output>
+fluent ReadY = <shiftY,output>
+fluent ReadZ = <shiftZ,output>
+fluent ReadT = <shiftT,output>
+fluent Sending = <send,output>
+
+// ---------------------------OLD CONTROLLER SPEC -----------------------------
+
+assert DECODE = (!decode[3])
+ltl_property P_DECODE = []DECODE
+
+controllerSpec OldSpec = {
+    safety = {P_DECODE}
+    controllable = {OldControllableActions}
+}
+
+controller ||OldController = OldEnvironment~{OldSpec}.
+||OldEnvironmentController = (OldEnvironment || OldController).
+
+// ---------------------------NEW CONTROLLER SPEC -----------------------------
+
+assert NEW_DECODE = (!decode[2])
+
+ltl_property P_NEW_DECODE = []NEW_DECODE
+
+controllerSpec NewSpec = {
+    safety = {P_NEW_DECODE}
+    controllable = {NewControllableActions}
+}
+
+controller ||NewController = NewEnvironment~{NewSpec}.
+||NewEnvironmentController = (NewController || NewEnvironment).
+
+// ---------------------------UPDATING CONTROLLER SPEC-----------------------------
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+fluent Reconfigure = <reconfigure, hotSwapIn>
+
+assert AnyAction = (shiftX || shiftY || shiftZ || shiftT || encode || send || receive ||
+					decode[2]|| decode[3] || output)
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
+ltl_property T2_START_AFTER_STOP_AND_RECONFIGURE =
+	(startNewSpec -> (StopOldSpec && Reconfigure))
+
+updatingController UpdCont = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_T1 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
+updatingController Stepwise_UpdCont = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_UPDATE_CONTROLLER = Stepwise_UpdCont.
+
+updatingController Stepwise_UpdCont_T1 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T1_NO_CONTROLLABLE_DURING_GAP,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_UPDATE_CONTROLLER_T1 = Stepwise_UpdCont_T1.
+
+updatingController Stepwise_UpdCont_T2 = {
+    oldController = OldEnvironmentController,
+	oldEnvironment = {OLD_ENV},
+	newEnvironment = {NEW_ENV},
+	mapRelation ={R_ENV},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+	transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_UPDATE_CONTROLLER_T2 = Stepwise_UpdCont_T2.
+
+// ---------------------------TEST AND RESULTS-----------------------------
+assert S_OLD = (DECODE)
+assert S_NEW = (NEW_DECODE)
+
+assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
+assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
+assert TEST_FORMULA3 = [](hotSwapIn -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))
+assert T_NO_UPDATE_WHILE_SEND = [](Sending -> (!startNewSpec && !stopOldSpec))

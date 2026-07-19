@@ -594,6 +594,12 @@ public class UpdatingControllerSynthesizer {
         uccs.setMachines(machines);
 
         //評価実験用
+        UpdatingControllerEvaluationRecorder.endCountScope(
+                "Traditional DUC",
+                "GR(1)入力 safetyEnv 構築時間");
+        UpdatingControllerEvaluationRecorder.endFailureTimer(
+                "Traditional DUC",
+                "GR(1)入力 safetyEnv 構築時間");
         long synthesizeGRStart = System.currentTimeMillis();
         DUCHeartbeat.beginPhase("TRADITIONAL_GR1_SYNTHESIS");
         DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
@@ -834,17 +840,7 @@ public class UpdatingControllerSynthesizer {
 
             goalFluents.remove(fl);
 
-            Set<MTSSynthesis.ar.dc.uba.model.language.Symbol> terminating = new HashSet<>();
-            for (String action : actions){
-
-                if (!action.equals(fl.getName().split("_a")[0])){
-                    if (!action.equals("tau")) {
-                        terminating.add(new SingleSymbol(action));
-                    }
-                }
-            }
-
-            Fluent resultantFl = new FluentImpl(fl.getName(), fl.getInitiatingActions(), terminating, fl.getInitialValue());
+            Fluent resultantFl = UpdatingControllersUtils.completeActionFluentTerminatingActions(actions, fl);
             resultantFluents.add(resultantFl);
             goalFluents.add(resultantFl);
         }

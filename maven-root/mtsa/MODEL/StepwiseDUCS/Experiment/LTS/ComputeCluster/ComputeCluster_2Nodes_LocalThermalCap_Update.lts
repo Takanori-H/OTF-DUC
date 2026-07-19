@@ -1,0 +1,195 @@
+// ComputeCluster Stepwise DUCS model: local thermal-cap policy update.
+//
+// This model was designed from scratch for Stepwise DUCS evaluation. It is not
+// derived from ArtGallery, Drone, KIVA, or any existing update benchmark.
+//
+// Direct diagnostic base (left unchanged):
+//   ComputeCluster_2Nodes_NoChange_Update.lts
+//   SHA-256: ba1daba003d161975594827ff3f7f6c37b0663ccc0e278fba51c933bfd310c38
+//
+// System meaning:
+// - Two compute nodes execute jobs at one of three performance levels.
+// - A job request and normal job completion are uncontrollable.
+// - Starting, changing the performance level, and stopping are controllable.
+// - Old and new environments have identical behavior and alphabets.
+// - Each node is one mapping component. Every old state is related to the new
+//   state with the same operational meaning.
+//
+// Purpose of this file:
+// - Model a runtime policy update after a loss of cooling capacity.
+// - The old policy permits performance levels 1..3.
+// - The new policy caps each node independently at level 2. A node already at
+//   level 3 can execute the controllable setLevel[1], setLevel[2], or stop
+//   action before startNewSpec.
+// - P_LOCAL_THERMAL_CAP_1_NEW and P_LOCAL_THERMAL_CAP_2_NEW each refer only to
+//   the alphabet of one mapping component, so their expected scopes are {1}
+//   and {2}, respectively.
+// - The request/running phase-separation requirements remain unchanged between
+//   OLD and NEW.
+// - No pairwise or global power requirement is included yet; those are added
+//   only after this local-update model is shown to synthesize.
+// - Only no_tr Traditional DUCS and Stepwise DUCS targets are provided.
+//   T1/T2 and scaling are intentionally deferred until this model succeeds.
+
+// =============================================================================
+// Constants and action classification
+// =============================================================================
+
+const N = 2
+const MaxLevel = 3
+
+range NodeID = 1..N
+range Level = 1..MaxLevel
+set Nodes = {node[NodeID]}
+
+// Per node: start[1..3], setLevel[1..3], and stop are controllable.
+set ControllableActions = {
+    [Nodes].start[Level],
+    [Nodes].setLevel[Level],
+    [Nodes].stop
+}
+
+// node[i].request and node[i].finish are intentionally absent from the set
+// above and are therefore uncontrollable.
+
+// =============================================================================
+// Old and new environments
+// =============================================================================
+
+// Each node has five states: IDLE, READY, and RUN[level] for levels 1..3.
+// All transitions are atomic; there is no command/arrival intermediate state.
+
+NODE_OLD(I=1) = IDLE_OLD,
+IDLE_OLD = (
+    node[I].request -> READY_OLD
+),
+READY_OLD = (
+      node[I].start[level:Level] -> RUN_OLD[level]
+    | node[I].stop -> IDLE_OLD
+),
+RUN_OLD[current:Level] = (
+      node[I].setLevel[next:Level] -> RUN_OLD[next]
+    | node[I].finish -> IDLE_OLD
+    | node[I].stop -> IDLE_OLD
+).
+
+NODE_NEW(I=1) = IDLE_NEW,
+IDLE_NEW = (
+    node[I].request -> READY_NEW
+),
+READY_NEW = (
+      node[I].start[level:Level] -> RUN_NEW[level]
+    | node[I].stop -> IDLE_NEW
+),
+RUN_NEW[current:Level] = (
+      node[I].setLevel[next:Level] -> RUN_NEW[next]
+    | node[I].finish -> IDLE_NEW
+    | node[I].stop -> IDLE_NEW
+).
+
+||OLD_ENV = (NODE_OLD(1) || NODE_OLD(2)).
+||NEW_ENV = (NODE_NEW(1) || NODE_NEW(2)).
+
+// =============================================================================
+// Total identity state correspondence: one mapping component per node
+// =============================================================================
+
+relation R_NODE_1 = {
+    IDLE_OLD@NODE_OLD(1) = reconfigure -> IDLE_NEW@NODE_NEW(1),
+    READY_OLD@NODE_OLD(1) = reconfigure -> READY_NEW@NODE_NEW(1),
+    RUN_OLD[1]@NODE_OLD(1) = reconfigure -> RUN_NEW[1]@NODE_NEW(1),
+    RUN_OLD[2]@NODE_OLD(1) = reconfigure -> RUN_NEW[2]@NODE_NEW(1),
+    RUN_OLD[3]@NODE_OLD(1) = reconfigure -> RUN_NEW[3]@NODE_NEW(1)
+}
+
+relation R_NODE_2 = {
+    IDLE_OLD@NODE_OLD(2) = reconfigure -> IDLE_NEW@NODE_NEW(2),
+    READY_OLD@NODE_OLD(2) = reconfigure -> READY_NEW@NODE_NEW(2),
+    RUN_OLD[1]@NODE_OLD(2) = reconfigure -> RUN_NEW[1]@NODE_NEW(2),
+    RUN_OLD[2]@NODE_OLD(2) = reconfigure -> RUN_NEW[2]@NODE_NEW(2),
+    RUN_OLD[3]@NODE_OLD(2) = reconfigure -> RUN_NEW[3]@NODE_NEW(2)
+}
+
+// =============================================================================
+// Common fluent and unchanged safety requirements
+// =============================================================================
+
+fluent REQUEST_PENDING[node:Nodes] =
+    <[node].request, {[node].start[Level], [node].stop}> initially 0
+
+fluent RUNNING[node:Nodes] =
+    <[node].start[Level], {[node].finish, [node].stop}> initially 0
+
+// Level 3 exceeds the new thermal cap. Entering it is controllable; the fluent
+// is cleared by lowering the level, normal completion, or stopping the node.
+fluent ABOVE_NEW_THERMAL_CAP[node:Nodes] =
+    <{[node].start[3], [node].setLevel[3]},
+     {[node].setLevel[1], [node].setLevel[2], [node].finish, [node].stop}> initially 0
+
+ltl_property P_REQUEST_RUNNING_EXCLUSIVE_1_OLD =
+    [](!(REQUEST_PENDING['node.[1]] && RUNNING['node.[1]]))
+ltl_property P_REQUEST_RUNNING_EXCLUSIVE_2_OLD =
+    [](!(REQUEST_PENDING['node.[2]] && RUNNING['node.[2]]))
+
+controllerSpec OLD_REQ = {
+    safety = {
+        P_REQUEST_RUNNING_EXCLUSIVE_1_OLD,
+        P_REQUEST_RUNNING_EXCLUSIVE_2_OLD
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+ltl_property P_REQUEST_RUNNING_EXCLUSIVE_1_NEW =
+    [](!(REQUEST_PENDING['node.[1]] && RUNNING['node.[1]]))
+ltl_property P_REQUEST_RUNNING_EXCLUSIVE_2_NEW =
+    [](!(REQUEST_PENDING['node.[2]] && RUNNING['node.[2]]))
+ltl_property P_LOCAL_THERMAL_CAP_1_NEW = [](!ABOVE_NEW_THERMAL_CAP['node.[1]])
+ltl_property P_LOCAL_THERMAL_CAP_2_NEW = [](!ABOVE_NEW_THERMAL_CAP['node.[2]])
+
+controllerSpec NEW_REQ = {
+    safety = {
+        P_REQUEST_RUNNING_EXCLUSIVE_1_NEW,
+        P_REQUEST_RUNNING_EXCLUSIVE_2_NEW,
+        P_LOCAL_THERMAL_CAP_1_NEW,
+        P_LOCAL_THERMAL_CAP_2_NEW
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// =============================================================================
+// Updating-controller targets: no transition requirements
+// =============================================================================
+
+// Traditional DUCS
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2)},
+    mapRelation = {R_NODE_1, R_NODE_2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking
+}
+
+||COMPUTE_CLUSTER_LOCAL_THERMAL_CAP_TRADITIONAL = UpdCont.
+
+// Stepwise DUCS: non-incremental stepwise_delayed + SBP
+updatingController Stepwise_UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {NODE_OLD(1), NODE_OLD(2)},
+    newEnvironment = {NODE_NEW(1), NODE_NEW(2)},
+    mapRelation = {R_NODE_1, R_NODE_2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||COMPUTE_CLUSTER_LOCAL_THERMAL_CAP_STEPWISE = Stepwise_UpdCont.

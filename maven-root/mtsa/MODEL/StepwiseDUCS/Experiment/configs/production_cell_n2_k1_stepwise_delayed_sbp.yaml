@@ -18,122 +18,122 @@ cases:
     method: Traditional
     variant: no_tr
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional_no_tr.lts"
-    target: UPDATE_CONTROLLER
+    target: UpdCont
   - id: pc_n2_k1_traditional_sbp_no_tr
     example: ProductionCell_N=2_K=1
     method: Traditional+SBP
     variant: no_tr_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional+SBP_no_tr.lts"
-    target: UPDATE_CONTROLLER_SBP
+    target: UpdCont_SBP
   - id: pc_n2_k1_stepwise_delayed_no_tr
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed
     variant: no_tr
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed_no_tr.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER
+    target: UpdCont_stepwise_delayed
   - id: pc_n2_k1_stepwise_delayed_sbp_no_tr
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed+SBP
     variant: no_tr_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed+SBP_no_tr.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP
+    target: UpdCont_stepwise_delayed_SBP
 
   - id: pc_n2_k1_traditional_t_remove_polished_or_new_req
     example: ProductionCell_N=2_K=1
     method: Traditional
     variant: t_remove_polished_or_new_req
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional_t_remove_polished_or_new_req.lts"
-    target: UPDATE_CONTROLLER
+    target: UpdCont
   - id: pc_n2_k1_traditional_sbp_t_remove_polished_or_new_req
     example: ProductionCell_N=2_K=1
     method: Traditional+SBP
     variant: t_remove_polished_or_new_req_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional+SBP_t_remove_polished_or_new_req.lts"
-    target: UPDATE_CONTROLLER_SBP
+    target: UpdCont_SBP
   - id: pc_n2_k1_stepwise_delayed_t_remove_polished_or_new_req
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed
     variant: t_remove_polished_or_new_req
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed_t_remove_polished_or_new_req.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER
+    target: UpdCont_stepwise_delayed
   - id: pc_n2_k1_stepwise_delayed_sbp_t_remove_polished_or_new_req
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed+SBP
     variant: t_remove_polished_or_new_req_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed+SBP_t_remove_polished_or_new_req.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP
+    target: UpdCont_stepwise_delayed_SBP
 
   - id: pc_n2_k1_traditional_t_no_polish_on_update
     example: ProductionCell_N=2_K=1
     method: Traditional
     variant: t_no_polish_on_update
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional_t_no_polish_on_update.lts"
-    target: UPDATE_CONTROLLER
+    target: UpdCont
   - id: pc_n2_k1_traditional_sbp_t_no_polish_on_update
     example: ProductionCell_N=2_K=1
     method: Traditional+SBP
     variant: t_no_polish_on_update_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional+SBP_t_no_polish_on_update.lts"
-    target: UPDATE_CONTROLLER_SBP
+    target: UpdCont_SBP
   - id: pc_n2_k1_stepwise_delayed_t_no_polish_on_update
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed
     variant: t_no_polish_on_update
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed_t_no_polish_on_update.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER
+    target: UpdCont_stepwise_delayed
   - id: pc_n2_k1_stepwise_delayed_sbp_t_no_polish_on_update
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed+SBP
     variant: t_no_polish_on_update_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed+SBP_t_no_polish_on_update.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP
+    target: UpdCont_stepwise_delayed_SBP
 
   - id: pc_n2_k1_traditional_t_finish_with_old_req
     example: ProductionCell_N=2_K=1
     method: Traditional
     variant: t_finish_with_old_req
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional_t_finish_with_old_req.lts"
-    target: UPDATE_CONTROLLER
+    target: UpdCont
   - id: pc_n2_k1_traditional_sbp_t_finish_with_old_req
     example: ProductionCell_N=2_K=1
     method: Traditional+SBP
     variant: t_finish_with_old_req_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional+SBP_t_finish_with_old_req.lts"
-    target: UPDATE_CONTROLLER_SBP
+    target: UpdCont_SBP
   - id: pc_n2_k1_stepwise_delayed_t_finish_with_old_req
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed
     variant: t_finish_with_old_req
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed_t_finish_with_old_req.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER
+    target: UpdCont_stepwise_delayed
   - id: pc_n2_k1_stepwise_delayed_sbp_t_finish_with_old_req
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed+SBP
     variant: t_finish_with_old_req_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed+SBP_t_finish_with_old_req.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP
+    target: UpdCont_stepwise_delayed_SBP
 
   - id: pc_n2_k1_traditional_t_switch_to_new_asap
     example: ProductionCell_N=2_K=1
     method: Traditional
     variant: t_switch_to_new_asap
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional_t_switch_to_new_asap.lts"
-    target: UPDATE_CONTROLLER
+    target: UpdCont
   - id: pc_n2_k1_traditional_sbp_t_switch_to_new_asap
     example: ProductionCell_N=2_K=1
     method: Traditional+SBP
     variant: t_switch_to_new_asap_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_traditional+SBP_t_switch_to_new_asap.lts"
-    target: UPDATE_CONTROLLER_SBP
+    target: UpdCont_SBP
   - id: pc_n2_k1_stepwise_delayed_t_switch_to_new_asap
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed
     variant: t_switch_to_new_asap
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed_t_switch_to_new_asap.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER
+    target: UpdCont_stepwise_delayed
   - id: pc_n2_k1_stepwise_delayed_sbp_t_switch_to_new_asap
     example: ProductionCell_N=2_K=1
     method: stepwise_delayed+SBP
     variant: t_switch_to_new_asap_sbp
     lts: "Experiment/LTS/ProductionCell/ProductionCell_N=2, K=1/ProductionCell_N=2, K=1_stepwise_delayed+SBP_t_switch_to_new_asap.lts"
-    target: STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP
+    target: UpdCont_stepwise_delayed_SBP

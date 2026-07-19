@@ -220,6 +220,17 @@ ltl_property R1 = ((StopOldSpec && !StartNewSpec) -> !AnyAction)
 ltl_property R6 = (move -> (!((StopOldSpec && !StartNewSpec)  || (StartNewSpec && !StopOldSpec) )))
 ltl_property R7 = (picture -> (!((StopOldSpec && !StartNewSpec)  || (StartNewSpec && !StopOldSpec) )))
 
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_MISSION =
+	((StopOldSpec && !StartNewSpec) ->
+	 !(takeoff || return2base || move || low || mid || high || scan || picture || follow))
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_COUNTER =
+	((StopOldSpec && !StartNewSpec) ->
+	 !(return2base || move || low || mid || high || scan || picture || follow))
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MISSION = NO_CONTROLLABLE_ACTION_DURING_GAP_MISSION
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_COUNTER = NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_COUNTER
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 ltl_property R1_OTF = []((StopOldSpec && !StartNewSpec) -> !{return2base, move, low, mid, high,  scan, picture, follow, lowBattery, pictureOk[0],
 																pictureOk[1], scan.val[0], scan.val[1]})
 ltl_property R6_OTF = [](move -> (!((StopOldSpec && !StartNewSpec)  || (StartNewSpec && !StopOldSpec) )))
@@ -246,6 +257,33 @@ updatingController UpdCont = {
 
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {MISSION, BATTERY_COUNTER},
+	newEnvironment = {NEW_MISSION, NEW_BATTERY_COUNTER},
+	mapRelation = {R_MISSION, R_BATTERY_COUNTER},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MISSION,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_COUNTER,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {MISSION, BATTERY_COUNTER},
+	newEnvironment = {NEW_MISSION, NEW_BATTERY_COUNTER},
+	mapRelation = {R_MISSION, R_BATTERY_COUNTER},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = {
     oldController = EnvironmentAndController,
@@ -264,6 +302,37 @@ updatingController UpdCont_stepwise_delayed = {
 
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {MISSION, BATTERY_COUNTER},
+	newEnvironment = {NEW_MISSION, NEW_BATTERY_COUNTER},
+	mapRelation = {R_MISSION, R_BATTERY_COUNTER},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MISSION,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_COUNTER,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = EnvironmentAndController,
+	oldEnvironment = {MISSION, BATTERY_COUNTER},
+	newEnvironment = {NEW_MISSION, NEW_BATTERY_COUNTER},
+	mapRelation = {R_MISSION, R_BATTERY_COUNTER},
+    oldGoal = OldSpec,
+    newGoal = NewSpec,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+	nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = {
     oldController = EnvironmentAndController,
@@ -329,4 +398,3 @@ assert S_NEW = (ALWAYS_FLY_LOW && FOLLOWING_ACTIONS && NO_FOLLOW_BEFORE_SCAN && 
 assert TEST_FORMULA1 = [](!StopOldSpec -> S_OLD)
 assert TEST_FORMULA2 = [](StartNewSpec -> S_NEW)
 assert TEST_FORMULA3 = [](hotSwapIn -> (<>stopOldSpec && <>startNewSpec && <>reconfigure))
-

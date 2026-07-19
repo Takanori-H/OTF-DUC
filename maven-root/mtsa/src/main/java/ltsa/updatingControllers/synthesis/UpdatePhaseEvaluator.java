@@ -97,9 +97,17 @@ public final class UpdatePhaseEvaluator {
     private UpdatePhaseEvaluator() {
     }
 
+    private static String evaluationProfile() {
+        return System.getProperty(EVALUATION_PROFILE_PROPERTY, "paper");
+    }
+
     private static boolean isFullEvaluationProfile() {
-        String profile = System.getProperty(EVALUATION_PROFILE_PROPERTY, "full");
-        return !"compact".equalsIgnoreCase(profile) && !"lean".equalsIgnoreCase(profile);
+        String profile = evaluationProfile();
+        return "full".equalsIgnoreCase(profile) || "diagnostic".equalsIgnoreCase(profile);
+    }
+
+    private static boolean shouldRecordUpdatePhaseDiagnostics() {
+        return isFullEvaluationProfile();
     }
 
     public static int[] phaseOrder() {
@@ -209,6 +217,9 @@ public final class UpdatePhaseEvaluator {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
             return;
         }
+        if (!shouldRecordUpdatePhaseDiagnostics()) {
+            return;
+        }
         if (mts == null) {
             return;
         }
@@ -236,6 +247,9 @@ public final class UpdatePhaseEvaluator {
             String artifactLabel,
             MTS<Long, String> mts) {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
+        if (!shouldRecordUpdatePhaseDiagnostics()) {
             return;
         }
         if (mts == null) {
@@ -319,6 +333,9 @@ public final class UpdatePhaseEvaluator {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
             return;
         }
+        if (!shouldRecordUpdatePhaseDiagnostics()) {
+            return;
+        }
         if (mts == null) {
             return;
         }
@@ -361,6 +378,9 @@ public final class UpdatePhaseEvaluator {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
             return;
         }
+        if (!shouldRecordUpdatePhaseDiagnostics()) {
+            return;
+        }
         if (machine == null || machine.states == null) {
             return;
         }
@@ -388,6 +408,9 @@ public final class UpdatePhaseEvaluator {
             String artifactLabel,
             CompactState machine) {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
+        if (!shouldRecordUpdatePhaseDiagnostics()) {
             return;
         }
         if (machine == null || machine.states == null) {
@@ -476,6 +499,9 @@ public final class UpdatePhaseEvaluator {
             CompactState machine,
             Set<String> controllableActions) {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
+            return;
+        }
+        if (!shouldRecordUpdatePhaseDiagnostics()) {
             return;
         }
         if (machine == null || machine.states == null) {

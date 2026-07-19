@@ -1,0 +1,156 @@
+// Small three-component running example for the Stepwise DUCS paper.
+// Machines 1 and 2 share a cross-component safety requirement. Sensor 3 is
+// independent except for its local transition requirement during the update.
+
+set OldControllableActions_1 = {start_1}
+set OldControllableActions_2 = {start_2}
+set OldControllableActions_3 = {sample_3}
+set OldControllableActions = {
+    OldControllableActions_1,
+    OldControllableActions_2,
+    OldControllableActions_3
+}
+
+set NewControllableActions_1 = {start_1}
+set NewControllableActions_2 = {start_2}
+set NewControllableActions_3 = {sample_3}
+set NewControllableActions = {
+    NewControllableActions_1,
+    NewControllableActions_2,
+    NewControllableActions_3
+}
+
+// ---------------------------OLD ENVIRONMENTS-----------------------------
+MACHINE_OLD_1 = (start_1 -> MACHINE_OLD_ACTIVE_1),
+    MACHINE_OLD_ACTIVE_1 = (finish_1 -> MACHINE_OLD_1).
+
+MACHINE_OLD_2 = (start_2 -> MACHINE_OLD_ACTIVE_2),
+    MACHINE_OLD_ACTIVE_2 = (finish_2 -> MACHINE_OLD_2).
+
+SENSOR_OLD_3 = (sample_3 -> SENSOR_OLD_3).
+
+// ---------------------------NEW ENVIRONMENTS-----------------------------
+MACHINE_NEW_1 = (start_1 -> MACHINE_NEW_ACTIVE_1),
+    MACHINE_NEW_ACTIVE_1 = (finish_1 -> MACHINE_NEW_1).
+
+MACHINE_NEW_2 = (start_2 -> MACHINE_NEW_ACTIVE_2),
+    MACHINE_NEW_ACTIVE_2 = (finish_2 -> MACHINE_NEW_2).
+
+SENSOR_NEW_3 = (sample_3 -> SENSOR_NEW_3).
+
+// ---------------------------MAP RELATIONS-----------------------------
+relation R_MACHINE_1 = {
+    MACHINE_OLD_1@MACHINE_OLD_1 = reconfigure -> MACHINE_NEW_1@MACHINE_NEW_1,
+    MACHINE_OLD_ACTIVE_1@MACHINE_OLD_1 = reconfigure -> MACHINE_NEW_ACTIVE_1@MACHINE_NEW_1
+}
+
+relation R_MACHINE_2 = {
+    MACHINE_OLD_2@MACHINE_OLD_2 = reconfigure -> MACHINE_NEW_2@MACHINE_NEW_2,
+    MACHINE_OLD_ACTIVE_2@MACHINE_OLD_2 = reconfigure -> MACHINE_NEW_ACTIVE_2@MACHINE_NEW_2
+}
+
+relation R_SENSOR_3 = {
+    SENSOR_OLD_3@SENSOR_OLD_3 = reconfigure -> SENSOR_NEW_3@SENSOR_NEW_3
+}
+
+map MAP_MACHINE_1 = {MACHINE_OLD_1, MACHINE_NEW_1, R_MACHINE_1}
+map MAP_MACHINE_2 = {MACHINE_OLD_2, MACHINE_NEW_2, R_MACHINE_2}
+map MAP_SENSOR_3 = {SENSOR_OLD_3, SENSOR_NEW_3, R_SENSOR_3}
+
+||OLD_ENV = (MACHINE_OLD_1 || MACHINE_OLD_2 || SENSOR_OLD_3).
+||NEW_ENV = (MACHINE_NEW_1 || MACHINE_NEW_2 || SENSOR_NEW_3).
+||MAPPING_ENV = (MAP_MACHINE_1 || MAP_MACHINE_2 || MAP_SENSOR_3).
+||MapEnvironment = (MAP_MACHINE_1 || MAP_MACHINE_2 || MAP_SENSOR_3).
+
+// ---------------------------FLUENTS-----------------------------
+fluent Active_1 = <start_1, finish_1>
+fluent Active_2 = <start_2, finish_2>
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+
+// ---------------------------OLD REQUIREMENTS-----------------------------
+ltl_property P_OLD_MACHINE_1_IDLE = []!Active_1
+
+controllerSpec OLD_REQ = {
+    safety = {
+        P_OLD_MACHINE_1_IDLE
+    }
+    controllable = {OldControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+// ---------------------------NEW REQUIREMENTS-----------------------------
+ltl_property P_NEW_NO_SIMULTANEOUS_1_2 = []!(Active_1 && Active_2)
+
+controllerSpec NEW_REQ = {
+    safety = {
+        P_NEW_NO_SIMULTANEOUS_1_2
+    }
+    controllable = {NewControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// ---------------------------TRANSITION REQUIREMENT-----------------------------
+// Sensor 3 cannot sample after stopOldSpec and before startNewSpec.
+ltl_property T_NO_SAMPLE_3_DURING_UPDATE = ((StopOldSpec && !StartNewSpec) -> !sample_3)
+
+// ---------------------------UPDATING CONTROLLERS-----------------------------
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {MACHINE_OLD_1, MACHINE_OLD_2, SENSOR_OLD_3},
+    newEnvironment = {MACHINE_NEW_1, MACHINE_NEW_2, SENSOR_NEW_3},
+    mapRelation = {R_MACHINE_1, R_MACHINE_2, R_SENSOR_3},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_NO_SAMPLE_3_DURING_UPDATE,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER = UpdCont.
+
+updatingController UpdCont_SBP = {
+    oldController = OldCon,
+    oldEnvironment = {MACHINE_OLD_1, MACHINE_OLD_2, SENSOR_OLD_3},
+    newEnvironment = {MACHINE_NEW_1, MACHINE_NEW_2, SENSOR_NEW_3},
+    mapRelation = {R_MACHINE_1, R_MACHINE_2, R_SENSOR_3},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_NO_SAMPLE_3_DURING_UPDATE,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+||UPDATE_CONTROLLER_SBP = UpdCont_SBP.
+
+updatingController UpdCont_stepwise_delayed = {
+    oldController = OldCon,
+    oldEnvironment = {MACHINE_OLD_1, MACHINE_OLD_2, SENSOR_OLD_3},
+    newEnvironment = {MACHINE_NEW_1, MACHINE_NEW_2, SENSOR_NEW_3},
+    mapRelation = {R_MACHINE_1, R_MACHINE_2, R_SENSOR_3},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_NO_SAMPLE_3_DURING_UPDATE,
+    nonblocking,
+    stepwise_delayed
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP = {
+    oldController = OldCon,
+    oldEnvironment = {MACHINE_OLD_1, MACHINE_OLD_2, SENSOR_OLD_3},
+    newEnvironment = {MACHINE_NEW_1, MACHINE_NEW_2, SENSOR_NEW_3},
+    mapRelation = {R_MACHINE_1, R_MACHINE_2, R_SENSOR_3},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_NO_SAMPLE_3_DURING_UPDATE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP = UpdCont_stepwise_delayed_SBP.

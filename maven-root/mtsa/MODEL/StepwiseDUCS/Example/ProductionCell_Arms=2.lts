@@ -169,7 +169,7 @@ controller ||C_DRILL_POLISH_CLEAN = (OLD_ENV)~{DRILL_POLISH_CLEAN}.
 
 // ---------------------------NEW CONTROLLER SPEC-----------------------------
 
-assert NEW_TOOL_ORDER = forall[i:Arms] ((DrillPending[i] -> (Painted[i] && Cleaned[i])) && (PaintPending[i] -> (Cleaned[i] && !Drilled[i])) && (CleanPending[i] -> (!Painted[i] && !Drilled[i])))
+assert NEW_TOOL_ORDER = forall[i:Arms] ((DrillPending[i] -> (Painted[i] && Cleaned[i])) && (PaintPending[i] -> Cleaned[i]) && (CleanPending[i] -> !Painted[i]))
 assert NEW_OUT_IF_FINISHED = forall[i:Arms] (out[i] -> (Drilled[i] && Cleaned[i] && Painted[i]))
 assert PAINT_ONCE = forall[i:Arms] ( paint[i] -> !Painted[i] )
 
@@ -178,7 +178,7 @@ ltl_property P_NEW_OUT_IF_FINISHED = []NEW_OUT_IF_FINISHED
 ltl_property P_PAINT_ONCE = []PAINT_ONCE
 
 // アーム1の新仕様ルール
-assert NEW_TOOL_ORDER_1 = ((DrillPending[1] -> (Painted[1] && Cleaned[1])) && (PaintPending[1] -> (Cleaned[1] && !Drilled[1])) && (CleanPending[1] -> (!Painted[1] && !Drilled[1])))
+assert NEW_TOOL_ORDER_1 = ((DrillPending[1] -> (Painted[1] && Cleaned[1])) && (PaintPending[1] -> Cleaned[1]) && (CleanPending[1] -> !Painted[1]))
 assert NEW_OUT_IF_FINISHED_1 = (out[1] -> (Drilled[1] && Cleaned[1] && Painted[1]))
 assert PAINT_ONCE_1 = (paint[1] -> !Painted[1])
 
@@ -187,7 +187,7 @@ ltl_property P_NEW_OUT_IF_FINISHED_1 = []NEW_OUT_IF_FINISHED_1
 ltl_property P_PAINT_ONCE_1 = []PAINT_ONCE_1
 
 // アーム2の新仕様ルール
-assert NEW_TOOL_ORDER_2 = ((DrillPending[2] -> (Painted[2] && Cleaned[2])) && (PaintPending[2] -> (Cleaned[2] && !Drilled[2])) && (CleanPending[2] -> (!Painted[2] && !Drilled[2])))
+assert NEW_TOOL_ORDER_2 = ((DrillPending[2] -> (Painted[2] && Cleaned[2])) && (PaintPending[2] -> Cleaned[2]) && (CleanPending[2] -> !Painted[2]))
 assert NEW_OUT_IF_FINISHED_2 = (out[2] -> (Drilled[2] && Cleaned[2] && Painted[2]))
 assert PAINT_ONCE_2 = (paint[2] -> !Painted[2])
 
@@ -226,6 +226,12 @@ assert FINISH_WITH_OLD_REQ_2 = ((ToolApplied[2] && StopOldSpec && !StartNewSpec)
 assert SWITCH_TO_NEW_ASAP_1 = ((ToolApplied[1] && StopOldSpec && !StartNewSpec) -> NEW_TOOL_ORDER_1)
 assert SWITCH_TO_NEW_ASAP_2 = ((ToolApplied[2] && StopOldSpec && !StartNewSpec) -> NEW_TOOL_ORDER_2)
 
+assert ANY_CONTROLLABLE_ACTION_1 = (drill[1] || polish[1] || paint[1] || clean[1] || out[1] || stamp[1])
+assert ANY_CONTROLLABLE_ACTION_2 = (drill[2] || polish[2] || paint[2] || clean[2] || out[2] || stamp[2])
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_1 = ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_1)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_2 = ((StopOldSpec && !StartNewSpec) -> !ANY_CONTROLLABLE_ACTION_2)
+assert RECONFIGURE_AFTER_STOP_AND_START = (reconfigure -> (StopOldSpec && StartNewSpec))
+
 
 // ==============================================================================
 // 2. 従来DUC用 (パーサー仕様に合わせて [] を付けない)
@@ -238,6 +244,10 @@ ltl_property R11_2 = FINISH_WITH_OLD_REQ_2
 
 ltl_property R12_1 = SWITCH_TO_NEW_ASAP_1
 ltl_property R12_2 = SWITCH_TO_NEW_ASAP_2
+
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_1 = NO_CONTROLLABLE_ACTION_DURING_GAP_1
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_2 = NO_CONTROLLABLE_ACTION_DURING_GAP_2
+ltl_property T2_RECONFIGURE_AFTER_STOP_AND_START = RECONFIGURE_AFTER_STOP_AND_START
 
 
 // ==============================================================================
@@ -270,6 +280,33 @@ updatingController UpdCont = {
 
 ||UPDATE_CONTROLLER = UpdCont.
 
+updatingController UpdCont_T1 = {
+    oldController = DrillPolishClean,
+    oldEnvironment = {PRODUCTION_CELL_OLD(1), PRODUCTION_CELL_OLD(2)},
+    newEnvironment = {PRODUCTION_CELL_NEW(1), PRODUCTION_CELL_NEW(2)},
+    mapRelation = {R_PRODUCTION_CELL(1), R_PRODUCTION_CELL(2)},
+    oldGoal = DRILL_POLISH_CLEAN,
+    newGoal = CLEAN_PAINT_DRILL,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_2,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_T1 = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = DrillPolishClean,
+    oldEnvironment = {PRODUCTION_CELL_OLD(1), PRODUCTION_CELL_OLD(2)},
+    newEnvironment = {PRODUCTION_CELL_NEW(1), PRODUCTION_CELL_NEW(2)},
+    mapRelation = {R_PRODUCTION_CELL(1), R_PRODUCTION_CELL(2)},
+    oldGoal = DRILL_POLISH_CLEAN,
+    newGoal = CLEAN_PAINT_DRILL,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+    nonblocking
+}
+
+||UPDATE_CONTROLLER_T2 = UpdCont_T2.
+
 
 updatingController UpdCont_stepwise_delayed = {
     oldController = DrillPolishClean,
@@ -290,6 +327,37 @@ updatingController UpdCont_stepwise_delayed = {
 
 
 ||STEPWISE_DELAYED_UPDATE_CONTROLLER = UpdCont_stepwise_delayed.
+
+updatingController UpdCont_stepwise_delayed_SBP_T1 = {
+    oldController = DrillPolishClean,
+    oldEnvironment = {PRODUCTION_CELL_OLD(1), PRODUCTION_CELL_OLD(2)},
+    newEnvironment = {PRODUCTION_CELL_NEW(1), PRODUCTION_CELL_NEW(2)},
+    mapRelation = {R_PRODUCTION_CELL(1), R_PRODUCTION_CELL(2)},
+    oldGoal = DRILL_POLISH_CLEAN,
+    newGoal = CLEAN_PAINT_DRILL,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_2,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T1 = UpdCont_stepwise_delayed_SBP_T1.
+
+updatingController UpdCont_stepwise_delayed_SBP_T2 = {
+    oldController = DrillPolishClean,
+    oldEnvironment = {PRODUCTION_CELL_OLD(1), PRODUCTION_CELL_OLD(2)},
+    newEnvironment = {PRODUCTION_CELL_NEW(1), PRODUCTION_CELL_NEW(2)},
+    mapRelation = {R_PRODUCTION_CELL(1), R_PRODUCTION_CELL(2)},
+    oldGoal = DRILL_POLISH_CLEAN,
+    newGoal = CLEAN_PAINT_DRILL,
+    transition = T2_RECONFIGURE_AFTER_STOP_AND_START,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_DELAYED_UPDATE_CONTROLLER_SBP_T2 = UpdCont_stepwise_delayed_SBP_T2.
 
 updatingController UpdCont_stepwise_delayed_incrementalPruning = {
     oldController = DrillPolishClean,

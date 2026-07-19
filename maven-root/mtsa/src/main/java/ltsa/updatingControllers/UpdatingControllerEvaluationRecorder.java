@@ -154,6 +154,8 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric("run_jvm_max_heap", "Run", "JVM max heap", bytesToByteText(runtime.maxMemory()), "B");
         recordDataMetric("run_java_version", "Run", "Java version",
                 System.getProperty("java.version", ""), "text");
+        recordDataMetric("run_evaluation_profile", "Run", "evaluation profile",
+                System.getProperty("updating.controller.evaluation.profile", "paper"), "text");
         recordDataMetric("run_java_vm_name", "Run", "Java VM name",
                 System.getProperty("java.vm.name", ""), "text");
         recordDataMetric("run_os_name", "Run", "OS name",
@@ -213,6 +215,14 @@ public final class UpdatingControllerEvaluationRecorder {
             return;
         }
         putOrReplaceTime(section, label, millis, "");
+    }
+
+    public static synchronized void addTime(String section, String label, long millis) {
+        if (!isEnabled()) {
+            return;
+        }
+        long existing = optionalTime(section, label);
+        putOrReplaceTime(section, label, existing + Math.max(0, millis), "");
     }
 
     public static synchronized void beginFailureTimer(String section, String label) {
@@ -423,6 +433,7 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric(baseKey + "_states", section, label + " / States", Long.toString(states), "states");
         recordDataMetric(baseKey + "_transitions", section, label + " / Transitions", Long.toString(transitions), "transitions");
         recordDataMetric(baseKey + "_count_time", section, label + " / CountTime", Long.toString(countTimeMillis), "ms");
+        recordStableStateSpaceAlias(section, label, states, transitions, countTimeMillis);
         captureReferenceStateSpace(section, label, states, transitions);
     }
 
@@ -1502,6 +1513,9 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("solveControlProblem (Traditional DUC)".equals(section)) {
             return "Traditional DUC で更新用環境から安全性制約反映後の環境を作り、最後に update controller を合成する処理。";
         }
+        if ("Traditional DUC".equals(section)) {
+            return "Traditional DUC の final safety environment 構築と、GR(1) による出力コントローラ合成処理。";
+        }
         if ("Traditional DUC safetyEnv 構築時間内訳".equals(section)) {
             return "Traditional DUC の安全性制約反映後の環境を作る内部処理。Fluent 評価、安全性違反 pruning、DontDoTwice 合成を含む。";
         }
@@ -1509,7 +1523,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return "Traditional DUC の安全性制約反映後の環境を最終コントローラ合成器に渡し、出力コントローラを得る処理。";
         }
         if ("Stepwise Delayed DUC".equals(section)) {
-            return "Stepwise Delayed DUC で構築済みの final safety environment から GR(1) により出力コントローラを得る処理。";
+            return "Stepwise Delayed DUC の final safety environment 構築と、GR(1) による出力コントローラ合成処理。";
         }
         if ("Stepwise Delayed DUC GR1 時間内訳".equals(section)) {
             return "Stepwise Delayed DUC の final safety environment を最終コントローラ合成器に渡し、出力コントローラを得る処理。";
@@ -1595,8 +1609,17 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Stepwise Delayed DUC scope別要求数".equals(section)) {
             return "Stepwise Delayed DUC の requirement を stage scope ごとに集計した値。各 scope について local / cross と old safety / new safety / transition の内訳を記録する。";
         }
+        if ("Stepwise Delayed DUC scope別fluent数".equals(section)) {
+            return "Stepwise Delayed DUC の requirement fluent と metaEnv 構築に使う tracked fluent を stage scope ごとに記録する。";
+        }
         if ("Stepwise Delayed DUC scope別状態空間".equals(section)) {
             return "Stepwise Delayed DUC の local / cross pruning で作られる metaEnv と safetyEnv を stage scope ごとに記録した状態数・遷移数。";
+        }
+        if ("Stepwise Delayed DUC scope別時間".equals(section)) {
+            return "Stepwise Delayed DUC の local / cross / final product の metaEnv、safetyEnv、product 構築時間を stage scope ごとに記録する。";
+        }
+        if ("Stepwise Delayed DUC hotSwapIn connection".equals(section)) {
+            return "Stepwise Delayed DUC の old controller meta と mapping product を接続する hotSwapIn connection 構築統計。";
         }
         if ("Traditional DUC update phase 別状態空間".equals(section)) {
             return "Traditional DUC の中間状態空間を、hotSwapIn 前後、および stopOldSpec・reconfigure・startNewSpec の実行済み組合せごとに分けた状態数・遷移数。";
@@ -2002,12 +2025,149 @@ public final class UpdatingControllerEvaluationRecorder {
             return;
         }
         long now = System.currentTimeMillis();
+        if (isFailureStatus(resultStatus)) {
+            int index = 0;
+            String lastActiveTimer = "";
+            for (ActiveTimer timer : activeTimers.values()) {
+                String timerText = timer.section + " / " + timer.label;
+                recordDataMetric(
+                        "failure_active_timer_" + index,
+                        "Run",
+                        "failure active timer " + index,
+                        timerText,
+                        "text");
+                lastActiveTimer = timerText;
+                index++;
+            }
+            recordDataMetric(
+                    "failure_active_timer_count",
+                    "Run",
+                    "failure active timer count",
+                    Integer.toString(index),
+                    "timers");
+            if (!lastActiveTimer.isEmpty()) {
+                recordDataMetric(
+                        "failure_stage",
+                        "Run",
+                        "failure stage",
+                        lastActiveTimer,
+                        "text");
+            }
+        }
         for (ActiveTimer timer : activeTimers.values()) {
             putOrReplaceTime(timer.section, timer.label,
                     now - timer.startMillis,
                     " (失敗時点まで)");
         }
         activeTimers.clear();
+    }
+
+    private static void recordStableStateSpaceAlias(
+            String section,
+            String label,
+            long states,
+            long transitions,
+            long countTimeMillis) {
+        String prefix = stableStateSpaceMetricPrefix(section, label);
+        if (prefix.isEmpty()) {
+            return;
+        }
+        String aliasLabel = stableStateSpaceMetricLabel(section, label);
+        String safeCountTime = Long.toString(Math.max(0, countTimeMillis));
+        String formula = "既存の状態数・遷移数計測の再掲。CountTime は既に元の状態空間行で評価用オーバーヘッドに加算済み。";
+        recordDataMetricWithFormula(
+                prefix + "_states",
+                "主要中間状態空間",
+                aliasLabel + " / States",
+                Long.toString(states),
+                "states",
+                formula);
+        recordDataMetricWithFormula(
+                prefix + "_transitions",
+                "主要中間状態空間",
+                aliasLabel + " / Transitions",
+                Long.toString(transitions),
+                "transitions",
+                formula);
+        recordDataMetricWithFormula(
+                prefix + "_count_time",
+                "主要中間状態空間",
+                aliasLabel + " / CountTime",
+                safeCountTime,
+                "ms",
+                formula);
+    }
+
+    private static String stableStateSpaceMetricPrefix(String section, String label) {
+        if ("入力規模 / Traditional Mapping Environment".equals(section)
+                && "Traditional Mapping Environment".equals(label)) {
+            return "traditional_mapping_environment";
+        }
+        if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
+            if ("[1. E_u] (Old Controller || Mapping Environment)".equals(label)) {
+                return "traditional_intermediate_eu";
+            }
+            if ("[2. Meta] Meta Environment (PEAK)".equals(label)) {
+                return "traditional_intermediate_meta_environment";
+            }
+            if ("[4. Final] Safety Environment".equals(label)) {
+                return "traditional_intermediate_final_safety_environment";
+            }
+        }
+        if ("Stepwise Delayed DUC 最大状態数と遷移数".equals(section)) {
+            if ("[Stepwise Delayed DUCS] Product before delayed connection".equals(label)) {
+                return "stepwise_delayed_intermediate_product_before_delayed_connection";
+            }
+            if ("[Stepwise Delayed DUCS] OldCon fluent meta".equals(label)) {
+                return "stepwise_delayed_intermediate_old_controller_fluent_meta";
+            }
+            if ("[Stepwise Delayed DUCS] After delayed hotSwapIn connection".equals(label)) {
+                return "stepwise_delayed_intermediate_after_delayed_hotswapin_connection";
+            }
+            if ("[Stepwise Delayed DUCS] After global DontDoTwice".equals(label)) {
+                return "stepwise_delayed_intermediate_after_global_dont_do_twice";
+            }
+            if ("[Stepwise Delayed DUCS] After final safety backward pruning".equals(label)) {
+                return "stepwise_delayed_intermediate_after_final_sbp";
+            }
+        }
+        return "";
+    }
+
+    private static String stableStateSpaceMetricLabel(String section, String label) {
+        if ("入力規模 / Traditional Mapping Environment".equals(section)
+                && "Traditional Mapping Environment".equals(label)) {
+            return "Traditional DUC mapping environment";
+        }
+        if ("Traditional DUC 最大状態数と遷移数".equals(section)) {
+            if ("[1. E_u] (Old Controller || Mapping Environment)".equals(label)) {
+                return "Traditional DUC E_u";
+            }
+            if ("[2. Meta] Meta Environment (PEAK)".equals(label)) {
+                return "Traditional DUC metaEnv";
+            }
+            if ("[4. Final] Safety Environment".equals(label)) {
+                return "Traditional DUC final safetyEnv";
+            }
+        }
+        if ("Stepwise Delayed DUC 最大状態数と遷移数".equals(section)) {
+            if ("[Stepwise Delayed DUCS] Product before delayed connection".equals(label)) {
+                return "Stepwise Delayed DUC product before delayed connection";
+            }
+            if ("[Stepwise Delayed DUCS] OldCon fluent meta".equals(label)) {
+                return "Stepwise Delayed DUC old controller fluent meta";
+            }
+            if ("[Stepwise Delayed DUCS] After delayed hotSwapIn connection".equals(label)) {
+                return "Stepwise Delayed DUC after delayed hotSwapIn connection";
+            }
+            if ("[Stepwise Delayed DUCS] After global DontDoTwice".equals(label)) {
+                return "Stepwise Delayed DUC after global DontDoTwice";
+            }
+            if ("[Stepwise Delayed DUCS] After final safety backward pruning".equals(label)) {
+                return "Stepwise Delayed DUC after final SBP";
+            }
+        }
+        return label == null ? "" : label;
     }
 
     private static void recordComparisonSummary() {
@@ -2346,14 +2506,6 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummaryDataMetric(output, "Old Controller 状態数", "old_controller_states", "");
         printSummaryDataMetric(output, "Old Controller 遷移数", "old_controller_transitions", "");
         printSummaryDataMetric(output, "mapping component 数", metricKey("入力規模", "mapping component 数"), "");
-        printSummaryDataMetric(output, "mapping component 状態数合計",
-                metricKey("入力規模", "mapping component 状態数合計"), "");
-        printSummaryDataMetric(output, "mapping component 遷移数合計",
-                metricKey("入力規模", "mapping component 遷移数合計"), "");
-        printSummaryDataMetric(output, "mapping component 最大状態数",
-                metricKey("入力規模", "mapping component 最大状態数"), "");
-        printSummaryDataMetric(output, "mapping component 最大遷移数",
-                metricKey("入力規模", "mapping component 最大遷移数"), "");
         printSummaryDataMetric(output, "old safety 数", metricKey("入力規模", "old safety 数"), "");
         printSummaryDataMetric(output, "new safety 数", metricKey("入力規模", "new safety 数"), "");
         printSummaryDataMetric(output, "OTF-DUC new safety fluent 数（重複排除後）",
@@ -2369,6 +2521,12 @@ public final class UpdatingControllerEvaluationRecorder {
     private static void printStepwiseDelayedSummary(LTSOutput output) {
         String section = "Stepwise Delayed DUC 分類統計";
         printSummarySectionHeader(output, "Stepwise Delayed");
+        printSummaryMillis(output, "GR(1)入力 safetyEnv 構築時間",
+                optionalTime("Stepwise Delayed DUC", "GR(1)入力 safetyEnv 構築時間"),
+                "要求を scope ごとに分類し始める直前から、final safety environment を CompactState に変換して GR(1) に渡す直前までの時間。");
+        printSummaryMillis(output, "SBP 全体時間合計",
+                optionalTime("Stepwise Delayed DUC", "SBP 全体時間合計"),
+                "local / cross / final で実行された Safety Backward Pruning の全呼び出し時間の合計。SBP 無効時は未記録または 0。");
         printSummaryMillis(output, "最終コントローラ合成時間",
                 optionalTime("Stepwise Delayed DUC", "safetyEnv を GR1 で解く時間"),
                 "final safety environment から GR(1) で controller を合成する時間。SBP 有効時は SBP 後の final safety environment が入力になる。");
@@ -2566,6 +2724,12 @@ public final class UpdatingControllerEvaluationRecorder {
         printSummaryMillis(output, "安全性制約反映後の環境構築時間",
                 optionalTime("solveControlProblem (Traditional DUC)", "metaEnv からエラーを枝刈りして safetyEnv を構築する時間"),
                 "");
+        printSummaryMillis(output, "GR(1)入力 safetyEnv 構築時間",
+                optionalTime("Traditional DUC", "GR(1)入力 safetyEnv 構築時間"),
+                "mapping environment component の並列合成直前から、最終 safety environment を CompactState に変換して GR(1) に渡す直前までの時間。");
+        printSummaryMillis(output, "SBP 全体時間合計",
+                optionalTime("Traditional DUC", "SBP 全体時間合計"),
+                "final Safety Backward Pruning の呼び出し時間。SBP 無効時は未記録または 0。");
         printSummaryMillis(output, "最終コントローラ合成時間",
                 optionalTime("solveControlProblem (Traditional DUC)", "safetyEnv を GR1 で解く時間"),
                 "");
@@ -3568,8 +3732,14 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Stepwise Delayed DUC scope別要求数".equals(section)) {
             return "Stepwise Delayed DUC: scope 別 requirement 数";
         }
+        if ("Stepwise Delayed DUC scope別fluent数".equals(section)) {
+            return "Stepwise Delayed DUC: scope 別 fluent 数";
+        }
         if ("Stepwise Delayed DUC scope別状態空間".equals(section)) {
             return "Stepwise Delayed DUC: scope 別 meta/safety 状態空間";
+        }
+        if ("Stepwise Delayed DUC scope別時間".equals(section)) {
+            return "Stepwise Delayed DUC: scope 別 meta/safety/product 構築時間";
         }
         if ("Stepwise Delayed DUC cross scheduling".equals(section)) {
             return "Stepwise Delayed DUC: cross goal scheduling 集計";
@@ -3579,6 +3749,9 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Stepwise Delayed DUC direct pruning 削減率".equals(section)) {
             return "Stepwise Delayed DUC: direct safety pruning 削減率";
+        }
+        if ("Stepwise Delayed DUC hotSwapIn connection".equals(section)) {
+            return "Stepwise Delayed DUC: hotSwapIn connection 構築統計";
         }
         if ("Traditional DUC 状態空間削減率".equals(section)) {
             return "Traditional DUC: 中間生成物間の削減率";
@@ -4449,17 +4622,75 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("solveControlProblem 全体時間".equals(label)) {
                 return "traditional_solve_control_problem_total_time";
             }
+            if ("UpdatingEnvironment から E_u MTS への変換時間".equals(label)) {
+                return "traditional_eu_mts_conversion_time";
+            }
+            if ("Old Safety と New Safety から Fluent を抽出する時間".equals(label)) {
+                return "traditional_fluent_extraction_time";
+            }
             if ("Fluent とベース環境を並列合成した metaEnv 構築時間".equals(label)) {
                 return "traditional_meta_environment_construction_time";
             }
             if ("metaEnv からエラーを枝刈りして safetyEnv を構築する時間".equals(label)) {
                 return "traditional_safety_environment_pruning_time";
             }
+            if ("safetyEnv から CompactState への変換時間".equals(label)) {
+                return "traditional_safety_env_compact_state_conversion_time";
+            }
             if ("safetyEnv を GR1 で解く時間".equals(label)) {
                 return "traditional_gr1_solving_time";
             }
         }
+        if ("Traditional DUC".equals(section)) {
+            if ("GR(1)入力 safetyEnv 構築時間".equals(label)) {
+                return "traditional_final_gr_input_construction_time";
+            }
+            if ("SBP 全体時間合計".equals(label)) {
+                return "traditional_sbp_total_time";
+            }
+        }
+        if ("Traditional DUC safetyEnv 構築時間内訳".equals(section)) {
+            if ("hotSwapIn 前の旧 action を uncontrollable 化する時間".equals(label)) {
+                return "traditional_safety_env_old_action_uncontrollable_time";
+            }
+            if ("Fluent valuation 構築時間".equals(label)) {
+                return "traditional_safety_env_fluent_valuation_time";
+            }
+            if ("Safety formula 評価と違反状態 pruning 時間".equals(label)) {
+                return "traditional_safety_env_formula_eval_and_pruning_time";
+            }
+            if ("Safety formula を全状態で評価する時間".equals(label)) {
+                return "traditional_safety_env_formula_evaluation_time";
+            }
+            if ("Safety 違反状態を除去した MTS 構築時間".equals(label)) {
+                return "traditional_safety_env_violation_pruning_mts_build_time";
+            }
+            if ("DontDoTwice goal 合成時間".equals(label)) {
+                return "traditional_safety_env_dont_do_twice_time";
+            }
+        }
         if ("Stepwise Delayed DUC".equals(section)) {
+            if ("GR(1)入力 safetyEnv 構築時間".equals(label)) {
+                return "stepwise_delayed_final_gr_input_construction_time";
+            }
+            if ("SBP 全体時間合計".equals(label)) {
+                return "stepwise_delayed_sbp_total_time";
+            }
+            if ("old controller meta 構築時間".equals(label)) {
+                return "stepwise_delayed_old_controller_meta_construction_time";
+            }
+            if ("final tracked fluent 数".equals(label)) {
+                return "stepwise_delayed_final_tracked_fluent_count";
+            }
+            if ("hotSwapIn connection 後 environment 構築時間".equals(label)) {
+                return "stepwise_delayed_connection_environment_construction_time";
+            }
+            if ("global DontDoTwice 構築時間".equals(label)) {
+                return "stepwise_delayed_global_dont_do_twice_time";
+            }
+            if ("safetyEnv から CompactState への変換時間".equals(label)) {
+                return "stepwise_delayed_safety_env_compact_state_conversion_time";
+            }
             if ("safetyEnv を GR1 で解く時間".equals(label)) {
                 return "stepwise_delayed_gr1_solving_time";
             }
@@ -4471,6 +4702,9 @@ public final class UpdatingControllerEvaluationRecorder {
             return "stepwise_delayed_config_" + metricToken(label);
         }
         if ("Safety Backward Pruning".equals(section)) {
+            if ("SBP 全体時間合計".equals(label)) {
+                return "sbp_total_time";
+            }
             return "sbp_" + metricToken(label);
         }
         if ("Safety Backward Pruning 削減率".equals(section)) {
@@ -4640,18 +4874,6 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("mapping component 数".equals(label)) {
                 return "input_mapping_components";
             }
-            if ("mapping component 状態数合計".equals(label)) {
-                return "input_mapping_component_states_total";
-            }
-            if ("mapping component 遷移数合計".equals(label)) {
-                return "input_mapping_component_transitions_total";
-            }
-            if ("mapping component 最大状態数".equals(label)) {
-                return "input_mapping_component_states_max";
-            }
-            if ("mapping component 最大遷移数".equals(label)) {
-                return "input_mapping_component_transitions_max";
-            }
             if ("old safety 数".equals(label)) {
                 return "input_old_safety";
             }
@@ -4795,6 +5017,9 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("all-stage cross goal あり".equals(label)) {
                 return "stepwise_delayed_has_all_stage_cross_goal";
             }
+            if ("requirement fluent 数（重複排除後）".equals(label)) {
+                return "stepwise_delayed_requirement_fluent_count";
+            }
             if ("cross component 構築時間".equals(label)) {
                 return "stepwise_delayed_cross_component_build_time";
             }
@@ -4805,8 +5030,14 @@ public final class UpdatingControllerEvaluationRecorder {
         if ("Stepwise Delayed DUC scope別要求数".equals(section)) {
             return "stepwise_delayed_scope_requirements_" + metricToken(label);
         }
+        if ("Stepwise Delayed DUC scope別fluent数".equals(section)) {
+            return "stepwise_delayed_scope_fluents_" + metricToken(label);
+        }
         if ("Stepwise Delayed DUC scope別状態空間".equals(section)) {
             return "stepwise_delayed_scope_state_space_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC scope別時間".equals(section)) {
+            return "stepwise_delayed_scope_time_" + metricToken(label);
         }
         if ("Stepwise Delayed DUC cross scheduling".equals(section)) {
             return "stepwise_delayed_cross_scheduling_" + metricToken(label);
@@ -4816,6 +5047,9 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if ("Stepwise Delayed DUC direct pruning 削減率".equals(section)) {
             return "stepwise_delayed_direct_pruning_reduction_" + metricToken(label);
+        }
+        if ("Stepwise Delayed DUC hotSwapIn connection".equals(section)) {
+            return "stepwise_delayed_hot_swap_in_connection_" + metricToken(label);
         }
         if ("DCS (OTF-DUC)".equals(section)
                 && "DCS で探索した状態数と遷移数の最大値".equals(label)) {

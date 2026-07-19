@@ -1,0 +1,80 @@
+//******************************************************************************
+//*  NewPrivacyBusSystem.lts (for MTSA)
+//*  Create Date      : 2021/1/11
+//*  Creator Name     : Takuto Yamauchi
+//*  Example          : Bus Streaming System
+//*  MTSA run command : [java -jar -Xmx8G mtsa.jar] メモリサイズに応じて8Gは要変更
+//*****************************************************************************/
+
+//*****************************************************************************
+// Environment
+//*****************************************************************************
+
+/*Set of Object*/
+const N = 5 /* num of user */
+const K = 3 /* num of data (virtual server) */
+
+range SystemID = 1 .. N
+range DataID = 1 .. K
+
+/*Set of Actions*/
+set Authority = {admin, official, general}
+set RequestActions = {request[SystemID]}
+set ControllableActions = {select_data[SystemID][DataID], ok[SystemID][DataID], ng[SystemID][DataID], reject[SystemID][DataID], dataTransfer[SystemID][DataID], filter[SystemID], unfilter[SystemID], process[SystemID]}
+//set UnControllableActions = {}
+
+/*Environment Transitions*/
+System(ID = 1) = REQUEST,
+	REQUEST 				= 	(request[ID] -> DATA_SELECTION),
+	DATA_SELECTION			= 	(select_data[ID][data:DataID] -> JUDGEMENT[data]),
+	JUDGEMENT[data:DataID]	=	(ok[ID][data] -> OK[data]
+								|ng[ID][data] -> NG[data]),
+	NG[data:DataID] 		=	(reject[ID][data] -> REQUEST),
+	OK[data:DataID] 		=	FILTERING[data],
+	FILTERING[data:DataID] 	=	(filter[ID] -> GET_DATA[data] | unfilter[ID] -> GET_DATA[data]),
+	GET_DATA[data:DataID]	=	(dataTransfer[ID][data] -> USE_DATA),
+	USE_DATA				=	(process[ID] -> REQUEST).
+//PrivacyFilter = ().
+
+
+//*****************************************************************************
+// Requirement
+//*****************************************************************************
+range Public_Data = 1 .. 1
+
+/*FLTL*/
+ltl_property P_SECURITY_Admin   = [](!reject[1][DataID])
+ltl_property P_SECURITY_OK_02 = [](!{dataTransfer[2][DataID]}\{dataTransfer[2][Public_Data]})
+ltl_property P_SECURITY_OK_03 = [](!{dataTransfer[3][DataID]}\{dataTransfer[3][Public_Data]})
+ltl_property P_SECURITY_OK_04 = [](!{dataTransfer[4][DataID]}\{dataTransfer[4][Public_Data]})
+ltl_property P_SECURITY_OK_05 = [](!{dataTransfer[5][DataID]}\{dataTransfer[5][Public_Data]})
+
+ltl_property P_SECURITY_NG_02 = [](!reject[2][Public_Data])
+ltl_property P_SECURITY_NG_03 = [](!reject[3][Public_Data])
+ltl_property P_SECURITY_NG_04 = [](!reject[4][Public_Data])
+ltl_property P_SECURITY_NG_05 = [](!reject[5][Public_Data])
+
+controllerSpec Specification =
+{
+	safety       = {
+					P_SECURITY_Admin,
+					P_SECURITY_OK_02,P_SECURITY_NG_02,
+					P_SECURITY_OK_03,P_SECURITY_NG_03,
+					P_SECURITY_OK_04,P_SECURITY_NG_04,
+					P_SECURITY_OK_05,P_SECURITY_NG_05,
+				   }
+	//liveness     = {GOAL}
+	controllable = {ControllableActions}
+}
+
+
+//*****************************************************************************
+//Controller
+//*****************************************************************************
+
+//General Synthesis
+||Environment = (forall [id:SystemID] System(id)).
+
+controller ||Controller = (forall [id:SystemID] System(id))~{Specification}.
+controller ||TraditionalController = (Environment)~{Specification}.
+
