@@ -223,7 +223,16 @@ public class TransitionSystemDispatcher {
             //評価実験用
             long removeOldTransitionsStart = System.currentTimeMillis();
 
-            UpdatingControllersUtils.removeOldTransitions(toCompose);
+            Set<String> declaredControllableActions = Collections.emptySet();
+            if (toCompose instanceof UpdatingControllerCompositeState) {
+                Set<String> configuredActions =
+                        ((UpdatingControllerCompositeState) toCompose).getControllableActions();
+                if (configuredActions != null) {
+                    declaredControllableActions = configuredActions;
+                }
+            }
+            UpdatingControllersUtils.removeOldTransitions(
+                    toCompose, declaredControllableActions);
 
             long removeOldTransitionsTime = System.currentTimeMillis() - removeOldTransitionsStart;
             UpdatingControllerEvaluationRecorder.recordTime(

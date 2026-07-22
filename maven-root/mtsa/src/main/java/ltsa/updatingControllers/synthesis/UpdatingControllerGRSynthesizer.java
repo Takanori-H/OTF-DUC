@@ -72,6 +72,13 @@ public class UpdatingControllerGRSynthesizer {
             LTSOutput output,
             String timingSection,
             String heartbeatPrefix) {
+        // Safety/SBP may remove every transition carrying a declared
+        // controllable action.  Keep those labels in the GR input interface so
+        // validation and the generated controller still know that the action
+        // is controllable.  Only the declared controllable set is added here:
+        // copying the whole source alphabet would also copy the reserved tau
+        // label and can turn it into a real DontDoTwice self-loop upstream.
+        safetyEnv.addActions(uccs.getUpdateGRGoal().getControllableActions());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 timingSection,
                 "synthesizeGR 全体時間");

@@ -277,12 +277,21 @@ public class UpdatingControllersUtils {
 
 	/////////////////////////////THIS CODE IS FOR RELABELING ACTIONS ///////////////////////////////
 	public static void removeOldTransitions(CompositeState cs) {
+		removeOldTransitions(cs, Collections.<String>emptySet());
+	}
+
+	public static void removeOldTransitions(
+			CompositeState cs,
+			Collection<String> declaredControllableActions) {
 
 		MTS<Long, String> mts = AutomataToMTSConverter.getInstance().convert(cs.composition);
 		MTS<Long, String> resultMts = new MTSImpl<Long, String>(mts.getInitialState());
 		for (String action : mts.getActions()) {
-			if (!isOld(action)){
-				resultMts.addAction(action);
+			resultMts.addAction(isOld(action) ? withoutOld(action) : action);
+		}
+		if (declaredControllableActions != null) {
+			for (String action : declaredControllableActions) {
+				resultMts.addAction(isOld(action) ? withoutOld(action) : action);
 			}
 		}
 

@@ -1,0 +1,54 @@
+// Full-pipeline regression fixture for a legitimate one-to-many hotSwapIn
+// connection relation H.  OLD_ENV is a deterministic two-state cycle, while
+// OldCon is its valid one-state quotient.  Synchronised reachability therefore
+// relates the sole OldCon state to both OLD-side mapping states.  mapRelation
+// itself remains total and one-to-one so that reconfigure is deterministic.
+
+set ControllableActions = {tick}
+
+OLD_ENV = OLD_A,
+OLD_A = (tick -> OLD_B),
+OLD_B = (tick -> OLD_A).
+
+NEW_ENV = NEW_A,
+NEW_A = (tick -> NEW_B),
+NEW_B = (tick -> NEW_A).
+
+relation R_ENV = {
+    OLD_A@OLD_ENV = reconfigure -> NEW_A@NEW_ENV,
+    OLD_B@OLD_ENV = reconfigure -> NEW_B@NEW_ENV
+}
+
+map MAP_ENV = {OLD_ENV, NEW_ENV, R_ENV}
+
+||MAPPING_ENV = (MAP_ENV).
+
+controllerSpec OLD_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+// This quotient has exactly the same controlled trace language as OLD_ENV.
+OLD_CLOSED_LOOP = (tick -> OLD_CLOSED_LOOP).
+||OldCon = (OLD_CLOSED_LOOP).
+
+controllerSpec NEW_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+||NewCon = (NEW_ENV).
+
+updatingController Stepwise_OneToMany = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_ONE_TO_MANY = Stepwise_OneToMany.

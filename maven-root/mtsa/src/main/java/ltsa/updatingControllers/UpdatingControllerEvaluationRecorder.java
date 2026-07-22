@@ -51,6 +51,9 @@ public final class UpdatingControllerEvaluationRecorder {
     private static final Map<String, LineRef> lineRefs = new LinkedHashMap<>();
     private static final Map<String, Long> timeMillisByKey = new LinkedHashMap<>();
     private static final Map<String, DataMetric> dataMetrics = new LinkedHashMap<>();
+    // dataMetrics intentionally keeps the latest value per stable key. Peak
+    // computation needs every state-space sample, including repeated labels.
+    private static final List<StateSpaceObservation> stateSpaceObservations = new ArrayList<>();
     private static final Map<String, CountScope> countScopes = new LinkedHashMap<>();
     private static final List<String> activeCountScopes = new ArrayList<>();
 
@@ -101,6 +104,7 @@ public final class UpdatingControllerEvaluationRecorder {
         lineRefs.clear();
         timeMillisByKey.clear();
         dataMetrics.clear();
+        stateSpaceObservations.clear();
         countScopes.clear();
         activeCountScopes.clear();
         mode = "未記録";
@@ -429,7 +433,37 @@ public final class UpdatingControllerEvaluationRecorder {
         if (description != null && !description.isEmpty()) {
             add(section, "  説明: " + description);
         }
+        stateSpaceObservations.add(new StateSpaceObservation(
+                section,
+                label,
+                states,
+                transitions));
         String baseKey = metricKey(section, label);
+        if ("Stepwise Delayed DUC 最大状態数と遷移数".equals(section)) {
+            // Preserve every raw Stepwise observation for CSV auditability,
+            // while the stable base key below keeps its historical latest-value
+            // behaviour for existing consumers.
+            String observationBaseKey = baseKey + "_observation_"
+                    + stateSpaceObservations.size();
+            recordDataMetric(
+                    observationBaseKey + "_states",
+                    section,
+                    label + " / States",
+                    Long.toString(states),
+                    "states");
+            recordDataMetric(
+                    observationBaseKey + "_transitions",
+                    section,
+                    label + " / Transitions",
+                    Long.toString(transitions),
+                    "transitions");
+            recordDataMetric(
+                    observationBaseKey + "_count_time",
+                    section,
+                    label + " / CountTime",
+                    Long.toString(countTimeMillis),
+                    "ms");
+        }
         recordDataMetric(baseKey + "_states", section, label + " / States", Long.toString(states), "states");
         recordDataMetric(baseKey + "_transitions", section, label + " / Transitions", Long.toString(transitions), "transitions");
         recordDataMetric(baseKey + "_count_time", section, label + " / CountTime", Long.toString(countTimeMillis), "ms");
@@ -2924,16 +2958,10 @@ public final class UpdatingControllerEvaluationRecorder {
     private static void recordStepwiseDelayedPeakStateSpaceSummaryMetrics() {
         PeakValue peakStates = maxStateSpaceMetricInSection(
                 "Stepwise Delayed DUC 最大状態数と遷移数",
-                "states",
-                " / States",
-                "transitions",
-                " / Transitions");
+                true);
         PeakValue peakTransitions = maxStateSpaceMetricInSection(
                 "Stepwise Delayed DUC 最大状態数と遷移数",
-                "transitions",
-                " / Transitions",
-                "states",
-                " / States");
+                false);
 
         if (peakStates != null) {
             recordDataMetricWithFormula(
@@ -2989,25 +3017,15 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static PeakValue maxStateSpaceMetricInSection(
             String section,
-            String unit,
-            String labelSuffix,
-            String pairedUnit,
-            String pairedLabelSuffix) {
+            boolean maximizeStates) {
         PeakValue max = null;
-        for (DataMetric metric : dataMetrics.values()) {
-            if (!section.equals(metric.section)
-                    || !unit.equals(metric.unit)
-                    || metric.label == null
-                    || !metric.label.endsWith(labelSuffix)) {
+        for (StateSpaceObservation observation : stateSpaceObservations) {
+            if (!section.equals(observation.section)) {
                 continue;
             }
-            Long value = dataMetricLong(metric.key);
-            if (value == null) {
-                continue;
-            }
-            String rawStage = metric.label.substring(0, metric.label.length() - labelSuffix.length());
-            String stage = rawStage.trim();
-            long pairedValue = dataMetricLong(section, rawStage + pairedLabelSuffix, pairedUnit);
+            long value = maximizeStates ? observation.states : observation.transitions;
+            long pairedValue = maximizeStates ? observation.transitions : observation.states;
+            String stage = observation.label == null ? "" : observation.label.trim();
             if (max == null || value > max.value) {
                 max = new PeakValue(value, pairedValue, stage);
             }
@@ -3062,18 +3080,6 @@ public final class UpdatingControllerEvaluationRecorder {
         } catch (NumberFormatException ex) {
             return null;
         }
-    }
-
-    private static long dataMetricLong(String section, String label, String unit) {
-        for (DataMetric metric : dataMetrics.values()) {
-            if (section.equals(metric.section)
-                    && label.equals(metric.label)
-                    && unit.equals(metric.unit)) {
-                Long value = dataMetricLong(metric.key);
-                return value == null ? -1 : value;
-            }
-        }
-        return -1;
     }
 
     private static long methodPreparationTime() {
@@ -5168,6 +5174,24 @@ public final class UpdatingControllerEvaluationRecorder {
             this.value = value;
             this.pairedValue = pairedValue;
             this.stage = stage;
+        }
+    }
+
+    private static final class StateSpaceObservation {
+        private final String section;
+        private final String label;
+        private final long states;
+        private final long transitions;
+
+        private StateSpaceObservation(
+                String section,
+                String label,
+                long states,
+                long transitions) {
+            this.section = section;
+            this.label = label;
+            this.states = states;
+            this.transitions = transitions;
         }
     }
 

@@ -1,0 +1,265 @@
+OTF-DUC 実装・研究設計仕様書 (Rev. Final 8.1)
+
+1. 既存研究: Dynamic Update Controller Synthesis (DUCS)
+参考文献: Nahabedian et al., “Dynamic Update of Discrete Event Controllers”
+1.1 研究の背景と目的
+現代のソフトウェアシステム（特に高可用性が求められるシステム）では、システムを停止させることなく、稼働中にその振る舞いや構成を変更する「動的更新（Dynamic Update）」が求められている。本研究の目的は、以下の要件を満たす**更新コントローラ（Update Controller）**を自動合成することである。
+・Non-stop Update (無停止更新): システムの稼働を止めずに、旧仕様 $G$ を満たす Old Controller (OC) から、新仕様 $G'$ を満たす New Controller (NC) へと制御を移行する。
+・Safe Update (安全性): 更新プロセス中において、一時的に安全性が損なわれるリスクがある。更新コントローラは、更新中も常にシステムの安全性（Safety Property）を保証しなければならない。
+・Correct Reconfiguration (構成変更): ソフトウェアのロジック変更だけでなく、環境 $E$ の物理的・論理的な構成変更（アクチュエータの交換、接続先の変更など）を伴う更新に対応する。これは、旧環境 $E$ の状態から新環境 $E'$ の状態へのマッピング関係 $R$ として定義される。
+・Liveness (進行性): 更新プロセスがデッドロックせず、最終的に必ず更新が完了し、NCによる制御が開始される状態へ到達することを保証する。
+1.2 更新プロセス (4つの事象)
+更新は、更新コントローラが発行する以下の4つの Controllable な事象によって厳密に管理・進行される。
+ 1. hotswap (hotSwapIn):
+　・更新フェーズの開始を告げる事象。
+　・この瞬間、制御権（Control Authority）が OC から Update Controller へと委譲される。
+ 2. stopOldSpec:
+　・旧仕様 $G$ の保証終了を宣言する事象。
+　・これ以降、システムが Old Safety Property に違反する状態に遷移しても、エラーとはみなされなくなる。
+ 3. reconfigure:
+　・環境の構成変更を実行する事象。
+　・関係 $R \subseteq S_E \times S_{E'}$ に基づき、現在の旧環境の状態 $s \in S_E$ を、対応する新環境の状態 $s' \in S_{E'}$ へと遷移させる。
+ 4. startNewSpec:
+　・新仕様 $G'$ の保証開始を宣言する事象。
+　・これ以降、New Safety Property に違反する状態への遷移は許されず、厳密にエラーとして扱われる。
+1.3 課題: インターリービングによる状態爆発
+既存手法（Nahabedian et al.）における最大の課題は、合成時の計算量爆発である。正しい更新コントローラを合成するために、既存手法では 「更新用環境モデル ($E_u$)」 を事前に構築する。
+・全順序の網羅: stopOldSpec, reconfigure, startNewSpec の3事象は、遷移要件（Transition Requirement, $T$）に違反しない限り、どのような順序で発生してもよい。$E_u$ はこれら全てのインターリービング（順序の組み合わせ）を含む。
+・直積空間の巨大化: $E_u$ は、環境、OC、NC、および更新イベントの状態の直積となる。
+	$$States(E_u) \approx States(E) \times States(OC) \times States(NC) \times 2^{\{UpdateEvents\}}$$
+・結果: $OC$ や $NC$ が大規模な場合、あるいは $NC$ の状態数が膨大な場合、この状態空間はメモリに載らないほど巨大になり、合成不能（State Explosion）に陥る。
+
+2. 使用技術: Directed Controller Synthesis (DCS)
+参考文献: Ciolek et al., “Directed Controller Synthesis of Discrete Event Systems: Taming Composition with Heuristics”
+2.1 DCSの技術的特徴
+DCSは、従来の「全状態空間を網羅的に生成してから解く（Monolithic Synthesis）」手法とは対照的に、AIプランニングの技術を制御合成に応用した手法である。
+・On-the-Fly Composition (逐次合成):
+　・事前に巨大なLTSを構築しない。
+　・探索アルゴリズムが必要とした時点でのみ、各コンポーネント（LTS）の状態から次の合成状態（Compostate）と遷移を動的に生成する。これにより、到達しない無駄な状態空間の生成を回避する。
+・Heuristic Search (ヒューリスティック探索):
+　・ゴール（目標状態）までの距離を推定するヒューリスティック関数 $H(s)$ を導入する。
+　・$A^*$探索やGreedy Best-First Search（貪欲最良優先探索）を用いることで、有望なパスを優先的に探索し、早期に解（コントローラ）を発見する。
+　・Abstraction: $H(s)$ の計算には、各コンポーネントを抽象化したモデル上でのBFS距離（Pattern Database Heuristics等）を用いる。
+2.2 UncontrollableアクションとMixed State (AND/OR探索)
+DCSは、制御できない環境の動作（Uncontrollable Action）を扱うために、AND/ORグラフ探索の概念を持つ。
+・Controllable分岐 (ORノード):
+　・コントローラが能動的に選択できるアクション。
+　・複数の選択肢のうち、少なくとも1つ の遷移先がWinning（Goal到達可能かつ安全）であれば、その親状態もWinningとなる。
+・Uncontrollable分岐 (ANDノード):
+　・環境や制御不能な対象が自律的に起こすアクション。
+　・発生しうる すべての (For All) 遷移先がWinningでなければ、その親状態はWinningとならない（最悪ケースの保証）。
+・Mixed State:
+　・Controllableな遷移とUncontrollableな遷移が混在する状態。
+　・DCSはこれをUncontrollable分岐と同様に適切に処理し、「環境がどう動いても、コントローラが適切な手を選べば勝てる」戦略（Strategy）を合成する。
+
+3. 提案手法: OTF-DUC (On-the-Fly Dynamic Update Controller)
+3.1 アプローチ: 分割統治による更新パス探索
+本提案手法は、既存手法の状態爆発問題を解決するために、問題を分割する。
+・前提: OCとNCの合成自体は完了しており、それぞれのコントローラ単体は正しく動作することが既知であるとする。
+・Focus on the Bridge: OTF-DUCは、OCの状態からNCの状態へと至る 「更新パス（Update Path）」 のみをDCSを用いて探索する。
+・OCのすべての状態から、NCの対応する状態への更新パスを探索する。
+・hotswapをhotSwapInに変更し、4つの更新事象hotSwapIn, stopOldSpec, reconfigure, startNewSpecが探索(発火)し終わった合図の更新事象としてfinishUpdateを新たに加える。finishUpdateをmarkingアクションとして探索する。
+・NCの除外: 更新パスの探索中、NCの内部ロジック（更新に関係のないNC内の遷移）は探索空間（Compostate）に含めない。これにより、探索空間の次元を大幅に削減し、状態爆発を回避する。
+・Safety特化: 入力仕様をSafetyに限定することで、検査・合成の複雑さを抑制する。
+・Reachability-only Synthesis (目標到達の単回保証):
+　・従来のDCS: 通常、目標状態に「無限回」到達できること（Liveness / Büchi条件）を確認するため、到達後のサイクル検出などが必要となる。
+　・提案手法: 更新パスの役割は、システムを NC へ安全に引き渡すことである。一度 finishUpdate に到達して NC に制御が移れば、以降は NC 自身が保証する（NCは正当性が検証済みである前提）。
+　・したがって、更新パスの探索においては、目標状態への**単一の到達（Reachability / Co-Safety）**を確認すれば十分であり、無限ループの確認は不要である。これにより探索プロセスが大幅に簡素化される。
+・New Safetyの分解と追跡 (Delayed Activation):
+　・startNewSpec後のnew safetyの状態を特定するために、New SafetyはNew Safety中のFluentを用いて監視する。
+　・Original New Safety Property を boxList に含めるが、更新開始前（startNewSpec 未発火）は完全に無効化しておく。
+　・Fluentを監視するLTSを並行して走らせ、常にバックグラウンドで状態遷移を追跡（Trace）させる。
+　・startNewSpec が発火した瞬間、Fluent の状態から Original New Safety の正しい現在状態を特定し、Original New Safety をその状態に 同期（State Jump） させた上で有効化する。
+3.2 Anytime Hotswap の保証
+「いつ更新指令が来ても安全に更新できる」ことを保証するためのメカニズム。
+・OCのUncontrollable化:
+　・探索において、OCを「コントローラ」ではなく「環境（制御不能な動きをする対象）」とみなす。
+　・OCの全アクションを Uncontrollable として扱うことで、DCSは「OCがどの状態に遷移しても、そこから必ず更新完了まで導ける」パスが存在する状態のみを解として採用する。
+　・探索の効率化:
+　　・一度のDCS探索実行で、OC上の全ての到達可能状態からの更新戦略を網羅的に合成する。
+
+4. 実装方針詳細
+4.1 LTSリスト構成 (Compostateの定義)
+DCSアルゴリズムは以下のLTSリストを保持し、これらを組み合わせた単一の Compostate を管理単位とする。
+Index,コンポーネント名称,役割と設定
+0,Extended Marking LTS,更新進捗（フェーズ）とSafety Enforceフラグの管理。
+1,Old Controller (OC),全アクション名に _old を付与。全遷移を Uncontrollable に設定。
+2...a,Mapping Environment,旧環境 E から新環境 E′ への遷移 reconfigure を埋め込んだ事前構築済みモデル。
+a+1...b,Old Safety Property,旧仕様。違反時は -1 (Sink State) へ遷移する。
+b+1...c,New Safety Property(Original),新仕様。違反時は -1 (Sink State) へ遷移する。startNewSpec前は停止、後は稼働。
+c+1...d,Transition Requirement,移行要件 (T)。hotswap のガード条件や、更新中の禁止動作を定義。
+d+1...e,Synthesis Machines(Fluents),"裏方 (Background Trackers)。New Safety の状態を導出するために常に動く。Active, Enforce は常に FALSE、Trace は常に TRUE。"
+4.2 Extended Marking LTS の詳細定義
+このLTSは、システム全体の更新フェーズ（State）を管理し、それに基づいて各コンポーネントの挙動（フラグ）を決定する。
+・アクション: hotSwapIn, stopOldSpec, reconfigure, startNewSpec, finishUpdate
+状態遷移表:
+状態 ID,意味・発生済みイベント,Old Safety,New Safety,可能な遷移 (アクション → 次状態)
+0,Observation (初期),ON,OFF,hotSwapIn → 1
+1,hotswap 完了,ON,OFF,"stopOld → 2, reconfig → 3, startNew → 4"
+2,stopOld 完了,OFF,OFF,"reconfig → 5, startNew → 6"
+3,reconfig 完了,ON,OFF,"stopOld → 5, startNew → 7"
+4,"stopOld, reconfig 完了",OFF,OFF,startNew → 8
+5,startNew 完了,ON,ON,"stopOld → 6, reconfig → 7"
+6,"stopOld, startNew 完了",OFF,ON,reconfig → 8
+7,"reconfig, startNew 完了",ON,ON,stopOld → 8
+8,Ready (全完了),OFF,ON,finishUpdate → 9 (*ガード条件あり)
+9,Completion (Goal),OFF,ON,(探索終了・Stitching対象)
+4.3 フラグ制御と詳細アクション処理ロジック
+各コンポーネントは Marking State に応じて3つのフラグ (Active, Trace, Enforce) で制御される。
+A. フラグの詳細定義
+ 1. Active (同期参加・ガード):
+  ・このフラグが ON のコンポーネントは、システム全体のアクション決定プロセスに参加し、アクションの実行可否（Enabled/Disabled）を決定する権利を持つ。
+  ・重要: 拒否権の適用範囲
+  　・Activeなコンポーネントが、対象のアクション $a$ を知っている（自身のアルファベットに含まれている）場合:
+  　　・現在状態で $a$ への遷移定義を持っていなければ、**システム全体としてそのアクションは実行不可能（Disabled/Blocked）**となる。「私が許可しない限り、その動作はさせない」という強い同期制約を持つ。
+  　・Activeなコンポーネントが、対象のアクション $a$ を知らない（自身のアルファベットに含まれていない）場合:
+  　　・そのアクションに対して関知せず、**無視（Ignore）**する。遷移定義を持っていなくてもブロックせず、他のコンポーネントだけで実行可能となる。
+  ・あるアクション $a$ に対し、Activeなコンポーネントのうち一つでも「遷移定義なし（遷移不可）」であれば、そのアクションは実行できない。
+ 2. Enforce (強制判定・安全性):
+  ・Safety違反などの致命的なエラー判定を有効にするフラグ。
+  ・ON のコンポーネントの状態が -1 (Error/Sink) になった場合、そのパスは即座に「失敗（Safety違反）」とみなされ、探索打ち切りとなる。
+  ・OFF の場合、状態が -1 になっても許容され、探索は続行される（一時的な違反の許容）。
+ 3. Trace (状態追跡・同期):
+  ・アクション実行時に、自身の内部状態を遷移させるかどうかのフラグ。
+  ・ON の場合、他のコンポーネント主導で選ばれたアクションであっても、同名のアクション定義があれば自身の状態を進める。
+  ・これにより、Activeではない（ガードしない）コンポーネントも、裏側で現在の状況を正しく認識し続けることができる。
+B. フェーズごとのフラグ設定マトリクス
+フェーズ,Marking State,Component,Active,Enforce,Trace,挙動の詳細解説
+Observation(待機中),0,Marking,ON,ON,ON,hotswap の発行タイミングを制御。
+,,OC,ON,ON,ON,主導権を持つ。 OCのアクション(_old)とhotswapが競合するMixed Nodeとなる。
+,,Env (Mapping),OFF,OFF,ON,OCのアクションに追従して状態更新のみ行う。
+,,Old Safe,ON,ON,ON,OCが動作中もSafety違反がないか監視する。
+,,New Safe,OFF,OFF,OFF,完全に停止。
+,,Trans Req,ON,ON,ON,hotswap 禁止条件（危険区域での更新阻止など）を適用。
+,,Synthesis,OFF,OFF,ON,裏で追跡のみ。
+Update(更新中),1 - 9,Marking,ON,ON,ON,更新イベントの順序を制御。
+,,OC,OFF,OFF,OFF,切り離し (Handover)。 以降、OCの状態は更新パスに関与しない．
+,,Env (Mapping),ON,ON,ON,主導権を持つ。 DCSが環境に対して最適なアクションを選択する。
+,,Old Safe,Cond,Cond,Cond,"stopOldSpec 未完了 (State 1, 3, 4, 7) なら ON。完了済 (State 2, 5, 6, 8, 9) なら OFF。"
+,,New Safe,Cond,Cond,Cond,"startNewSpec 完了済 (State 4, 6, 7, 8, 9) なら ON。未完 (State 1, 2, 3, 5) なら OFF。"
+,,Trans Req,ON,ON,ON,更新プロセス中の制約を適用。
+,,Synthesis,OFF,OFF,ON,常に裏で追跡のみ。
+
+hotSwapIn前　markingLTSの状態0 hotswapの発行タイミングを制御。OCのアクション(_old)とhotswapが競合するMixed Nodeとなる。
+markingLTS, active=true, trace=true, enforce=true
+old controller, active=true, trace=true, enforce=true
+mapping components, active=false, trace=true, enforce=false　OCのアクションに追従して状態更新のみ行う。
+old safety, active=true, trace=true, enforce=true　OCが動作中もSafety違反がないか監視する。
+new safety, active=false, trace=false, enforce=false　startNewSpec発火までは 全て FALSE（完全に停止）。
+transition requirements, active=true, trace=true, enforce=true　hotswap 禁止条件（危険区域での更新阻止など）を適用。
+synthesis machines, active=false, trace=true, enforce=false　常に Active=F, Enforce=F, Trace=T（裏で追跡のみ）。
+hotSwapIn後 markingLTSの状態1-9，更新中
+markingLTS, active=true, trace=true, enforce=true
+old controller, active=false, trace=true, enforce=false　以降、OCの状態は更新パスに関与しない。
+mapping components, active=true, trace=true, enforce=true
+stopOldSpec発火前のold safety, active=true, trace=true, enforce=true
+stopOldSpec発火後のold safety, active=false, trace=false, enforce=false
+startNewSpec発火前のnew safety, active=false. trace=false, enforce=false
+startNewSpec発火後のnew safety, active=true, trace=true, enforce=true
+transition requirements, active=true, trace=true, enforce=true
+synthesis machines, active=false, trace=true, enforce=false　常に Active=F, Enforce=F, Trace=T（裏で追跡のみ）。
+
+例1
+hotSwapInの後にstartNewSpecをした場合，
+markingLTS, active=true, trace=true, enforce=true
+old controller, active=false, trace=true, enforce=false
+mapping components, active=true, trace=true, enforce=true
+stopOldSpec発火前なのでold safety, active=true, trace=true, enforce=true
+startNewSpec発火した後なのでnew safety, active=true, trace=true, enforce=true
+transition requirements, active=true, trace=true, enforce=true
+synthesis machines, active=false, trace=true, enforce=false
+
+例２hotSwapInの後にstopOldSpecをした場合，
+markingLTS, active=true, trace=true, enforce=true
+old controller, active=false, trace=false, enforce=false
+mapping components, active=true, trace=true, enforce=true
+stopOldSpec発火後なのでold safety, active=false, trace=false, enforce=false
+startNewSpec発火前なのでnew safety, active=false. trace=false, enforce=false
+transition requirements, active=true, trace=true, enforce=true
+synthesis machines, active=false, trace=true, enforce=false
+
+C. State 0 におけるアクション処理の詳細 (重要)
+State 0 では、OCは Active であり、アクション名に _old が付いている。しかし、EnvやSafetyは通常のアクション名を待っている。そのため以下の処理を行う。
+ 1. Generate: OC (Active) から遷移可能なアクション候補（例: drill_old）を取得する。
+ 2. Strip: アクション名の末尾から _old を削除し、標準名（例: drill）に変換する。
+ 3. Check & Trace:
+  ・変換後の標準名 drill を用いて、Trace=ON であるコンポーネント（Mapping Env, Old Safety, Trans Req, Synthesis Machines）に対して遷移可能かチェックし、状態遷移を実行する。
+  ・これにより、OCが駆動している間も、環境モデルやSafetyプロパティは「OCが何をしているか」を正しく追跡できる。
+  ・注意: Active=OFF かつ Trace=ON のコンポーネント（Mapping Env, Synthesis Machines）は、遷移先がなくても探索をブロックしない（無視して自己ループする）。
+D. startNewSpec 遷移時の特殊処理 (State Synchronization)
+DCSの探索において、startNewSpec アクションが選択され、次状態（Child State）を生成する際に、以下の状態同期処理を行う。
+ 1. 情報の取得: 現在（親状態）の Monitors と Fluents の状態IDを取得する。
+ 2. 状態の導出: safetyStateLookupMap (Map<Integer, Map<List<Integer>, Integer>>) を引き、対応する Original New Safety のあるべき状態ID ($S_{target}$) を特定する。
+ 3. 状態の上書き: 生成される次状態（Child State）において、Original New Safety の状態IDを $S_{target}$ に強制設定する。
+  ・もし $S_{target}$ が -1 (ERROR) であれば、その時点で探索パスは破棄される（直後にEnforce=TRUE に切り替わるため）。
+E. 状態の正規化
+探索の重複を避けるため，TraceフラグがOFFになっているコンポーネントの状態ば"-2"とする
+4.4 探索アルゴリズム詳細
+・アルゴリズム: Greedy Best-First Search (DCS向けAND/OR対応版)。
+・State 0 (Mixed Node) の処理:
+　・Uncontrollable分岐 (OC由来 a_old): 全ての子ノード（遷移先）を展開し、そのすべてがGoal到達可能であることを確認する。
+　・Controllable分岐 (hotSwapIn): ヒューリスティックにより優先的に探索される。この枝でGoal到達が確認されれば、親ノードの解決に寄与する。
+・ヒューリスティック関数 $H(s)$ の定義
+探索におけるトータルスコア（コスト）は、以下の3つの要素の合計で計算される。値が小さいほどゴールに近い（優先度が高い）と評価される。
+$$TotalScore(s, a) = W_{Marking} \times (5 - Depth(s)) + BFS_{Env}(s) + Cost(a)$$
+ 1. 更新プロセスの進行度 ($Depth(s)$)
+ Marking LTS の状態IDそのものではなく、更新プロセスがどれだけ完了に近づいたかを示す「深さ (0〜5)」に基づいて評価する。 これにより、インターリービングによって分岐した等価な進捗状態（例: State 2 と State 4）を対等に評価する。
+ ・重み係数 ($W_{Marking}$): 1000
+  ・更新フェーズを進めることを、環境の移動やアクションコストよりも圧倒的に優先する。
+  Marking State ID,状態の意味,定義される Depth
+  0,Observation (初期状態),0
+  1,hotSwapIn 完了,1
+  "2, 3, 4",更新3事象のうち 1つ が完了(stopOldのみ / reconfigのみ / startNewのみ),2
+  "5, 6, 7",更新3事象のうち 2つ が完了,3
+  8,Ready (3事象全て完了),4
+  9,Completion (finishUpdate 完了 / Goal),5
+ 2. 環境モデル上の距離 ($BFS_{Env}(s)$)
+ Mapping Environment における、現在の状態からターゲット（Marked State）までの最短距離。
+ ・事前計算された BFS (幅優先探索) マップを使用する。
+ ・到達不可能な状態の場合は、大きなペナルティ（10000）を加算する。
+ 3. アクション優先度コスト ($Cost(a)$)
+ 同一の Depth、同一の環境距離である場合、以下のアクション優先順位に従って遷移を選択する。更新を完了させる方向のアクションを優先する。
+ アクション名,コスト,備考
+ finishUpdate,0,最優先 (Goal到達)
+ stopOldSpec,10,安全性監視の解除を優先
+ reconfigure,20,
+ startNewSpec,30,新仕様の適用
+ hotSwapIn,40,更新開始
+ Others,100,通常の制御アクション
+ 4. OTF-DUC向けのヒューリスティック
+  1. OC上の状態，つまりMarkingState=0の時はhotSwapInを最優先で探索する．
+  2. その後は探索におけるトータルスコアが小さいものから探索する．コストの付け方により，更新を完了させる方向のアクションを優先することになる．
+  3. トータルスコアが同じ場合はuncontrollableアクションを優先して探索する
+4.5 finishUpdate の発火条件 (中間状態チェック)
+Marking State が 8 に到達しても、無条件に finishUpdate を発火してはならない。環境が reconfigure の途中（中間状態）である可能性があるためである。
+判定ロジック:
+ 1. 前提: 4つの更新事象は全て完了している（Marking 8の定義により保証）。
+ 2. Map Lookup: 現在の Mapping Environment の状態 $s_{map\_env}$ をキーとして、事前に用意した対応表 Map_Env (MappingEnvState $\to$ NewEnvState) を検索する。
+ 3. 判定:
+  ・Hit (存在): 対応する新環境の状態が存在する＝中間状態ではない。$\rightarrow$ finishUpdate を 許可 (Enabled)。
+  ・Miss (不在): 対応なし＝Reconfigureの過渡期である。$\rightarrow$ finishUpdate を 禁止 (Disabled)。環境側の遷移が進み、対応する状態になるのを待つ。
+ 4. また，finishUpdate後の状態はNCと置き換えるため，Map_EnvとNew Safety propertyの状態から，対応するNCの状態があるかを検索する．
+ 　・Hit (存在): 対応するNCの状態が存在する．$\rightarrow$ finishUpdate を 許可 (Enabled)。
+ 　・Miss (不在): 対応なし=安全にNCへ制御を移せない．$\rightarrow$ finishUpdate を 禁止 (Disabled)。環境側の遷移が進み、対応する状態になるのを待つ。実装上では，Missの場合はfinishUpdateは探索せずに他のアクションを探索する．
+4.6 NCとの接合 (Stitching) - 事後処理詳細
+DCS探索が完了し、Director（更新コントローラ）が得られた後、最後に「Marking State = 9」という抽象的なゴールを、具体的な New Controller の対応する状態へと接続する。
+手順:
+ 1. 抽出: 生成されたDirectorグラフから、Marking State = 9 (Goal) である全てのリーフノードをリストアップする。
+ 2. Context取得: 各リーフノードが保持している以下の状態IDを取得する。
+  ・$s_{map\_env}$: Mapping Environment の状態。
+  ・$s_{new\_safe}$: Original New Safety の状態。（※startNewSpec 時に同期済みのため、Monitor/Fluentから再計算する必要はなく、Compostate内の値を直接使用する）
+ 3. NC状態の特定 (2段階Lookup):
+  ・Step 1: Map_Env を引き、$s_{map\_env}$ に対応する New Environment の状態 $s_{new\_env}$ を取得する。
+  ・Step 2: Map_NC (Key: ($s_{new\_env}, s_{new\_safe}$)) を引き、この環境・Safety状態で有効な New Controller の状態 $s_{nc}$ を特定する。
+ 4. Wiring (接続):
+  ・Directorグラフにおいて、当該リーフノード（Marking=9）への遷移エッジを、特定した $s_{nc}$ への遷移に書き換える（またはノード自体を置換する）。
+  ・これにより、更新コントローラの出口が、シームレスに NC の入口へと接続される。
+4.7 OCとの接合 (Entry Stitching)
+探索完了後、NCとの接合（Exit Stitching）に加え、Directorの入口部分（OCパート）も適切な形に変換します。
+目的: Directorグラフに含まれる「更新待機中（Marking State = 0）」の状態を、実際のOCが動作している状態と同等に見えるように修正し、シームレスな更新開始を可能にする。
+手順:
+ 1. 抽出: 生成されたDirectorグラフから、Marking State = 0 (Observation) である全てのノードをリストアップする。
+ 2. アクションの置換 (Renaming & Restoration): 各ノードから出る遷移について、以下の処理を行う。
+  ・リネーム: アクション名 action_old を、元の名前 action に書き換える。
+  ・属性復元: 全て Uncontrollable に設定されていた属性を、元のコンポーネント（OCまたはEnv）定義における制御属性（Controllable/Uncontrollable）に戻す。
+  　・例: OCが元々Controllableなアクションとして持っていたものはControllableに戻す（更新コントローラがOCをラップして動作する場合）。

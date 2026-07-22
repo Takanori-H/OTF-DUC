@@ -214,6 +214,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     localSafetyEnvironments,
                     bases,
                     stages,
+                    globalActions,
                     uccs.isIncrementalPruningCleanup(),
                     uccs.isSafetyBackwardPruning(),
                     uccs.getUpdateGRGoal().getControllableActions(),
@@ -239,6 +240,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 outputGoalNames(output, "local transition", classification.getTransitions(stageIndex));
                 outputStateSpace(output, "  mapping before pruning", base.mapping);
 
+                // This is the first valued representation of the raw mapping
+                // component, so local and phase fluents are built once here.
+                // Delta extension starts only after valued fragments exist.
                 addPassiveSelfLoopsForMissingActions(base.mapping, globalActions);
                 Set<Fluent> trackedFluents =
                         StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
@@ -309,6 +313,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                                 localSafetyEnvironments,
                                 bases,
                                 stages,
+                                globalActions,
                                 uccs.isSafetyBackwardPruning(),
                                 uccs.getUpdateGRGoal().getControllableActions(),
                                 actionOwnership.asMap(),
@@ -779,6 +784,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     goal.getStageScope(),
                     productScope,
                     Collections.<Integer>emptySet(),
+                    globalActions,
                     cleanup,
                     safetyBackwardPruning,
                     controllableActions,
@@ -805,6 +811,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             List<DelayedEnv> localSafetyEnvironments,
             List<StageBase> bases,
             List<StepwiseStage> stages,
+            Set<String> globalActions,
             boolean cleanup,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
@@ -821,6 +828,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     localSafetyEnvironments,
                     bases,
                     stages,
+                    globalActions,
                     cleanup,
                     safetyBackwardPruning,
                     controllableActions,
@@ -853,6 +861,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             List<DelayedEnv> localSafetyEnvironments,
             List<StageBase> bases,
             List<StepwiseStage> stages,
+            Set<String> globalActions,
             boolean cleanup,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
@@ -915,9 +924,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                         + goal.getName() + " scope=" + displayStageScope(goalScope)
                         + " productScope=" + displayStageScope(currentScope) + ".");
             }
-            addPassiveSelfLoopsForMissingActions(
+            Set<String> outOfScopeActions = outOfScopeActionsForScope(currentScope, bases);
+            requirePassiveActionAlphabet(
                     current,
-                    outOfScopeActionsForScope(currentScope, bases));
+                    outOfScopeActions,
+                    "incremental cross component " + component.getId());
             current = new DelayedEnv(
                     current.env,
                     current.trackedFluents,
@@ -933,6 +944,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     goalScope,
                     currentScope,
                     addedStages,
+                    globalActions,
                     cleanup,
                     safetyBackwardPruning,
                     controllableActions,
@@ -943,9 +955,10 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         if (current == null) {
             Diagnostics.fatal("stepwise_delayed incremental cross component has no goals.");
         }
-        addPassiveSelfLoopsForMissingActions(
+        requirePassiveActionAlphabet(
                 current,
-                outOfScopeActionsForScope(component.getStageScope(), bases));
+                outOfScopeActionsForScope(component.getStageScope(), bases),
+                "incremental cross component " + component.getId() + " final");
         StateSpaceStats componentSafetyStats =
                 outputStateSpace(output, "  incremental cross component safety", current.env);
         recordScopedStateSpace(
@@ -967,6 +980,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             List<DelayedEnv> localSafetyEnvironments,
             List<StageBase> bases,
             List<StepwiseStage> stages,
+            Set<String> globalActions,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
             Map<String, Set<Integer>> ownersByAction,
@@ -1038,11 +1052,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             remaining.removeAll(batch);
 
             Set<String> outOfScopeActions = outOfScopeActionsForScope(merged.stageScope, bases);
-            addPassiveSelfLoopsForMissingActions(merged.env, outOfScopeActions);
+            requirePassiveActionAlphabet(
+                    merged.env,
+                    outOfScopeActions,
+                    "cross component " + component.getId() + " step " + step);
             if (DEBUG_ACTION_DIAGNOSTICS) {
                 String checkpoint = "cross_component_" + component.getId()
                         + "_step_" + step + "_after_passive";
-                debugPassiveSelfLoopInvariant(
+                debugPassiveTransitionInvariant(
                         checkpoint,
                         merged.env,
                         merged.stageScope,
@@ -1071,12 +1088,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     step,
                     merged.stageScope,
                     merged.addedStageScope,
+                    globalActions,
                     safetyBackwardPruning,
                     controllableActions,
                     ownersByAction,
                     output);
             fragments.removeAll(selected);
-            fragments.add(new ScopedDelayedEnv(merged.stageScope, pruned, merged.stageScope));
+            // Every stage in this fragment has now participated in cross
+            // pruning; a later merge must not report it as newly added again.
+            fragments.add(new ScopedDelayedEnv(
+                    merged.stageScope,
+                    pruned,
+                    Collections.<Integer>emptySet()));
             sortFragmentsByScope(fragments);
             step++;
         }
@@ -1095,9 +1118,10 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 component.getId(),
                 step,
                 output);
-        addPassiveSelfLoopsForMissingActions(
+        requirePassiveActionAlphabet(
                 finalFragment.env,
-                outOfScopeActionsForScope(component.getStageScope(), bases));
+                outOfScopeActionsForScope(component.getStageScope(), bases),
+                "cross component " + component.getId() + " final");
         DelayedEnv finalComponent = finalFragment.env;
         if (safetyBackwardPruning) {
             finalComponent = applyDeferredSafetyBackwardPruning(
@@ -1173,13 +1197,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
         if (fragments.size() == 1) {
             ScopedDelayedEnv fragment = fragments.get(0);
-            return new ScopedDelayedEnv(fragment.stageScope, fragment.env, fragment.stageScope);
+            return new ScopedDelayedEnv(
+                    fragment.stageScope,
+                    fragment.env,
+                    fragment.addedStageScope);
         }
 
         Set<Integer> mergedScope = new java.util.TreeSet<Integer>();
+        Set<Integer> addedStageScope = new java.util.TreeSet<Integer>();
         List<DelayedEnv> inputs = new ArrayList<DelayedEnv>();
         for (ScopedDelayedEnv fragment : fragments) {
             mergedScope.addAll(fragment.stageScope);
+            addedStageScope.addAll(fragment.addedStageScope);
             inputs.add(fragment.env);
         }
         DelayedEnv merged = timedComposeProduct(
@@ -1189,7 +1218,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 mergedScope,
                 "cross component " + componentId + " step " + step + " safetyEnv fragment 並列合成時間",
                 output);
-        return new ScopedDelayedEnv(mergedScope, merged, mergedScope);
+        return new ScopedDelayedEnv(mergedScope, merged, addedStageScope);
     }
 
     private static void sortFragmentsByScope(List<ScopedDelayedEnv> fragments) {
@@ -1497,43 +1526,36 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             int step,
             Set<Integer> productScope,
             Set<Integer> addedStages,
+            Set<String> globalActions,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
             Map<String, Set<Integer>> ownersByAction,
             LTSOutput output) {
-        Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(current.trackedFluents);
-        trackedFluents.addAll(StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
-                goals,
-                current.env.getActions()));
-        addPhaseComparisonFluents(trackedFluents);
+        // The merged fragment already has authoritative valuations for every
+        // tracked fluent. Add only fluents first needed by this cross batch.
+        Set<Fluent> requiredFluents =
+                StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
+                        goals,
+                        globalActions);
+        addPhaseComparisonFluents(requiredFluents);
+        Set<Fluent> trackedFluents = mergedFluentSet(current.trackedFluents, requiredFluents);
         recordScopedFluentCount(
                 "cross component " + componentId + " step " + step + " tracked fluent 数",
                 productScope,
                 trackedFluents);
 
-        DelayedEnv metaRaw = timedBuildFluentProduct(
-                current.env,
-                current.stageMetadata,
-                current.oldControllerOrigin,
-                current.errorStates,
-                trackedFluents,
+        DelayedEnv meta = timedExtendFluentProduct(
+                current,
+                requiredFluents,
                 productScope,
                 "cross component " + componentId + " step " + step + " product から cross metaEnv 構築時間");
-        if (DEBUG_HOT_SWAP_LINEAGE) {
+        if (DEBUG_HOT_SWAP_LINEAGE && meta != current) {
             debugFluentProductConsistency(
                     "cross_component_" + componentId + "_step_" + step,
                     current,
-                    metaRaw,
+                    meta,
                     output);
         }
-        DelayedEnv meta = new DelayedEnv(
-                metaRaw.env,
-                metaRaw.trackedFluents,
-                metaRaw.valuation,
-                metaRaw.stageMetadata,
-                metaRaw.oldControllerOrigin,
-                current.realActions,
-                metaRaw.errorStates);
 
         if (DEBUG_ACTION_DIAGNOSTICS) {
             debugActionStatistics(
@@ -1644,37 +1666,28 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Set<Integer> goalScope,
             Set<Integer> productScope,
             Set<Integer> addedStages,
+            Set<String> globalActions,
             boolean cleanup,
             boolean safetyBackwardPruning,
             Set<String> controllableActions,
             IncrementalPruningCounter counter,
             LTSOutput output) {
         int step = counter.next();
-        Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(current.trackedFluents);
-        trackedFluents.addAll(StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
-                Collections.singletonList(goal),
-                current.env.getActions()));
-        addPhaseComparisonFluents(trackedFluents);
+        Set<Fluent> requiredFluents =
+                StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
+                        Collections.singletonList(goal),
+                        globalActions);
+        addPhaseComparisonFluents(requiredFluents);
+        Set<Fluent> trackedFluents = mergedFluentSet(current.trackedFluents, requiredFluents);
 
         String stepLabel = "incremental " + localOrCross + " step " + step
                 + " " + goal.getKind() + " " + goal.getName();
         recordScopedFluentCount(stepLabel + " tracked fluent 数", productScope, trackedFluents);
-        DelayedEnv metaRaw = timedBuildFluentProduct(
-                current.env,
-                current.stageMetadata,
-                current.oldControllerOrigin,
-                current.errorStates,
-                trackedFluents,
+        DelayedEnv meta = timedExtendFluentProduct(
+                current,
+                requiredFluents,
                 productScope,
                 stepLabel + " metaEnv 構築時間");
-        DelayedEnv meta = new DelayedEnv(
-                metaRaw.env,
-                metaRaw.trackedFluents,
-                metaRaw.valuation,
-                metaRaw.stageMetadata,
-                metaRaw.oldControllerOrigin,
-                current.realActions,
-                metaRaw.errorStates);
 
         output.outln("");
         output.outln("[Stepwise Delayed DUCS] incremental step " + step);
@@ -1949,7 +1962,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         return result;
     }
 
-    private static DelayedEnv buildFluentProduct(
+    static DelayedEnv buildFluentProduct(
             MTS<Long, String> base,
             Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> stageMetadata,
             Map<Long, Long> oldOrigins,
@@ -1969,6 +1982,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Set<Long> baseErrorStates,
             Set<Fluent> fluents) {
         MTS<Long, String> result = new MTSImpl<Long, String>(0L);
+        result.addActions(base.getActions());
         Map<ProductStateKey, Long> keyToState = new HashMap<ProductStateKey, Long>();
         Map<Long, Set<Fluent>> trueFluentsByState = new HashMap<Long, Set<Fluent>>();
         Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> resultMetadata =
@@ -2034,6 +2048,131 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             debugPropagateLocalStateVectorsThroughFluentProduct(base, result, keyToState);
         }
         return fluentProduct;
+    }
+
+    /**
+     * Extends an already-valuated partial environment with only the fluents that
+     * are not tracked yet. Existing valuations are authoritative: replaying an
+     * existing fluent from its initial value would duplicate partial-product
+     * histories and can make delayed hotSwapIn non-deterministic.
+     */
+    static DelayedEnv extendFluentProduct(
+            DelayedEnv current,
+            Set<Fluent> requiredFluents) {
+        Set<Fluent> newFluents = missingFluents(current.trackedFluents, requiredFluents);
+        if (newFluents.isEmpty()) {
+            return current;
+        }
+
+        MTS<Long, String> result = new MTSImpl<Long, String>(0L);
+        result.addActions(current.env.getActions());
+        Map<ProductStateKey, Long> keyToState = new HashMap<ProductStateKey, Long>();
+        Map<Long, Long> resultToBaseState = new HashMap<Long, Long>();
+        Map<Long, Set<Fluent>> newTrueFluentsByState = new HashMap<Long, Set<Fluent>>();
+        Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> resultMetadata =
+                new HashMap<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>>();
+        Map<Long, Long> resultOldOrigins = new HashMap<Long, Long>();
+        Set<Long> resultErrorStates = new LinkedHashSet<Long>();
+        Queue<ProductStateKey> pending = new LinkedList<ProductStateKey>();
+
+        ProductStateKey initial = new ProductStateKey(
+                current.env.getInitialState(),
+                initialTrueFluents(newFluents));
+        keyToState.put(initial, 0L);
+        resultToBaseState.put(0L, initial.baseState);
+        newTrueFluentsByState.put(0L, initial.trueFluents);
+        copyMetadata(
+                initial.baseState,
+                0L,
+                current.stageMetadata,
+                current.oldControllerOrigin,
+                resultMetadata,
+                resultOldOrigins);
+        if (current.errorStates.contains(initial.baseState)) {
+            resultErrorStates.add(0L);
+        }
+        pending.add(initial);
+        long nextStateId = 1L;
+
+        while (!pending.isEmpty()) {
+            ProductStateKey productState = pending.remove();
+            Long fromState = keyToState.get(productState);
+            result.addState(fromState);
+            if (resultErrorStates.contains(fromState)) {
+                continue;
+            }
+            for (Pair<String, Long> transition : current.env.getTransitions(
+                    productState.baseState,
+                    MTS.TransitionType.REQUIRED)) {
+                Set<Fluent> nextFluents = nextTrueFluents(
+                        productState.trueFluents,
+                        newFluents,
+                        transition.getFirst());
+                ProductStateKey targetKey = new ProductStateKey(transition.getSecond(), nextFluents);
+                Long targetState = keyToState.get(targetKey);
+                if (targetState == null) {
+                    targetState = nextStateId++;
+                    keyToState.put(targetKey, targetState);
+                    resultToBaseState.put(targetState, targetKey.baseState);
+                    newTrueFluentsByState.put(targetState, targetKey.trueFluents);
+                    result.addState(targetState);
+                    copyMetadata(
+                            targetKey.baseState,
+                            targetState,
+                            current.stageMetadata,
+                            current.oldControllerOrigin,
+                            resultMetadata,
+                            resultOldOrigins);
+                    if (current.errorStates.contains(targetKey.baseState)) {
+                        resultErrorStates.add(targetState);
+                    } else {
+                        pending.add(targetKey);
+                    }
+                }
+                result.addRequired(fromState, transition.getFirst(), targetState);
+            }
+        }
+
+        Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(current.trackedFluents);
+        trackedFluents.addAll(newFluents);
+        FluentStateValuation<Long> valuation = new FluentStateValuation<Long>(result.getStates());
+        for (Map.Entry<Long, Long> entry : resultToBaseState.entrySet()) {
+            Long resultState = entry.getKey();
+            Long baseState = entry.getValue();
+            for (Fluent fluent : current.valuation.getFluentsFromState(baseState)) {
+                valuation.addHoldingFluent(resultState, fluent);
+            }
+            Set<Fluent> newTrueFluents = newTrueFluentsByState.get(resultState);
+            if (newTrueFluents != null) {
+                for (Fluent fluent : newTrueFluents) {
+                    valuation.addHoldingFluent(resultState, fluent);
+                }
+            }
+        }
+
+        DelayedEnv extended = new DelayedEnv(
+                result,
+                trackedFluents,
+                valuation,
+                resultMetadata,
+                resultOldOrigins,
+                current.realActions,
+                resultErrorStates);
+        if (DEBUG_HOT_SWAP_LINEAGE) {
+            debugPropagateLocalStateVectorsThroughFluentProduct(current.env, result, keyToState);
+        }
+        return extended;
+    }
+
+    private static DelayedEnv timedExtendFluentProduct(
+            DelayedEnv current,
+            Set<Fluent> requiredFluents,
+            Set<Integer> scope,
+            String label) {
+        long start = System.currentTimeMillis();
+        DelayedEnv result = extendFluentProduct(current, requiredFluents);
+        recordScopedTime(label, scope, System.currentTimeMillis() - start);
+        return result;
     }
 
     private static DelayedEnv timedBuildFluentProduct(
@@ -2118,6 +2257,42 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             }
         }
         return result;
+    }
+
+    private static Set<Fluent> mergedFluentSet(
+            Set<Fluent> trackedFluents,
+            Set<Fluent> requiredFluents) {
+        Set<Fluent> result = new LinkedHashSet<Fluent>(trackedFluents);
+        result.addAll(missingFluents(trackedFluents, requiredFluents));
+        return result;
+    }
+
+    private static Set<Fluent> missingFluents(
+            Set<Fluent> trackedFluents,
+            Set<Fluent> requiredFluents) {
+        Map<String, Fluent> trackedByName = new HashMap<String, Fluent>();
+        for (Fluent fluent : trackedFluents) {
+            trackedByName.put(fluent.getName(), fluent);
+        }
+
+        Set<Fluent> result = new LinkedHashSet<Fluent>();
+        for (Fluent required : requiredFluents) {
+            Fluent tracked = trackedByName.get(required.getName());
+            if (tracked == null) {
+                result.add(required);
+            } else if (!sameFluentDefinition(tracked, required)) {
+                Diagnostics.fatal("stepwise_delayed fluent definition changed after it was tracked: "
+                        + required.getName() + ". Action-fluent termination must use the canonical "
+                        + "global synthesis alphabet at every stage.");
+            }
+        }
+        return result;
+    }
+
+    private static boolean sameFluentDefinition(Fluent left, Fluent right) {
+        return left.getInitialValue() == right.getInitialValue()
+                && left.getInitiatingActions().equals(right.getInitiatingActions())
+                && left.getTerminatingActions().equals(right.getTerminatingActions());
     }
 
     private static DelayedEnv pruneSafety(DelayedEnv meta, Collection<StepwiseClassifiedGoal> goals, LTSOutput output) {
@@ -2251,13 +2426,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
     }
 
-    private static DelayedEnv composeProduct(List<DelayedEnv> inputs, String productName, LTSOutput output) {
+    static DelayedEnv composeProduct(List<DelayedEnv> inputs, String productName, LTSOutput output) {
         if (inputs.size() == 1) {
             return inputs.get(0);
         }
 
         output.outln("Owner-aware delayed product: " + productName);
         MTS<Long, String> product = new MTSImpl<Long, String>(0L);
+        for (DelayedEnv input : inputs) {
+            product.addActions(input.env.getActions());
+        }
         Map<List<Long>, Long> tupleToState = new HashMap<List<Long>, Long>();
         Map<Long, List<Long>> stateToTuple = new HashMap<Long, List<Long>>();
         Set<Long> productErrorStates = new LinkedHashSet<Long>();
@@ -3562,15 +3740,6 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     }
 
     private static void addPassiveSelfLoopsForMissingActions(
-            DelayedEnv environment,
-            Set<String> globalActions) {
-        addPassiveSelfLoopsForMissingActions(
-                environment.env,
-                globalActions,
-                environment.errorStates);
-    }
-
-    private static void addPassiveSelfLoopsForMissingActions(
             MTS<Long, String> environment,
             Set<String> globalActions,
             Set<Long> errorStates) {
@@ -3587,6 +3756,20 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     }
                 }
             }
+        }
+    }
+
+    private static void requirePassiveActionAlphabet(
+            DelayedEnv environment,
+            Set<String> passiveActions,
+            String context) {
+        Set<String> missing = new java.util.TreeSet<String>(passiveActions);
+        missing.removeAll(environment.env.getActions());
+        if (!missing.isEmpty()) {
+            Diagnostics.fatal("stepwise_delayed partial product lost passive action alphabet in "
+                    + context + ": " + missing + ". Passive transitions must be retained before "
+                    + "fluent valuation is attached; adding raw self-loops here would freeze "
+                    + "already tracked fluents.");
         }
     }
 
@@ -3652,7 +3835,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
     }
 
-    private static void debugPassiveSelfLoopInvariant(
+    private static void debugPassiveTransitionInvariant(
             String checkpoint,
             DelayedEnv environment,
             Set<Integer> stageScope,
@@ -3666,38 +3849,57 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         Collections.sort(actions);
         for (String action : actions) {
             long checkedStates = 0L;
-            long missingSelfLoopStates = 0L;
-            long multipleSelfLoopStates = 0L;
+            long statesWithTransition = 0L;
+            long transitions = 0L;
+            long valuationMismatches = 0L;
+            long selfLoops = 0L;
             long nonSelfTransitions = 0L;
             for (Long state : environment.env.getStates()) {
                 if (environment.errorStates.contains(state)) {
                     continue;
                 }
                 checkedStates++;
-                int selfLoops = 0;
+                boolean hasTransition = false;
+                Set<Fluent> sourceValuation = new LinkedHashSet<Fluent>(
+                        environment.valuation.getFluentsFromState(state));
+                Set<Fluent> expectedValuation = nextTrueFluents(
+                        sourceValuation,
+                        environment.trackedFluents,
+                        action);
                 for (Pair<String, Long> transition :
                         environment.env.getTransitions(state, MTS.TransitionType.REQUIRED)) {
                     if (!action.equals(transition.getFirst())) {
                         continue;
                     }
+                    hasTransition = true;
+                    transitions++;
                     if (state.equals(transition.getSecond())) {
                         selfLoops++;
                     } else {
                         nonSelfTransitions++;
                     }
+                    for (Fluent fluent : environment.trackedFluents) {
+                        boolean expected = expectedValuation.contains(fluent);
+                        boolean actual = environment.valuation.isTrue(
+                                transition.getSecond(),
+                                fluent);
+                        if (expected != actual) {
+                            valuationMismatches++;
+                        }
+                    }
                 }
-                if (selfLoops == 0) {
-                    missingSelfLoopStates++;
-                } else if (selfLoops > 1) {
-                    multipleSelfLoopStates++;
+                if (hasTransition) {
+                    statesWithTransition++;
                 }
             }
             output.outln("[StepwiseDebug] PASSIVE checkpoint=" + checkpoint
                     + " scope=" + displayStageScope(stageScope)
                     + " action=" + action
                     + " checkedStates=" + checkedStates
-                    + " missingSelfLoopStates=" + missingSelfLoopStates
-                    + " multipleSelfLoopStates=" + multipleSelfLoopStates
+                    + " statesWithTransition=" + statesWithTransition
+                    + " transitions=" + transitions
+                    + " valuationMismatches=" + valuationMismatches
+                    + " selfLoops=" + selfLoops
                     + " nonSelfTransitions=" + nonSelfTransitions);
         }
     }
@@ -3858,7 +4060,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 }
             }
         }
-        return hasOwner;
+        if (hasOwner) {
+            return true;
+        }
+
+        // A normal action whose real owner has not entered the current scope is
+        // still a passive transition of this partial product. Keeping that
+        // transition is essential because it may update an already tracked
+        // fluent even though the mapping state itself stutters. A later product
+        // with the real owner gates the action through realActions as usual.
+        return !MTSConstants.TAU.equals(baseAction);
     }
 
     private static List<List<Long>> targetChoices(String action, List<Long> tuple, List<DelayedEnv> inputs) {
@@ -4210,6 +4421,8 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     private static final class ScopedDelayedEnv {
         private final Set<Integer> stageScope;
         private final DelayedEnv env;
+        // Stages in this fragment that have not yet participated in a staged
+        // cross-pruning step. mergeFragments unions this pending set.
         private final Set<Integer> addedStageScope;
 
         private ScopedDelayedEnv(Set<Integer> stageScope, DelayedEnv env, Set<Integer> addedStageScope) {
@@ -4243,7 +4456,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
     }
 
-    private static final class DelayedEnv {
+    static final class DelayedEnv {
         private final MTS<Long, String> env;
         private final Set<Fluent> trackedFluents;
         private final FluentStateValuation<Long> valuation;
@@ -4252,7 +4465,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         private final Set<String> realActions;
         private final Set<Long> errorStates;
 
-        private DelayedEnv(
+        DelayedEnv(
                 MTS<Long, String> env,
                 Set<Fluent> trackedFluents,
                 FluentStateValuation<Long> valuation,
@@ -4263,7 +4476,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     realActions, Collections.<Long>emptySet());
         }
 
-        private DelayedEnv(
+        DelayedEnv(
                 MTS<Long, String> env,
                 Set<Fluent> trackedFluents,
                 FluentStateValuation<Long> valuation,
@@ -4279,6 +4492,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             this.realActions = new HashSet<String>(realActions);
             this.errorStates = new LinkedHashSet<Long>(errorStates);
             this.errorStates.retainAll(env.getStates());
+        }
+
+        MTS<Long, String> getEnvironment() {
+            return env;
+        }
+
+        Set<Fluent> getTrackedFluents() {
+            return new LinkedHashSet<Fluent>(trackedFluents);
+        }
+
+        FluentStateValuation<Long> getValuation() {
+            return valuation;
         }
     }
 
