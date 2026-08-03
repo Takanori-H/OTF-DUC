@@ -1,0 +1,1813 @@
+// Drone Stepwise DUCS model: temporary-geofence policy rollout.
+//
+// Conversion source (left unchanged):
+//   MODEL/StepwiseDUCS/Experiment/LTS/Drone_new/Drone(N, 2 drone).lts
+//   SHA-256: dc6ed6c4c59badee8250b35bed62dd39c68b8b4cc1878621e1785860876f8834
+//
+// This file is a clean DUCS reconstruction and an explicitly scaled extension
+// of the shared source.  It does not copy an existing Drone update model.
+//
+// Fixed scale:
+// - 3 drones
+// - x is 1..3, y is 1..3, and height is 1..2
+// - 6 mapping components in this order:
+//     BATTERY_1, MOVE_1, BATTERY_2, MOVE_2, BATTERY_3, MOVE_3
+//
+// Update meaning:
+// - OLD and NEW environments have identical behavior.
+// - The pre-update policy has no geofence requirement.  The source model's
+//   asymmetric P_MOVE_LIMIT_1 and P_MOVE_LIMIT_2 are deliberately excluded.
+// - The common goal preserves and scales the source low-battery and collision
+//   policies to every drone and every reachable coordinate.
+// - As separately approved, takeoff is also prohibited while the battery is
+//   already low.
+// - The NEW policy activates a temporary geofence at cell (1,1,2).
+// - The geofence forbids the uncontrollable arrive[1][1][2] event.  Under
+//   steady NEW operation, synthesis must disable its controllable predecessor
+//   command (up, move[s], or move[w]).
+//
+// Policy boundary:
+// - A pending arrive[1][1][2] cannot occur after startNewSpec.  If a command
+//   toward that cell was issued under the OLD policy, the updating controller
+//   must delay startNewSpec until that arrival has completed.
+// - A drone already in (1,1,2) is not forcibly evacuated.
+// - The policy means "no entry completion under the NEW policy", rather than
+//   "the cell is empty immediately when the policy starts".
+//
+// Expected scopes:
+// - each NEW geofence formula: the corresponding MOVE component only
+// - each low-battery formula: BATTERY_i and MOVE_i
+// - each collision formula: the two corresponding MOVE components
+// - each T1 formula: one mapping component
+// - T2: all 6 mapping components (update-event-only formula)
+//
+// MOVE states per drone: 86
+// Collision formulas per OLD/NEW goal: 108
+//
+// The model defines Traditional and non-incremental Stepwise DUCS + SBP
+// targets for no_tr, T1, and T2.
+
+// =============================================================================
+// Constants and action classification
+// =============================================================================
+
+const N = 3
+const MaxX = 3
+const MaxY = 3
+const MaxH = 2
+
+range DroneID = 1..N
+range X = 1..MaxX
+range Y = 1..MaxY
+range H = 1..MaxH
+range XYFrom2 = 2..3
+range XYToBeforeMax = 1..2
+range HFrom2 = 2..2
+range HToBeforeMax = 1..1
+
+set Drones = {drone[DroneID]}
+set Direction = {n,s,e,w}
+
+set ControllableActions = {
+    [Drones].battery['safe],
+    [Drones].takeoff,
+    [Drones].land,
+    [Drones].up,
+    [Drones].down,
+    [Drones].move[Direction]
+}
+
+// =============================================================================
+// OLD environment: one battery and one movement component per drone
+// =============================================================================
+
+BATTERY_OLD(I=1) = BATTERY_SAFE_OLD,
+BATTERY_SAFE_OLD = (
+    drone[I].battery['low] -> BATTERY_LOW_OLD
+),
+BATTERY_LOW_OLD = (
+    drone[I].battery['safe] -> BATTERY_SAFE_OLD
+).
+
+MOVE_OLD(I=1) = GROUNDED_OLD,
+GROUNDED_OLD = (
+    drone[I].takeoff -> WAIT_TAKEOFF_OLD
+),
+WAIT_TAKEOFF_OLD = (
+    drone[I].arrive[1][1][1] -> FLYING_OLD[1][1][1]
+),
+FLYING_OLD[x:X][y:Y][h:H] = (
+      when (x > 1)    drone[I].move['w] -> WAIT_W_OLD[x][y][h]
+    | when (x < MaxX) drone[I].move['e] -> WAIT_E_OLD[x][y][h]
+    | when (y > 1)    drone[I].move['s] -> WAIT_S_OLD[x][y][h]
+    | when (y < MaxY) drone[I].move['n] -> WAIT_N_OLD[x][y][h]
+    | when (h > 1)    drone[I].down -> WAIT_DOWN_OLD[x][y][h]
+    | when (h < MaxH) drone[I].up -> WAIT_UP_OLD[x][y][h]
+    | when (h == 1)   drone[I].land -> GROUNDED_OLD
+),
+WAIT_W_OLD[x:XYFrom2][y:Y][h:H] = (
+    drone[I].arrive[x-1][y][h] -> FLYING_OLD[x-1][y][h]
+),
+WAIT_E_OLD[x:XYToBeforeMax][y:Y][h:H] = (
+    drone[I].arrive[x+1][y][h] -> FLYING_OLD[x+1][y][h]
+),
+WAIT_S_OLD[x:X][y:XYFrom2][h:H] = (
+    drone[I].arrive[x][y-1][h] -> FLYING_OLD[x][y-1][h]
+),
+WAIT_N_OLD[x:X][y:XYToBeforeMax][h:H] = (
+    drone[I].arrive[x][y+1][h] -> FLYING_OLD[x][y+1][h]
+),
+WAIT_DOWN_OLD[x:X][y:Y][h:HFrom2] = (
+    drone[I].arrive[x][y][h-1] -> FLYING_OLD[x][y][h-1]
+),
+WAIT_UP_OLD[x:X][y:Y][h:HToBeforeMax] = (
+    drone[I].arrive[x][y][h+1] -> FLYING_OLD[x][y][h+1]
+).
+
+||OLD_ENV = (
+    BATTERY_OLD(1) || MOVE_OLD(1) ||
+    BATTERY_OLD(2) || MOVE_OLD(2) ||
+    BATTERY_OLD(3) || MOVE_OLD(3)
+).
+
+// =============================================================================
+// NEW environment: behaviorally identical to OLD
+// =============================================================================
+
+BATTERY_NEW(I=1) = BATTERY_SAFE_NEW,
+BATTERY_SAFE_NEW = (
+    drone[I].battery['low] -> BATTERY_LOW_NEW
+),
+BATTERY_LOW_NEW = (
+    drone[I].battery['safe] -> BATTERY_SAFE_NEW
+).
+
+MOVE_NEW(I=1) = GROUNDED_NEW,
+GROUNDED_NEW = (
+    drone[I].takeoff -> WAIT_TAKEOFF_NEW
+),
+WAIT_TAKEOFF_NEW = (
+    drone[I].arrive[1][1][1] -> FLYING_NEW[1][1][1]
+),
+FLYING_NEW[x:X][y:Y][h:H] = (
+      when (x > 1)    drone[I].move['w] -> WAIT_W_NEW[x][y][h]
+    | when (x < MaxX) drone[I].move['e] -> WAIT_E_NEW[x][y][h]
+    | when (y > 1)    drone[I].move['s] -> WAIT_S_NEW[x][y][h]
+    | when (y < MaxY) drone[I].move['n] -> WAIT_N_NEW[x][y][h]
+    | when (h > 1)    drone[I].down -> WAIT_DOWN_NEW[x][y][h]
+    | when (h < MaxH) drone[I].up -> WAIT_UP_NEW[x][y][h]
+    | when (h == 1)   drone[I].land -> GROUNDED_NEW
+),
+WAIT_W_NEW[x:XYFrom2][y:Y][h:H] = (
+    drone[I].arrive[x-1][y][h] -> FLYING_NEW[x-1][y][h]
+),
+WAIT_E_NEW[x:XYToBeforeMax][y:Y][h:H] = (
+    drone[I].arrive[x+1][y][h] -> FLYING_NEW[x+1][y][h]
+),
+WAIT_S_NEW[x:X][y:XYFrom2][h:H] = (
+    drone[I].arrive[x][y-1][h] -> FLYING_NEW[x][y-1][h]
+),
+WAIT_N_NEW[x:X][y:XYToBeforeMax][h:H] = (
+    drone[I].arrive[x][y+1][h] -> FLYING_NEW[x][y+1][h]
+),
+WAIT_DOWN_NEW[x:X][y:Y][h:HFrom2] = (
+    drone[I].arrive[x][y][h-1] -> FLYING_NEW[x][y][h-1]
+),
+WAIT_UP_NEW[x:X][y:Y][h:HToBeforeMax] = (
+    drone[I].arrive[x][y][h+1] -> FLYING_NEW[x][y][h+1]
+).
+
+||NEW_ENV = (
+    BATTERY_NEW(1) || MOVE_NEW(1) ||
+    BATTERY_NEW(2) || MOVE_NEW(2) ||
+    BATTERY_NEW(3) || MOVE_NEW(3)
+).
+
+// =============================================================================
+// Total identity correspondence for all mapping components
+// =============================================================================
+
+relation R_BATTERY_1 = {
+    BATTERY_SAFE_OLD@BATTERY_OLD(1)
+        = reconfigure -> BATTERY_SAFE_NEW@BATTERY_NEW(1),
+    BATTERY_LOW_OLD@BATTERY_OLD(1)
+        = reconfigure -> BATTERY_LOW_NEW@BATTERY_NEW(1)
+}
+
+relation R_MOVE_1 = {
+    GROUNDED_OLD@MOVE_OLD(1)
+        = reconfigure -> GROUNDED_NEW@MOVE_NEW(1),
+    WAIT_TAKEOFF_OLD@MOVE_OLD(1)
+        = reconfigure -> WAIT_TAKEOFF_NEW@MOVE_NEW(1),
+
+    FLYING_OLD[1][1][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[1][1][1]@MOVE_NEW(1),
+    FLYING_OLD[1][1][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[1][1][2]@MOVE_NEW(1),
+    FLYING_OLD[1][2][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[1][2][1]@MOVE_NEW(1),
+    FLYING_OLD[1][2][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[1][2][2]@MOVE_NEW(1),
+    FLYING_OLD[1][3][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[1][3][1]@MOVE_NEW(1),
+    FLYING_OLD[1][3][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[1][3][2]@MOVE_NEW(1),
+    FLYING_OLD[2][1][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[2][1][1]@MOVE_NEW(1),
+    FLYING_OLD[2][1][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[2][1][2]@MOVE_NEW(1),
+    FLYING_OLD[2][2][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[2][2][1]@MOVE_NEW(1),
+    FLYING_OLD[2][2][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[2][2][2]@MOVE_NEW(1),
+    FLYING_OLD[2][3][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[2][3][1]@MOVE_NEW(1),
+    FLYING_OLD[2][3][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[2][3][2]@MOVE_NEW(1),
+    FLYING_OLD[3][1][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[3][1][1]@MOVE_NEW(1),
+    FLYING_OLD[3][1][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[3][1][2]@MOVE_NEW(1),
+    FLYING_OLD[3][2][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[3][2][1]@MOVE_NEW(1),
+    FLYING_OLD[3][2][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[3][2][2]@MOVE_NEW(1),
+    FLYING_OLD[3][3][1]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[3][3][1]@MOVE_NEW(1),
+    FLYING_OLD[3][3][2]@MOVE_OLD(1)
+        = reconfigure -> FLYING_NEW[3][3][2]@MOVE_NEW(1),
+
+    WAIT_W_OLD[2][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[2][1][1]@MOVE_NEW(1),
+    WAIT_W_OLD[2][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[2][1][2]@MOVE_NEW(1),
+    WAIT_W_OLD[2][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[2][2][1]@MOVE_NEW(1),
+    WAIT_W_OLD[2][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[2][2][2]@MOVE_NEW(1),
+    WAIT_W_OLD[2][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[2][3][1]@MOVE_NEW(1),
+    WAIT_W_OLD[2][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[2][3][2]@MOVE_NEW(1),
+    WAIT_W_OLD[3][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[3][1][1]@MOVE_NEW(1),
+    WAIT_W_OLD[3][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[3][1][2]@MOVE_NEW(1),
+    WAIT_W_OLD[3][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[3][2][1]@MOVE_NEW(1),
+    WAIT_W_OLD[3][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[3][2][2]@MOVE_NEW(1),
+    WAIT_W_OLD[3][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[3][3][1]@MOVE_NEW(1),
+    WAIT_W_OLD[3][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_W_NEW[3][3][2]@MOVE_NEW(1),
+
+    WAIT_E_OLD[1][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[1][1][1]@MOVE_NEW(1),
+    WAIT_E_OLD[1][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[1][1][2]@MOVE_NEW(1),
+    WAIT_E_OLD[1][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[1][2][1]@MOVE_NEW(1),
+    WAIT_E_OLD[1][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[1][2][2]@MOVE_NEW(1),
+    WAIT_E_OLD[1][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[1][3][1]@MOVE_NEW(1),
+    WAIT_E_OLD[1][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[1][3][2]@MOVE_NEW(1),
+    WAIT_E_OLD[2][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[2][1][1]@MOVE_NEW(1),
+    WAIT_E_OLD[2][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[2][1][2]@MOVE_NEW(1),
+    WAIT_E_OLD[2][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[2][2][1]@MOVE_NEW(1),
+    WAIT_E_OLD[2][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[2][2][2]@MOVE_NEW(1),
+    WAIT_E_OLD[2][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[2][3][1]@MOVE_NEW(1),
+    WAIT_E_OLD[2][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_E_NEW[2][3][2]@MOVE_NEW(1),
+
+    WAIT_S_OLD[1][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[1][2][1]@MOVE_NEW(1),
+    WAIT_S_OLD[1][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[1][2][2]@MOVE_NEW(1),
+    WAIT_S_OLD[1][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[1][3][1]@MOVE_NEW(1),
+    WAIT_S_OLD[1][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[1][3][2]@MOVE_NEW(1),
+    WAIT_S_OLD[2][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[2][2][1]@MOVE_NEW(1),
+    WAIT_S_OLD[2][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[2][2][2]@MOVE_NEW(1),
+    WAIT_S_OLD[2][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[2][3][1]@MOVE_NEW(1),
+    WAIT_S_OLD[2][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[2][3][2]@MOVE_NEW(1),
+    WAIT_S_OLD[3][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[3][2][1]@MOVE_NEW(1),
+    WAIT_S_OLD[3][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[3][2][2]@MOVE_NEW(1),
+    WAIT_S_OLD[3][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[3][3][1]@MOVE_NEW(1),
+    WAIT_S_OLD[3][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_S_NEW[3][3][2]@MOVE_NEW(1),
+
+    WAIT_N_OLD[1][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[1][1][1]@MOVE_NEW(1),
+    WAIT_N_OLD[1][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[1][1][2]@MOVE_NEW(1),
+    WAIT_N_OLD[1][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[1][2][1]@MOVE_NEW(1),
+    WAIT_N_OLD[1][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[1][2][2]@MOVE_NEW(1),
+    WAIT_N_OLD[2][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[2][1][1]@MOVE_NEW(1),
+    WAIT_N_OLD[2][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[2][1][2]@MOVE_NEW(1),
+    WAIT_N_OLD[2][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[2][2][1]@MOVE_NEW(1),
+    WAIT_N_OLD[2][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[2][2][2]@MOVE_NEW(1),
+    WAIT_N_OLD[3][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[3][1][1]@MOVE_NEW(1),
+    WAIT_N_OLD[3][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[3][1][2]@MOVE_NEW(1),
+    WAIT_N_OLD[3][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[3][2][1]@MOVE_NEW(1),
+    WAIT_N_OLD[3][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_N_NEW[3][2][2]@MOVE_NEW(1),
+
+    WAIT_DOWN_OLD[1][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[1][1][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[1][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[1][2][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[1][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[1][3][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[2][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[2][1][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[2][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[2][2][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[2][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[2][3][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[3][1][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[3][1][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[3][2][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[3][2][2]@MOVE_NEW(1),
+    WAIT_DOWN_OLD[3][3][2]@MOVE_OLD(1)
+        = reconfigure -> WAIT_DOWN_NEW[3][3][2]@MOVE_NEW(1),
+
+    WAIT_UP_OLD[1][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[1][1][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[1][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[1][2][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[1][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[1][3][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[2][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[2][1][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[2][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[2][2][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[2][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[2][3][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[3][1][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[3][1][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[3][2][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[3][2][1]@MOVE_NEW(1),
+    WAIT_UP_OLD[3][3][1]@MOVE_OLD(1)
+        = reconfigure -> WAIT_UP_NEW[3][3][1]@MOVE_NEW(1)
+}
+
+relation R_BATTERY_2 = {
+    BATTERY_SAFE_OLD@BATTERY_OLD(2)
+        = reconfigure -> BATTERY_SAFE_NEW@BATTERY_NEW(2),
+    BATTERY_LOW_OLD@BATTERY_OLD(2)
+        = reconfigure -> BATTERY_LOW_NEW@BATTERY_NEW(2)
+}
+
+relation R_MOVE_2 = {
+    GROUNDED_OLD@MOVE_OLD(2)
+        = reconfigure -> GROUNDED_NEW@MOVE_NEW(2),
+    WAIT_TAKEOFF_OLD@MOVE_OLD(2)
+        = reconfigure -> WAIT_TAKEOFF_NEW@MOVE_NEW(2),
+
+    FLYING_OLD[1][1][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[1][1][1]@MOVE_NEW(2),
+    FLYING_OLD[1][1][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[1][1][2]@MOVE_NEW(2),
+    FLYING_OLD[1][2][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[1][2][1]@MOVE_NEW(2),
+    FLYING_OLD[1][2][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[1][2][2]@MOVE_NEW(2),
+    FLYING_OLD[1][3][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[1][3][1]@MOVE_NEW(2),
+    FLYING_OLD[1][3][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[1][3][2]@MOVE_NEW(2),
+    FLYING_OLD[2][1][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[2][1][1]@MOVE_NEW(2),
+    FLYING_OLD[2][1][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[2][1][2]@MOVE_NEW(2),
+    FLYING_OLD[2][2][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[2][2][1]@MOVE_NEW(2),
+    FLYING_OLD[2][2][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[2][2][2]@MOVE_NEW(2),
+    FLYING_OLD[2][3][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[2][3][1]@MOVE_NEW(2),
+    FLYING_OLD[2][3][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[2][3][2]@MOVE_NEW(2),
+    FLYING_OLD[3][1][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[3][1][1]@MOVE_NEW(2),
+    FLYING_OLD[3][1][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[3][1][2]@MOVE_NEW(2),
+    FLYING_OLD[3][2][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[3][2][1]@MOVE_NEW(2),
+    FLYING_OLD[3][2][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[3][2][2]@MOVE_NEW(2),
+    FLYING_OLD[3][3][1]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[3][3][1]@MOVE_NEW(2),
+    FLYING_OLD[3][3][2]@MOVE_OLD(2)
+        = reconfigure -> FLYING_NEW[3][3][2]@MOVE_NEW(2),
+
+    WAIT_W_OLD[2][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[2][1][1]@MOVE_NEW(2),
+    WAIT_W_OLD[2][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[2][1][2]@MOVE_NEW(2),
+    WAIT_W_OLD[2][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[2][2][1]@MOVE_NEW(2),
+    WAIT_W_OLD[2][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[2][2][2]@MOVE_NEW(2),
+    WAIT_W_OLD[2][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[2][3][1]@MOVE_NEW(2),
+    WAIT_W_OLD[2][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[2][3][2]@MOVE_NEW(2),
+    WAIT_W_OLD[3][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[3][1][1]@MOVE_NEW(2),
+    WAIT_W_OLD[3][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[3][1][2]@MOVE_NEW(2),
+    WAIT_W_OLD[3][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[3][2][1]@MOVE_NEW(2),
+    WAIT_W_OLD[3][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[3][2][2]@MOVE_NEW(2),
+    WAIT_W_OLD[3][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[3][3][1]@MOVE_NEW(2),
+    WAIT_W_OLD[3][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_W_NEW[3][3][2]@MOVE_NEW(2),
+
+    WAIT_E_OLD[1][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[1][1][1]@MOVE_NEW(2),
+    WAIT_E_OLD[1][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[1][1][2]@MOVE_NEW(2),
+    WAIT_E_OLD[1][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[1][2][1]@MOVE_NEW(2),
+    WAIT_E_OLD[1][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[1][2][2]@MOVE_NEW(2),
+    WAIT_E_OLD[1][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[1][3][1]@MOVE_NEW(2),
+    WAIT_E_OLD[1][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[1][3][2]@MOVE_NEW(2),
+    WAIT_E_OLD[2][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[2][1][1]@MOVE_NEW(2),
+    WAIT_E_OLD[2][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[2][1][2]@MOVE_NEW(2),
+    WAIT_E_OLD[2][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[2][2][1]@MOVE_NEW(2),
+    WAIT_E_OLD[2][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[2][2][2]@MOVE_NEW(2),
+    WAIT_E_OLD[2][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[2][3][1]@MOVE_NEW(2),
+    WAIT_E_OLD[2][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_E_NEW[2][3][2]@MOVE_NEW(2),
+
+    WAIT_S_OLD[1][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[1][2][1]@MOVE_NEW(2),
+    WAIT_S_OLD[1][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[1][2][2]@MOVE_NEW(2),
+    WAIT_S_OLD[1][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[1][3][1]@MOVE_NEW(2),
+    WAIT_S_OLD[1][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[1][3][2]@MOVE_NEW(2),
+    WAIT_S_OLD[2][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[2][2][1]@MOVE_NEW(2),
+    WAIT_S_OLD[2][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[2][2][2]@MOVE_NEW(2),
+    WAIT_S_OLD[2][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[2][3][1]@MOVE_NEW(2),
+    WAIT_S_OLD[2][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[2][3][2]@MOVE_NEW(2),
+    WAIT_S_OLD[3][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[3][2][1]@MOVE_NEW(2),
+    WAIT_S_OLD[3][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[3][2][2]@MOVE_NEW(2),
+    WAIT_S_OLD[3][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[3][3][1]@MOVE_NEW(2),
+    WAIT_S_OLD[3][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_S_NEW[3][3][2]@MOVE_NEW(2),
+
+    WAIT_N_OLD[1][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[1][1][1]@MOVE_NEW(2),
+    WAIT_N_OLD[1][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[1][1][2]@MOVE_NEW(2),
+    WAIT_N_OLD[1][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[1][2][1]@MOVE_NEW(2),
+    WAIT_N_OLD[1][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[1][2][2]@MOVE_NEW(2),
+    WAIT_N_OLD[2][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[2][1][1]@MOVE_NEW(2),
+    WAIT_N_OLD[2][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[2][1][2]@MOVE_NEW(2),
+    WAIT_N_OLD[2][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[2][2][1]@MOVE_NEW(2),
+    WAIT_N_OLD[2][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[2][2][2]@MOVE_NEW(2),
+    WAIT_N_OLD[3][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[3][1][1]@MOVE_NEW(2),
+    WAIT_N_OLD[3][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[3][1][2]@MOVE_NEW(2),
+    WAIT_N_OLD[3][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[3][2][1]@MOVE_NEW(2),
+    WAIT_N_OLD[3][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_N_NEW[3][2][2]@MOVE_NEW(2),
+
+    WAIT_DOWN_OLD[1][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[1][1][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[1][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[1][2][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[1][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[1][3][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[2][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[2][1][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[2][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[2][2][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[2][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[2][3][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[3][1][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[3][1][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[3][2][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[3][2][2]@MOVE_NEW(2),
+    WAIT_DOWN_OLD[3][3][2]@MOVE_OLD(2)
+        = reconfigure -> WAIT_DOWN_NEW[3][3][2]@MOVE_NEW(2),
+
+    WAIT_UP_OLD[1][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[1][1][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[1][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[1][2][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[1][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[1][3][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[2][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[2][1][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[2][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[2][2][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[2][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[2][3][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[3][1][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[3][1][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[3][2][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[3][2][1]@MOVE_NEW(2),
+    WAIT_UP_OLD[3][3][1]@MOVE_OLD(2)
+        = reconfigure -> WAIT_UP_NEW[3][3][1]@MOVE_NEW(2)
+}
+
+relation R_BATTERY_3 = {
+    BATTERY_SAFE_OLD@BATTERY_OLD(3)
+        = reconfigure -> BATTERY_SAFE_NEW@BATTERY_NEW(3),
+    BATTERY_LOW_OLD@BATTERY_OLD(3)
+        = reconfigure -> BATTERY_LOW_NEW@BATTERY_NEW(3)
+}
+
+relation R_MOVE_3 = {
+    GROUNDED_OLD@MOVE_OLD(3)
+        = reconfigure -> GROUNDED_NEW@MOVE_NEW(3),
+    WAIT_TAKEOFF_OLD@MOVE_OLD(3)
+        = reconfigure -> WAIT_TAKEOFF_NEW@MOVE_NEW(3),
+
+    FLYING_OLD[1][1][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[1][1][1]@MOVE_NEW(3),
+    FLYING_OLD[1][1][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[1][1][2]@MOVE_NEW(3),
+    FLYING_OLD[1][2][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[1][2][1]@MOVE_NEW(3),
+    FLYING_OLD[1][2][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[1][2][2]@MOVE_NEW(3),
+    FLYING_OLD[1][3][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[1][3][1]@MOVE_NEW(3),
+    FLYING_OLD[1][3][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[1][3][2]@MOVE_NEW(3),
+    FLYING_OLD[2][1][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[2][1][1]@MOVE_NEW(3),
+    FLYING_OLD[2][1][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[2][1][2]@MOVE_NEW(3),
+    FLYING_OLD[2][2][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[2][2][1]@MOVE_NEW(3),
+    FLYING_OLD[2][2][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[2][2][2]@MOVE_NEW(3),
+    FLYING_OLD[2][3][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[2][3][1]@MOVE_NEW(3),
+    FLYING_OLD[2][3][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[2][3][2]@MOVE_NEW(3),
+    FLYING_OLD[3][1][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[3][1][1]@MOVE_NEW(3),
+    FLYING_OLD[3][1][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[3][1][2]@MOVE_NEW(3),
+    FLYING_OLD[3][2][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[3][2][1]@MOVE_NEW(3),
+    FLYING_OLD[3][2][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[3][2][2]@MOVE_NEW(3),
+    FLYING_OLD[3][3][1]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[3][3][1]@MOVE_NEW(3),
+    FLYING_OLD[3][3][2]@MOVE_OLD(3)
+        = reconfigure -> FLYING_NEW[3][3][2]@MOVE_NEW(3),
+
+    WAIT_W_OLD[2][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[2][1][1]@MOVE_NEW(3),
+    WAIT_W_OLD[2][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[2][1][2]@MOVE_NEW(3),
+    WAIT_W_OLD[2][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[2][2][1]@MOVE_NEW(3),
+    WAIT_W_OLD[2][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[2][2][2]@MOVE_NEW(3),
+    WAIT_W_OLD[2][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[2][3][1]@MOVE_NEW(3),
+    WAIT_W_OLD[2][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[2][3][2]@MOVE_NEW(3),
+    WAIT_W_OLD[3][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[3][1][1]@MOVE_NEW(3),
+    WAIT_W_OLD[3][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[3][1][2]@MOVE_NEW(3),
+    WAIT_W_OLD[3][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[3][2][1]@MOVE_NEW(3),
+    WAIT_W_OLD[3][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[3][2][2]@MOVE_NEW(3),
+    WAIT_W_OLD[3][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[3][3][1]@MOVE_NEW(3),
+    WAIT_W_OLD[3][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_W_NEW[3][3][2]@MOVE_NEW(3),
+
+    WAIT_E_OLD[1][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[1][1][1]@MOVE_NEW(3),
+    WAIT_E_OLD[1][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[1][1][2]@MOVE_NEW(3),
+    WAIT_E_OLD[1][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[1][2][1]@MOVE_NEW(3),
+    WAIT_E_OLD[1][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[1][2][2]@MOVE_NEW(3),
+    WAIT_E_OLD[1][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[1][3][1]@MOVE_NEW(3),
+    WAIT_E_OLD[1][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[1][3][2]@MOVE_NEW(3),
+    WAIT_E_OLD[2][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[2][1][1]@MOVE_NEW(3),
+    WAIT_E_OLD[2][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[2][1][2]@MOVE_NEW(3),
+    WAIT_E_OLD[2][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[2][2][1]@MOVE_NEW(3),
+    WAIT_E_OLD[2][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[2][2][2]@MOVE_NEW(3),
+    WAIT_E_OLD[2][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[2][3][1]@MOVE_NEW(3),
+    WAIT_E_OLD[2][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_E_NEW[2][3][2]@MOVE_NEW(3),
+
+    WAIT_S_OLD[1][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[1][2][1]@MOVE_NEW(3),
+    WAIT_S_OLD[1][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[1][2][2]@MOVE_NEW(3),
+    WAIT_S_OLD[1][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[1][3][1]@MOVE_NEW(3),
+    WAIT_S_OLD[1][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[1][3][2]@MOVE_NEW(3),
+    WAIT_S_OLD[2][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[2][2][1]@MOVE_NEW(3),
+    WAIT_S_OLD[2][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[2][2][2]@MOVE_NEW(3),
+    WAIT_S_OLD[2][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[2][3][1]@MOVE_NEW(3),
+    WAIT_S_OLD[2][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[2][3][2]@MOVE_NEW(3),
+    WAIT_S_OLD[3][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[3][2][1]@MOVE_NEW(3),
+    WAIT_S_OLD[3][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[3][2][2]@MOVE_NEW(3),
+    WAIT_S_OLD[3][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[3][3][1]@MOVE_NEW(3),
+    WAIT_S_OLD[3][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_S_NEW[3][3][2]@MOVE_NEW(3),
+
+    WAIT_N_OLD[1][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[1][1][1]@MOVE_NEW(3),
+    WAIT_N_OLD[1][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[1][1][2]@MOVE_NEW(3),
+    WAIT_N_OLD[1][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[1][2][1]@MOVE_NEW(3),
+    WAIT_N_OLD[1][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[1][2][2]@MOVE_NEW(3),
+    WAIT_N_OLD[2][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[2][1][1]@MOVE_NEW(3),
+    WAIT_N_OLD[2][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[2][1][2]@MOVE_NEW(3),
+    WAIT_N_OLD[2][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[2][2][1]@MOVE_NEW(3),
+    WAIT_N_OLD[2][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[2][2][2]@MOVE_NEW(3),
+    WAIT_N_OLD[3][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[3][1][1]@MOVE_NEW(3),
+    WAIT_N_OLD[3][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[3][1][2]@MOVE_NEW(3),
+    WAIT_N_OLD[3][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[3][2][1]@MOVE_NEW(3),
+    WAIT_N_OLD[3][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_N_NEW[3][2][2]@MOVE_NEW(3),
+
+    WAIT_DOWN_OLD[1][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[1][1][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[1][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[1][2][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[1][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[1][3][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[2][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[2][1][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[2][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[2][2][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[2][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[2][3][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[3][1][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[3][1][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[3][2][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[3][2][2]@MOVE_NEW(3),
+    WAIT_DOWN_OLD[3][3][2]@MOVE_OLD(3)
+        = reconfigure -> WAIT_DOWN_NEW[3][3][2]@MOVE_NEW(3),
+
+    WAIT_UP_OLD[1][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[1][1][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[1][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[1][2][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[1][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[1][3][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[2][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[2][1][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[2][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[2][2][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[2][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[2][3][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[3][1][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[3][1][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[3][2][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[3][2][1]@MOVE_NEW(3),
+    WAIT_UP_OLD[3][3][1]@MOVE_OLD(3)
+        = reconfigure -> WAIT_UP_NEW[3][3][1]@MOVE_NEW(3)
+}
+
+// =============================================================================
+// Common fluents
+// =============================================================================
+
+fluent GROUNDED[drone:Drones] =
+    <[drone].land, [drone].takeoff> initially 1
+
+fluent LOW_BATTERY[drone:Drones] =
+    <[drone].battery['low], [drone].battery['safe]> initially 0
+
+fluent AT_H1[drone:Drones][x:X][y:Y] =
+    <[drone].arrive[x][y][1],
+     {[drone].arrive[X][Y][H], [drone].land}\{[drone].arrive[x][y][1]}>
+    initially 0
+
+fluent AT_H2[drone:Drones][x:X][y:Y] =
+    <[drone].arrive[x][y][2],
+     {[drone].arrive[X][Y][H], [drone].land}\{[drone].arrive[x][y][2]}>
+    initially 0
+
+// =============================================================================
+// OLD safety: common policies without a geofence
+// =============================================================================
+
+ltl_property P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 =
+    [](!GROUNDED['drone.[1]] -> !drone[1].battery['safe])
+ltl_property P_OLD_LOW_BATTERY_TAKEOFF_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].takeoff)
+ltl_property P_OLD_LOW_BATTERY_UP_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].up)
+ltl_property P_OLD_LOW_BATTERY_MOVE_E_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].move['e])
+ltl_property P_OLD_LOW_BATTERY_MOVE_N_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].move['n])
+
+ltl_property P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 =
+    [](!GROUNDED['drone.[2]] -> !drone[2].battery['safe])
+ltl_property P_OLD_LOW_BATTERY_TAKEOFF_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].takeoff)
+ltl_property P_OLD_LOW_BATTERY_UP_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].up)
+ltl_property P_OLD_LOW_BATTERY_MOVE_E_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].move['e])
+ltl_property P_OLD_LOW_BATTERY_MOVE_N_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].move['n])
+
+ltl_property P_OLD_NO_RECOVERY_WHILE_AIRBORNE_3 =
+    [](!GROUNDED['drone.[3]] -> !drone[3].battery['safe])
+ltl_property P_OLD_LOW_BATTERY_TAKEOFF_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].takeoff)
+ltl_property P_OLD_LOW_BATTERY_UP_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].up)
+ltl_property P_OLD_LOW_BATTERY_MOVE_E_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].move['e])
+ltl_property P_OLD_LOW_BATTERY_MOVE_N_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].move['n])
+
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][1][1] -> !drone[2].arrive[1][1][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][1][2] -> !drone[2].arrive[1][2][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][1][3] -> !drone[2].arrive[1][3][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][2][1] -> !drone[2].arrive[2][1][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][2][2] -> !drone[2].arrive[2][2][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][2][3] -> !drone[2].arrive[2][3][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][3][1] -> !drone[2].arrive[3][1][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][3][2] -> !drone[2].arrive[3][2][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][3][3] -> !drone[2].arrive[3][3][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][1][1] -> !drone[2].arrive[1][1][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][1][2] -> !drone[2].arrive[1][2][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][1][3] -> !drone[2].arrive[1][3][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][2][1] -> !drone[2].arrive[2][1][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][2][2] -> !drone[2].arrive[2][2][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][2][3] -> !drone[2].arrive[2][3][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][3][1] -> !drone[2].arrive[3][1][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][3][2] -> !drone[2].arrive[3][2][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][3][3] -> !drone[2].arrive[3][3][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][1][1] -> !drone[3].arrive[1][1][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][1][2] -> !drone[3].arrive[1][2][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][1][3] -> !drone[3].arrive[1][3][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][2][1] -> !drone[3].arrive[2][1][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][2][2] -> !drone[3].arrive[2][2][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][2][3] -> !drone[3].arrive[2][3][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][3][1] -> !drone[3].arrive[3][1][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][3][2] -> !drone[3].arrive[3][2][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][3][3] -> !drone[3].arrive[3][3][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][1][1] -> !drone[3].arrive[1][1][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][1][2] -> !drone[3].arrive[1][2][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][1][3] -> !drone[3].arrive[1][3][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][2][1] -> !drone[3].arrive[2][1][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][2][2] -> !drone[3].arrive[2][2][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][2][3] -> !drone[3].arrive[2][3][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][3][1] -> !drone[3].arrive[3][1][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][3][2] -> !drone[3].arrive[3][2][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][3][3] -> !drone[3].arrive[3][3][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][1][1] -> !drone[1].arrive[1][1][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][1][2] -> !drone[1].arrive[1][2][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][1][3] -> !drone[1].arrive[1][3][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][2][1] -> !drone[1].arrive[2][1][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][2][2] -> !drone[1].arrive[2][2][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][2][3] -> !drone[1].arrive[2][3][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][3][1] -> !drone[1].arrive[3][1][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][3][2] -> !drone[1].arrive[3][2][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][3][3] -> !drone[1].arrive[3][3][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][1][1] -> !drone[1].arrive[1][1][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][1][2] -> !drone[1].arrive[1][2][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][1][3] -> !drone[1].arrive[1][3][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][2][1] -> !drone[1].arrive[2][1][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][2][2] -> !drone[1].arrive[2][2][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][2][3] -> !drone[1].arrive[2][3][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][3][1] -> !drone[1].arrive[3][1][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][3][2] -> !drone[1].arrive[3][2][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][3][3] -> !drone[1].arrive[3][3][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][1][1] -> !drone[3].arrive[1][1][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][1][2] -> !drone[3].arrive[1][2][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][1][3] -> !drone[3].arrive[1][3][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][2][1] -> !drone[3].arrive[2][1][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][2][2] -> !drone[3].arrive[2][2][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][2][3] -> !drone[3].arrive[2][3][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][3][1] -> !drone[3].arrive[3][1][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][3][2] -> !drone[3].arrive[3][2][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][3][3] -> !drone[3].arrive[3][3][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][1][1] -> !drone[3].arrive[1][1][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][1][2] -> !drone[3].arrive[1][2][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][1][3] -> !drone[3].arrive[1][3][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][2][1] -> !drone[3].arrive[2][1][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][2][2] -> !drone[3].arrive[2][2][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][2][3] -> !drone[3].arrive[2][3][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][3][1] -> !drone[3].arrive[3][1][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][3][2] -> !drone[3].arrive[3][2][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][3][3] -> !drone[3].arrive[3][3][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][1][1] -> !drone[1].arrive[1][1][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][1][2] -> !drone[1].arrive[1][2][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][1][3] -> !drone[1].arrive[1][3][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][2][1] -> !drone[1].arrive[2][1][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][2][2] -> !drone[1].arrive[2][2][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][2][3] -> !drone[1].arrive[2][3][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][3][1] -> !drone[1].arrive[3][1][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][3][2] -> !drone[1].arrive[3][2][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][3][3] -> !drone[1].arrive[3][3][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][1][1] -> !drone[1].arrive[1][1][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][1][2] -> !drone[1].arrive[1][2][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][1][3] -> !drone[1].arrive[1][3][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][2][1] -> !drone[1].arrive[2][1][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][2][2] -> !drone[1].arrive[2][2][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][2][3] -> !drone[1].arrive[2][3][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][3][1] -> !drone[1].arrive[3][1][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][3][2] -> !drone[1].arrive[3][2][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][3][3] -> !drone[1].arrive[3][3][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][1][1] -> !drone[2].arrive[1][1][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][1][2] -> !drone[2].arrive[1][2][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][1][3] -> !drone[2].arrive[1][3][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][2][1] -> !drone[2].arrive[2][1][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][2][2] -> !drone[2].arrive[2][2][1])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][2][3] -> !drone[2].arrive[2][3][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][3][1] -> !drone[2].arrive[3][1][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][3][2] -> !drone[2].arrive[3][2][1])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][3][3] -> !drone[2].arrive[3][3][1])
+ltl_property P_OLD_NO_COLLISION_X1_Y1_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][1][1] -> !drone[2].arrive[1][1][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y2_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][1][2] -> !drone[2].arrive[1][2][2])
+ltl_property P_OLD_NO_COLLISION_X1_Y3_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][1][3] -> !drone[2].arrive[1][3][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y1_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][2][1] -> !drone[2].arrive[2][1][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y2_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][2][2] -> !drone[2].arrive[2][2][2])
+ltl_property P_OLD_NO_COLLISION_X2_Y3_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][2][3] -> !drone[2].arrive[2][3][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y1_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][3][1] -> !drone[2].arrive[3][1][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y2_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][3][2] -> !drone[2].arrive[3][2][2])
+ltl_property P_OLD_NO_COLLISION_X3_Y3_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][3][3] -> !drone[2].arrive[3][3][2])
+
+controllerSpec OLD_REQ = {
+    safety = {
+        P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1,
+        P_OLD_LOW_BATTERY_TAKEOFF_1,
+        P_OLD_LOW_BATTERY_UP_1,
+        P_OLD_LOW_BATTERY_MOVE_E_1,
+        P_OLD_LOW_BATTERY_MOVE_N_1,
+        P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2,
+        P_OLD_LOW_BATTERY_TAKEOFF_2,
+        P_OLD_LOW_BATTERY_UP_2,
+        P_OLD_LOW_BATTERY_MOVE_E_2,
+        P_OLD_LOW_BATTERY_MOVE_N_2,
+        P_OLD_NO_RECOVERY_WHILE_AIRBORNE_3,
+        P_OLD_LOW_BATTERY_TAKEOFF_3,
+        P_OLD_LOW_BATTERY_UP_3,
+        P_OLD_LOW_BATTERY_MOVE_E_3,
+        P_OLD_LOW_BATTERY_MOVE_N_3,
+        P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X1_Y3_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X2_Y3_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X3_Y3_H1_1_TO_2,
+        P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X1_Y3_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X2_Y3_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X3_Y3_H2_1_TO_2,
+        P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X1_Y3_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X2_Y3_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X3_Y3_H1_1_TO_3,
+        P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X1_Y3_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X2_Y3_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X3_Y3_H2_1_TO_3,
+        P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X1_Y3_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X2_Y3_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X3_Y3_H1_2_TO_1,
+        P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X1_Y3_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X2_Y3_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X3_Y3_H2_2_TO_1,
+        P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X1_Y3_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X2_Y3_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X3_Y3_H1_2_TO_3,
+        P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X1_Y3_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X2_Y3_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X3_Y3_H2_2_TO_3,
+        P_OLD_NO_COLLISION_X1_Y1_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X1_Y2_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X1_Y3_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X2_Y1_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X2_Y2_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X2_Y3_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X3_Y1_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X3_Y2_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X3_Y3_H1_3_TO_1,
+        P_OLD_NO_COLLISION_X1_Y1_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X1_Y2_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X1_Y3_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X2_Y1_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X2_Y2_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X2_Y3_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X3_Y1_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X3_Y2_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X3_Y3_H2_3_TO_1,
+        P_OLD_NO_COLLISION_X1_Y1_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X1_Y2_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X1_Y3_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X2_Y1_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X2_Y2_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X2_Y3_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X3_Y1_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X3_Y2_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X3_Y3_H1_3_TO_2,
+        P_OLD_NO_COLLISION_X1_Y1_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X1_Y2_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X1_Y3_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X2_Y1_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X2_Y2_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X2_Y3_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X3_Y1_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X3_Y2_H2_3_TO_2,
+        P_OLD_NO_COLLISION_X3_Y3_H2_3_TO_2
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||OldController = (OLD_ENV)~{OLD_REQ}.
+||OldCon = (OldController || OLD_ENV).
+
+// =============================================================================
+// NEW safety: same common policies plus the temporary geofence
+// =============================================================================
+
+ltl_property P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1 =
+    [](!GROUNDED['drone.[1]] -> !drone[1].battery['safe])
+ltl_property P_NEW_LOW_BATTERY_TAKEOFF_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].takeoff)
+ltl_property P_NEW_LOW_BATTERY_UP_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].up)
+ltl_property P_NEW_LOW_BATTERY_MOVE_E_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].move['e])
+ltl_property P_NEW_LOW_BATTERY_MOVE_N_1 =
+    [](LOW_BATTERY['drone.[1]] -> !drone[1].move['n])
+
+ltl_property P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2 =
+    [](!GROUNDED['drone.[2]] -> !drone[2].battery['safe])
+ltl_property P_NEW_LOW_BATTERY_TAKEOFF_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].takeoff)
+ltl_property P_NEW_LOW_BATTERY_UP_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].up)
+ltl_property P_NEW_LOW_BATTERY_MOVE_E_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].move['e])
+ltl_property P_NEW_LOW_BATTERY_MOVE_N_2 =
+    [](LOW_BATTERY['drone.[2]] -> !drone[2].move['n])
+
+ltl_property P_NEW_NO_RECOVERY_WHILE_AIRBORNE_3 =
+    [](!GROUNDED['drone.[3]] -> !drone[3].battery['safe])
+ltl_property P_NEW_LOW_BATTERY_TAKEOFF_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].takeoff)
+ltl_property P_NEW_LOW_BATTERY_UP_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].up)
+ltl_property P_NEW_LOW_BATTERY_MOVE_E_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].move['e])
+ltl_property P_NEW_LOW_BATTERY_MOVE_N_3 =
+    [](LOW_BATTERY['drone.[3]] -> !drone[3].move['n])
+
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][1][1] -> !drone[2].arrive[1][1][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][1][2] -> !drone[2].arrive[1][2][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][1][3] -> !drone[2].arrive[1][3][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][2][1] -> !drone[2].arrive[2][1][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][2][2] -> !drone[2].arrive[2][2][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][2][3] -> !drone[2].arrive[2][3][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][3][1] -> !drone[2].arrive[3][1][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][3][2] -> !drone[2].arrive[3][2][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H1_1_TO_2 =
+    [](AT_H1['drone.[1]][3][3] -> !drone[2].arrive[3][3][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][1][1] -> !drone[2].arrive[1][1][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][1][2] -> !drone[2].arrive[1][2][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][1][3] -> !drone[2].arrive[1][3][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][2][1] -> !drone[2].arrive[2][1][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][2][2] -> !drone[2].arrive[2][2][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][2][3] -> !drone[2].arrive[2][3][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][3][1] -> !drone[2].arrive[3][1][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][3][2] -> !drone[2].arrive[3][2][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H2_1_TO_2 =
+    [](AT_H2['drone.[1]][3][3] -> !drone[2].arrive[3][3][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][1][1] -> !drone[3].arrive[1][1][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][1][2] -> !drone[3].arrive[1][2][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][1][3] -> !drone[3].arrive[1][3][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][2][1] -> !drone[3].arrive[2][1][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][2][2] -> !drone[3].arrive[2][2][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][2][3] -> !drone[3].arrive[2][3][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][3][1] -> !drone[3].arrive[3][1][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][3][2] -> !drone[3].arrive[3][2][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H1_1_TO_3 =
+    [](AT_H1['drone.[1]][3][3] -> !drone[3].arrive[3][3][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][1][1] -> !drone[3].arrive[1][1][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][1][2] -> !drone[3].arrive[1][2][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][1][3] -> !drone[3].arrive[1][3][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][2][1] -> !drone[3].arrive[2][1][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][2][2] -> !drone[3].arrive[2][2][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][2][3] -> !drone[3].arrive[2][3][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][3][1] -> !drone[3].arrive[3][1][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][3][2] -> !drone[3].arrive[3][2][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H2_1_TO_3 =
+    [](AT_H2['drone.[1]][3][3] -> !drone[3].arrive[3][3][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][1][1] -> !drone[1].arrive[1][1][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][1][2] -> !drone[1].arrive[1][2][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][1][3] -> !drone[1].arrive[1][3][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][2][1] -> !drone[1].arrive[2][1][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][2][2] -> !drone[1].arrive[2][2][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][2][3] -> !drone[1].arrive[2][3][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][3][1] -> !drone[1].arrive[3][1][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][3][2] -> !drone[1].arrive[3][2][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H1_2_TO_1 =
+    [](AT_H1['drone.[2]][3][3] -> !drone[1].arrive[3][3][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][1][1] -> !drone[1].arrive[1][1][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][1][2] -> !drone[1].arrive[1][2][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][1][3] -> !drone[1].arrive[1][3][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][2][1] -> !drone[1].arrive[2][1][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][2][2] -> !drone[1].arrive[2][2][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][2][3] -> !drone[1].arrive[2][3][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][3][1] -> !drone[1].arrive[3][1][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][3][2] -> !drone[1].arrive[3][2][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H2_2_TO_1 =
+    [](AT_H2['drone.[2]][3][3] -> !drone[1].arrive[3][3][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][1][1] -> !drone[3].arrive[1][1][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][1][2] -> !drone[3].arrive[1][2][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][1][3] -> !drone[3].arrive[1][3][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][2][1] -> !drone[3].arrive[2][1][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][2][2] -> !drone[3].arrive[2][2][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][2][3] -> !drone[3].arrive[2][3][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][3][1] -> !drone[3].arrive[3][1][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][3][2] -> !drone[3].arrive[3][2][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H1_2_TO_3 =
+    [](AT_H1['drone.[2]][3][3] -> !drone[3].arrive[3][3][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][1][1] -> !drone[3].arrive[1][1][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][1][2] -> !drone[3].arrive[1][2][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][1][3] -> !drone[3].arrive[1][3][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][2][1] -> !drone[3].arrive[2][1][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][2][2] -> !drone[3].arrive[2][2][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][2][3] -> !drone[3].arrive[2][3][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][3][1] -> !drone[3].arrive[3][1][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][3][2] -> !drone[3].arrive[3][2][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H2_2_TO_3 =
+    [](AT_H2['drone.[2]][3][3] -> !drone[3].arrive[3][3][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][1][1] -> !drone[1].arrive[1][1][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][1][2] -> !drone[1].arrive[1][2][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][1][3] -> !drone[1].arrive[1][3][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][2][1] -> !drone[1].arrive[2][1][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][2][2] -> !drone[1].arrive[2][2][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][2][3] -> !drone[1].arrive[2][3][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][3][1] -> !drone[1].arrive[3][1][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][3][2] -> !drone[1].arrive[3][2][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H1_3_TO_1 =
+    [](AT_H1['drone.[3]][3][3] -> !drone[1].arrive[3][3][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][1][1] -> !drone[1].arrive[1][1][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][1][2] -> !drone[1].arrive[1][2][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][1][3] -> !drone[1].arrive[1][3][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][2][1] -> !drone[1].arrive[2][1][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][2][2] -> !drone[1].arrive[2][2][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][2][3] -> !drone[1].arrive[2][3][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][3][1] -> !drone[1].arrive[3][1][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][3][2] -> !drone[1].arrive[3][2][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H2_3_TO_1 =
+    [](AT_H2['drone.[3]][3][3] -> !drone[1].arrive[3][3][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][1][1] -> !drone[2].arrive[1][1][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][1][2] -> !drone[2].arrive[1][2][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][1][3] -> !drone[2].arrive[1][3][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][2][1] -> !drone[2].arrive[2][1][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][2][2] -> !drone[2].arrive[2][2][1])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][2][3] -> !drone[2].arrive[2][3][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][3][1] -> !drone[2].arrive[3][1][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][3][2] -> !drone[2].arrive[3][2][1])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H1_3_TO_2 =
+    [](AT_H1['drone.[3]][3][3] -> !drone[2].arrive[3][3][1])
+ltl_property P_NEW_NO_COLLISION_X1_Y1_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][1][1] -> !drone[2].arrive[1][1][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y2_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][1][2] -> !drone[2].arrive[1][2][2])
+ltl_property P_NEW_NO_COLLISION_X1_Y3_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][1][3] -> !drone[2].arrive[1][3][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y1_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][2][1] -> !drone[2].arrive[2][1][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y2_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][2][2] -> !drone[2].arrive[2][2][2])
+ltl_property P_NEW_NO_COLLISION_X2_Y3_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][2][3] -> !drone[2].arrive[2][3][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y1_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][3][1] -> !drone[2].arrive[3][1][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y2_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][3][2] -> !drone[2].arrive[3][2][2])
+ltl_property P_NEW_NO_COLLISION_X3_Y3_H2_3_TO_2 =
+    [](AT_H2['drone.[3]][3][3] -> !drone[2].arrive[3][3][2])
+
+// NEW-only local geofence formulas.  arrive is uncontrollable, so synthesis
+// must prevent or finish a pending entry before the NEW policy starts.
+ltl_property P_NEW_GEOFENCE_1 =
+    [](!drone[1].arrive[1][1][2])
+ltl_property P_NEW_GEOFENCE_2 =
+    [](!drone[2].arrive[1][1][2])
+ltl_property P_NEW_GEOFENCE_3 =
+    [](!drone[3].arrive[1][1][2])
+
+controllerSpec NEW_REQ = {
+    safety = {
+        P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1,
+        P_NEW_LOW_BATTERY_TAKEOFF_1,
+        P_NEW_LOW_BATTERY_UP_1,
+        P_NEW_LOW_BATTERY_MOVE_E_1,
+        P_NEW_LOW_BATTERY_MOVE_N_1,
+        P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2,
+        P_NEW_LOW_BATTERY_TAKEOFF_2,
+        P_NEW_LOW_BATTERY_UP_2,
+        P_NEW_LOW_BATTERY_MOVE_E_2,
+        P_NEW_LOW_BATTERY_MOVE_N_2,
+        P_NEW_NO_RECOVERY_WHILE_AIRBORNE_3,
+        P_NEW_LOW_BATTERY_TAKEOFF_3,
+        P_NEW_LOW_BATTERY_UP_3,
+        P_NEW_LOW_BATTERY_MOVE_E_3,
+        P_NEW_LOW_BATTERY_MOVE_N_3,
+        P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X1_Y3_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X2_Y3_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X3_Y3_H1_1_TO_2,
+        P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X1_Y3_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X2_Y3_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X3_Y3_H2_1_TO_2,
+        P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X1_Y3_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X2_Y3_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X3_Y3_H1_1_TO_3,
+        P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X1_Y3_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X2_Y3_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X3_Y3_H2_1_TO_3,
+        P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X1_Y3_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X2_Y3_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X3_Y3_H1_2_TO_1,
+        P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X1_Y3_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X2_Y3_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X3_Y3_H2_2_TO_1,
+        P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X1_Y3_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X2_Y3_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X3_Y3_H1_2_TO_3,
+        P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X1_Y3_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X2_Y3_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X3_Y3_H2_2_TO_3,
+        P_NEW_NO_COLLISION_X1_Y1_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X1_Y2_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X1_Y3_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X2_Y1_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X2_Y2_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X2_Y3_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X3_Y1_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X3_Y2_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X3_Y3_H1_3_TO_1,
+        P_NEW_NO_COLLISION_X1_Y1_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X1_Y2_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X1_Y3_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X2_Y1_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X2_Y2_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X2_Y3_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X3_Y1_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X3_Y2_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X3_Y3_H2_3_TO_1,
+        P_NEW_NO_COLLISION_X1_Y1_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X1_Y2_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X1_Y3_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X2_Y1_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X2_Y2_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X2_Y3_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X3_Y1_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X3_Y2_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X3_Y3_H1_3_TO_2,
+        P_NEW_NO_COLLISION_X1_Y1_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X1_Y2_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X1_Y3_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X2_Y1_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X2_Y2_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X2_Y3_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X3_Y1_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X3_Y2_H2_3_TO_2,
+        P_NEW_NO_COLLISION_X3_Y3_H2_3_TO_2,
+        P_NEW_GEOFENCE_1,
+        P_NEW_GEOFENCE_2,
+        P_NEW_GEOFENCE_3
+    }
+    controllable = {ControllableActions}
+}
+
+controller ||NewController = (NEW_ENV)~{NEW_REQ}.
+||NewCon = (NewController || NEW_ENV).
+
+// =============================================================================
+// Transition requirements
+// =============================================================================
+
+fluent StopOldSpec = <stopOldSpec, hotSwapIn>
+fluent StartNewSpec = <startNewSpec, hotSwapIn>
+fluent Reconfigure = <reconfigure, hotSwapIn>
+
+assert ANY_CONTROLLABLE_ACTION_BATTERY_1 = (
+    drone[1].battery['safe]
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_1 =
+    ((StopOldSpec && !StartNewSpec) ->
+        !ANY_CONTROLLABLE_ACTION_BATTERY_1)
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_1
+
+assert ANY_CONTROLLABLE_ACTION_MOVE_1 = (
+    drone[1].takeoff ||
+    drone[1].land ||
+    drone[1].up ||
+    drone[1].down ||
+    drone[1].move['n] ||
+    drone[1].move['s] ||
+    drone[1].move['e] ||
+    drone[1].move['w]
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_MOVE_1 =
+    ((StopOldSpec && !StartNewSpec) ->
+        !ANY_CONTROLLABLE_ACTION_MOVE_1)
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_MOVE_1
+
+assert ANY_CONTROLLABLE_ACTION_BATTERY_2 = (
+    drone[2].battery['safe]
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_2 =
+    ((StopOldSpec && !StartNewSpec) ->
+        !ANY_CONTROLLABLE_ACTION_BATTERY_2)
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_2
+
+assert ANY_CONTROLLABLE_ACTION_MOVE_2 = (
+    drone[2].takeoff ||
+    drone[2].land ||
+    drone[2].up ||
+    drone[2].down ||
+    drone[2].move['n] ||
+    drone[2].move['s] ||
+    drone[2].move['e] ||
+    drone[2].move['w]
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_MOVE_2 =
+    ((StopOldSpec && !StartNewSpec) ->
+        !ANY_CONTROLLABLE_ACTION_MOVE_2)
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_MOVE_2
+
+assert ANY_CONTROLLABLE_ACTION_BATTERY_3 = (
+    drone[3].battery['safe]
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_3 =
+    ((StopOldSpec && !StartNewSpec) ->
+        !ANY_CONTROLLABLE_ACTION_BATTERY_3)
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_3 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_BATTERY_3
+
+assert ANY_CONTROLLABLE_ACTION_MOVE_3 = (
+    drone[3].takeoff ||
+    drone[3].land ||
+    drone[3].up ||
+    drone[3].down ||
+    drone[3].move['n] ||
+    drone[3].move['s] ||
+    drone[3].move['e] ||
+    drone[3].move['w]
+)
+assert NO_CONTROLLABLE_ACTION_DURING_GAP_MOVE_3 =
+    ((StopOldSpec && !StartNewSpec) ->
+        !ANY_CONTROLLABLE_ACTION_MOVE_3)
+ltl_property T1_NO_CONTROLLABLE_DURING_GAP_MOVE_3 =
+    NO_CONTROLLABLE_ACTION_DURING_GAP_MOVE_3
+
+ltl_property T2_START_AFTER_STOP_AND_RECONFIGURE =
+    (startNewSpec -> (StopOldSpec && Reconfigure))
+
+// =============================================================================
+// Updating-controller targets: no_tr, T1, and T2
+// =============================================================================
+
+updatingController UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {
+        BATTERY_OLD(1), MOVE_OLD(1),
+        BATTERY_OLD(2), MOVE_OLD(2),
+        BATTERY_OLD(3), MOVE_OLD(3)
+    },
+    newEnvironment = {
+        BATTERY_NEW(1), MOVE_NEW(1),
+        BATTERY_NEW(2), MOVE_NEW(2),
+        BATTERY_NEW(3), MOVE_NEW(3)
+    },
+    mapRelation = {
+        R_BATTERY_1, R_MOVE_1,
+        R_BATTERY_2, R_MOVE_2,
+        R_BATTERY_3, R_MOVE_3
+    },
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking
+}
+
+||DRONE_3DRONES_3X3X2_TEMPORARY_GEOFENCE_TRADITIONAL = UpdCont.
+
+updatingController UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        BATTERY_OLD(1), MOVE_OLD(1),
+        BATTERY_OLD(2), MOVE_OLD(2),
+        BATTERY_OLD(3), MOVE_OLD(3)
+    },
+    newEnvironment = {
+        BATTERY_NEW(1), MOVE_NEW(1),
+        BATTERY_NEW(2), MOVE_NEW(2),
+        BATTERY_NEW(3), MOVE_NEW(3)
+    },
+    mapRelation = {
+        R_BATTERY_1, R_MOVE_1,
+        R_BATTERY_2, R_MOVE_2,
+        R_BATTERY_3, R_MOVE_3
+    },
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_3,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_3,
+    nonblocking
+}
+
+||DRONE_3DRONES_3X3X2_TEMPORARY_GEOFENCE_T1_TRADITIONAL = UpdCont_T1.
+
+updatingController UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        BATTERY_OLD(1), MOVE_OLD(1),
+        BATTERY_OLD(2), MOVE_OLD(2),
+        BATTERY_OLD(3), MOVE_OLD(3)
+    },
+    newEnvironment = {
+        BATTERY_NEW(1), MOVE_NEW(1),
+        BATTERY_NEW(2), MOVE_NEW(2),
+        BATTERY_NEW(3), MOVE_NEW(3)
+    },
+    mapRelation = {
+        R_BATTERY_1, R_MOVE_1,
+        R_BATTERY_2, R_MOVE_2,
+        R_BATTERY_3, R_MOVE_3
+    },
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking
+}
+
+||DRONE_3DRONES_3X3X2_TEMPORARY_GEOFENCE_T2_TRADITIONAL = UpdCont_T2.
+
+updatingController Stepwise_UpdCont = {
+    oldController = OldCon,
+    oldEnvironment = {
+        BATTERY_OLD(1), MOVE_OLD(1),
+        BATTERY_OLD(2), MOVE_OLD(2),
+        BATTERY_OLD(3), MOVE_OLD(3)
+    },
+    newEnvironment = {
+        BATTERY_NEW(1), MOVE_NEW(1),
+        BATTERY_NEW(2), MOVE_NEW(2),
+        BATTERY_NEW(3), MOVE_NEW(3)
+    },
+    mapRelation = {
+        R_BATTERY_1, R_MOVE_1,
+        R_BATTERY_2, R_MOVE_2,
+        R_BATTERY_3, R_MOVE_3
+    },
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||DRONE_3DRONES_3X3X2_TEMPORARY_GEOFENCE_STEPWISE = Stepwise_UpdCont.
+
+updatingController Stepwise_UpdCont_T1 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        BATTERY_OLD(1), MOVE_OLD(1),
+        BATTERY_OLD(2), MOVE_OLD(2),
+        BATTERY_OLD(3), MOVE_OLD(3)
+    },
+    newEnvironment = {
+        BATTERY_NEW(1), MOVE_NEW(1),
+        BATTERY_NEW(2), MOVE_NEW(2),
+        BATTERY_NEW(3), MOVE_NEW(3)
+    },
+    mapRelation = {
+        R_BATTERY_1, R_MOVE_1,
+        R_BATTERY_2, R_MOVE_2,
+        R_BATTERY_3, R_MOVE_3
+    },
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_3,
+    transition = T1_NO_CONTROLLABLE_DURING_GAP_MOVE_3,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||DRONE_3DRONES_3X3X2_TEMPORARY_GEOFENCE_T1_STEPWISE = Stepwise_UpdCont_T1.
+
+updatingController Stepwise_UpdCont_T2 = {
+    oldController = OldCon,
+    oldEnvironment = {
+        BATTERY_OLD(1), MOVE_OLD(1),
+        BATTERY_OLD(2), MOVE_OLD(2),
+        BATTERY_OLD(3), MOVE_OLD(3)
+    },
+    newEnvironment = {
+        BATTERY_NEW(1), MOVE_NEW(1),
+        BATTERY_NEW(2), MOVE_NEW(2),
+        BATTERY_NEW(3), MOVE_NEW(3)
+    },
+    mapRelation = {
+        R_BATTERY_1, R_MOVE_1,
+        R_BATTERY_2, R_MOVE_2,
+        R_BATTERY_3, R_MOVE_3
+    },
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T2_START_AFTER_STOP_AND_RECONFIGURE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||DRONE_3DRONES_3X3X2_TEMPORARY_GEOFENCE_T2_STEPWISE = Stepwise_UpdCont_T2.

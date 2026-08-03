@@ -1,0 +1,35 @@
+outputDir: "Experiment/diagnostics/gc_baseline_drone_2x2x2/result"
+runs: 3
+timeoutHours: 2
+requirementsCheck: false
+traceCheck: false
+notifyOn: never
+
+javaOptions:
+  - -Djava.awt.headless=true
+  - -Dmtsa.evaluation.enabled=true
+  - -Dmtsa.evaluation.memorySampling.enabled=true
+  - -Dmtsa.evaluation.memorySampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.enabled=true
+  - -Dmtsa.evaluation.rssSampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000
+  - -Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000
+  - -Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false
+  - -XX:+UseG1GC
+  - "-Xlog:gc*,gc+heap=debug,safepoint:file=Experiment/diagnostics/gc_baseline_drone_2x2x2/gc_%p_%t.log:time,uptime,level,tags:filecount=0"
+  - -Xmx220g
+
+cases:
+  - id: drone_rebuilt_2drones_2x2x2_gc_diagnostic_stepwise_no_tr
+    example: DroneRebuilt_TemporaryArriveGeofencePolicyRollout_2Drones_2x2x2_GCDiagnostic
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/DroneRebuilt/Drone_2Drones_2x2x2_TemporaryGeofencePolicyRollout_Update.lts"
+    target: Stepwise_UpdCont
+
+  - id: drone_rebuilt_2drones_2x2x2_gc_diagnostic_traditional_no_tr
+    example: DroneRebuilt_TemporaryArriveGeofencePolicyRollout_2Drones_2x2x2_GCDiagnostic
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/DroneRebuilt/Drone_2Drones_2x2x2_TemporaryGeofencePolicyRollout_Update.lts"
+    target: UpdCont

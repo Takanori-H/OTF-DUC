@@ -1,0 +1,670 @@
+comp.compile time : 103ms
+Compiled: BATTERY_OLD(1)
+Compiled: MOVE_OLD(1)
+Compiled: BATTERY_OLD(2)
+Compiled: MOVE_OLD(2)
+Composition:OLD_ENV = OLD_ENV.BATTERY_OLD(1) || OLD_ENV.MOVE_OLD(1) || OLD_ENV.BATTERY_OLD(2) || OLD_ENV.MOVE_OLD(2)
+State Space: 2 * 34 * 2 * 34 = 2 ** 14
+Composing...
+-- States: 4624 Transitions: 23936 Memory used: 28593K
+Composed in 67ms
+Formula !P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 = (true U (!GROUNDED.drone.1 & drone[1].battery.safe))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 = S0,
+S1@ =(true -> S1),
+S0 =(!GROUNDED.drone.1&drone[1].battery.safe -> S1 |true -> S0).
+Composition:P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 = GROUNDED.drone.1 || drone[1].battery.safe || SYNC || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19653K
+Composed in 41ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1)
+DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_TAKEOFF_1 = (true U (LOW_BATTERY.drone.1 & drone[1].takeoff))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_TAKEOFF_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].takeoff -> S1).
+Composition:P_OLD_LOW_BATTERY_TAKEOFF_1 = LOW_BATTERY.drone.1 || drone[1].takeoff || SYNC || P_OLD_LOW_BATTERY_TAKEOFF_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19492K
+Composed in 30ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_TAKEOFF_1)
+DFA(P_OLD_LOW_BATTERY_TAKEOFF_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_UP_1 = (true U (LOW_BATTERY.drone.1 & drone[1].up))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_UP_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].up -> S1).
+Composition:P_OLD_LOW_BATTERY_UP_1 = LOW_BATTERY.drone.1 || drone[1].up || SYNC || P_OLD_LOW_BATTERY_UP_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19410K
+Composed in 28ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_LOW_BATTERY_UP_1)
+DFA(P_OLD_LOW_BATTERY_UP_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_E_1 = (true U (LOW_BATTERY.drone.1 & drone[1].move.e))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_E_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].move.e -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_E_1 = LOW_BATTERY.drone.1 || drone[1].move.e || SYNC || P_OLD_LOW_BATTERY_MOVE_E_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19314K
+Composed in 28ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_E_1)
+DFA(P_OLD_LOW_BATTERY_MOVE_E_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_N_1 = (true U (LOW_BATTERY.drone.1 & drone[1].move.n))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_N_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].move.n -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_N_1 = LOW_BATTERY.drone.1 || drone[1].move.n || SYNC || P_OLD_LOW_BATTERY_MOVE_N_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19290K
+Composed in 29ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_N_1)
+DFA(P_OLD_LOW_BATTERY_MOVE_N_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 = (true U (!GROUNDED.drone.2 & drone[2].battery.safe))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 = S0,
+S1@ =(true -> S1),
+S0 =(!GROUNDED.drone.2&drone[2].battery.safe -> S1 |true -> S0).
+Composition:P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 = GROUNDED.drone.2 || drone[2].battery.safe || SYNC || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19248K
+Composed in 30ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2)
+DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_TAKEOFF_2 = (true U (LOW_BATTERY.drone.2 & drone[2].takeoff))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_TAKEOFF_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].takeoff -> S1).
+Composition:P_OLD_LOW_BATTERY_TAKEOFF_2 = LOW_BATTERY.drone.2 || drone[2].takeoff || SYNC || P_OLD_LOW_BATTERY_TAKEOFF_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19224K
+Composed in 26ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_TAKEOFF_2)
+DFA(P_OLD_LOW_BATTERY_TAKEOFF_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_UP_2 = (true U (LOW_BATTERY.drone.2 & drone[2].up))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_UP_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].up -> S1).
+Composition:P_OLD_LOW_BATTERY_UP_2 = LOW_BATTERY.drone.2 || drone[2].up || SYNC || P_OLD_LOW_BATTERY_UP_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19224K
+Composed in 27ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_2 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_LOW_BATTERY_UP_2)
+DFA(P_OLD_LOW_BATTERY_UP_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_E_2 = (true U (LOW_BATTERY.drone.2 & drone[2].move.e))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_E_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].move.e -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_E_2 = LOW_BATTERY.drone.2 || drone[2].move.e || SYNC || P_OLD_LOW_BATTERY_MOVE_E_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19234K
+Composed in 25ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_E_2)
+DFA(P_OLD_LOW_BATTERY_MOVE_E_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_N_2 = (true U (LOW_BATTERY.drone.2 & drone[2].move.n))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_N_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].move.n -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_N_2 = LOW_BATTERY.drone.2 || drone[2].move.n || SYNC || P_OLD_LOW_BATTERY_MOVE_N_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 19244K
+Composed in 27ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_N_2)
+DFA(P_OLD_LOW_BATTERY_MOVE_N_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_111_1_TO_2 = (true U (AT_H1.drone.1.1.1 & drone[2].arrive[1][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_111_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.1.1&drone[2].arrive[1][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_111_1_TO_2 = AT_H1.drone.1.1.1 || drone[2].arrive[1][1][1] || SYNC || P_OLD_NO_COLLISION_H1_111_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19297K
+Composed in 26ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_111_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_111_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H1_111_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_111_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_112_1_TO_2 = (true U (AT_H1.drone.1.1.2 & drone[2].arrive[1][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_112_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.1.2&drone[2].arrive[1][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_112_1_TO_2 = AT_H1.drone.1.1.2 || drone[2].arrive[1][2][1] || SYNC || P_OLD_NO_COLLISION_H1_112_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19318K
+Composed in 27ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_112_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_112_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H1_112_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_112_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_121_1_TO_2 = (true U (AT_H1.drone.1.2.1 & drone[2].arrive[2][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_121_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.2.1&drone[2].arrive[2][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_121_1_TO_2 = AT_H1.drone.1.2.1 || drone[2].arrive[2][1][1] || SYNC || P_OLD_NO_COLLISION_H1_121_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19338K
+Composed in 26ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_121_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_121_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H1_121_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_121_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_122_1_TO_2 = (true U (AT_H1.drone.1.2.2 & drone[2].arrive[2][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_122_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.2.2&drone[2].arrive[2][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_122_1_TO_2 = AT_H1.drone.1.2.2 || drone[2].arrive[2][2][1] || SYNC || P_OLD_NO_COLLISION_H1_122_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19345K
+Composed in 27ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_122_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_122_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H1_122_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_122_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_111_1_TO_2 = (true U (AT_H2.drone.1.1.1 & drone[2].arrive[1][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_111_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.1.1&drone[2].arrive[1][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_111_1_TO_2 = AT_H2.drone.1.1.1 || drone[2].arrive[1][1][2] || SYNC || P_OLD_NO_COLLISION_H2_111_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19361K
+Composed in 29ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_111_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_111_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H2_111_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_111_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_112_1_TO_2 = (true U (AT_H2.drone.1.1.2 & drone[2].arrive[1][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_112_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.1.2&drone[2].arrive[1][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_112_1_TO_2 = AT_H2.drone.1.1.2 || drone[2].arrive[1][2][2] || SYNC || P_OLD_NO_COLLISION_H2_112_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19372K
+Composed in 27ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_112_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_112_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H2_112_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_112_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_121_1_TO_2 = (true U (AT_H2.drone.1.2.1 & drone[2].arrive[2][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_121_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.2.1&drone[2].arrive[2][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_121_1_TO_2 = AT_H2.drone.1.2.1 || drone[2].arrive[2][1][2] || SYNC || P_OLD_NO_COLLISION_H2_121_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19389K
+Composed in 28ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_121_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_121_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H2_121_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_121_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_122_1_TO_2 = (true U (AT_H2.drone.1.2.2 & drone[2].arrive[2][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_122_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.2.2&drone[2].arrive[2][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_122_1_TO_2 = AT_H2.drone.1.2.2 || drone[2].arrive[2][2][2] || SYNC || P_OLD_NO_COLLISION_H2_122_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19401K
+Composed in 28ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_122_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_122_1_TO_2)
+DFA(P_OLD_NO_COLLISION_H2_122_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_122_1_TO_2 minimising...
+Minimised States: 2 in 1ms
+Formula !P_OLD_NO_COLLISION_H1_111_2_TO_1 = (true U (AT_H1.drone.2.1.1 & drone[1].arrive[1][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_111_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.1.1&drone[1].arrive[1][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_111_2_TO_1 = AT_H1.drone.2.1.1 || drone[1].arrive[1][1][1] || SYNC || P_OLD_NO_COLLISION_H1_111_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19415K
+Composed in 30ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_111_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_111_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H1_111_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_111_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_112_2_TO_1 = (true U (AT_H1.drone.2.1.2 & drone[1].arrive[1][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_112_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.1.2&drone[1].arrive[1][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_112_2_TO_1 = AT_H1.drone.2.1.2 || drone[1].arrive[1][2][1] || SYNC || P_OLD_NO_COLLISION_H1_112_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19426K
+Composed in 29ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_112_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_112_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H1_112_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_112_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_121_2_TO_1 = (true U (AT_H1.drone.2.2.1 & drone[1].arrive[2][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_121_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.2.1&drone[1].arrive[2][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_121_2_TO_1 = AT_H1.drone.2.2.1 || drone[1].arrive[2][1][1] || SYNC || P_OLD_NO_COLLISION_H1_121_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19439K
+Composed in 30ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_121_2_TO_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_NO_COLLISION_H1_121_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H1_121_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_121_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H1_122_2_TO_1 = (true U (AT_H1.drone.2.2.2 & drone[1].arrive[2][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H1_122_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.2.2&drone[1].arrive[2][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_H1_122_2_TO_1 = AT_H1.drone.2.2.2 || drone[1].arrive[2][2][1] || SYNC || P_OLD_NO_COLLISION_H1_122_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19453K
+Composed in 28ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_122_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H1_122_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H1_122_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H1_122_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_111_2_TO_1 = (true U (AT_H2.drone.2.1.1 & drone[1].arrive[1][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_111_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.1.1&drone[1].arrive[1][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_111_2_TO_1 = AT_H2.drone.2.1.1 || drone[1].arrive[1][1][2] || SYNC || P_OLD_NO_COLLISION_H2_111_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19467K
+Composed in 30ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_111_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_111_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H2_111_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_111_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_112_2_TO_1 = (true U (AT_H2.drone.2.1.2 & drone[1].arrive[1][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_112_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.1.2&drone[1].arrive[1][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_112_2_TO_1 = AT_H2.drone.2.1.2 || drone[1].arrive[1][2][2] || SYNC || P_OLD_NO_COLLISION_H2_112_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19483K
+Composed in 28ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_112_2_TO_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_NO_COLLISION_H2_112_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H2_112_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_112_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_121_2_TO_1 = (true U (AT_H2.drone.2.2.1 & drone[1].arrive[2][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_121_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.2.1&drone[1].arrive[2][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_121_2_TO_1 = AT_H2.drone.2.2.1 || drone[1].arrive[2][1][2] || SYNC || P_OLD_NO_COLLISION_H2_121_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19495K
+Composed in 33ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_121_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_121_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H2_121_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_121_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_H2_122_2_TO_1 = (true U (AT_H2.drone.2.2.2 & drone[1].arrive[2][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_H2_122_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.2.2&drone[1].arrive[2][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_H2_122_2_TO_1 = AT_H2.drone.2.2.2 || drone[1].arrive[2][2][2] || SYNC || P_OLD_NO_COLLISION_H2_122_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 97 Memory used: 19516K
+Composed in 29ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_122_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_H2_122_2_TO_1)
+DFA(P_OLD_NO_COLLISION_H2_122_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_H2_122_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Composition:OldController = OLD_ENV || P_OLD_NO_COLLISION_H1_122_2_TO_1 || P_OLD_LOW_BATTERY_UP_1 || P_OLD_NO_COLLISION_H2_122_2_TO_1 || P_OLD_NO_COLLISION_H1_111_1_TO_2 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 || P_OLD_LOW_BATTERY_TAKEOFF_1 || P_OLD_NO_COLLISION_H2_121_2_TO_1 || P_OLD_NO_COLLISION_H2_111_1_TO_2 || P_OLD_LOW_BATTERY_TAKEOFF_2 || P_OLD_LOW_BATTERY_MOVE_E_2 || P_OLD_NO_COLLISION_H2_122_1_TO_2 || P_OLD_NO_COLLISION_H1_121_2_TO_1 || P_OLD_NO_COLLISION_H1_111_2_TO_1 || P_OLD_NO_COLLISION_H2_111_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_N_2 || P_OLD_NO_COLLISION_H1_112_1_TO_2 || P_OLD_NO_COLLISION_H2_121_1_TO_2 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 || P_OLD_NO_COLLISION_H1_122_1_TO_2 || P_OLD_LOW_BATTERY_MOVE_N_1 || P_OLD_LOW_BATTERY_UP_2 || P_OLD_NO_COLLISION_H1_121_1_TO_2 || P_OLD_NO_COLLISION_H1_112_2_TO_1 || P_OLD_NO_COLLISION_H2_112_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_E_1 || P_OLD_NO_COLLISION_H2_112_1_TO_2
+State Space: 4624 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 39
+Composing...
+-- States: 4112 Transitions: 21248 Memory used: 40280K
+Composed in 74ms
+Solving the LTS control problem.
+Environment states: 4113
+Game states: 4113
+Game transitions: 12339
+Analysis time: 579ms.
+Controller [3188] generated successfully.
+Composition:OldController = OldController || P_OLD_NO_COLLISION_H1_122_2_TO_1 || P_OLD_LOW_BATTERY_UP_1 || P_OLD_NO_COLLISION_H2_122_2_TO_1 || P_OLD_NO_COLLISION_H1_111_1_TO_2 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 || P_OLD_LOW_BATTERY_TAKEOFF_1 || P_OLD_NO_COLLISION_H2_121_2_TO_1 || P_OLD_NO_COLLISION_H2_111_1_TO_2 || P_OLD_LOW_BATTERY_TAKEOFF_2 || P_OLD_LOW_BATTERY_MOVE_E_2 || P_OLD_NO_COLLISION_H2_122_1_TO_2 || P_OLD_NO_COLLISION_H1_121_2_TO_1 || P_OLD_NO_COLLISION_H1_111_2_TO_1 || P_OLD_NO_COLLISION_H2_111_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_N_2 || P_OLD_NO_COLLISION_H1_112_1_TO_2 || P_OLD_NO_COLLISION_H2_121_1_TO_2 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 || P_OLD_NO_COLLISION_H1_122_1_TO_2 || P_OLD_LOW_BATTERY_MOVE_N_1 || P_OLD_LOW_BATTERY_UP_2 || P_OLD_NO_COLLISION_H1_121_1_TO_2 || P_OLD_NO_COLLISION_H1_112_2_TO_1 || P_OLD_NO_COLLISION_H2_112_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_E_1 || P_OLD_NO_COLLISION_H2_112_1_TO_2
+State Space: 3188 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 38
+Composing...
+-- States: 3188 Transitions: 11800 Memory used: 103889K
+Composed in 107ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.BATTERY_OLD(1) || OLD_ENV.MOVE_OLD(1) || OLD_ENV.BATTERY_OLD(2) || OLD_ENV.MOVE_OLD(2)
+State Space: 2 * 34 * 2 * 34 = 2 ** 14
+Composing...
+-- States: 4624 Transitions: 23936 Memory used: 69392K
+Composed in 124ms
+ - Synthesizing Mapping Environment from lists (size=4)...
+INFO: Auto-compiling dependency: BATTERY_NEW(1)
+Generating Mapping Environment: MAP_BATTERY_OLD(1)_BATTERY_NEW(1)
+INFO: Auto-compiling dependency: MOVE_NEW(1)
+Generating Mapping Environment: MAP_MOVE_OLD(1)_MOVE_NEW(1)
+INFO: Auto-compiling dependency: BATTERY_NEW(2)
+Generating Mapping Environment: MAP_BATTERY_OLD(2)_BATTERY_NEW(2)
+INFO: Auto-compiling dependency: MOVE_NEW(2)
+Generating Mapping Environment: MAP_MOVE_OLD(2)_MOVE_NEW(2)
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_BATTERY_OLD(1)_BATTERY_NEW(1) || MAP_MOVE_OLD(1)_MOVE_NEW(1) || MAP_BATTERY_OLD(2)_BATTERY_NEW(2) || MAP_MOVE_OLD(2)_MOVE_NEW(2)
+State Space: 4 * 68 * 4 * 68 = 2 ** 18
+Composing...
+-- States: 9248 Transitions: 52496 Memory used: 92860K
+Composed in 133ms
+comp.continueCompilation time : 2402ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_TAKEOFF_1_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_UP_1_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_MOVE_E_1_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_MOVE_N_1_UPD_OLD
+Processing formula for update: P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_TAKEOFF_2_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_UP_2_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_MOVE_E_2_UPD_OLD
+Processing formula for update: P_OLD_LOW_BATTERY_MOVE_N_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_111_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_112_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_121_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_122_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_111_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_112_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_121_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_122_1_TO_2_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_111_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_112_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_121_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H1_122_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_111_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_112_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_121_2_TO_1_UPD_OLD
+Processing formula for update: P_OLD_NO_COLLISION_H2_122_2_TO_1_UPD_OLD
+Processing formula for update: P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_TAKEOFF_1_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_UP_1_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_MOVE_E_1_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_MOVE_N_1_UPD_NEW
+Processing formula for update: P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_TAKEOFF_2_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_UP_2_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_MOVE_E_2_UPD_NEW
+Processing formula for update: P_NEW_LOW_BATTERY_MOVE_N_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_111_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_112_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_121_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_122_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_111_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_112_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_121_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_122_1_TO_2_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_111_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_112_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_121_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H1_122_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_111_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_112_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_121_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_NO_COLLISION_H2_122_2_TO_1_UPD_NEW
+Processing formula for update: P_NEW_GEOFENCE_1_UPD_NEW
+Processing formula for update: P_NEW_GEOFENCE_2_UPD_NEW
+Environment states:125431
+Solving safety goals for the controller synthesis
+Environment states after safety: 119800
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [55231] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+比較用時間（合成全体-CountTime-描画） : 38分01.64秒
+
+[規模]
+最大状態数時の状態数 : 125431 states
+最大状態数時の遷移数 : 963179 transitions
+最大状態数時の段階 : [2. Meta]
+最大遷移数時の状態数 : 125431 states
+最大遷移数時の遷移数 : 963179 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 55231 states
+出力遷移数 : 212524 transitions
+
+[GR(1)]
+final GR input 状態数 : 119800 states
+final GR input 遷移数 : 635899 transitions
+GR(1)合成時間 : 34分29.02秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 6.84 GB
+最初の有効sampleからのヒープ増加 : 6.83 GB
+====================================================
+
+Evaluation data CSV written to: Experiment\diagnostics\phase_memory_jfr_drone_2x2x2_after_phase_refactor\run_02\result\DroneRebuilt_TemporaryArriveGeofencePolicyRollout_2Drones_2x2x2_PhaseMemoryJFRPhaseRefactorDiagnostic\Traditional\drone_rebuilt_2drones_2x2x2_phase_memory_jfr_phase_refactor_traditional_no_tr_evaluation_UpdCont.csv
+Tau reduction ON
+UpdCont minimising...........
+Minimised States: 21240 in 60397ms
+
+[minimized 出力]
+minimized 出力状態数 : 21240 states
+minimized 出力遷移数 : 89196 transitions
+minimize 時間 : 60405 ms
+Evaluation data CSV written to: Experiment\diagnostics\phase_memory_jfr_drone_2x2x2_after_phase_refactor\run_02\result\DroneRebuilt_TemporaryArriveGeofencePolicyRollout_2Drones_2x2x2_PhaseMemoryJFRPhaseRefactorDiagnostic\Traditional\drone_rebuilt_2drones_2x2x2_phase_memory_jfr_phase_refactor_traditional_no_tr_evaluation_UpdCont.csv

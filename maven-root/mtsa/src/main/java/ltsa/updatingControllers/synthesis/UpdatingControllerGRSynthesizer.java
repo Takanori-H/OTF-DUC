@@ -79,6 +79,10 @@ public class UpdatingControllerGRSynthesizer {
         // copying the whole source alphabet would also copy the reserved tau
         // label and can turn it into a real DontDoTwice self-loop upstream.
         safetyEnv.addActions(uccs.getUpdateGRGoal().getControllableActions());
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                compactSafetyEnv.isNonDeterministic() ? "nondeterministic" : "deterministic",
+                "input_alphabet_ready");
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
                 timingSection,
                 "synthesizeGR 全体時間");
@@ -92,6 +96,10 @@ public class UpdatingControllerGRSynthesizer {
             output.outln("Solving a deterministic controller synthesis");
             synthesizeGRDeterministic(uccs, output, safetyEnv, timingSection, heartbeatPrefix);
         }
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                compactSafetyEnv.isNonDeterministic() ? "nondeterministic" : "deterministic",
+                "branch_returned");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "synthesizeGR 全体時間");
@@ -120,6 +128,10 @@ public class UpdatingControllerGRSynthesizer {
                 "非決定環境の subset construction 時間");
         subsetConstructionBuilder = new SubsetConstructionBuilder<Long, String>(safetyEnv);
         perfectInfoGame = subsetConstructionBuilder.build();
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "nondeterministic",
+                "subset_game_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "非決定環境の subset construction 時間");
@@ -151,6 +163,10 @@ public class UpdatingControllerGRSynthesizer {
         Set<Set<Long>> faults = new HashSet<Set<Long>>();
 
         grGoal = new GRGoal<Set<Long>>(guarantees, assumptions, faults, uccs.getUpdateGRGoal().isPermissive());
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "nondeterministic",
+                "goal_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "GR goal 構築時間");
@@ -170,6 +186,10 @@ public class UpdatingControllerGRSynthesizer {
                 timingSection,
                 "Knowledge GR game 構築時間");
         game = new KnowledgeGRGame<Long, String>(initialStates, safetyEnv, perfectInfoGame, uccs.getUpdateGRGoal().getControllableActions(), grGoal);
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "nondeterministic",
+                "game_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "Knowledge GR game 構築時間");
@@ -187,6 +207,10 @@ public class UpdatingControllerGRSynthesizer {
                 timingSection,
                 "Rank system 構築時間");
         GRRankSystem<Set<Long>> system = new GRRankSystem<Set<Long>>(game.getStates(), grGoal.getGuarantees(), grGoal.getAssumptions(), grGoal.getFailures());
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "nondeterministic",
+                "rank_system_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "Rank system 構築時間");
@@ -203,6 +227,10 @@ public class UpdatingControllerGRSynthesizer {
                 timingSection,
                 "Winning region 計算時間");
         solver.solveGame();
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "nondeterministic",
+                "winning_region_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "Winning region 計算時間");
@@ -218,6 +246,10 @@ public class UpdatingControllerGRSynthesizer {
                     timingSection,
                     "Strategy 構築時間");
             Strategy<Set<Long>, Integer> strategy = solver.buildStrategy();
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "strategy_ready");
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     timingSection,
                     "Strategy 構築時間");
@@ -227,17 +259,41 @@ public class UpdatingControllerGRSynthesizer {
                     System.currentTimeMillis() - strategyBuildStart);
 
             Set<Pair<StrategyState<Set<Long>, Integer>, StrategyState<Set<Long>, Integer>>> worseRank = solver.getWorseRank();
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "controller_mts_build_before");
             long strategyToMtsStart = System.currentTimeMillis();
             DUCHeartbeat.beginPhase(heartbeatPrefix + "_CONTROLLER_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
                     "Strategy から controller MTS を構築する時間");
             MTS<StrategyState<Set<Long>, Integer>, String> result = GameStrategyToMTSBuilder.getInstance().buildMTSFrom(perfectInfoGame, strategy, worseRank);
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "controller_mts_build_after");
 
             result.removeUnreachableStates();
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "remove_unreachable_after");
             LTSAdapter<StrategyState<Set<Long>, Integer>, String> ltsAdapter = new LTSAdapter<StrategyState<Set<Long>,Integer>, String>(result, MTS.TransitionType.POSSIBLE);
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "lts_adapter_ready");
             MTS<StrategyState<Set<Long>, Integer>, String> synthesised  = new MTSAdapter<StrategyState<Set<Long>,Integer>, String>(ltsAdapter);
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "mts_adapter_ready");
             MTS<Long, String> plainController = new GenericMTSToLongStringMTSConverter<StrategyState<Set<Long>, Integer>, String>().transform(synthesised);
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "plain_controller_ready");
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     timingSection,
                     "Strategy から controller MTS を構築する時間");
@@ -251,7 +307,15 @@ public class UpdatingControllerGRSynthesizer {
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
                     "Controller を CompactState に変換する時間");
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "compact_controller_convert_before");
             CompactState compactState = MTSToAutomataConverter.getInstance().convert(plainController, uccs.getName(), false, true);
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "compact_controller_convert_after");
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     timingSection,
                     "Controller を CompactState に変換する時間");
@@ -260,6 +324,10 @@ public class UpdatingControllerGRSynthesizer {
                     "Controller を CompactState に変換する時間",
                     System.currentTimeMillis() - compactConvertStart);
             uccs.setComposition(compactState);
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "nondeterministic",
+                    "composition_published");
         } else {
             output.outln("There is no controller for model " + uccs.name + " for the given setting.");
             uccs.setComposition(null);
@@ -333,6 +401,10 @@ public class UpdatingControllerGRSynthesizer {
                 timingSection,
                 "GR game 構築時間");
         game = new GRGameBuilder<Long, String>().buildGRGameFrom(safetyEnv,uccs.getUpdateGRGoal());
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "deterministic",
+                "game_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "GR game 構築時間");
@@ -353,6 +425,10 @@ public class UpdatingControllerGRSynthesizer {
                 "Rank system 構築時間");
         GRRankSystem<Long> system = new GRRankSystem<Long>(game.getStates(),game.getGoal().getGuarantees(),
                 game.getGoal().getAssumptions(), game.getGoal().getFailures());
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "deterministic",
+                "rank_system_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "Rank system 構築時間");
@@ -368,6 +444,10 @@ public class UpdatingControllerGRSynthesizer {
                 timingSection,
                 "Winning region 計算時間");
         solver.solveGame();
+        recordGrPhaseMemoryCheckpoint(
+                heartbeatPrefix,
+                "deterministic",
+                "winning_region_ready");
         UpdatingControllerEvaluationRecorder.endFailureTimer(
                 timingSection,
                 "Winning region 計算時間");
@@ -383,6 +463,10 @@ public class UpdatingControllerGRSynthesizer {
                     timingSection,
                     "Strategy 構築時間");
             Strategy<Long, Integer> strategy = solver.buildStrategy();
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "deterministic",
+                    "strategy_ready");
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     timingSection,
                     "Strategy 構築時間");
@@ -392,12 +476,20 @@ public class UpdatingControllerGRSynthesizer {
                     System.currentTimeMillis() - strategyBuildStart);
             GRGameSolver<Long> grSolver = (GRGameSolver<Long>) solver;
             Set<Pair<StrategyState<Long, Integer>, StrategyState<Long, Integer>>> worseRank = grSolver.getWorseRank();
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "deterministic",
+                    "controller_mts_build_before");
             long strategyToMtsStart = System.currentTimeMillis();
             DUCHeartbeat.beginPhase(heartbeatPrefix + "_CONTROLLER_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
                     "Strategy から controller MTS を構築する時間");
             MTS<StrategyState<Long, Integer>, String> result = GameStrategyToMTSBuilder.getInstance().buildMTSFrom(safetyEnv, strategy, worseRank, uccs.getUpdateGRGoal().getLazyness());
+            recordGrPhaseMemoryCheckpoint(
+                    heartbeatPrefix,
+                    "deterministic",
+                    "controller_mts_build_after");
             UpdatingControllerEvaluationRecorder.endFailureTimer(
                     timingSection,
                     "Strategy から controller MTS を構築する時間");
@@ -414,8 +506,16 @@ public class UpdatingControllerGRSynthesizer {
                 UpdatingControllerEvaluationRecorder.beginFailureTimer(
                         timingSection,
                         "StrategyState controller を Long/String MTS に変換する時間");
+                recordGrPhaseMemoryCheckpoint(
+                        heartbeatPrefix,
+                        "deterministic",
+                        "plain_controller_transform_before");
                 GenericMTSToLongStringMTSConverter<StrategyState<Long, Integer>, String> transformer = new GenericMTSToLongStringMTSConverter<StrategyState<Long, Integer>, String>();
                 MTS<Long, String> plainController = transformer.transform(result);
+                recordGrPhaseMemoryCheckpoint(
+                        heartbeatPrefix,
+                        "deterministic",
+                        "plain_controller_ready");
                 UpdatingControllerEvaluationRecorder.endFailureTimer(
                         timingSection,
                         "StrategyState controller を Long/String MTS に変換する時間");
@@ -429,7 +529,15 @@ public class UpdatingControllerGRSynthesizer {
                 UpdatingControllerEvaluationRecorder.beginFailureTimer(
                         timingSection,
                         "Controller を CompactState に変換する時間");
+                recordGrPhaseMemoryCheckpoint(
+                        heartbeatPrefix,
+                        "deterministic",
+                        "compact_controller_convert_before");
                 CompactState convert = MTSToAutomataConverter.getInstance().convert(plainController, uccs.getName(), true);
+                recordGrPhaseMemoryCheckpoint(
+                        heartbeatPrefix,
+                        "deterministic",
+                        "compact_controller_convert_after");
                 UpdatingControllerEvaluationRecorder.endFailureTimer(
                         timingSection,
                         "Controller を CompactState に変換する時間");
@@ -438,12 +546,27 @@ public class UpdatingControllerGRSynthesizer {
                         "Controller を CompactState に変換する時間",
                         System.currentTimeMillis() - compactConvertStart);
                 uccs.setComposition(convert);
+                recordGrPhaseMemoryCheckpoint(
+                        heartbeatPrefix,
+                        "deterministic",
+                        "composition_published");
             }
         } else {
             output.outln("There is no controller for model " + uccs.name + " for the given setting.");
             uccs.setComposition(null);
         }
 
+    }
+
+    private static void recordGrPhaseMemoryCheckpoint(
+            String heartbeatPrefix,
+            String branch,
+            String boundary) {
+        if (!UpdatingControllerEvaluationRecorder.isPhaseMemoryDiagnosticsEnabled()) {
+            return;
+        }
+        UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
+                "gr." + heartbeatPrefix + "." + branch + "." + boundary);
     }
 
     private static CompactState buildDeterministicGRGameCompactState(GRGame<Long> game) {

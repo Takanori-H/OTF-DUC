@@ -11,6 +11,7 @@ import MTSTools.ac.ic.doc.mtstools.model.MTSConstants;
 import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 import ltsa.lts.LTSException;
 import ltsa.lts.LTSOutput;
+import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.synthesis.SafetyBackwardPruner;
 import org.junit.Test;
 
@@ -386,6 +387,138 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
     }
 
     @Test
+    public void sharedNondeterministicActionPreservesEveryCartesianTargetCombination() {
+        MTS<Long, String> first = new MTSImpl<Long, String>(0L);
+        first.addState(1L);
+        first.addState(2L);
+        first.addAction("branch");
+        first.addRequired(0L, "branch", 1L);
+        first.addRequired(0L, "branch", 2L);
+
+        MTS<Long, String> second = new MTSImpl<Long, String>(0L);
+        second.addState(10L);
+        second.addState(20L);
+        second.addAction("branch");
+        second.addRequired(0L, "branch", 10L);
+        second.addRequired(0L, "branch", 20L);
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.composeProduct(
+                        Arrays.asList(
+                                emptyValuedFragment(first, Collections.singleton("branch")),
+                                emptyValuedFragment(second, Collections.singleton("branch"))),
+                        "NONDETERMINISTIC_CARTESIAN_TEST",
+                        NO_OUTPUT);
+
+        long initial = product.getEnvironment().getInitialState();
+        Set<Long> targets = targets(product.getEnvironment(), initial, "branch");
+        assertEquals("Two targets from each owner must produce all 2 x 2 combinations.",
+                4,
+                targets.size());
+        assertEquals(5, product.getEnvironment().getStates().size());
+        assertEquals(4, totalTransitionCount(product.getEnvironment()));
+    }
+
+    @Test
+    public void updateActionSynchronizesOnlyWhenEveryInputEnablesIt() {
+        MTS<Long, String> alwaysReady = new MTSImpl<Long, String>(0L);
+        alwaysReady.addAction(UpdateConstants.STOP_OLD_SPEC);
+        alwaysReady.addRequired(0L, UpdateConstants.STOP_OLD_SPEC, 0L);
+
+        MTS<Long, String> initiallyNotReady = new MTSImpl<Long, String>(0L);
+        initiallyNotReady.addState(1L);
+        initiallyNotReady.addActions(set("enableSecond", UpdateConstants.STOP_OLD_SPEC));
+        initiallyNotReady.addRequired(0L, "enableSecond", 1L);
+        initiallyNotReady.addRequired(1L, UpdateConstants.STOP_OLD_SPEC, 1L);
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.composeProduct(
+                        Arrays.asList(
+                                emptyValuedFragment(
+                                        alwaysReady,
+                                        Collections.<String>emptySet()),
+                                emptyValuedFragment(
+                                        initiallyNotReady,
+                                        Collections.singleton("enableSecond"))),
+                        "UPDATE_ACTION_ALL_INPUTS_TEST",
+                        NO_OUTPUT);
+
+        long initial = product.getEnvironment().getInitialState();
+        assertTrue(product.getEnvironment().getActions().contains(
+                UpdateConstants.STOP_OLD_SPEC));
+        assertFalse("An update action must wait until every input enables it.",
+                hasTransition(product.getEnvironment(), initial, UpdateConstants.STOP_OLD_SPEC));
+
+        long ready = onlyTarget(product.getEnvironment(), initial, "enableSecond");
+        assertTrue("The update action must synchronize once every input enables it.",
+                hasTransition(product.getEnvironment(), ready, UpdateConstants.STOP_OLD_SPEC));
+    }
+
+    @Test
+    public void oldActionUsesTheOwnerOfItsNormalizedBaseAction() {
+        MTS<Long, String> normalOwner = new MTSImpl<Long, String>(0L);
+        normalOwner.addAction("move");
+
+        MTS<Long, String> oldActionFragment = oneStateEnvironment("move.old");
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.composeProduct(
+                        Arrays.asList(
+                                emptyValuedFragment(
+                                        normalOwner,
+                                        Collections.singleton("move")),
+                                emptyValuedFragment(
+                                        oldActionFragment,
+                                        Collections.<String>emptySet())),
+                        "OLD_ACTION_OWNER_NORMALIZATION_TEST",
+                        NO_OUTPUT);
+
+        long initial = product.getEnvironment().getInitialState();
+        assertTrue(product.getEnvironment().getActions().contains("move.old"));
+        assertFalse("move.old must be gated by the component that owns normal action move.",
+                hasTransition(product.getEnvironment(), initial, "move.old"));
+    }
+
+    @Test
+    public void errorTupleIsRecordedButNeverExpanded() {
+        MTS<Long, String> failing = new MTSImpl<Long, String>(0L);
+        failing.addState(1L);
+        failing.addState(2L);
+        failing.addActions(set("enterError", "escape"));
+        failing.addRequired(0L, "enterError", 1L);
+        failing.addRequired(1L, "escape", 2L);
+
+        MTS<Long, String> observer = oneStateEnvironment("enterError", "escape");
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv failingFragment =
+                new StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv(
+                        failing,
+                        Collections.<Fluent>emptySet(),
+                        new FluentStateValuation<Long>(failing.getStates()),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        set("enterError", "escape"),
+                        Collections.singleton(1L));
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.composeProduct(
+                        Arrays.asList(
+                                failingFragment,
+                                emptyValuedFragment(observer, set("enterError", "escape"))),
+                        "ERROR_TUPLE_TERMINAL_TEST",
+                        NO_OUTPUT);
+
+        long initial = product.getEnvironment().getInitialState();
+        long error = onlyTarget(product.getEnvironment(), initial, "enterError");
+        assertFalse("An error tuple is terminal even if its inputs have outgoing transitions.",
+                hasTransition(product.getEnvironment(), error, "escape"));
+        assertEquals("The successor beyond the error tuple must not be discovered.",
+                2,
+                product.getEnvironment().getStates().size());
+        assertEquals(0, product.getEnvironment().getTransitions(
+                error, MTS.TransitionType.REQUIRED).size());
+    }
+
+    @Test
     public void safetyPrunedPassiveTransitionStaysDisabledAfterOwnerJoins() {
         Fluent unsafe = fluent(
                 "unsafe",
@@ -498,6 +631,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                 realActions);
     }
 
+    private static StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv emptyValuedFragment(
+            MTS<Long, String> environment,
+            Set<String> realActions) {
+        return new StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv(
+                environment,
+                Collections.<Fluent>emptySet(),
+                new FluentStateValuation<Long>(environment.getStates()),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                realActions);
+    }
+
     private static Set<String> semanticSnapshot(
             StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv environment,
             Set<Fluent> fluents) {
@@ -564,6 +709,17 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
     }
 
     private static long onlyTarget(MTS<Long, String> environment, long state, String action) {
+        Set<Long> targets = targets(environment, state, action);
+        assertEquals("Expected one target for action " + action + " from state " + state,
+                1,
+                targets.size());
+        return targets.iterator().next();
+    }
+
+    private static Set<Long> targets(
+            MTS<Long, String> environment,
+            long state,
+            String action) {
         Set<Long> targets = new LinkedHashSet<Long>();
         for (Pair<String, Long> transition :
                 environment.getTransitions(state, MTS.TransitionType.REQUIRED)) {
@@ -571,10 +727,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                 targets.add(transition.getSecond());
             }
         }
-        assertEquals("Expected one target for action " + action + " from state " + state,
-                1,
-                targets.size());
-        return targets.iterator().next();
+        return targets;
     }
 
     private static boolean hasTransition(MTS<Long, String> environment, long state, String action) {

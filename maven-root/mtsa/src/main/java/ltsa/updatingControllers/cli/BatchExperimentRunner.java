@@ -24,6 +24,9 @@ import ltsa.updatingControllers.checks.TraceLanguageChecker;
 import ltsa.updatingControllers.checks.TransitionGraph;
 import ltsa.updatingControllers.checks.UpdateRequirementChecker;
 import ltsa.updatingControllers.cli.ExperimentConfig.ExperimentCase;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
+import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ExternalDataMetric;
+import ltsa.updatingControllers.memory.MemoryMeasurementProtocol;
 
 public final class BatchExperimentRunner {
 
@@ -34,6 +37,22 @@ public final class BatchExperimentRunner {
     private static final String STATUS_EXCEPTION = "EXCEPTION";
     private static final String STATUS_NO_COMPOSITION = "NO_COMPOSITION";
     private static final String STATUS_NO_TRANSITION_OUTPUT = "NO_TRANSITION_OUTPUT";
+    private static final String STATUS_MEASUREMENT_FAILED = "MEASUREMENT_FAILED";
+    private static final String MEMORY_SAMPLING_ENABLED_PROPERTY =
+            "mtsa.evaluation.memorySampling.enabled";
+    private static final String MEMORY_SAMPLING_INTERVAL_PROPERTY =
+            "mtsa.evaluation.memorySampling.intervalMillis";
+    private static final String RSS_SAMPLING_ENABLED_PROPERTY =
+            "mtsa.evaluation.rssSampling.enabled";
+    private static final String RSS_SAMPLING_INTERVAL_PROPERTY =
+            "mtsa.evaluation.rssSampling.intervalMillis";
+    private static final String RSS_PROVIDER_TIMEOUT_PROPERTY =
+            "mtsa.evaluation.rssSampling.providerTimeoutMillis";
+    private static final String WINDOWS_PEAK_WORKING_SET_ENABLED_PROPERTY =
+            "mtsa.evaluation.windowsPeakWorkingSet.enabled";
+    private static final long CHILD_TERMINATION_WAIT_MILLIS = 10_000L;
+    private static final long STREAM_DRAIN_WAIT_MILLIS = 10_000L;
+    private static final long STREAM_DRAIN_AFTER_CLOSE_WAIT_MILLIS = 1_000L;
 
     private BatchExperimentRunner() {
     }
@@ -156,22 +175,92 @@ public final class BatchExperimentRunner {
         CaseResult result = new CaseResult();
         result.startedAt = now();
         long timeoutMillis = experimentCase.timeoutMillisOrDefault(config.timeoutMillis);
+        result.heapSamplingEnabled = configuredBooleanSystemProperty(
+                config.javaOptions,
+                MEMORY_SAMPLING_ENABLED_PROPERTY,
+                true);
+        result.rssSamplingEnabled = configuredBooleanSystemProperty(
+                config.javaOptions,
+                RSS_SAMPLING_ENABLED_PROPERTY,
+                result.heapSamplingEnabled);
+        result.windowsPeakWorkingSetEnabled = configuredBooleanSystemProperty(
+                config.javaOptions,
+                WINDOWS_PEAK_WORKING_SET_ENABLED_PROPERTY,
+                false);
         Process process = null;
         StreamCopyThread stdoutThread = null;
         StreamCopyThread stderrThread = null;
+        ProcessRssSampler rssSampler = null;
+        WindowsPeakWorkingSetProbe windowsPeakWorkingSetProbe = null;
+        MemoryWindowHandshakeCoordinator memoryProtocol = null;
 
         try {
             paths.ensureDirectories();
+            Files.write(paths.evaluationCsvFile.toPath(), new byte[0]);
             List<String> command = buildChildCommand(config, experimentCase, paths);
             result.command = command;
 
             ProcessBuilder builder = new ProcessBuilder(command);
             process = builder.start();
+            result.processStartedAtEpochMillis = System.currentTimeMillis();
+            result.processStartedAtNanos = System.nanoTime();
 
-            stdoutThread = new StreamCopyThread(process.getInputStream(), paths.stdoutFile);
+            final MemoryWindowHandshakeCoordinator protocolForListener =
+                    result.rssSamplingEnabled
+                            ? new MemoryWindowHandshakeCoordinator(process.getOutputStream())
+                            : null;
+            memoryProtocol = protocolForListener;
+            MemoryWindowMarkerDetector markerDetector = protocolForListener == null
+                    ? null
+                    : new MemoryWindowMarkerDetector(protocolForListener);
+            stdoutThread = new StreamCopyThread(
+                    process.getInputStream(),
+                    paths.stdoutFile,
+                    markerDetector);
             stderrThread = new StreamCopyThread(process.getErrorStream(), paths.stderrFile);
             stdoutThread.start();
             stderrThread.start();
+
+            if (result.rssSamplingEnabled) {
+                if (result.windowsPeakWorkingSetEnabled) {
+                    try {
+                        windowsPeakWorkingSetProbe =
+                                WindowsPeakWorkingSetProbe.open(process.pid());
+                    } catch (RuntimeException e) {
+                        result.rssMeasurementError = appendError(
+                                result.rssMeasurementError,
+                                "Windows peak probe open failed: " + e);
+                    } catch (LinkageError e) {
+                        result.rssMeasurementError = appendError(
+                                result.rssMeasurementError,
+                                "Windows peak probe linkage failed: " + e);
+                    } catch (OutOfMemoryError e) {
+                        result.rssMeasurementError = appendError(
+                                result.rssMeasurementError,
+                                "Windows peak probe open out of memory");
+                    }
+                }
+                try {
+                    rssSampler = new ProcessRssSampler(
+                            process.pid(),
+                            configuredRssSamplingInterval(config.javaOptions),
+                            configuredRssProviderTimeout(config.javaOptions));
+                    rssSampler.start();
+                    result.rssSamplerAttachedAtEpochMillis = System.currentTimeMillis();
+                    result.rssSamplerAttachElapsedMillis = TimeUnit.NANOSECONDS.toMillis(
+                            System.nanoTime() - result.processStartedAtNanos);
+                } catch (RuntimeException e) {
+                    result.rssMeasurementError = e.toString();
+                    rssSampler = null;
+                } catch (LinkageError e) {
+                    result.rssMeasurementError = e.toString();
+                    rssSampler = null;
+                } finally {
+                    // A missing provider must disable RSS data, not leave the
+                    // child blocked waiting for the protocol ACK.
+                    protocolForListener.samplerReady(rssSampler);
+                }
+            }
 
             boolean finished;
             if (timeoutMillis <= 0) {
@@ -188,9 +277,17 @@ public final class BatchExperimentRunner {
                 result.timedOut = true;
                 result.status = STATUS_TIMEOUT;
                 process.destroy();
-                if (!process.waitFor(10, TimeUnit.SECONDS)) {
+                if (!process.waitFor(
+                        CHILD_TERMINATION_WAIT_MILLIS,
+                        TimeUnit.MILLISECONDS)) {
                     process.destroyForcibly();
-                    process.waitFor();
+                    if (!process.waitFor(
+                            CHILD_TERMINATION_WAIT_MILLIS,
+                            TimeUnit.MILLISECONDS)) {
+                        result.errorMessage = appendError(
+                                result.errorMessage,
+                                "Child process remained alive after forced termination");
+                    }
                 }
             } else {
                 result.status = statusFromExitCode(result.exitCode.intValue(), paths);
@@ -203,12 +300,735 @@ public final class BatchExperimentRunner {
             result.status = STATUS_EXCEPTION;
             result.errorMessage = e.toString();
         } finally {
-            joinQuietly(stdoutThread);
-            joinQuietly(stderrThread);
+            if (!terminateIfAlive(process)) {
+                result.errorMessage = appendError(
+                        result.errorMessage,
+                        "Child process remained alive during final cleanup");
+            }
+            boolean stdoutDrained = drainStreamThread(
+                    stdoutThread,
+                    process == null ? null : process.getInputStream());
+            boolean stderrDrained = drainStreamThread(
+                    stderrThread,
+                    process == null ? null : process.getErrorStream());
+            if (!stdoutDrained) {
+                result.stdoutCopyError = appendError(
+                        result.stdoutCopyError,
+                        "stdout_drain_timeout");
+            }
+            if (!stderrDrained) {
+                result.stderrCopyError = appendError(
+                        result.stderrCopyError,
+                        "stderr_drain_timeout");
+            }
+            if (memoryProtocol != null) {
+                if (stdoutThread != null && stdoutThread.getErrorMessage() != null) {
+                    result.stdoutCopyError = appendError(
+                            result.stdoutCopyError,
+                            stdoutThread.getErrorMessage());
+                }
+                if (stdoutDrained) {
+                    result.memoryProtocolResult = memoryProtocol.snapshot();
+                    memoryProtocol.close();
+                } else {
+                    // The copy thread may still be inside a protocol callback
+                    // holding the coordinator lock. Do not turn a stream
+                    // timeout into an unbounded snapshot/close wait.
+                    result.rssMeasurementError = appendError(
+                            result.rssMeasurementError,
+                            "memory_protocol_unavailable_after_stdout_drain_timeout");
+                }
+            }
+            if (stderrThread != null && stderrThread.getErrorMessage() != null) {
+                result.stderrCopyError = appendError(
+                        result.stderrCopyError,
+                        stderrThread.getErrorMessage());
+            }
+            if (rssSampler != null) {
+                try {
+                    result.rssResult = rssSampler.stop();
+                } catch (RuntimeException e) {
+                    result.rssMeasurementError = appendError(
+                            result.rssMeasurementError,
+                            e.toString());
+                } catch (LinkageError e) {
+                    result.rssMeasurementError = appendError(
+                            result.rssMeasurementError,
+                            e.toString());
+                }
+            }
+            if (windowsPeakWorkingSetProbe != null) {
+                try {
+                    result.windowsPeakWorkingSetResult =
+                            windowsPeakWorkingSetProbe.closeAndGet();
+                } catch (RuntimeException e) {
+                    result.rssMeasurementError = appendError(
+                            result.rssMeasurementError,
+                            "Windows peak probe final read failed: " + e);
+                } catch (LinkageError e) {
+                    result.rssMeasurementError = appendError(
+                            result.rssMeasurementError,
+                            "Windows peak probe final linkage failed: " + e);
+                } catch (OutOfMemoryError e) {
+                    result.rssMeasurementError = appendError(
+                            result.rssMeasurementError,
+                            "Windows peak probe final read out of memory");
+                }
+            }
             result.endedAt = now();
+            appendProcessMemoryMetrics(config, paths, experimentCase, result);
         }
 
         return result;
+    }
+
+    private static boolean terminateIfAlive(Process process) {
+        if (process == null || !process.isAlive()) {
+            return true;
+        }
+        boolean interrupted = Thread.interrupted();
+        boolean terminated = false;
+        try {
+            process.destroy();
+            try {
+                if (!process.waitFor(
+                        CHILD_TERMINATION_WAIT_MILLIS,
+                        TimeUnit.MILLISECONDS)) {
+                    process.destroyForcibly();
+                    process.waitFor(
+                            CHILD_TERMINATION_WAIT_MILLIS,
+                            TimeUnit.MILLISECONDS);
+                }
+                terminated = !process.isAlive();
+            } catch (InterruptedException e) {
+                interrupted = true;
+                process.destroyForcibly();
+                terminated = !process.isAlive();
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return terminated;
+    }
+
+    private static boolean drainStreamThread(Thread thread, InputStream stream) {
+        if (joinBounded(thread, STREAM_DRAIN_WAIT_MILLIS)) {
+            return true;
+        }
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+                // The timeout is reported by the caller.
+            }
+        }
+        if (thread != null) {
+            thread.interrupt();
+        }
+        return joinBounded(thread, STREAM_DRAIN_AFTER_CLOSE_WAIT_MILLIS);
+    }
+
+    private static String appendError(String existing, String additional) {
+        if (additional == null || additional.isEmpty()) {
+            return existing;
+        }
+        if (existing == null || existing.isEmpty()) {
+            return additional;
+        }
+        return existing + "; " + additional;
+    }
+
+    private static void appendProcessMemoryMetrics(
+            ExperimentConfig config,
+            CasePaths paths,
+            ExperimentCase experimentCase,
+            CaseResult result) {
+        List<ExternalDataMetric> metrics = new ArrayList<ExternalDataMetric>();
+        String section = "Parent process memory measurement";
+        Map<String, String> existingMetrics =
+                readEvaluationCsvValues(paths.evaluationCsvFile);
+        MemoryWindowHandshakeCoordinator.Result protocol =
+                result.memoryProtocolResult;
+        boolean protocolComplete = protocol != null && protocol.isComplete();
+        boolean boundarySamplesComplete = protocolComplete
+                && protocol.isStartBoundarySampleSucceeded()
+                && protocol.isEndBoundarySampleSucceeded();
+        ProcessRssSampler.Result rss = result.rssResult;
+        boolean completeSynthesisRssWindow = rss != null
+                && rss.isSynthesisWindowAvailable()
+                && rss.isSynthesisWindowCompleted()
+                && boundarySamplesComplete;
+        boolean heapMeasurementComplete = !result.heapSamplingEnabled
+                || Boolean.parseBoolean(existingMetrics.get(
+                        "heap_memory_sampling_available"));
+        boolean rssMeasurementComplete = !result.rssSamplingEnabled
+                || completeSynthesisRssWindow;
+        boolean requiredMemoryDataComplete =
+                heapMeasurementComplete && rssMeasurementComplete;
+        if (STATUS_SUCCESS.equals(result.status) && !requiredMemoryDataComplete) {
+            result.status = STATUS_MEASUREMENT_FAILED;
+            result.errorMessage = appendError(
+                    result.errorMessage,
+                    "Required memory measurement incomplete"
+                            + " (heap=" + heapMeasurementComplete
+                            + ", rss=" + rssMeasurementComplete + ")");
+        }
+        String childRecordedResult = existingMetrics.get("result");
+        if (UpdatingControllerEvaluationRecorder.PARENT_FINALIZATION_PENDING
+                .equals(childRecordedResult)) {
+            childRecordedResult = STATUS_SUCCESS;
+        }
+        String childRecordedFailureReason = existingMetrics.get("failure_reason");
+        String finalFailureReason = batchFailureReason(result, existingMetrics);
+        // A successful child already writes these rows. Add them only as a
+        // fallback for timeout/JVM-start-failure cases so one run never has
+        // duplicate stable metric keys.
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("result", "Run", "result",
+                        result.status, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("failure_reason", "Run", "failure reason",
+                        finalFailureReason, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_result", "Run", "batch final result",
+                        result.status, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "batch_failure_reason",
+                        "Run",
+                        "batch final failure reason",
+                        finalFailureReason,
+                        "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "memory_measurement_required_data_complete",
+                        section,
+                        "有効化された主メモリ指標が完結",
+                        Boolean.toString(requiredMemoryDataComplete),
+                        "boolean"));
+        if (childRecordedResult != null
+                && !childRecordedResult.equals(result.status)) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "child_recorded_result_before_batch_finalize",
+                            "Run",
+                            "child recorder result before batch finalize",
+                            childRecordedResult,
+                            "text"));
+        }
+        if (childRecordedFailureReason != null
+                && !childRecordedFailureReason.equals(finalFailureReason)) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "child_recorded_failure_reason_before_batch_finalize",
+                            "Run",
+                            "child recorder failure reason before batch finalize",
+                            childRecordedFailureReason,
+                            "text"));
+        }
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("evaluation_csv_file", "Run", "evaluation CSV file",
+                        paths.evaluationCsvFile.getPath(), "path"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_case_id", "Run", "batch case id",
+                        experimentCase.id, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_example", "Run", "batch example",
+                        experimentCase.example, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_method", "Run", "batch method",
+                        experimentCase.method, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_variant", "Run", "batch variant",
+                        experimentCase.variant, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_target", "Run", "batch target",
+                        experimentCase.target, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_lts_file", "Run", "batch LTS file",
+                        experimentCase.lts.getPath(), "path"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_config_file", "Run", "batch config file",
+                        config.configFile.getPath(), "path"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_run_index", "Run", "batch run index",
+                        Integer.toString(paths.runIndex), "count"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_run_count", "Run", "batch run count",
+                        Integer.toString(paths.runCount), "count"));
+        if (paths.runLabel != null) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric("batch_run_label", "Run", "batch run label",
+                            paths.runLabel, "text"));
+        }
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "heap_memory_sampling_enabled",
+                        section,
+                        "child JVM aggregate heap周期計測の有効化",
+                        Boolean.toString(result.heapSamplingEnabled),
+                        "boolean"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "heap_memory_sampling_available",
+                        section,
+                        "child heap計測値取得可否",
+                        "false",
+                        "boolean"));
+        if (result.heapSamplingEnabled
+                && !existingMetrics.containsKey("heap_memory_sampling_available")
+                && !existingMetrics.containsKey("heap_memory_sampling_error")) {
+            metrics.add(externalMetric(
+                    "heap_memory_sampling_error",
+                    section,
+                    "child heap計測エラー",
+                    "child_metric_unavailable:" + result.status,
+                    "text"));
+        }
+        metrics.add(externalMetric(
+                "process_rss_sampling_enabled",
+                section,
+                "子JVM RSS周期計測の有効化",
+                Boolean.toString(result.rssSamplingEnabled),
+                "boolean"));
+        metrics.add(externalMetric(
+                "process_rss_sampling_available",
+                section,
+                "child lifetime RSS取得可否",
+                Boolean.toString(result.rssResult != null
+                        && result.rssResult.isAvailable()),
+                "boolean"));
+        if (result.processStartedAtEpochMillis >= 0L) {
+            metrics.add(externalMetric(
+                    "child_process_started_at_epoch_ms",
+                    section,
+                    "子JVM開始epoch時刻",
+                    Long.toString(result.processStartedAtEpochMillis),
+                    "epoch_ms"));
+        }
+        if (result.rssSamplerAttachedAtEpochMillis >= 0L) {
+            metrics.add(externalMetric(
+                    "process_rss_sampler_attached_at_epoch_ms",
+                    section,
+                    "RSS sampler attach epoch時刻",
+                    Long.toString(result.rssSamplerAttachedAtEpochMillis),
+                    "epoch_ms"));
+            metrics.add(externalMetric(
+                    "process_rss_sampler_attach_elapsed_ms",
+                    section,
+                    "子JVM開始からRSS sampler attachまで",
+                    Long.toString(result.rssSamplerAttachElapsedMillis),
+                    "ms"));
+        }
+
+        metrics.add(externalMetric(
+                "memory_protocol_version",
+                section,
+                "RSS計測境界protocol version",
+                MemoryMeasurementProtocol.VERSION,
+                "text"));
+        metrics.add(externalMetric(
+                "memory_protocol_enabled",
+                section,
+                "RSS計測境界protocol有効化",
+                Boolean.toString(result.rssSamplingEnabled),
+                "boolean"));
+        metrics.add(externalMetric(
+                "memory_protocol_ack_timeout_ms",
+                section,
+                "子JVMの境界ACK待機上限",
+                Long.toString(configuredMemoryProtocolAckTimeout(config.javaOptions)),
+                "ms"));
+        metrics.add(externalMetric(
+                "memory_protocol_handshake_complete",
+                section,
+                "合成RSS区間のSTART/END handshake完了",
+                Boolean.toString(protocolComplete),
+                "boolean"));
+        metrics.add(externalMetric(
+                "memory_protocol_boundary_samples_complete",
+                section,
+                "合成RSS区間の両境界sample成功",
+                Boolean.toString(boundarySamplesComplete),
+                "boolean"));
+        if (protocol != null) {
+            metrics.add(externalMetric("memory_protocol_start_marker_count", section,
+                    "START marker受信数",
+                    Integer.toString(protocol.getStartMarkerCount()), "count"));
+            metrics.add(externalMetric("memory_protocol_end_marker_count", section,
+                    "END marker受信数",
+                    Integer.toString(protocol.getEndMarkerCount()), "count"));
+            metrics.add(externalMetric("memory_protocol_start_ack_sent", section,
+                    "START ACK送信",
+                    Boolean.toString(protocol.isStartAckSent()), "boolean"));
+            metrics.add(externalMetric("memory_protocol_end_ack_sent", section,
+                    "END ACK送信",
+                    Boolean.toString(protocol.isEndAckSent()), "boolean"));
+            metrics.add(externalMetric("memory_protocol_start_boundary_sample_success", section,
+                    "START境界RSS sample成功",
+                    Boolean.toString(protocol.isStartBoundarySampleSucceeded()), "boolean"));
+            metrics.add(externalMetric("memory_protocol_end_boundary_sample_success", section,
+                    "END境界RSS sample成功",
+                    Boolean.toString(protocol.isEndBoundarySampleSucceeded()), "boolean"));
+            metrics.add(externalMetric("memory_protocol_start_ack_wait_ms", section,
+                    "START marker受信からACKまで",
+                    Long.toString(protocol.getStartAckWaitMillis()), "ms"));
+            metrics.add(externalMetric("memory_protocol_end_ack_wait_ms", section,
+                    "END marker受信からACKまで",
+                    Long.toString(protocol.getEndAckWaitMillis()), "ms"));
+            metrics.add(externalMetric("memory_protocol_error", section,
+                    "RSS計測境界protocol error",
+                    protocol.getProtocolError(), "text"));
+        }
+
+        if (result.rssMeasurementError != null && !result.rssMeasurementError.isEmpty()) {
+            metrics.add(externalMetric(
+                    "process_rss_sampling_error",
+                    section,
+                    "子JVM RSS計測エラー",
+                    result.rssMeasurementError,
+                    "text"));
+        }
+        if (result.stdoutCopyError != null && !result.stdoutCopyError.isEmpty()) {
+            metrics.add(externalMetric(
+                    "memory_protocol_stdout_copy_error",
+                    section,
+                    "子JVM stdout保存エラー（protocol drainは継続）",
+                    result.stdoutCopyError,
+                    "text"));
+        }
+        if (result.stderrCopyError != null && !result.stderrCopyError.isEmpty()) {
+            metrics.add(externalMetric(
+                    "child_stderr_copy_error",
+                    section,
+                    "子JVM stderr保存エラー",
+                    result.stderrCopyError,
+                    "text"));
+        }
+
+        metrics.add(externalMetric(
+                "process_rss_synthesis_window_complete_and_valid",
+                section,
+                "合成RSS区間が完結し主評価に利用可能",
+                Boolean.toString(completeSynthesisRssWindow),
+                "boolean"));
+        if (rss != null) {
+            metrics.add(externalMetric("process_rss_sampling_provider", section,
+                    "RSS provider", rss.getProvider(), "text"));
+            metrics.add(externalMetric("process_rss_sampling_pid", section,
+                    "計測対象の子JVM PID", Long.toString(rss.getPid()), "pid"));
+            metrics.add(externalMetric("process_rss_sampling_interval_ms", section,
+                    "RSS計測設定間隔", Long.toString(rss.getIntervalMillis()), "ms"));
+            metrics.add(externalMetric("process_rss_sampling_provider_timeout_ms", section,
+                    "RSS provider 1回の読取上限",
+                    Long.toString(rss.getProviderTimeoutMillis()), "ms"));
+            metrics.add(externalMetric("process_rss_sampling_sample_count", section,
+                    "child lifetime有効RSS sample数",
+                    Long.toString(rss.getSampleCount()), "samples"));
+            metrics.add(externalMetric("process_rss_sampling_failure_count", section,
+                    "child lifetime失敗RSS sample数",
+                    Long.toString(rss.getSampleFailureCount()), "samples"));
+            metrics.add(externalMetric("process_rss_sampling_provider_failure_count", section,
+                    "RSS provider例外数",
+                    Long.toString(rss.getProviderFailureCount()), "samples"));
+            metrics.add(externalMetric("process_rss_sampling_provider_timeout_count", section,
+                    "RSS provider timeout数",
+                    Long.toString(rss.getProviderTimeoutCount()), "samples"));
+            metrics.add(externalMetric("process_rss_sampling_attempt_count", section,
+                    "RSS sample試行数",
+                    Long.toString(rss.getSampleAttemptCount()), "samples"));
+            metrics.add(externalMetric("process_rss_sampling_max_gap_ms", section,
+                    "RSS sample開始間隔の最大値",
+                    Long.toString(rss.getMaxSampleGapMillis()), "ms"));
+            metrics.add(externalMetric("process_rss_sampling_total_wall_time_ns", section,
+                    "RSS provider call待機wall time合計（timeout上限で打切り）",
+                    Long.toString(rss.getTotalSamplingWallTimeNanos()), "ns"));
+            metrics.add(externalMetric("process_rss_sampling_thread_cpu_time_ns", section,
+                    "RSS scheduling daemon threadのCPU時間",
+                    Long.toString(rss.getSamplerThreadCpuTimeNanos()), "ns"));
+            metrics.add(externalMetric("process_rss_sampling_thread_cpu_time_available", section,
+                    "RSS scheduling daemon thread CPU時間取得可否",
+                    Boolean.toString(rss.isSamplerThreadCpuTimeAvailable()), "boolean"));
+            metrics.add(externalMetric("process_rss_sampling_provider_thread_cpu_time_ns", section,
+                    "完了したRSS provider taskのCPU時間合計",
+                    Long.toString(rss.getProviderThreadCpuTimeNanos()), "ns"));
+            metrics.add(externalMetric(
+                    "process_rss_sampling_provider_thread_cpu_time_available",
+                    section,
+                    "RSS provider thread CPU時間取得可否",
+                    Boolean.toString(rss.isProviderThreadCpuTimeAvailable()),
+                    "boolean"));
+            metrics.add(externalMetric(
+                    "process_rss_sampling_provider_thread_cpu_measurement_complete",
+                    section,
+                    "RSS provider thread CPU計測完結",
+                    Boolean.toString(rss.isProviderThreadCpuMeasurementComplete()),
+                    "boolean"));
+            metrics.add(externalMetric("process_rss_sampling_total_thread_cpu_time_ns", section,
+                    "RSS schedulingとproviderのCPU時間合計",
+                    Long.toString(rss.getTotalMeasurementThreadCpuTimeNanos()), "ns"));
+            metrics.add(externalMetric(
+                    "process_rss_sampling_total_thread_cpu_time_available",
+                    section,
+                    "RSS計測thread CPU時間合計の利用可否",
+                    Boolean.toString(rss.isTotalMeasurementThreadCpuTimeAvailable()),
+                    "boolean"));
+            metrics.add(externalMetric("process_rss_sampling_provider_circuit_open", section,
+                    "Batch内RSS provider circuit breaker作動",
+                    Boolean.toString(rss.isProviderCircuitOpen()), "boolean"));
+            metrics.add(externalMetric(
+                    "process_rss_sampling_provider_disabled_by_circuit_breaker",
+                    section,
+                    "先行hard timeoutにより当該caseのRSS providerを無効化",
+                    Boolean.toString(rss.isProviderDisabledByCircuitBreaker()),
+                    "boolean"));
+            metrics.add(externalMetric("process_rss_synthesis_window_started", section,
+                    "合成RSS区間開始marker検出",
+                    Boolean.toString(rss.isSynthesisWindowStarted()), "boolean"));
+            metrics.add(externalMetric("process_rss_synthesis_window_completed", section,
+                    "合成RSS区間終了marker検出",
+                    Boolean.toString(rss.isSynthesisWindowCompleted()), "boolean"));
+            metrics.add(externalMetric("process_rss_synthesis_window_available", section,
+                    "合成区間RSS取得可否",
+                    Boolean.toString(rss.isSynthesisWindowAvailable()), "boolean"));
+            metrics.add(externalMetric("process_rss_synthesis_window_sample_count", section,
+                    "合成区間有効RSS sample数",
+                    Long.toString(rss.getSynthesisWindowSampleCount()), "samples"));
+            metrics.add(externalMetric("process_rss_synthesis_window_failure_count", section,
+                    "合成区間失敗RSS sample数",
+                    Long.toString(rss.getSynthesisWindowSampleFailureCount()), "samples"));
+            metrics.add(externalMetric("process_rss_synthesis_window_provider_failure_count", section,
+                    "合成区間RSS provider例外数",
+                    Long.toString(rss.getSynthesisWindowProviderFailureCount()), "samples"));
+            metrics.add(externalMetric(
+                    "process_rss_synthesis_window_sampling_wait_wall_time_ns",
+                    section,
+                    "合成RSS区間内のprovider結果待機wall time合計",
+                    Long.toString(rss.getSynthesisWindowSamplingWallTimeNanos()),
+                    "ns"));
+            metrics.add(externalMetric(
+                    "process_rss_synthesis_window_provider_thread_cpu_time_ns",
+                    section,
+                    "合成RSS区間内の完了provider task CPU時間合計",
+                    Long.toString(rss.getSynthesisWindowProviderThreadCpuTimeNanos()),
+                    "ns"));
+            metrics.add(externalMetric(
+                    "process_rss_synthesis_window_provider_thread_cpu_time_available",
+                    section,
+                    "合成RSS区間provider thread CPU時間取得可否",
+                    Boolean.toString(
+                            rss.isSynthesisWindowProviderThreadCpuTimeAvailable()),
+                    "boolean"));
+            metrics.add(externalMetric(
+                    "process_rss_synthesis_window_provider_thread_cpu_measurement_complete",
+                    section,
+                    "合成RSS区間provider thread CPU計測完結",
+                    Boolean.toString(
+                            rss.isSynthesisWindowProviderThreadCpuMeasurementComplete()),
+                    "boolean"));
+
+            if (rss.isAvailable()) {
+                metrics.add(externalMetric(
+                        "child_lifetime_sampled_peak_process_rss",
+                        section,
+                        "子JVM lifetimeのsampled peak RSS",
+                        Long.toString(rss.getLifetimePeakRssBytes()),
+                        "B",
+                        "RSS sampler attach後から終了までの周期sample最大値。"
+                                + "attach前とsample間の瞬間peakは含まない下限。"));
+                metrics.add(externalMetric(
+                        "child_lifetime_sampled_peak_process_rss_epoch_ms",
+                        section,
+                        "子JVM lifetime sampled peak RSSの観測epoch時刻",
+                        Long.toString(rss.getLifetimePeakAtEpochMillis()),
+                        "epoch_ms"));
+                metrics.add(externalMetric(
+                        "child_lifetime_sampled_peak_process_rss_elapsed_ms",
+                        section,
+                        "RSS sampler attachからlifetime sampled peak RSSまでの時間",
+                        Long.toString(rss.getLifetimePeakAtElapsedMillis()),
+                        "ms"));
+            }
+            if (completeSynthesisRssWindow) {
+                metrics.add(externalMetric(
+                        "controller_synthesis_sampled_peak_process_rss",
+                        section,
+                        "合成区間のsampled peak process RSS",
+                        Long.toString(rss.getSynthesisWindowPeakRssBytes()),
+                        "B",
+                        "子JVMの合成開始・終了marker間に周期sampleしたRSS最大値。真の瞬間peakの下限。"));
+                metrics.add(externalMetric(
+                        "controller_synthesis_sampled_peak_process_rss_epoch_ms",
+                        section,
+                        "合成区間sampled peak RSSの観測epoch時刻",
+                        Long.toString(rss.getSynthesisWindowPeakAtEpochMillis()),
+                        "epoch_ms"));
+                metrics.add(externalMetric(
+                        "controller_synthesis_sampled_peak_process_rss_elapsed_ms",
+                        section,
+                        "合成区間開始からsampled peak RSSまでの時間",
+                        Long.toString(rss.getSynthesisWindowPeakAtElapsedMillis()),
+                        "ms"));
+            } else if (rss.isSynthesisWindowAvailable()) {
+                metrics.add(externalMetric(
+                        "controller_synthesis_partial_sampled_peak_process_rss",
+                        section,
+                        "未完結・品質未確認の合成区間sampled peak process RSS",
+                        Long.toString(rss.getSynthesisWindowPeakRssBytes()),
+                        "B",
+                        "START/END handshakeまたは境界sampleが完結していない"
+                                + "censored区間の診断値。主評価値へ混在させない。"));
+            }
+        }
+
+        WindowsPeakWorkingSetProbe.Result windowsPeak =
+                result.windowsPeakWorkingSetResult;
+        metrics.add(externalMetric(
+                "windows_peak_working_set_enabled",
+                section,
+                "Windows OS high-water計測の有効化",
+                Boolean.toString(result.windowsPeakWorkingSetEnabled),
+                "boolean"));
+        if (windowsPeak != null) {
+            metrics.add(externalMetric(
+                    "windows_peak_working_set_available",
+                    section,
+                    "Windows OS high-water取得可否",
+                    Boolean.toString(windowsPeak.isAvailable()),
+                    "boolean"));
+            metrics.add(externalMetric(
+                    "windows_peak_working_set_provider",
+                    section,
+                    "Windows OS high-water provider",
+                    windowsPeak.getProvider(),
+                    "text"));
+            metrics.add(externalMetric(
+                    "windows_peak_working_set_failure_reason",
+                    section,
+                    "Windows OS high-water取得失敗理由",
+                    windowsPeak.getFailureReason(),
+                    "text"));
+            metrics.add(externalMetric(
+                    "windows_peak_working_set_native_error_code",
+                    section,
+                    "Windows OS high-water native error code",
+                    Integer.toString(windowsPeak.getNativeErrorCode()),
+                    "code"));
+            metrics.add(externalMetric(
+                    "windows_peak_working_set_final_read",
+                    section,
+                    "Windows OS high-water終了時read実施",
+                    Boolean.toString(windowsPeak.isFinalRead()),
+                    "boolean"));
+            if (windowsPeak.isAvailable()) {
+                metrics.add(externalMetric(
+                        "child_lifetime_windows_peak_working_set_size",
+                        section,
+                        "子JVM lifetimeのWindows PeakWorkingSetSize",
+                        Long.toString(windowsPeak.getPeakWorkingSetSizeBytes()),
+                        "B",
+                        "Windows GetProcessMemoryInfoが保持するprocess lifetimeの"
+                                + "PeakWorkingSetSize high-water mark。"));
+            }
+        }
+
+        try {
+            result.memoryMetricsWriteAttempted = true;
+            UpdatingControllerEvaluationRecorder.appendExternalDataMetrics(
+                    paths.evaluationCsvFile,
+                    evaluationMode(experimentCase.method),
+                    result.status,
+                    finalFailureReason,
+                    metrics);
+            result.memoryMetricsWriteSucceeded = true;
+        } catch (IOException e) {
+            recordMemoryMetricsWriteFailure(result, e);
+        } catch (RuntimeException e) {
+            recordMemoryMetricsWriteFailure(result, e);
+        }
+    }
+
+    private static void recordMemoryMetricsWriteFailure(
+            CaseResult result,
+            Throwable failure) {
+        result.memoryMetricsWriteSucceeded = false;
+        String message = "Failed to finalize memory metrics: " + failure;
+        result.rssMeasurementError = appendError(
+                result.rssMeasurementError,
+                message);
+        result.errorMessage = appendError(result.errorMessage, message);
+        if (STATUS_SUCCESS.equals(result.status)) {
+            result.status = STATUS_MEASUREMENT_FAILED;
+        }
+        System.err.println("[WARN] Memory metric CSV finalize failed: " + failure);
+    }
+
+    private static ExternalDataMetric externalMetric(
+            String key,
+            String section,
+            String label,
+            String value,
+            String unit) {
+        return new ExternalDataMetric(key, section, label, value, unit);
+    }
+
+    private static ExternalDataMetric externalMetric(
+            String key,
+            String section,
+            String label,
+            String value,
+            String unit,
+            String formula) {
+        return new ExternalDataMetric(key, section, label, value, unit, formula);
+    }
+
+    private static void addExternalMetricIfAbsent(
+            List<ExternalDataMetric> output,
+            Map<String, String> existingMetrics,
+            ExternalDataMetric metric) {
+        if (!existingMetrics.containsKey(metric.getKey())) {
+            output.add(metric);
+        }
+    }
+
+    private static String evaluationMode(String method) {
+        String normalized = safeLower(method);
+        if (normalized.contains("traditional")) {
+            return "Traditional DUC";
+        }
+        if (normalized.contains("stepwise")) {
+            return "Stepwise Delayed DUC";
+        }
+        if (normalized.contains("otf")) {
+            return "OTF-DUC";
+        }
+        return method == null ? "未記録" : method;
+    }
+
+    private static String batchFailureReason(
+            CaseResult result,
+            Map<String, String> existingMetrics) {
+        if (STATUS_SUCCESS.equals(result.status)) {
+            return "";
+        }
+        if (result.errorMessage != null && !result.errorMessage.isEmpty()) {
+            return result.errorMessage;
+        }
+        if (result.timedOut) {
+            return "Batch timeout";
+        }
+        String childFailureReason = existingMetrics == null
+                ? null
+                : existingMetrics.get("failure_reason");
+        if (childFailureReason != null && !childFailureReason.isEmpty()) {
+            return childFailureReason;
+        }
+        if (result.exitCode != null) {
+            return result.status + " (child exit code " + result.exitCode + ")";
+        }
+        return result.status;
     }
 
     private static List<String> buildChildCommand(
@@ -222,6 +1042,27 @@ public final class BatchExperimentRunner {
         addInheritedSystemProperty(command, "mtsa.evaluation.enabled");
         addInheritedSystemProperty(command, "updating.controller.evaluation.enabled");
         addInheritedSystemProperty(command, "updating.controller.evaluation.printDetailedReport");
+        addInheritedSystemProperty(command, MEMORY_SAMPLING_ENABLED_PROPERTY);
+        addInheritedSystemProperty(command, MEMORY_SAMPLING_INTERVAL_PROPERTY);
+        addInheritedSystemProperty(command, RSS_SAMPLING_ENABLED_PROPERTY);
+        addInheritedSystemProperty(command, RSS_SAMPLING_INTERVAL_PROPERTY);
+        addInheritedSystemProperty(command, RSS_PROVIDER_TIMEOUT_PROPERTY);
+        addInheritedSystemProperty(command,
+                MemoryMeasurementProtocol.ACK_TIMEOUT_MILLIS_PROPERTY);
+        boolean rssSamplingEnabled = configuredBooleanSystemProperty(
+                config.javaOptions,
+                RSS_SAMPLING_ENABLED_PROPERTY,
+                configuredBooleanSystemProperty(
+                        config.javaOptions,
+                        MEMORY_SAMPLING_ENABLED_PROPERTY,
+                        true));
+        addSystemProperty(command,
+                MemoryMeasurementProtocol.ENABLED_PROPERTY,
+                Boolean.toString(rssSamplingEnabled));
+        addSystemProperty(command,
+                UpdatingControllerEvaluationRecorder
+                        .PARENT_FINALIZATION_REQUIRED_PROPERTY,
+                "true");
         addSystemProperty(command, "mtsa.evaluation.csvFile", paths.evaluationCsvFile.getPath());
         addSystemProperty(command, "mtsa.evaluation.caseId", experimentCase.id);
         addSystemProperty(command, "mtsa.evaluation.example", experimentCase.example);
@@ -278,6 +1119,80 @@ public final class BatchExperimentRunner {
             }
         }
         return false;
+    }
+
+    private static boolean configuredBooleanSystemProperty(
+            List<String> javaOptions,
+            String key,
+            boolean defaultValue) {
+        String value = configuredSystemProperty(javaOptions, key);
+        return value == null ? defaultValue : Boolean.parseBoolean(value);
+    }
+
+    private static long configuredRssSamplingInterval(List<String> javaOptions) {
+        String value = configuredSystemProperty(javaOptions, RSS_SAMPLING_INTERVAL_PROPERTY);
+        if (value == null) {
+            value = configuredSystemProperty(javaOptions, MEMORY_SAMPLING_INTERVAL_PROPERTY);
+        }
+        if (value != null) {
+            try {
+                long interval = Long.parseLong(value.trim());
+                if (interval > 0L) {
+                    return interval;
+                }
+            } catch (NumberFormatException ignored) {
+                // Fall through to the documented default.
+            }
+        }
+        return ProcessRssSampler.DEFAULT_INTERVAL_MILLIS;
+    }
+
+    private static long configuredMemoryProtocolAckTimeout(List<String> javaOptions) {
+        String value = configuredSystemProperty(
+                javaOptions,
+                MemoryMeasurementProtocol.ACK_TIMEOUT_MILLIS_PROPERTY);
+        if (value != null) {
+            try {
+                long timeout = Long.parseLong(value.trim());
+                if (timeout > 0L) {
+                    return timeout;
+                }
+            } catch (NumberFormatException ignored) {
+                // Fall through to the protocol default.
+            }
+        }
+        return MemoryMeasurementProtocol.DEFAULT_ACK_TIMEOUT_MILLIS;
+    }
+
+    private static long configuredRssProviderTimeout(List<String> javaOptions) {
+        String value = configuredSystemProperty(javaOptions, RSS_PROVIDER_TIMEOUT_PROPERTY);
+        if (value != null) {
+            try {
+                long timeout = Long.parseLong(value.trim());
+                if (timeout > 0L) {
+                    return timeout;
+                }
+            } catch (NumberFormatException ignored) {
+                // Fall through to the sampler default.
+            }
+        }
+        return ProcessRssSampler.DEFAULT_PROVIDER_TIMEOUT_MILLIS;
+    }
+
+    private static String configuredSystemProperty(List<String> javaOptions, String key) {
+        String configured = null;
+        String exact = "-D" + key;
+        String prefix = exact + "=";
+        if (javaOptions != null) {
+            for (String option : javaOptions) {
+                if (exact.equals(option)) {
+                    configured = "true";
+                } else if (option != null && option.startsWith(prefix)) {
+                    configured = option.substring(prefix.length());
+                }
+            }
+        }
+        return configured == null ? System.getProperty(key) : configured;
     }
 
     private static String javaExecutable() {
@@ -357,6 +1272,198 @@ public final class BatchExperimentRunner {
         values.put("requirementsCheck",
                 paths.requirementsCheckFile == null ? null : paths.requirementsCheckFile.getPath());
         values.put("evaluationCsv", paths.evaluationCsvFile.getPath());
+        values.put("memoryMetricSchemaVersion",
+                UpdatingControllerEvaluationRecorder.getMetricSchemaVersion());
+        values.put("memoryMetricsWriteAttempted",
+                Boolean.valueOf(result.memoryMetricsWriteAttempted));
+        values.put("memoryMetricsWriteSucceeded",
+                Boolean.valueOf(result.memoryMetricsWriteSucceeded));
+        values.put("heapSamplingEnabled", Boolean.valueOf(result.heapSamplingEnabled));
+        Map<String, String> evaluationMetrics = readEvaluationCsvValues(paths.evaluationCsvFile);
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_sampled_base_heap_used",
+                "controllerSynthesisSampledBaseHeapUsedBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_sampled_peak_heap_used",
+                "controllerSynthesisSampledPeakHeapUsedBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_sampled_heap_increase",
+                "controllerSynthesisSampledHeapIncreaseBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_sampled_peak_process_rss",
+                "controllerSynthesisSampledPeakProcessRssBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_partial_sampled_peak_process_rss",
+                "controllerSynthesisPartialSampledPeakProcessRssBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "child_lifetime_sampled_peak_process_rss",
+                "childProcessLifetimeSampledPeakRssBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "child_lifetime_windows_peak_working_set_size",
+                "childProcessLifetimeWindowsPeakWorkingSetSizeBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_peak_memory_legacy_pool_sum",
+                "legacyPoolPeakSumBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "heap_memory_sampling_interval_ms",
+                "heapSamplingIntervalMillis");
+        putMetricIfPresent(values, evaluationMetrics,
+                "heap_memory_sampling_sample_count",
+                "heapSamplingSampleCount");
+        putMetricIfPresent(values, evaluationMetrics,
+                "process_rss_sampling_interval_ms",
+                "rssSamplingIntervalMillis");
+        putMetricIfPresent(values, evaluationMetrics,
+                "process_rss_sampling_sample_count",
+                "rssSamplingSampleCount");
+        putBooleanMetricIfPresent(values, evaluationMetrics,
+                "heap_memory_sampling_enabled",
+                "heapSamplingEnabled");
+        putBooleanMetricIfPresent(values, evaluationMetrics,
+                "heap_memory_sampling_available",
+                "heapSamplingAvailable");
+        putBooleanMetricIfPresent(values, evaluationMetrics,
+                "memory_measurement_required_data_complete",
+                "memoryMeasurementRequiredDataComplete");
+        putTextMetricIfPresent(values, evaluationMetrics,
+                "heap_memory_sampling_error",
+                "heapSamplingError");
+        values.put("rssSamplingEnabled", Boolean.valueOf(result.rssSamplingEnabled));
+        values.put("windowsPeakWorkingSetEnabled",
+                Boolean.valueOf(result.windowsPeakWorkingSetEnabled));
+        values.put("rssAvailable", Boolean.valueOf(
+                result.rssResult != null && result.rssResult.isAvailable()));
+        values.put("childProcessStartedAtEpochMillis",
+                result.processStartedAtEpochMillis < 0L
+                        ? null
+                        : Long.valueOf(result.processStartedAtEpochMillis));
+        values.put("rssSamplerAttachedAtEpochMillis",
+                result.rssSamplerAttachedAtEpochMillis < 0L
+                        ? null
+                        : Long.valueOf(result.rssSamplerAttachedAtEpochMillis));
+        values.put("rssSamplerAttachElapsedMillis",
+                result.rssSamplerAttachElapsedMillis < 0L
+                        ? null
+                        : Long.valueOf(result.rssSamplerAttachElapsedMillis));
+        if (result.rssMeasurementError != null) {
+            values.put("rssMeasurementError", result.rssMeasurementError);
+        }
+        if (result.stdoutCopyError != null) {
+            values.put("memoryProtocolStdoutCopyError", result.stdoutCopyError);
+        }
+        if (result.stderrCopyError != null) {
+            values.put("childStderrCopyError", result.stderrCopyError);
+        }
+        MemoryWindowHandshakeCoordinator.Result protocol = result.memoryProtocolResult;
+        values.put("memoryProtocolVersion", MemoryMeasurementProtocol.VERSION);
+        values.put("memoryProtocolEnabled", Boolean.valueOf(result.rssSamplingEnabled));
+        values.put("memoryProtocolAckTimeoutMillis",
+                Long.valueOf(configuredMemoryProtocolAckTimeout(config.javaOptions)));
+        values.put("memoryProtocolComplete",
+                Boolean.valueOf(protocol != null && protocol.isComplete()));
+        values.put("memoryProtocolBoundarySamplesComplete",
+                Boolean.valueOf(protocol != null
+                        && protocol.isComplete()
+                        && protocol.isStartBoundarySampleSucceeded()
+                        && protocol.isEndBoundarySampleSucceeded()));
+        values.put("rssSynthesisWindowCompleteAndValid",
+                Boolean.valueOf(result.rssResult != null
+                        && result.rssResult.isSynthesisWindowAvailable()
+                        && result.rssResult.isSynthesisWindowCompleted()
+                        && protocol != null
+                        && protocol.isComplete()
+                        && protocol.isStartBoundarySampleSucceeded()
+                        && protocol.isEndBoundarySampleSucceeded()));
+        if (protocol != null) {
+            values.put("memoryProtocolStartMarkerCount",
+                    Integer.valueOf(protocol.getStartMarkerCount()));
+            values.put("memoryProtocolEndMarkerCount",
+                    Integer.valueOf(protocol.getEndMarkerCount()));
+            values.put("memoryProtocolStartAckSent",
+                    Boolean.valueOf(protocol.isStartAckSent()));
+            values.put("memoryProtocolEndAckSent",
+                    Boolean.valueOf(protocol.isEndAckSent()));
+            values.put("memoryProtocolStartBoundarySampleSucceeded",
+                    Boolean.valueOf(protocol.isStartBoundarySampleSucceeded()));
+            values.put("memoryProtocolEndBoundarySampleSucceeded",
+                    Boolean.valueOf(protocol.isEndBoundarySampleSucceeded()));
+            values.put("memoryProtocolStartAckWaitMillis",
+                    Long.valueOf(protocol.getStartAckWaitMillis()));
+            values.put("memoryProtocolEndAckWaitMillis",
+                    Long.valueOf(protocol.getEndAckWaitMillis()));
+            values.put("memoryProtocolError", protocol.getProtocolError());
+        }
+        if (result.rssResult != null) {
+            values.put("rssProvider", result.rssResult.getProvider());
+            values.put("rssSynthesisWindowStarted",
+                    Boolean.valueOf(result.rssResult.isSynthesisWindowStarted()));
+            values.put("rssSynthesisWindowCompleted",
+                    Boolean.valueOf(result.rssResult.isSynthesisWindowCompleted()));
+            values.put("rssSynthesisWindowAvailable",
+                    Boolean.valueOf(result.rssResult.isSynthesisWindowAvailable()));
+            values.put("rssSynthesisWindowStartBoundarySampleSucceeded",
+                    Boolean.valueOf(result.rssResult
+                            .isSynthesisWindowStartBoundarySampleSucceeded()));
+            values.put("rssSynthesisWindowEndBoundarySampleSucceeded",
+                    Boolean.valueOf(result.rssResult
+                            .isSynthesisWindowEndBoundarySampleSucceeded()));
+            values.put("rssSamplingFailureCount",
+                    Long.valueOf(result.rssResult.getSampleFailureCount()));
+            values.put("rssProviderFailureCount",
+                    Long.valueOf(result.rssResult.getProviderFailureCount()));
+            values.put("rssProviderTimeoutMillis",
+                    Long.valueOf(result.rssResult.getProviderTimeoutMillis()));
+            values.put("rssProviderTimeoutCount",
+                    Long.valueOf(result.rssResult.getProviderTimeoutCount()));
+            values.put("rssSamplingMaxGapMillis",
+                    Long.valueOf(result.rssResult.getMaxSampleGapMillis()));
+            values.put("rssSamplingTotalWallTimeNanos",
+                    Long.valueOf(result.rssResult.getTotalSamplingWallTimeNanos()));
+            values.put("rssSamplerThreadCpuTimeNanos",
+                    Long.valueOf(result.rssResult.getSamplerThreadCpuTimeNanos()));
+            values.put("rssSamplerThreadCpuTimeAvailable",
+                    Boolean.valueOf(result.rssResult.isSamplerThreadCpuTimeAvailable()));
+            values.put("rssProviderThreadCpuTimeNanos",
+                    Long.valueOf(result.rssResult.getProviderThreadCpuTimeNanos()));
+            values.put("rssProviderThreadCpuTimeAvailable",
+                    Boolean.valueOf(result.rssResult.isProviderThreadCpuTimeAvailable()));
+            values.put("rssProviderThreadCpuMeasurementComplete",
+                    Boolean.valueOf(result.rssResult
+                            .isProviderThreadCpuMeasurementComplete()));
+            values.put("rssTotalMeasurementThreadCpuTimeNanos",
+                    Long.valueOf(result.rssResult
+                            .getTotalMeasurementThreadCpuTimeNanos()));
+            values.put("rssTotalMeasurementThreadCpuTimeAvailable",
+                    Boolean.valueOf(result.rssResult
+                            .isTotalMeasurementThreadCpuTimeAvailable()));
+            values.put("rssProviderCircuitOpen",
+                    Boolean.valueOf(result.rssResult.isProviderCircuitOpen()));
+            values.put("rssProviderDisabledByCircuitBreaker",
+                    Boolean.valueOf(result.rssResult
+                            .isProviderDisabledByCircuitBreaker()));
+            values.put("rssSynthesisWindowSamplingWaitWallTimeNanos",
+                    Long.valueOf(result.rssResult
+                            .getSynthesisWindowSamplingWallTimeNanos()));
+            values.put("rssSynthesisWindowProviderThreadCpuTimeNanos",
+                    Long.valueOf(result.rssResult
+                            .getSynthesisWindowProviderThreadCpuTimeNanos()));
+            values.put("rssSynthesisWindowProviderThreadCpuTimeAvailable",
+                    Boolean.valueOf(result.rssResult
+                            .isSynthesisWindowProviderThreadCpuTimeAvailable()));
+            values.put("rssSynthesisWindowProviderThreadCpuMeasurementComplete",
+                    Boolean.valueOf(result.rssResult
+                            .isSynthesisWindowProviderThreadCpuMeasurementComplete()));
+        }
+        if (result.windowsPeakWorkingSetResult != null) {
+            values.put("windowsPeakWorkingSetAvailable",
+                    Boolean.valueOf(result.windowsPeakWorkingSetResult.isAvailable()));
+            values.put("windowsPeakWorkingSetProvider",
+                    result.windowsPeakWorkingSetResult.getProvider());
+            values.put("windowsPeakWorkingSetFailureReason",
+                    result.windowsPeakWorkingSetResult.getFailureReason());
+            values.put("windowsPeakWorkingSetNativeErrorCode",
+                    Integer.valueOf(result.windowsPeakWorkingSetResult.getNativeErrorCode()));
+        }
         Map<String, String> minimizedCounts = readMetricCsvValues(paths.minimizedCountsFile);
         putMetricIfPresent(values, minimizedCounts,
                 "raw_output_update_controller_states",
@@ -734,6 +1841,84 @@ public final class BatchExperimentRunner {
         return values;
     }
 
+    private static Map<String, String> readEvaluationCsvValues(File csvFile) {
+        Map<String, String> values = new LinkedHashMap<String, String>();
+        if (csvFile == null || !csvFile.isFile()) {
+            return values;
+        }
+        try {
+            String csv = new String(
+                    Files.readAllBytes(csvFile.toPath()),
+                    StandardCharsets.UTF_8);
+            List<List<String>> records = parseCsvRecords(csv);
+            for (int i = 1; i < records.size(); i++) {
+                List<String> columns = records.get(i);
+                if (columns.size() >= 7) {
+                    values.put(columns.get(4), columns.get(6));
+                }
+            }
+        } catch (IOException e) {
+            // Keep meta writing best-effort; the evaluation CSV remains primary.
+        }
+        return values;
+    }
+
+    /** Parses RFC-style quoted CSV records, including embedded newlines. */
+    static List<List<String>> parseCsvRecords(String csv) {
+        List<List<String>> records = new ArrayList<List<String>>();
+        List<String> columns = new ArrayList<String>();
+        StringBuilder value = new StringBuilder();
+        boolean quoted = false;
+        boolean recordHasContent = false;
+        String input = csv == null ? "" : csv;
+        for (int i = 0; i < input.length(); i++) {
+            char ch = input.charAt(i);
+            if (quoted) {
+                if (ch == '"') {
+                    if (i + 1 < input.length() && input.charAt(i + 1) == '"') {
+                        value.append('"');
+                        i++;
+                    } else {
+                        quoted = false;
+                    }
+                } else {
+                    value.append(ch);
+                }
+            } else if (ch == '"' && value.length() == 0) {
+                quoted = true;
+                recordHasContent = true;
+            } else if (ch == ',') {
+                columns.add(value.toString());
+                value.setLength(0);
+                recordHasContent = true;
+            } else if (ch == '\n' || ch == '\r') {
+                columns.add(value.toString());
+                value.setLength(0);
+                if (recordHasContent || columns.size() > 1
+                        || !columns.get(0).isEmpty()) {
+                    records.add(columns);
+                }
+                columns = new ArrayList<String>();
+                recordHasContent = false;
+                if (ch == '\r' && i + 1 < input.length()
+                        && input.charAt(i + 1) == '\n') {
+                    i++;
+                }
+            } else {
+                value.append(ch);
+                recordHasContent = true;
+            }
+        }
+        // An unterminated quoted record is deliberately discarded. With the
+        // child-side atomic writer it can only come from an older/corrupt file,
+        // and appending parent metrics must not legitimize that partial row.
+        if (!quoted && (recordHasContent || !columns.isEmpty() || value.length() > 0)) {
+            columns.add(value.toString());
+            records.add(columns);
+        }
+        return records;
+    }
+
     private static Map<String, String> readRequirementCsvValues(File csvFile) {
         Map<String, String> values = new LinkedHashMap<String, String>();
         if (csvFile == null || !csvFile.isFile()) {
@@ -773,6 +1958,28 @@ public final class BatchExperimentRunner {
         try {
             output.put(jsonKey, Long.valueOf(value));
         } catch (NumberFormatException e) {
+            output.put(jsonKey, value);
+        }
+    }
+
+    private static void putBooleanMetricIfPresent(
+            Map<String, Object> output,
+            Map<String, String> metrics,
+            String metricKey,
+            String jsonKey) {
+        String value = metrics.get(metricKey);
+        if (value != null && !value.trim().isEmpty()) {
+            output.put(jsonKey, Boolean.valueOf(value));
+        }
+    }
+
+    private static void putTextMetricIfPresent(
+            Map<String, Object> output,
+            Map<String, String> metrics,
+            String metricKey,
+            String jsonKey) {
+        String value = metrics.get(metricKey);
+        if (value != null) {
             output.put(jsonKey, value);
         }
     }
@@ -927,15 +2134,31 @@ public final class BatchExperimentRunner {
         return ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
-    private static void joinQuietly(Thread thread) {
+    private static boolean joinBounded(Thread thread, long timeoutMillis) {
         if (thread == null) {
-            return;
+            return true;
         }
-        try {
-            thread.join();
-        } catch (InterruptedException e) {
+        boolean interrupted = Thread.interrupted();
+        long deadline = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(Math.max(0L, timeoutMillis));
+        while (thread.isAlive()) {
+            long remainingNanos = deadline - System.nanoTime();
+            if (remainingNanos <= 0L) {
+                break;
+            }
+            try {
+                long waitMillis = Math.max(
+                        1L,
+                        TimeUnit.NANOSECONDS.toMillis(remainingNanos));
+                thread.join(waitMillis);
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
             Thread.currentThread().interrupt();
         }
+        return !thread.isAlive();
     }
 
     private static String runLabel(int runIndex, int runCount) {
@@ -1050,6 +2273,21 @@ public final class BatchExperimentRunner {
         String endedAt;
         String errorMessage;
         List<String> command;
+        boolean rssSamplingEnabled;
+        boolean heapSamplingEnabled;
+        boolean windowsPeakWorkingSetEnabled;
+        boolean memoryMetricsWriteAttempted;
+        boolean memoryMetricsWriteSucceeded;
+        String rssMeasurementError;
+        String stdoutCopyError;
+        String stderrCopyError;
+        long processStartedAtEpochMillis = -1L;
+        long processStartedAtNanos = -1L;
+        long rssSamplerAttachedAtEpochMillis = -1L;
+        long rssSamplerAttachElapsedMillis = -1L;
+        ProcessRssSampler.Result rssResult;
+        MemoryWindowHandshakeCoordinator.Result memoryProtocolResult;
+        WindowsPeakWorkingSetProbe.Result windowsPeakWorkingSetResult;
     }
 
     private static final class CompletedCase {
@@ -1067,11 +2305,21 @@ public final class BatchExperimentRunner {
     private static final class StreamCopyThread extends Thread {
         private final InputStream input;
         private final File outputFile;
+        private final MemoryWindowMarkerDetector markerDetector;
+        private volatile String errorMessage;
 
         StreamCopyThread(InputStream input, File outputFile) {
+            this(input, outputFile, null);
+        }
+
+        StreamCopyThread(
+                InputStream input,
+                File outputFile,
+                MemoryWindowMarkerDetector markerDetector) {
             super("stream-copy-" + outputFile.getName());
             this.input = input;
             this.outputFile = outputFile;
+            this.markerDetector = markerDetector;
             setDaemon(true);
         }
 
@@ -1079,28 +2327,80 @@ public final class BatchExperimentRunner {
         public void run() {
             try {
                 CliFileLTSOutput.ensureParentDirectory(outputFile);
-                copy(input, outputFile);
-            } catch (IOException ignored) {
-                // The meta file still records the child process status.
+            } catch (IOException e) {
+                recordError(e);
             }
+            copy(input, outputFile, markerDetector);
         }
 
-        private static void copy(InputStream input, File outputFile) throws IOException {
+        String getErrorMessage() {
+            return errorMessage;
+        }
+
+        private void copy(
+                InputStream input,
+                File outputFile,
+                MemoryWindowMarkerDetector markerDetector) {
             BufferedInputStream bufferedInput = new BufferedInputStream(input);
-            OutputStream output = new FileOutputStream(outputFile, false);
+            OutputStream output = null;
             try {
+                try {
+                    output = new FileOutputStream(outputFile, false);
+                } catch (IOException e) {
+                    // Continue draining the pipe and recognizing protocol
+                    // markers even when the diagnostic file cannot be opened.
+                    recordError(e);
+                }
                 byte[] buffer = new byte[8192];
                 int read;
                 while ((read = bufferedInput.read(buffer)) >= 0) {
-                    output.write(buffer, 0, read);
-                    output.flush();
+                    if (markerDetector != null) {
+                        markerDetector.accept(buffer, 0, read);
+                    }
+                    if (output != null) {
+                        try {
+                            output.write(buffer, 0, read);
+                            output.flush();
+                        } catch (IOException e) {
+                            recordError(e);
+                            try {
+                                output.close();
+                            } catch (IOException closeError) {
+                                recordError(closeError);
+                            }
+                            output = null;
+                        }
+                    }
                 }
+            } catch (IOException e) {
+                recordError(e);
             } finally {
                 try {
-                    bufferedInput.close();
+                    if (markerDetector != null) {
+                        markerDetector.endOfInput();
+                    }
+                    try {
+                        bufferedInput.close();
+                    } catch (IOException e) {
+                        recordError(e);
+                    }
                 } finally {
-                    output.close();
+                    if (output != null) {
+                        try {
+                            output.close();
+                        } catch (IOException e) {
+                            recordError(e);
+                        }
+                    }
                 }
+            }
+        }
+
+        private void recordError(IOException error) {
+            if (errorMessage == null) {
+                errorMessage = error.toString();
+            } else {
+                errorMessage += "; " + error;
             }
         }
     }

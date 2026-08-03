@@ -5,7 +5,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -18,11 +23,28 @@ import java.util.Map;
 import ltsa.MultiCore.ComputerOptions;
 import ltsa.lts.LTSOutput;
 import ltsa.ui.EnvConfiguration;
+import ltsa.updatingControllers.memory.RunHeapMemorySampler;
 
 /**
  * 更新コントローラ合成の評価値を 1 回の合成単位で集約する recorder。
  */
 public final class UpdatingControllerEvaluationRecorder {
+
+    /**
+     * BatchExperimentRunner sets this in its child JVM.  Until the parent has
+     * atomically added process-memory metrics and canonicalized the outcome,
+     * a child-produced CSV must not look like a completed successful run.
+     */
+    public static final String PARENT_FINALIZATION_REQUIRED_PROPERTY =
+            "mtsa.evaluation.parentFinalizationRequired";
+    public static final String PARENT_FINALIZATION_PENDING =
+            "PARENT_FINALIZATION_PENDING";
+    /**
+     * Opt-in switch for fine-grained heap checkpoints used only while
+     * diagnosing the Stepwise/Traditional memory difference.
+     */
+    public static final String PHASE_MEMORY_DIAGNOSTICS_PROPERTY =
+            "mtsa.evaluation.phaseMemoryDiagnostics";
 
     private static final String EVALUATION_ENABLED_PROPERTY = "mtsa.evaluation.enabled";
     private static final String LEGACY_EVALUATION_ENABLED_PROPERTY = "updating.controller.evaluation.enabled";
@@ -34,7 +56,8 @@ public final class UpdatingControllerEvaluationRecorder {
     private static final String DATA_CSV_HEADER = "mode,result,failure_reason,section,metric_key,metric_label,value,unit,formula,"
             + "metric_schema_version,metric_description_id,"
             + "section_readable_ja,metric_readable_ja,metric_category,artifact,phase,action,event,stat";
-    private static final String METRIC_SCHEMA_VERSION = "2026-05-19";
+    private static final int DATA_CSV_COLUMN_COUNT = 19;
+    private static final String METRIC_SCHEMA_VERSION = "2026-08-01-memory-v2";
 
     public enum ResultStatus {
         NOT_RECORDED,
@@ -82,12 +105,20 @@ public final class UpdatingControllerEvaluationRecorder {
     private static long evaluationOutputOverheadMillis = 0;
     private static long memoryBaselineBytes = -1;
     private static long previousMemoryCheckpointBytes = -1;
+    private static volatile boolean phaseMemoryDiagnosticsEnabled = false;
+    private static long phaseMemoryDiagnosticsStartNanos = -1;
+    private static long phaseMemoryDiagnosticsSequence = 0;
     private static String currentSummarySection = "";
     private static String otfExecutionMode = "";
     private static String autoCsvFile = "";
     private static long autoCsvSequence = 0;
 
     private UpdatingControllerEvaluationRecorder() {
+    }
+
+    /** Stable schema identifier written to every evaluation CSV row. */
+    public static String getMetricSchemaVersion() {
+        return METRIC_SCHEMA_VERSION;
     }
 
     public static boolean isEnabled() {
@@ -132,6 +163,14 @@ public final class UpdatingControllerEvaluationRecorder {
         evaluationOutputOverheadMillis = 0;
         memoryBaselineBytes = -1;
         previousMemoryCheckpointBytes = -1;
+        phaseMemoryDiagnosticsEnabled = isEnabled()
+                && Boolean.parseBoolean(System.getProperty(
+                        PHASE_MEMORY_DIAGNOSTICS_PROPERTY,
+                        "false"));
+        phaseMemoryDiagnosticsStartNanos = phaseMemoryDiagnosticsEnabled
+                ? System.nanoTime()
+                : -1;
+        phaseMemoryDiagnosticsSequence = 0;
         currentSummarySection = "";
         otfExecutionMode = "";
         autoCsvFile = "";
@@ -1154,6 +1193,176 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric(section, label, bytesToByteText(bytes), "B");
     }
 
+    /**
+     * Records the same-time aggregate heap samples collected for one synthesis
+     * window.  These metrics are the primary heap-memory measurements; the
+     * MemoryPoolMXBean peak sum is retained separately as a legacy diagnostic.
+     */
+    public static synchronized void recordSampledHeapMemory(
+            RunHeapMemorySampler.Result result) {
+        if (!isEnabled() || result == null) {
+            return;
+        }
+
+        String section = "共通 / sampled heap memory";
+        boolean available = result.getSampleCount() > 0L;
+        long baselineBytes = result.getFirstHeapUsedBytes();
+        long peakBytes = result.getPeakHeapUsedBytes();
+        long increaseBytes = baselineBytes >= 0L && peakBytes >= 0L
+                ? Math.max(0L, peakBytes - baselineBytes)
+                : -1L;
+
+        recordDataMetric(
+                "heap_memory_sampling_enabled",
+                section,
+                "同時点ヒープ周期計測の有効化",
+                "true",
+                "boolean");
+        recordDataMetric(
+                "heap_memory_sampling_available",
+                section,
+                "同時点ヒープsample取得可否",
+                Boolean.toString(available),
+                "boolean");
+        if (available) {
+            recordDataMetric(
+                    "controller_synthesis_sampled_base_heap_used",
+                    section,
+                    "合成区間の最初の有効sampleにおける同時点ヒープ使用量",
+                    Long.toString(baselineBytes),
+                    "B");
+            recordDataMetric(
+                    "controller_synthesis_sampled_peak_heap_used",
+                    section,
+                    "合成区間の同時点ヒープ使用量最大値",
+                    Long.toString(peakBytes),
+                    "B");
+            recordDataMetric(
+                    "controller_synthesis_sampled_heap_increase",
+                    section,
+                    "同時点ヒープ最大値と最初の有効sampleとの差",
+                    Long.toString(increaseBytes),
+                    "B");
+            recordDataMetric(
+                    "controller_synthesis_sampled_peak_heap_epoch_ms",
+                    section,
+                    "同時点ヒープ最大値の観測epoch時刻",
+                    Long.toString(result.getPeakTimestampEpochMillis()),
+                    "epoch_ms");
+            recordDataMetric(
+                    "heap_memory_sampling_first_sample_epoch_ms",
+                    section,
+                    "最初の有効ヒープsampleのepoch時刻",
+                    Long.toString(result.getFirstTimestampEpochMillis()),
+                    "epoch_ms");
+        }
+        recordDataMetric(
+                "heap_memory_sampling_interval_ms",
+                section,
+                "ヒープ計測設定間隔",
+                Long.toString(result.getIntervalMillis()),
+                "ms");
+        recordDataMetric(
+                "heap_memory_sampling_sample_count",
+                section,
+                "有効ヒープsample数",
+                Long.toString(result.getSampleCount()),
+                "samples");
+        recordDataMetric(
+                "heap_memory_sampling_failure_count",
+                section,
+                "失敗ヒープsample数",
+                Long.toString(result.getFailedSampleCount()),
+                "samples");
+        recordDataMetric(
+                "heap_memory_sampling_max_gap_ms",
+                section,
+                "ヒープsample開始間隔の最大値",
+                Long.toString(result.getMaxSampleGapMillis()),
+                "ms");
+        recordDataMetric(
+                "heap_memory_sampling_total_wall_time_ns",
+                section,
+                "ヒープsample取得wall time合計",
+                Long.toString(result.getTotalSamplingWallTimeNanos()),
+                "ns");
+        recordDataMetric(
+                "heap_memory_sampling_thread_cpu_time_ns",
+                section,
+                "ヒープsampler thread CPU時間",
+                Long.toString(result.getSamplerThreadCpuTimeNanos()),
+                "ns");
+        recordDataMetric(
+                "heap_memory_sampling_thread_cpu_time_available",
+                section,
+                "ヒープsampler thread CPU時間取得可否",
+                Boolean.toString(result.isSamplerThreadCpuTimeAvailable()),
+                "boolean");
+    }
+
+    public static synchronized void recordHeapMemorySamplingStatus(
+            boolean enabled,
+            boolean available,
+            String failure) {
+        if (!isEnabled()) {
+            return;
+        }
+        String section = "共通 / sampled heap memory";
+        recordDataMetric("heap_memory_sampling_enabled", section,
+                "同時点ヒープ周期計測の有効化",
+                Boolean.toString(enabled), "boolean");
+        recordDataMetric("heap_memory_sampling_available", section,
+                "同時点ヒープsample取得可否",
+                Boolean.toString(available), "boolean");
+        if (failure != null && !failure.isEmpty()) {
+            recordDataMetric("heap_memory_sampling_error", section,
+                    "同時点ヒープ計測エラー", failure, "text");
+        }
+    }
+
+    /**
+     * Adds explicit aliases for the historical pool-wise peak sum without
+     * changing the meaning of the pre-existing CSV keys.
+     */
+    public static synchronized void recordLegacyPoolPeakMemoryAliases(
+            long baselineBytes,
+            long peakPoolSumBytes,
+            long increaseBytes) {
+        if (!isEnabled()) {
+            return;
+        }
+        String section = "共通 / legacy memory metric";
+        String formula = "各heap MemoryPoolMXBeanが別々の時刻に記録したpeak usedの合計。"
+                + "同一時点のJVM heap最大値ではない。";
+        recordDataMetricWithFormula(
+                "controller_synthesis_base_memory_legacy_pool_api",
+                section,
+                "旧指標の合成開始時ヒープ使用量",
+                Long.toString(baselineBytes),
+                "B",
+                "各heap poolのcurrent usedを順に取得して合計。" );
+        recordDataMetricWithFormula(
+                "controller_synthesis_peak_memory_legacy_pool_sum",
+                section,
+                "旧指標のpool別peak合計",
+                Long.toString(peakPoolSumBytes),
+                "B",
+                formula);
+        recordDataMetricWithFormula(
+                "controller_synthesis_memory_increase_legacy_pool_sum",
+                section,
+                "旧指標のpool別peak合計と開始値との差",
+                Long.toString(increaseBytes),
+                "B",
+                "旧指標のpool別peak合計 - 旧指標の合成開始時ヒープ使用量。" );
+
+        attachDataMetricFormula("controller_synthesis_base_memory",
+                "後方互換key。各heap poolのcurrent usedを順に取得して合計。" );
+        attachDataMetricFormula("controller_synthesis_peak_memory", formula);
+        attachDataMetricFormula("controller_synthesis_memory_increase",
+                "後方互換key。pool別peak合計 - 旧指標の合成開始時ヒープ使用量。" );
+    }
+
     public static synchronized void recordMemoryInterval(
             String section,
             String labelPrefix,
@@ -1196,14 +1405,89 @@ public final class UpdatingControllerEvaluationRecorder {
         add(normalizedSection,
                 padRight(label, 46)
                         + " 現在ヒープ=" + padLeft(formatMiB(currentBytes), 8)
-                        + " ピークヒープ=" + padLeft(formatMiB(peakBytes), 8)
+                        + " 旧pool peak合計=" + padLeft(formatMiB(peakBytes), 8)
                         + " 開始時からの増減=" + padLeft(formatSignedMiB(deltaFromBaseline), 9)
                         + " 直前からの増減=" + padLeft(formatSignedMiB(deltaFromPrevious), 9));
         String baseKey = metricKey(normalizedSection, label);
         recordDataMetric(baseKey + "_current_heap", normalizedSection, label + " / 現在ヒープ", bytesToByteText(currentBytes), "B");
-        recordDataMetric(baseKey + "_peak_heap", normalizedSection, label + " / ピークヒープ", bytesToByteText(peakBytes), "B");
+        recordDataMetricWithFormula(baseKey + "_peak_heap", normalizedSection,
+                label + " / 旧pool別peak合計", bytesToByteText(peakBytes), "B",
+                "各heap MemoryPoolMXBeanが別々の時刻に記録したpeak usedの合計。" );
         recordDataMetric(baseKey + "_delta_from_start", normalizedSection, label + " / 開始時からの増減", bytesToByteText(deltaFromBaseline), "B");
         recordDataMetric(baseKey + "_delta_from_previous", normalizedSection, label + " / 直前からの増減", bytesToByteText(deltaFromPrevious), "B");
+    }
+
+    /**
+     * Returns whether the opt-in phase-memory diagnostics are active for the
+     * current synthesis run.  The property is sampled by {@link #reset()} so
+     * ordinary runs do not repeatedly parse a system property at every phase.
+     */
+    public static boolean isPhaseMemoryDiagnosticsEnabled() {
+        return phaseMemoryDiagnosticsEnabled;
+    }
+
+    /**
+     * Records one instantaneous aggregate-heap observation and timestamps it
+     * for correlation with GC logs and JFR.  This method deliberately does not
+     * call {@link #recordMemoryCheckpoint(String, String)}: that legacy method
+     * also reads the sum of independently timed pool peaks and mutates the
+     * ordinary checkpoint delta chain.
+     */
+    public static synchronized void recordPhaseMemoryCheckpoint(String label) {
+        if (!isEnabled() || !phaseMemoryDiagnosticsEnabled) {
+            return;
+        }
+
+        try {
+            recordPhaseMemoryCheckpointEnabled(label);
+        } catch (RuntimeException ignored) {
+            // Diagnostics must never replace or invalidate synthesis.
+            phaseMemoryDiagnosticsEnabled = false;
+        } catch (LinkageError ignored) {
+            phaseMemoryDiagnosticsEnabled = false;
+        } catch (OutOfMemoryError ignored) {
+            phaseMemoryDiagnosticsEnabled = false;
+        }
+    }
+
+    private static void recordPhaseMemoryCheckpointEnabled(String label) {
+
+        final String section = "診断 / phase memory checkpoints";
+        final String normalizedLabel = label == null || label.isEmpty()
+                ? "unnamed"
+                : label;
+        final long sequence = ++phaseMemoryDiagnosticsSequence;
+        final long epochMillis = System.currentTimeMillis();
+        final long elapsedMillis = phaseMemoryDiagnosticsStartNanos < 0
+                ? -1
+                : Math.max(0L,
+                        (System.nanoTime() - phaseMemoryDiagnosticsStartNanos)
+                                / 1_000_000L);
+        final long currentHeapBytes = ManagementFactory.getMemoryMXBean()
+                .getHeapMemoryUsage()
+                .getUsed();
+
+        add(section,
+                padRight(normalizedLabel, 58)
+                        + " sequence=" + padLeft(Long.toString(sequence), 4)
+                        + " elapsed=" + padLeft(Long.toString(elapsedMillis), 10) + " ms"
+                        + " currentHeap=" + padLeft(formatMiB(currentHeapBytes), 8));
+
+        String token = metricToken(normalizedLabel);
+        if (token.isEmpty()) {
+            token = Integer.toHexString(normalizedLabel.hashCode());
+        }
+        String baseKey = "diagnostic_phase_memory_" + token;
+        recordDataMetric(baseKey + "_sequence", section,
+                normalizedLabel + " / sequence", Long.toString(sequence), "count");
+        recordDataMetric(baseKey + "_epoch_ms", section,
+                normalizedLabel + " / epoch", Long.toString(epochMillis), "epoch_ms");
+        recordDataMetric(baseKey + "_elapsed_ms", section,
+                normalizedLabel + " / elapsed from synthesis reset",
+                Long.toString(elapsedMillis), "ms");
+        recordDataMetric(baseKey + "_current_heap_used", section,
+                normalizedLabel + " / current aggregate heap used",
+                bytesToByteText(currentHeapBytes), "B");
     }
 
     public static synchronized void recordOutputController(long states, long transitions, long countTimeMillis) {
@@ -2007,7 +2291,7 @@ public final class UpdatingControllerEvaluationRecorder {
             return;
         }
         List<String> lines = sections.computeIfAbsent(section, k -> new ArrayList<>());
-        lines.add("段階                                           現在ヒープ ピークヒープ 開始時からの増減 直前からの増減");
+        lines.add("段階                                           現在ヒープ 旧pool peak合計 開始時からの増減 直前からの増減");
         lines.add("------------------------------------------------------------------------------------------------");
         lineRefs.put(key, new LineRef(section, lines.size() - 2));
     }
@@ -2514,8 +2798,17 @@ public final class UpdatingControllerEvaluationRecorder {
 
         printGrSummary(output);
         printSummarySectionHeader(output, "メモリ");
-        printSummaryDataMetricCompact(output, "合成使用メモリ", "controller_synthesis_memory_increase",
-                "コントローラ合成全体のピークメモリ - コントローラ合成のベースラインメモリ。");
+        if (dataMetrics.containsKey("controller_synthesis_sampled_peak_heap_used")) {
+            printSummaryDataMetricCompact(output, "合成区間の同時点ヒープ最大値",
+                    "controller_synthesis_sampled_peak_heap_used",
+                    "MemoryMXBeanのaggregate heap usedを周期sampleした主指標。");
+            printSummaryDataMetricCompact(output, "最初の有効sampleからのヒープ増加",
+                    "controller_synthesis_sampled_heap_increase", "");
+        } else {
+            printSummaryDataMetricCompact(output, "旧pool別peak合計の増加（参考）",
+                    "controller_synthesis_memory_increase",
+                    "後方互換指標。poolごとに異なる時刻のpeakを合計している。");
+        }
 
         if ("Stepwise Delayed DUC".equals(mode)) {
             printStepwiseDelayedClassificationSummary(output);
@@ -2826,11 +3119,23 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static void printMemorySummary(LTSOutput output) {
         printSummarySectionHeader(output, "メモリ");
-        printSummaryDataMetric(output, "ベースラインメモリ", "controller_synthesis_base_memory", "");
-        printSummaryDataMetric(output, "全体ピークメモリ", "controller_synthesis_peak_memory", "");
-        printSummaryDataMetric(output, "増加メモリ", "controller_synthesis_memory_increase", "");
+        printSummaryDataMetric(output, "同時点ヒープ開始値",
+                "controller_synthesis_sampled_base_heap_used", "");
+        printSummaryDataMetric(output, "同時点ヒープ最大値",
+                "controller_synthesis_sampled_peak_heap_used",
+                "MemoryMXBeanのaggregate heap usedを周期sampleした主指標。");
+        printSummaryDataMetric(output, "同時点ヒープ増加最大値",
+                "controller_synthesis_sampled_heap_increase", "");
+        printSummaryDataMetric(output, "旧ベースラインメモリ（参考）",
+                "controller_synthesis_base_memory",
+                "後方互換用のheap pool API指標。");
+        printSummaryDataMetric(output, "旧pool別peak合計（参考）",
+                "controller_synthesis_peak_memory",
+                "poolごとに異なる時刻のpeakを合計するため、同一時点最大値ではない。");
+        printSummaryDataMetric(output, "旧pool別peak合計の増加（参考）",
+                "controller_synthesis_memory_increase", "");
         printSummaryDataMetric(output, "合成終了時の現在ヒープ", metricKey("メモリ使用量チェックポイント", "合成終了時") + "_current_heap", "");
-        printSummaryDataMetric(output, "合成終了時のピークヒープ", metricKey("メモリ使用量チェックポイント", "合成終了時") + "_peak_heap", "");
+        printSummaryDataMetric(output, "合成終了時の旧pool別peak合計", metricKey("メモリ使用量チェックポイント", "合成終了時") + "_peak_heap", "");
     }
 
     private static long commonPreparationTime() {
@@ -3409,29 +3714,78 @@ public final class UpdatingControllerEvaluationRecorder {
                 throw new IOException("Failed to create directory: " + parent);
             }
 
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream(file, false),
-                    StandardCharsets.UTF_8));
+            Path destination = file.toPath().toAbsolutePath();
+            boolean parentFinalizationRequired = Boolean.parseBoolean(
+                    System.getProperty(
+                            PARENT_FINALIZATION_REQUIRED_PROPERTY,
+                            "false"));
+            boolean parentFinalizationPending = parentFinalizationRequired
+                    && resultStatus == ResultStatus.SUCCESS;
+            String csvResult = parentFinalizationPending
+                    ? PARENT_FINALIZATION_PENDING
+                    : resultStatus.toString();
+            String csvFailureReason = parentFinalizationPending
+                    ? ""
+                    : failureMessage;
+            Path temporary = Files.createTempFile(
+                    destination.getParent(),
+                    file.getName() + ".",
+                    ".tmp");
             try {
-                writer.write(DATA_CSV_HEADER);
-                writer.newLine();
-                writeDataRow(writer, new DataMetric("mode", "Run", "mode", mode, "text"));
-                if ("OTF-DUC".equals(mode)) {
-                    writeDataRow(writer, new DataMetric(
-                            "otf_execution_mode",
-                            "Run",
-                            "OTF-DUC実行モード",
-                            otfExecutionMode,
-                            "text",
-                            "otfduc.simple.merge と otfduc.belief.repair の設定から分類。"));
+                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(temporary.toFile(), false),
+                        StandardCharsets.UTF_8));
+                try {
+                    writer.write(DATA_CSV_HEADER);
+                    writer.newLine();
+                    writeDataRow(writer,
+                            new DataMetric("mode", "Run", "mode", mode, "text"),
+                            csvResult,
+                            csvFailureReason);
+                    if ("OTF-DUC".equals(mode)) {
+                        writeDataRow(writer, new DataMetric(
+                                "otf_execution_mode",
+                                "Run",
+                                "OTF-DUC実行モード",
+                                otfExecutionMode,
+                                "text",
+                                "otfduc.simple.merge と otfduc.belief.repair の設定から分類。"),
+                                csvResult,
+                                csvFailureReason);
+                    }
+                    writeDataRow(writer,
+                            new DataMetric("result", "Run", "result", csvResult, "text"),
+                            csvResult,
+                            csvFailureReason);
+                    writeDataRow(writer,
+                            new DataMetric(
+                                    "failure_reason",
+                                    "Run",
+                                    "failure reason",
+                                    csvFailureReason,
+                                    "text"),
+                            csvResult,
+                            csvFailureReason);
+                    for (DataMetric metric : dataMetrics.values()) {
+                        writeDataRow(writer, metric, csvResult, csvFailureReason);
+                    }
+                } finally {
+                    writer.close();
                 }
-                writeDataRow(writer, new DataMetric("result", "Run", "result", resultStatus.toString(), "text"));
-                writeDataRow(writer, new DataMetric("failure_reason", "Run", "failure reason", failureMessage, "text"));
-                for (DataMetric metric : dataMetrics.values()) {
-                    writeDataRow(writer, metric);
+                try {
+                    Files.move(
+                            temporary,
+                            destination,
+                            StandardCopyOption.ATOMIC_MOVE,
+                            StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException e) {
+                    Files.move(
+                            temporary,
+                            destination,
+                            StandardCopyOption.REPLACE_EXISTING);
                 }
             } finally {
-                writer.close();
+                Files.deleteIfExists(temporary);
             }
             if (output != null) {
                 output.outln("Evaluation data CSV written to: " + file.getPath());
@@ -3439,6 +3793,210 @@ public final class UpdatingControllerEvaluationRecorder {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to write evaluation data CSV: " + file, e);
         }
+    }
+
+    /**
+     * Appends metrics observed by the parent batch process, such as child RSS.
+     * The same row formatter and description-id generator as child-side
+     * metrics are used so downstream compaction does not collapse distinct
+     * external rows.
+     */
+    public static synchronized void appendExternalDataMetrics(
+            File file,
+            String rowMode,
+            String rowResult,
+            String rowFailureReason,
+            List<ExternalDataMetric> metrics) throws IOException {
+        if (file == null) {
+            throw new IllegalArgumentException("file must not be null");
+        }
+        if (metrics == null || metrics.isEmpty()) {
+            return;
+        }
+
+        File parent = file.getAbsoluteFile().getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("Failed to create directory: " + parent);
+        }
+
+        Path destination = file.toPath().toAbsolutePath();
+        List<List<String>> existingRecords = readCompleteDataCsvRecords(destination);
+        boolean hasValidExistingHeader = !existingRecords.isEmpty()
+                && isExpectedDataCsvHeader(existingRecords.get(0));
+        Path temporary = Files.createTempFile(
+                destination.getParent(),
+                file.getName() + ".parent.",
+                ".tmp");
+        try {
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream(temporary.toFile(), false),
+                    StandardCharsets.UTF_8));
+            try {
+                writer.write(DATA_CSV_HEADER);
+                writer.newLine();
+                if (hasValidExistingHeader) {
+                    for (int index = 1; index < existingRecords.size(); index++) {
+                        List<String> existing = existingRecords.get(index);
+                        if (existing.size() != DATA_CSV_COLUMN_COUNT) {
+                            continue;
+                        }
+                        List<String> normalized = new ArrayList<String>(existing);
+                        normalizeExistingOutcome(
+                                normalized,
+                                rowMode,
+                                rowResult,
+                                rowFailureReason);
+                        writeCsvRecord(writer, normalized);
+                    }
+                }
+                for (ExternalDataMetric metric : metrics) {
+                    if (metric == null) {
+                        continue;
+                    }
+                    DataMetric dataMetric = new DataMetric(
+                            metric.key,
+                            metric.section,
+                            metric.label,
+                            metric.value,
+                            metric.unit,
+                            metric.formula);
+                    writer.write(dataCsvRow(
+                            dataMetric,
+                            rowMode,
+                            rowResult,
+                            rowFailureReason));
+                    writer.newLine();
+                }
+            } finally {
+                writer.close();
+            }
+            try {
+                Files.move(
+                        temporary,
+                        destination,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(
+                        temporary,
+                        destination,
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static List<List<String>> readCompleteDataCsvRecords(Path file)
+            throws IOException {
+        if (!Files.isRegularFile(file) || Files.size(file) <= 0L) {
+            return new ArrayList<List<String>>();
+        }
+        String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+        return parseCsvRecords(text);
+    }
+
+    private static boolean isExpectedDataCsvHeader(List<String> record) {
+        if (record == null || record.size() != DATA_CSV_COLUMN_COUNT) {
+            return false;
+        }
+        StringBuilder rebuilt = new StringBuilder();
+        for (int index = 0; index < record.size(); index++) {
+            if (index > 0) {
+                rebuilt.append(',');
+            }
+            rebuilt.append(record.get(index));
+        }
+        return DATA_CSV_HEADER.equals(rebuilt.toString());
+    }
+
+    private static void normalizeExistingOutcome(
+            List<String> record,
+            String rowMode,
+            String rowResult,
+            String rowFailureReason) {
+        record.set(0, safeCsvValue(rowMode));
+        record.set(1, safeCsvValue(rowResult));
+        record.set(2, safeCsvValue(rowFailureReason));
+        String metricKey = record.get(4);
+        if ("mode".equals(metricKey)) {
+            record.set(6, safeCsvValue(rowMode));
+        } else if ("result".equals(metricKey)) {
+            record.set(6, safeCsvValue(rowResult));
+        } else if ("failure_reason".equals(metricKey)) {
+            record.set(6, safeCsvValue(rowFailureReason));
+        }
+    }
+
+    private static String safeCsvValue(String value) {
+        return value == null ? "" : value;
+    }
+
+    private static void writeCsvRecord(
+            BufferedWriter writer,
+            List<String> record) throws IOException {
+        for (int index = 0; index < record.size(); index++) {
+            if (index > 0) {
+                writer.write(',');
+            }
+            writer.write(csv(record.get(index)));
+        }
+        writer.newLine();
+    }
+
+    /** Parses quoted CSV records and discards an unterminated final record. */
+    private static List<List<String>> parseCsvRecords(String csvText) {
+        List<List<String>> records = new ArrayList<List<String>>();
+        List<String> columns = new ArrayList<String>();
+        StringBuilder value = new StringBuilder();
+        boolean quoted = false;
+        boolean recordHasContent = false;
+        String input = csvText == null ? "" : csvText;
+        for (int index = 0; index < input.length(); index++) {
+            char ch = input.charAt(index);
+            if (quoted) {
+                if (ch == '"') {
+                    if (index + 1 < input.length()
+                            && input.charAt(index + 1) == '"') {
+                        value.append('"');
+                        index++;
+                    } else {
+                        quoted = false;
+                    }
+                } else {
+                    value.append(ch);
+                }
+            } else if (ch == '"' && value.length() == 0) {
+                quoted = true;
+                recordHasContent = true;
+            } else if (ch == ',') {
+                columns.add(value.toString());
+                value.setLength(0);
+                recordHasContent = true;
+            } else if (ch == '\n' || ch == '\r') {
+                columns.add(value.toString());
+                value.setLength(0);
+                if (recordHasContent || columns.size() > 1
+                        || !columns.get(0).isEmpty()) {
+                    records.add(columns);
+                }
+                columns = new ArrayList<String>();
+                recordHasContent = false;
+                if (ch == '\r' && index + 1 < input.length()
+                        && input.charAt(index + 1) == '\n') {
+                    index++;
+                }
+            } else {
+                value.append(ch);
+                recordHasContent = true;
+            }
+        }
+        if (!quoted && (recordHasContent || !columns.isEmpty()
+                || value.length() > 0)) {
+            columns.add(value.toString());
+            records.add(columns);
+        }
+        return records;
     }
 
     private static String configuredCsvFile() {
@@ -3551,11 +4109,28 @@ public final class UpdatingControllerEvaluationRecorder {
         writer.newLine();
     }
 
+    private static void writeDataRow(
+            BufferedWriter writer,
+            DataMetric metric,
+            String rowResult,
+            String rowFailureReason) throws IOException {
+        writer.write(dataCsvRow(metric, mode, rowResult, rowFailureReason));
+        writer.newLine();
+    }
+
     private static String dataCsvRow(DataMetric metric) {
+        return dataCsvRow(metric, mode, resultStatus.toString(), failureMessage);
+    }
+
+    private static String dataCsvRow(
+            DataMetric metric,
+            String rowMode,
+            String rowResult,
+            String rowFailureReason) {
         MetricView view = metricView(metric);
-        return csv(mode)
-                + "," + csv(resultStatus.toString())
-                + "," + csv(failureMessage)
+        return csv(rowMode)
+                + "," + csv(rowResult)
+                + "," + csv(rowFailureReason)
                 + "," + csv(metric.section)
                 + "," + csv(metric.key)
                 + "," + csv(metric.label)
@@ -3906,6 +4481,15 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static String metricCategory(String section, String label, String key, String unit) {
         String text = lower(section + " " + label + " " + key + " " + unit);
+        String normalizedUnit = lower(unit);
+        if ("ms".equals(normalizedUnit)
+                || "ns".equals(normalizedUnit)
+                || "epoch_ms".equals(normalizedUnit)) {
+            return "時間";
+        }
+        if ("parent process memory measurement".equals(lower(section))) {
+            return "メモリ";
+        }
         if (text.contains("time") || text.contains("時間") || text.contains("counttime") || "ms".equals(unit)) {
             return "時間";
         }
@@ -5192,6 +5776,47 @@ public final class UpdatingControllerEvaluationRecorder {
             this.label = label;
             this.states = states;
             this.transitions = transitions;
+        }
+    }
+
+    /** A metric produced outside the synthesis child JVM. */
+    public static final class ExternalDataMetric {
+        private final String key;
+        private final String section;
+        private final String label;
+        private final String value;
+        private final String unit;
+        private final String formula;
+
+        public ExternalDataMetric(
+                String key,
+                String section,
+                String label,
+                String value,
+                String unit) {
+            this(key, section, label, value, unit, "");
+        }
+
+        public ExternalDataMetric(
+                String key,
+                String section,
+                String label,
+                String value,
+                String unit,
+                String formula) {
+            if (key == null || key.trim().isEmpty()) {
+                throw new IllegalArgumentException("External metric key must not be empty");
+            }
+            this.key = key;
+            this.section = section == null ? "" : section;
+            this.label = label == null ? "" : label;
+            this.value = value == null ? "" : value;
+            this.unit = unit == null ? "" : unit;
+            this.formula = formula == null ? "" : formula;
+        }
+
+        public String getKey() {
+            return key;
         }
     }
 

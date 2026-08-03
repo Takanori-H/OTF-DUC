@@ -10,6 +10,8 @@ import ltsa.lts.LTSInput;
 import ltsa.lts.LTSOutput;
 import ltsa.ui.EnvConfiguration;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ResultStatus;
+import ltsa.updatingControllers.memory.MemoryMeasurementProtocol;
+import ltsa.updatingControllers.memory.RunHeapMemorySampler;
 import ltsa.updatingControllers.synthesis.UpdatePhaseEvaluator;
 
 /**
@@ -18,6 +20,10 @@ import ltsa.updatingControllers.synthesis.UpdatePhaseEvaluator;
 public final class CompositionEvaluationRunner {
 
     private static final String COMMON_SECTION = "共通 / HPWindow";
+    private static final String MEMORY_SAMPLING_ENABLED_PROPERTY =
+            "mtsa.evaluation.memorySampling.enabled";
+    private static final String MEMORY_SAMPLING_INTERVAL_PROPERTY =
+            "mtsa.evaluation.memorySampling.intervalMillis";
 
     private CompositionEvaluationRunner() {
     }
@@ -111,6 +117,18 @@ public final class CompositionEvaluationRunner {
             return runWithoutEvaluation(request);
         }
 
+        MemoryMeasurementSession memoryMeasurement = MemoryMeasurementSession.create();
+        try {
+            return runWithEvaluation(request, memoryMeasurement);
+        } finally {
+            memoryMeasurement.finishAndRecord();
+        }
+    }
+
+    private static Result runWithEvaluation(
+            Request request,
+            MemoryMeasurementSession memoryMeasurement) {
+
         long runStart = System.currentTimeMillis();
         System.gc();
         UpdatingControllerEvaluationRecorder.reset();
@@ -118,6 +136,8 @@ public final class CompositionEvaluationRunner {
         EvaluationProfiler.resetPeakMemory();
         long baselineMemory = EvaluationProfiler.getCurrentMemoryUsage();
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("合成開始時");
+        UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
+                "run.synthesis_reset_ready");
 
         if (request.openFileName != null) {
             EnvConfiguration.getInstance().setOpenFileName(request.openFileName);
@@ -131,37 +151,43 @@ public final class CompositionEvaluationRunner {
         CompositeState current = null;
         Throwable failure = null;
 
+        memoryMeasurement.start();
         long compileStart = System.currentTimeMillis();
         try {
             current = request.compilationStep.compile(request.output);
             compileTime = System.currentTimeMillis() - compileStart;
             UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("構文解析・合成問題準備後");
+            UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
+                    "run.compilation_ready");
         } catch (OutOfMemoryError e) {
             compileTime = System.currentTimeMillis() - compileStart;
             failure = e;
+            memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailure(
                     ResultStatus.OUT_OF_MEMORY,
                     failureMessage(e));
             UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         } catch (RuntimeException e) {
             compileTime = System.currentTimeMillis() - compileStart;
             failure = e;
+            memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                     ResultStatus.EXCEPTION,
                     failureMessage(e));
             UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         } catch (Exception e) {
             compileTime = System.currentTimeMillis() - compileStart;
             failure = e;
+            memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                     ResultStatus.EXCEPTION,
                     failureMessage(e));
             UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         }
 
@@ -173,31 +199,39 @@ public final class CompositionEvaluationRunner {
             } catch (OutOfMemoryError e) {
                 synthesisTime = System.currentTimeMillis() - synthesisStart;
                 failure = e;
+                memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailure(
                         ResultStatus.OUT_OF_MEMORY,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (LTSCompositionException e) {
                 synthesisTime = System.currentTimeMillis() - synthesisStart;
                 failure = e;
+                memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (RuntimeException e) {
                 synthesisTime = System.currentTimeMillis() - synthesisStart;
                 failure = e;
+                memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             }
+
+            // The measured synthesis window is parsing/problem preparation
+            // plus controller composition. CLI artifact generation and GUI
+            // callbacks are covered only by the parent child-lifetime RSS.
+            memoryMeasurement.finishAndRecord();
 
             long postCompositionStart = System.currentTimeMillis();
             try {
@@ -206,7 +240,7 @@ public final class CompositionEvaluationRunner {
                             ResultStatus.NOT_CONTROLLABLE,
                             "Composition not controllable.");
                     UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                    finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                    finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                     return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
                 }
 
@@ -221,7 +255,7 @@ public final class CompositionEvaluationRunner {
                         ResultStatus.OUT_OF_MEMORY,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (RuntimeException e) {
                 postCompositionTime = System.currentTimeMillis() - postCompositionStart;
@@ -230,7 +264,7 @@ public final class CompositionEvaluationRunner {
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (Exception e) {
                 postCompositionTime = System.currentTimeMillis() - postCompositionStart;
@@ -239,10 +273,12 @@ public final class CompositionEvaluationRunner {
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             }
         }
+
+        memoryMeasurement.finishAndRecord();
 
         boolean successful = current != null && current.composition != null;
         if (successful) {
@@ -253,7 +289,7 @@ public final class CompositionEvaluationRunner {
                     "Composition was not generated.");
         }
 
-        finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current);
+        finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
         return new Result(current, successful, failure, compileTime, synthesisTime, postCompositionTime);
     }
 
@@ -413,9 +449,11 @@ public final class CompositionEvaluationRunner {
             long synthesisTime,
             long postCompositionTime,
             long baselineMemory,
-            CompositeState current) {
+            CompositeState current,
+            MemoryMeasurementSession memoryMeasurement) {
 
         long runTime = System.currentTimeMillis() - runStart;
+        memoryMeasurement.finishAndRecord();
         UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
         long overallPeakMemory = EvaluationProfiler.getPeakMemoryUsage();
         long netPeakMemory = overallPeakMemory - baselineMemory;
@@ -456,6 +494,10 @@ public final class CompositionEvaluationRunner {
         UpdatingControllerEvaluationRecorder.recordMemory(
                 COMMON_SECTION,
                 "コントローラ合成により増えたメモリ",
+                netPeakMemory);
+        UpdatingControllerEvaluationRecorder.recordLegacyPoolPeakMemoryAliases(
+                baselineMemory,
+                overallPeakMemory,
                 netPeakMemory);
 
         if (current != null && current.composition != null) {
@@ -505,6 +547,118 @@ public final class CompositionEvaluationRunner {
 
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("合成終了時");
         UpdatingControllerEvaluationRecorder.printSummary(output);
+    }
+
+    /** Owns the heap sampler and the child-to-parent RSS phase markers. */
+    private static final class MemoryMeasurementSession {
+        private final boolean heapSamplingEnabled;
+        private final long intervalMillis;
+        private RunHeapMemorySampler heapSampler;
+        private boolean started;
+        private boolean finished;
+
+        private MemoryMeasurementSession(boolean heapSamplingEnabled, long intervalMillis) {
+            this.heapSamplingEnabled = heapSamplingEnabled;
+            this.intervalMillis = intervalMillis;
+        }
+
+        private static MemoryMeasurementSession create() {
+            boolean enabled = Boolean.parseBoolean(System.getProperty(
+                    MEMORY_SAMPLING_ENABLED_PROPERTY,
+                    "true"));
+            return new MemoryMeasurementSession(enabled, configuredMemorySamplingInterval());
+        }
+
+        private synchronized void start() {
+            if (started || finished) {
+                return;
+            }
+            // In batch mode the parent opens the RSS window and acknowledges
+            // this boundary before compilation is allowed to begin.
+            MemoryMeasurementProtocol.emitSynthesisWindowStart();
+            started = true;
+            if (heapSamplingEnabled) {
+                recordHeapSamplingStatusSafely(true, false, "");
+                try {
+                    heapSampler = new RunHeapMemorySampler(intervalMillis);
+                    heapSampler.start();
+                } catch (RuntimeException e) {
+                    heapSampler = null;
+                    recordHeapSamplingStatusSafely(true, false, e.toString());
+                } catch (LinkageError e) {
+                    heapSampler = null;
+                    recordHeapSamplingStatusSafely(true, false, e.toString());
+                } catch (OutOfMemoryError e) {
+                    // Measurement must not replace the synthesis outcome when
+                    // memory is already exhausted.
+                    heapSampler = null;
+                    recordHeapSamplingStatusSafely(
+                            true, false, "heap_sampler_start_out_of_memory");
+                }
+            } else {
+                recordHeapSamplingStatusSafely(false, false, "");
+            }
+        }
+
+        private synchronized void finishAndRecord() {
+            if (finished) {
+                return;
+            }
+            UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
+                    "run.synthesis_window_end");
+            finished = true;
+            RunHeapMemorySampler.Result sampledHeap = null;
+            if (heapSampler != null) {
+                try {
+                    sampledHeap = heapSampler.stop();
+                } catch (RuntimeException e) {
+                    recordHeapSamplingStatusSafely(true, false, e.toString());
+                } catch (LinkageError e) {
+                    recordHeapSamplingStatusSafely(true, false, e.toString());
+                } catch (OutOfMemoryError e) {
+                    // Preserve the original synthesis result/failure.
+                    recordHeapSamplingStatusSafely(
+                            true, false, "heap_sampler_stop_out_of_memory");
+                }
+            }
+            if (started) {
+                // The parent takes the synchronous final RSS sample before it
+                // acknowledges this boundary and lets post-processing begin.
+                MemoryMeasurementProtocol.emitSynthesisWindowEnd();
+            }
+            if (sampledHeap != null) {
+                try {
+                    UpdatingControllerEvaluationRecorder.recordSampledHeapMemory(sampledHeap);
+                } catch (OutOfMemoryError ignored) {
+                    // Never replace the synthesis result with recorder OOME.
+                }
+            }
+        }
+
+        private static void recordHeapSamplingStatusSafely(
+                boolean enabled,
+                boolean available,
+                String error) {
+            try {
+                UpdatingControllerEvaluationRecorder.recordHeapMemorySamplingStatus(
+                        enabled, available, error);
+            } catch (OutOfMemoryError ignored) {
+                // Best effort only when the measured JVM is exhausted.
+            }
+        }
+    }
+
+    private static long configuredMemorySamplingInterval() {
+        String raw = System.getProperty(MEMORY_SAMPLING_INTERVAL_PROPERTY);
+        if (raw == null || raw.trim().isEmpty()) {
+            return RunHeapMemorySampler.DEFAULT_INTERVAL_MILLIS;
+        }
+        try {
+            long value = Long.parseLong(raw.trim());
+            return value > 0L ? value : RunHeapMemorySampler.DEFAULT_INTERVAL_MILLIS;
+        } catch (NumberFormatException e) {
+            return RunHeapMemorySampler.DEFAULT_INTERVAL_MILLIS;
+        }
     }
 
     private static void recordPartialCompilationTimes(
