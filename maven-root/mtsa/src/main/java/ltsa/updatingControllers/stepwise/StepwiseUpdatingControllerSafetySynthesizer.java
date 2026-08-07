@@ -265,13 +265,8 @@ public class StepwiseUpdatingControllerSafetySynthesizer {
         }
     }
 
-    private static int countTransitions(MTS<Long, String> mts) {
-        int count = 0;
-        for (Long state : mts.getStates()) {
-            count += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
-            count += mts.getTransitions(state, MTS.TransitionType.MAYBE).size();
-        }
-        return count;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequiredAndMaybe(mts);
     }
 
     private static void outputStateSpace(LTSOutput output, String label, MTS<Long, String> mts) {

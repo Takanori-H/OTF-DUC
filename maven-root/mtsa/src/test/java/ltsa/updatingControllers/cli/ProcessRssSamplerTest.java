@@ -33,6 +33,7 @@ public class ProcessRssSamplerTest {
 
         supplier.setValue(300L);
         assertTrue(sampler.beginSynthesisWindow());
+        assertEquals(300L, sampler.snapshot().getSynthesisWindowStartRssBytes());
         supplier.setValue(500L);
         assertTrue(sampler.endSynthesisWindow());
         supplier.setValue(700L);
@@ -42,6 +43,8 @@ public class ProcessRssSamplerTest {
         assertEquals(60_000L, result.getIntervalMillis());
         assertEquals(700L, result.getLifetimePeakRssBytes());
         assertEquals(500L, result.getSynthesisWindowPeakRssBytes());
+        assertEquals(300L, result.getSynthesisWindowStartRssBytes());
+        assertEquals(200L, result.getSynthesisWindowPeakIncreaseRssBytes());
         assertTrue(result.getLifetimePeakAtEpochMillis() >= beforeStart);
         assertTrue(result.getLifetimePeakAtElapsedMillis() >= 0L);
         assertTrue(result.getSynthesisWindowPeakAtEpochMillis() >= beforeStart);
@@ -95,6 +98,65 @@ public class ProcessRssSamplerTest {
     }
 
     @Test
+    public void synthesisWindowGapExcludesPreWindowAndPostWindowAttempts()
+            throws Exception {
+        ControllableSupplier supplier = new ControllableSupplier(100L);
+        ProcessRssSampler sampler = sampler(60_000L, supplier);
+
+        sampler.start();
+        Thread.sleep(80L);
+        sampler.beginSynthesisWindow();
+        Thread.sleep(5L);
+        sampler.endSynthesisWindow();
+        ProcessRssSampler.Result result = sampler.stop();
+
+        assertTrue(result.getMaxSampleGapMillis() >= 50L);
+        assertTrue(result.getSynthesisWindowMaxSampleGapMillis() >= 1L);
+        assertTrue(result.getSynthesisWindowMaxSampleGapMillis()
+                < result.getMaxSampleGapMillis());
+    }
+
+    @Test
+    public void countsProviderTimeoutOnlyWhenItOccursInsideSynthesisWindow() {
+        final AtomicInteger calls = new AtomicInteger();
+        final CountDownLatch releaseProvider = new CountDownLatch(1);
+        ProcessRssSampler sampler = new ProcessRssSampler(
+                TEST_PID,
+                60_000L,
+                "window_timeout_fake",
+                new LongSupplier() {
+                    @Override
+                    public long getAsLong() {
+                        if (calls.incrementAndGet() == 1) {
+                            return 100L;
+                        }
+                        while (true) {
+                            try {
+                                releaseProvider.await();
+                                return 200L;
+                            } catch (InterruptedException ignored) {
+                                // Model a provider that ignores cancellation.
+                            }
+                        }
+                    }
+                },
+                50L,
+                true);
+        try {
+            sampler.start();
+            assertTrue(sampler.beginSynthesisWindow());
+            ProcessRssSampler.Result result = sampler.stop();
+
+            assertEquals(1L, result.getSynthesisWindowProviderFailureCount());
+            assertEquals(1L, result.getSynthesisWindowProviderTimeoutCount());
+            assertTrue(result.isSynthesisWindowProviderCircuitOpened());
+        } finally {
+            releaseProvider.countDown();
+            sampler.stop();
+        }
+    }
+
+    @Test
     public void boundaryMethodsTakeSynchronousSamples() {
         ControllableSupplier supplier = new ControllableSupplier(10L);
         ProcessRssSampler sampler = sampler(60_000L, supplier);
@@ -113,7 +175,43 @@ public class ProcessRssSamplerTest {
         assertEquals(4, supplier.getCallCount());
         assertEquals(40L, result.getLifetimePeakRssBytes());
         assertEquals(30L, result.getSynthesisWindowPeakRssBytes());
+        assertEquals(20L, result.getSynthesisWindowStartRssBytes());
+        assertEquals(10L, result.getSynthesisWindowPeakIncreaseRssBytes());
         assertEquals(2L, result.getSynthesisWindowSampleCount());
+    }
+
+    @Test
+    public void usesStartBoundaryReadingAsBaselineAndClampsIncreaseAtZero() {
+        ControllableSupplier supplier = new ControllableSupplier(100L);
+        ProcessRssSampler sampler = sampler(60_000L, supplier);
+
+        sampler.start();
+        supplier.setValue(300L);
+        assertTrue(sampler.beginSynthesisWindow());
+        supplier.setValue(200L);
+        assertTrue(sampler.endSynthesisWindow());
+        ProcessRssSampler.Result result = sampler.stop();
+
+        assertEquals(300L, result.getSynthesisWindowStartRssBytes());
+        assertEquals(300L, result.getSynthesisWindowPeakRssBytes());
+        assertEquals(0L, result.getSynthesisWindowPeakIncreaseRssBytes());
+    }
+
+    @Test
+    public void increaseIsUnavailableWhenStartBoundaryReadingFails() {
+        SequenceSupplier supplier = new SequenceSupplier(100L, 0L, 300L, 400L);
+        ProcessRssSampler sampler = sampler(60_000L, supplier);
+
+        sampler.start();
+        assertTrue(sampler.beginSynthesisWindow());
+        assertTrue(sampler.endSynthesisWindow());
+        ProcessRssSampler.Result result = sampler.stop();
+
+        assertFalse(result.isSynthesisWindowStartBoundarySampleSucceeded());
+        assertTrue(result.isSynthesisWindowAvailable());
+        assertEquals(-1L, result.getSynthesisWindowStartRssBytes());
+        assertEquals(300L, result.getSynthesisWindowPeakRssBytes());
+        assertEquals(-1L, result.getSynthesisWindowPeakIncreaseRssBytes());
     }
 
     @Test
@@ -128,6 +226,9 @@ public class ProcessRssSamplerTest {
         assertTrue(result.isSynthesisWindowStarted());
         assertFalse(result.isSynthesisWindowCompleted());
         assertTrue(result.isSynthesisWindowAvailable());
+        assertEquals(100L, result.getSynthesisWindowStartRssBytes());
+        assertEquals(100L, result.getSynthesisWindowPeakRssBytes());
+        assertEquals(0L, result.getSynthesisWindowPeakIncreaseRssBytes());
         assertEquals(-1L, result.getSynthesisWindowCompletedAtEpochMillis());
     }
 
@@ -144,7 +245,9 @@ public class ProcessRssSamplerTest {
         assertFalse(result.isSynthesisWindowAvailable());
         assertFalse(result.isSynthesisWindowStartBoundarySampleSucceeded());
         assertFalse(result.isSynthesisWindowEndBoundarySampleSucceeded());
+        assertEquals(-1L, result.getSynthesisWindowStartRssBytes());
         assertEquals(-1L, result.getSynthesisWindowPeakRssBytes());
+        assertEquals(-1L, result.getSynthesisWindowPeakIncreaseRssBytes());
         assertEquals(0L, result.getSynthesisWindowSampleCount());
     }
 

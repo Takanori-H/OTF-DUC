@@ -307,7 +307,7 @@ public class UpdatingControllerSynthesizer {
         // ▼▼▼ 評価実験用: [1] Updating Environment 生成直後 ▼▼▼
         long euCountStart = 0;
         int euStates = 0;
-        int euTrans = 0;
+        long euTrans = 0;
         long euCountTime = 0;
         if (UpdatingControllerEvaluationRecorder.isEnabled()) {
             euCountStart = System.currentTimeMillis();
@@ -388,7 +388,7 @@ public class UpdatingControllerSynthesizer {
         // ▼▼▼ 評価実験用: [2] Meta Environment 生成直後 (★最大ピーク★) ▼▼▼
         long metaCountStart = 0;
         int metaStates = 0;
-        int metaTrans = 0;
+        long metaTrans = 0;
         long metaCountTime = 0;
         if (UpdatingControllerEvaluationRecorder.isEnabled()) {
             metaCountStart = System.currentTimeMillis();
@@ -515,7 +515,7 @@ public class UpdatingControllerSynthesizer {
         // ▼▼▼ 評価実験用: [4] 最終 Safety Environment 生成直後 ▼▼▼
         long safeCountStart = 0;
         int safeStates = 0;
-        int safeTrans = 0;
+        long safeTrans = 0;
         long safeCountTime = 0;
         if (UpdatingControllerEvaluationRecorder.isEnabled()) {
             safeCountStart = System.currentTimeMillis();
@@ -1691,14 +1691,8 @@ public class UpdatingControllerSynthesizer {
     }
 
     // ▼▼▼ 評価実験用: MTSの遷移数をカウントするヘルパーメソッド ▼▼▼
-    private static int countTransitions(MTS<Long, String> mts) {
-        int count = 0;
-        for (Long state : mts.getStates()) {
-            // REQUIRED と MAYBE の両方の遷移をカウントする（通常はREQUIREDのみですが念のため両方）
-            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.REQUIRED).size();
-            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.MAYBE).size();
-        }
-        return count;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequiredAndMaybe(mts);
     }
     // ▲▲▲ 追加ここまで ▲▲▲
 }

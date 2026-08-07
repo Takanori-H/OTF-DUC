@@ -1,0 +1,5 @@
+role,path,sha256,size_bytes
+"config_original","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\configs\final\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml","de058f43cae3826fb2f705ab85b2c473417c9f5a67ef6098402062cc814e82aa",4131
+"config_sanitized_snapshot","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\final_20260804\drone_rebuilt_2drones_3x2x2_geofence\result\executed_config.sanitized.yaml","6e38e1f71b438b96ece157addedce45dc9000c1b227f9ee538df3ff4e2ca0a0a",4020
+"lts","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\LTS\DroneRebuilt\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts","f1db6c81c715079bc44e236060f357d459824b00e882b1c9d120bc4d2a65b399",35100
+"launcher_artifact","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\mtsa-1.0-SNAPSHOT.jar","6430f5d5f8b57cf044c9803c7421d7d9d493912e2284b324a19e0ae5a54aa5d8",353847554

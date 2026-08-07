@@ -25,6 +25,7 @@ import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
 import ltsa.lts.CompactState;
 import ltsa.lts.LTSOutput;
 import ltsa.updatingControllers.DUCHeartbeat;
+import ltsa.updatingControllers.EvaluationTransitionCounter;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 
@@ -120,7 +121,7 @@ public class UpdatingControllerGRSynthesizer {
 
         FluentUtils fluentUtils = FluentUtils.getInstance();
 
-        long subsetStart = System.currentTimeMillis();
+        long subsetStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_SUBSET_CONSTRUCTION");
         DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -138,21 +139,21 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "非決定環境の subset construction 時間",
-                System.currentTimeMillis() - subsetStart);
-        long perfectInfoCountStart = System.currentTimeMillis();
+                monotonicMillis() - subsetStart);
+        long perfectInfoCountStart = monotonicMillis();
         UpdatingControllerEvaluationRecorder.recordStateSpace(
                 timingSection,
                 "Perfect-info game after subset construction",
                 perfectInfoGame.getStates().size(),
-                perfectInfoGame.getNumberOfTransitions(),
-                System.currentTimeMillis() - perfectInfoCountStart,
+                EvaluationTransitionCounter.countRequiredAndMaybe(perfectInfoGame),
+                monotonicMillis() - perfectInfoCountStart,
                 "非決定 safety environment から subset construction で作った perfect-info game。");
         if (uccs.isShowGRGameInDraw()) {
             addGRGameDrawMachine(uccs, buildPerfectInfoGRGameCompactState(perfectInfoGame), output);
         }
 
         FluentStateValuation<Set<Long>> valuation = fluentUtils.buildValuation(perfectInfoGame, uccs.getUpdateGRGoal().getFluents());
-        long goalBuildStart = System.currentTimeMillis();
+        long goalBuildStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_GOAL_BUILD");
         DUCHeartbeat.setCounter("perfectInfoStates", perfectInfoGame.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -173,13 +174,13 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "GR goal 構築時間",
-                System.currentTimeMillis() - goalBuildStart);
+                monotonicMillis() - goalBuildStart);
         Set<Set<Long>> initialStates = new HashSet<Set<Long>>();
         Set<Long> initialState = new HashSet<Long>();
         initialState.add(safetyEnv.getInitialState());
         initialStates.add(initialState);
 
-        long gameBuildStart = System.currentTimeMillis();
+        long gameBuildStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_GAME_BUILD");
         DUCHeartbeat.setCounter("perfectInfoStates", perfectInfoGame.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -196,11 +197,11 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "Knowledge GR game 構築時間",
-                System.currentTimeMillis() - gameBuildStart);
+                monotonicMillis() - gameBuildStart);
         recordGrGoalCounts(timingSection, grGoal);
         recordGrGameStateSpace(timingSection, "Knowledge GR game", game);
 
-        long rankSystemStart = System.currentTimeMillis();
+        long rankSystemStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_RANK_SYSTEM_BUILD");
         DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -217,10 +218,10 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "Rank system 構築時間",
-                System.currentTimeMillis() - rankSystemStart);
+                monotonicMillis() - rankSystemStart);
 
         KnowledgeGRGameSolver<Long, String> solver = new KnowledgeGRGameSolver<Long, String>(game, system);
-        long solveStart = System.currentTimeMillis();
+        long solveStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_WINNING_REGION");
         DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -237,10 +238,10 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "Winning region 計算時間",
-                System.currentTimeMillis() - solveStart);
+                monotonicMillis() - solveStart);
 
         if (solver.isWinning(perfectInfoGame.getInitialState())) {
-            long strategyBuildStart = System.currentTimeMillis();
+            long strategyBuildStart = monotonicMillis();
             DUCHeartbeat.beginPhase(heartbeatPrefix + "_STRATEGY_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
@@ -256,14 +257,14 @@ public class UpdatingControllerGRSynthesizer {
             UpdatingControllerEvaluationRecorder.recordTime(
                     timingSection,
                     "Strategy 構築時間",
-                    System.currentTimeMillis() - strategyBuildStart);
+                    monotonicMillis() - strategyBuildStart);
 
             Set<Pair<StrategyState<Set<Long>, Integer>, StrategyState<Set<Long>, Integer>>> worseRank = solver.getWorseRank();
             recordGrPhaseMemoryCheckpoint(
                     heartbeatPrefix,
                     "nondeterministic",
                     "controller_mts_build_before");
-            long strategyToMtsStart = System.currentTimeMillis();
+            long strategyToMtsStart = monotonicMillis();
             DUCHeartbeat.beginPhase(heartbeatPrefix + "_CONTROLLER_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
@@ -300,10 +301,10 @@ public class UpdatingControllerGRSynthesizer {
             UpdatingControllerEvaluationRecorder.recordTime(
                     timingSection,
                     "Strategy から controller MTS を構築する時間",
-                    System.currentTimeMillis() - strategyToMtsStart);
+                    monotonicMillis() - strategyToMtsStart);
 
             output.outln("Controller [" + plainController.getStates().size() + "] generated successfully.");
-            long compactConvertStart = System.currentTimeMillis();
+            long compactConvertStart = monotonicMillis();
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
                     "Controller を CompactState に変換する時間");
@@ -322,7 +323,7 @@ public class UpdatingControllerGRSynthesizer {
             UpdatingControllerEvaluationRecorder.recordTime(
                     timingSection,
                     "Controller を CompactState に変換する時間",
-                    System.currentTimeMillis() - compactConvertStart);
+                    monotonicMillis() - compactConvertStart);
             uccs.setComposition(compactState);
             recordGrPhaseMemoryCheckpoint(
                     heartbeatPrefix,
@@ -394,7 +395,7 @@ public class UpdatingControllerGRSynthesizer {
             String heartbeatPrefix) {
         GRGame<Long> game;
 
-        long gameBuildStart = System.currentTimeMillis();
+        long gameBuildStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_GAME_BUILD");
         DUCHeartbeat.setCounter("safetyStates", safetyEnv.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -411,13 +412,13 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "GR game 構築時間",
-                System.currentTimeMillis() - gameBuildStart);
+                monotonicMillis() - gameBuildStart);
         recordGrGoalCounts(timingSection, game.getGoal());
         recordGrGameStateSpace(timingSection, "GR game", game);
         if (uccs.isShowGRGameInDraw()) {
             addGRGameDrawMachine(uccs, buildDeterministicGRGameCompactState(game), output);
         }
-        long rankSystemStart = System.currentTimeMillis();
+        long rankSystemStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_RANK_SYSTEM_BUILD");
         DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -435,9 +436,9 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "Rank system 構築時間",
-                System.currentTimeMillis() - rankSystemStart);
+                monotonicMillis() - rankSystemStart);
         PerfectInfoGRGameSolver<Long> solver = new PerfectInfoGRGameSolver<Long>(game, system);
-        long solveStart = System.currentTimeMillis();
+        long solveStart = monotonicMillis();
         DUCHeartbeat.beginPhase(heartbeatPrefix + "_WINNING_REGION");
         DUCHeartbeat.setCounter("grGameStates", game.getStates().size());
         UpdatingControllerEvaluationRecorder.beginFailureTimer(
@@ -454,10 +455,10 @@ public class UpdatingControllerGRSynthesizer {
         UpdatingControllerEvaluationRecorder.recordTime(
                 timingSection,
                 "Winning region 計算時間",
-                System.currentTimeMillis() - solveStart);
+                monotonicMillis() - solveStart);
 
         if (solver.isWinning(safetyEnv.getInitialState())) {
-            long strategyBuildStart = System.currentTimeMillis();
+            long strategyBuildStart = monotonicMillis();
             DUCHeartbeat.beginPhase(heartbeatPrefix + "_STRATEGY_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
@@ -473,14 +474,14 @@ public class UpdatingControllerGRSynthesizer {
             UpdatingControllerEvaluationRecorder.recordTime(
                     timingSection,
                     "Strategy 構築時間",
-                    System.currentTimeMillis() - strategyBuildStart);
+                    monotonicMillis() - strategyBuildStart);
             GRGameSolver<Long> grSolver = (GRGameSolver<Long>) solver;
             Set<Pair<StrategyState<Long, Integer>, StrategyState<Long, Integer>>> worseRank = grSolver.getWorseRank();
             recordGrPhaseMemoryCheckpoint(
                     heartbeatPrefix,
                     "deterministic",
                     "controller_mts_build_before");
-            long strategyToMtsStart = System.currentTimeMillis();
+            long strategyToMtsStart = monotonicMillis();
             DUCHeartbeat.beginPhase(heartbeatPrefix + "_CONTROLLER_BUILD");
             UpdatingControllerEvaluationRecorder.beginFailureTimer(
                     timingSection,
@@ -496,13 +497,13 @@ public class UpdatingControllerGRSynthesizer {
             UpdatingControllerEvaluationRecorder.recordTime(
                     timingSection,
                     "Strategy から controller MTS を構築する時間",
-                    System.currentTimeMillis() - strategyToMtsStart);
+                    monotonicMillis() - strategyToMtsStart);
 
             if (result == null) {
                 output.outln("There is no controller for model " + uccs.name + " for the given setting.");
                 uccs.setComposition(null);
             } else {
-                long plainTransformStart = System.currentTimeMillis();
+                long plainTransformStart = monotonicMillis();
                 UpdatingControllerEvaluationRecorder.beginFailureTimer(
                         timingSection,
                         "StrategyState controller を Long/String MTS に変換する時間");
@@ -522,10 +523,10 @@ public class UpdatingControllerGRSynthesizer {
                 UpdatingControllerEvaluationRecorder.recordTime(
                         timingSection,
                         "StrategyState controller を Long/String MTS に変換する時間",
-                        System.currentTimeMillis() - plainTransformStart);
+                        monotonicMillis() - plainTransformStart);
 
                 output.outln("Controller [" + plainController.getStates().size() + "] generated successfully.");
-                long compactConvertStart = System.currentTimeMillis();
+                long compactConvertStart = monotonicMillis();
                 UpdatingControllerEvaluationRecorder.beginFailureTimer(
                         timingSection,
                         "Controller を CompactState に変換する時間");
@@ -544,7 +545,7 @@ public class UpdatingControllerGRSynthesizer {
                 UpdatingControllerEvaluationRecorder.recordTime(
                         timingSection,
                         "Controller を CompactState に変換する時間",
-                        System.currentTimeMillis() - compactConvertStart);
+                        monotonicMillis() - compactConvertStart);
                 uccs.setComposition(convert);
                 recordGrPhaseMemoryCheckpoint(
                         heartbeatPrefix,
@@ -612,14 +613,14 @@ public class UpdatingControllerGRSynthesizer {
     }
 
     private static <S> void recordGrGameStateSpace(String timingSection, String label, Game<S> game) {
-        long countStart = System.currentTimeMillis();
+        long countStart = monotonicMillis();
         long controllableSuccessors = 0;
         long uncontrollableSuccessors = 0;
         for (S state : game.getStates()) {
             controllableSuccessors += game.getControllableSuccessors(state).size();
             uncontrollableSuccessors += game.getUncontrollableSuccessors(state).size();
         }
-        long countTime = System.currentTimeMillis() - countStart;
+        long countTime = monotonicMillis() - countStart;
         UpdatingControllerEvaluationRecorder.recordGrGameStateSpace(
                 timingSection,
                 label,
@@ -651,6 +652,10 @@ public class UpdatingControllerGRSynthesizer {
         }
         machines.add(compactGRGame);
         output.outln("GR game graph added to Draw tab as " + compactGRGame.name + ".");
+    }
+
+    private static long monotonicMillis() {
+        return System.nanoTime() / 1_000_000L;
     }
 
 }

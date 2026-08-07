@@ -1,0 +1,12 @@
+{
+  "target": "UpdCont_T2",
+  "expectedMethod": "Traditional",
+  "actualMethod": "traditional",
+  "expectedSbp": false,
+  "actualSbp": false,
+  "compositeStateClass": "ltsa.updatingControllers.structures.UpdatingControllerCompositeState",
+  "compositeStateName": "UpdCont_T2",
+  "targetMatches": true,
+  "matches": true,
+  "message": "method/target validation passed"
+}

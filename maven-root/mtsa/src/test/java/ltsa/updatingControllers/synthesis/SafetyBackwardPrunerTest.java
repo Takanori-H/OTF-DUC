@@ -13,9 +13,68 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class SafetyBackwardPrunerTest {
+
+    @Test
+    public void completePruningReusesReachableRequiredOnlyInputWhenThereAreNoSeeds() {
+        MTS<Long, String> environment = environment(0L);
+        environment.addState(1L);
+        addTransition(environment, 0L, "next", 1L);
+        addTransition(environment, 1L, "back", 0L);
+
+        SafetyBackwardPruner.Result result = SafetyBackwardPruner.prune(
+                environment,
+                set("next", "back"),
+                "no-op",
+                null);
+
+        assertSame(environment, result.getEnvironment());
+        assertTrue(result.isInputEnvironmentReused());
+    }
+
+    @Test
+    public void completePruningStillRemovesUnreachableStatesWhenThereAreNoSeeds() {
+        MTS<Long, String> environment = environment(0L);
+        environment.addState(1L);
+        addTransition(environment, 0L, "stay", 0L);
+        addTransition(environment, 1L, "hidden", 1L);
+
+        SafetyBackwardPruner.Result result = SafetyBackwardPruner.prune(
+                environment,
+                set("stay", "hidden"),
+                "cleanup",
+                null);
+
+        assertNotSame(environment, result.getEnvironment());
+        assertFalse(result.isInputEnvironmentReused());
+        assertEquals(set(0L), result.getEnvironment().getStates());
+        assertTrue(result.getEnvironment().getActions().contains("hidden"));
+    }
+
+    @Test
+    public void completePruningStillDropsMaybeOnlyTransitions() {
+        MTS<Long, String> environment = environment(0L);
+        environment.addAction("stay");
+        environment.addAction("maybe");
+        environment.addRequired(0L, "stay", 0L);
+        environment.addPossible(0L, "maybe", 0L);
+
+        SafetyBackwardPruner.Result result = SafetyBackwardPruner.prune(
+                environment,
+                set("stay"),
+                "maybe-projection",
+                null);
+
+        assertNotSame(environment, result.getEnvironment());
+        assertFalse(result.isInputEnvironmentReused());
+        assertTrue(result.getEnvironment()
+                .getTransitions(0L, MTS.TransitionType.MAYBE).isEmpty());
+        assertTrue(result.getEnvironment().getActions().contains("maybe"));
+    }
 
     @Test
     public void deferredPruningDoesNotTreatOrdinaryDeadEndAsError() {
@@ -33,9 +92,57 @@ public class SafetyBackwardPrunerTest {
                 null);
 
         assertFalse(result.isInitialLosing());
+        assertSame(environment, result.getEnvironment());
+        assertTrue(result.isInputEnvironmentReused());
         assertTrue(result.getEnvironment().getStates().contains(1L));
         assertTransition(result.getEnvironment(), 0L, "a", 1L);
         assertTrue(result.getErrorStates().isEmpty());
+    }
+
+    @Test
+    public void deferredPruningStillCleansUnreachableStatesWithoutErrorSeeds() {
+        MTS<Long, String> environment = environment(0L);
+        environment.addState(1L);
+        addTransition(environment, 0L, "stay", 0L);
+        addTransition(environment, 1L, "hidden", 1L);
+
+        SafetyBackwardPruner.DeferredResult result = SafetyBackwardPruner.pruneDeferred(
+                environment,
+                Collections.<Long>emptySet(),
+                set("stay", "hidden"),
+                owners("stay", 0),
+                stages(0),
+                "cleanup",
+                null);
+
+        assertNotSame(environment, result.getEnvironment());
+        assertFalse(result.isInputEnvironmentReused());
+        assertEquals(set(0L), result.getEnvironment().getStates());
+        assertTrue(result.getEnvironment().getActions().contains("hidden"));
+    }
+
+    @Test
+    public void deferredPruningStillDropsMaybeOnlyTransitionsWithoutErrorSeeds() {
+        MTS<Long, String> environment = environment(0L);
+        environment.addAction("stay");
+        environment.addAction("maybe");
+        environment.addRequired(0L, "stay", 0L);
+        environment.addPossible(0L, "maybe", 0L);
+
+        SafetyBackwardPruner.DeferredResult result = SafetyBackwardPruner.pruneDeferred(
+                environment,
+                Collections.<Long>emptySet(),
+                set("stay"),
+                owners("stay", 0),
+                stages(0),
+                "maybe-projection",
+                null);
+
+        assertNotSame(environment, result.getEnvironment());
+        assertFalse(result.isInputEnvironmentReused());
+        assertTrue(result.getEnvironment()
+                .getTransitions(0L, MTS.TransitionType.MAYBE).isEmpty());
+        assertTrue(result.getEnvironment().getActions().contains("maybe"));
     }
 
     @Test

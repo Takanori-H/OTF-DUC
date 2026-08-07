@@ -1,0 +1,247 @@
+INFO: Registered Map Environment: MAP_MISSION
+INFO: Registered Map Environment: MAP_BATTERY_COUNTER
+comp.compile time : 99ms
+Compiled: MISSION
+Compiled: BATTERY_COUNTER
+Composition:OldEnvironment = OldEnvironment.MISSION || OldEnvironment.BATTERY_COUNTER
+State Space: 5 * 11 = 2 ** 7
+Composing...
+-- States: 30 Transitions: 107 Memory used: 9851K
+Composed in 19ms
+Formula !P_ALWAYS_FLY_HIGH = (true U (MissionStarted & (FlyingLow | FlyingMid)))
+GBA 2 states 4 transitions
+Buchi automata:
+P_ALWAYS_FLY_HIGH = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |MissionStarted&FlyingLow -> S1 |MissionStarted&FlyingMid -> S1).
+Composition:P_ALWAYS_FLY_HIGH = MissionStarted || FlyingLow || FlyingMid || SYNC || P_ALWAYS_FLY_HIGH
+State Space: 2 * 2 * 2 * 2 * 2 = 2 ** 5
+Composing...
+-- States: 24 Transitions: 86 Memory used: 10618K
+Composed in 12ms
+After Tau elimination = 12 state
+Tau reduction ON
+P_ALWAYS_FLY_HIGH minimising...
+Minimised States: 5 in 0ms
+make DFA(P_ALWAYS_FLY_HIGH)
+DFA(P_ALWAYS_FLY_HIGH) has 3 states.
+Tau reduction ON
+P_ALWAYS_FLY_HIGH minimising...
+Minimised States: 3 in 0ms
+Formula !P_DETECTED_ACTIONS = (true U ((SuspiciousActivityDetected & scan) | (picture & !SuspiciousActivityDetected)))
+GBA 2 states 4 transitions
+Buchi automata:
+P_DETECTED_ACTIONS = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |SuspiciousActivityDetected&scan -> S1 |picture&!SuspiciousActivityDetected -> S1).
+Composition:P_DETECTED_ACTIONS = SuspiciousActivityDetected || picture || scan || SYNC || P_DETECTED_ACTIONS
+State Space: 2 * 2 * 2 * 2 * 2 = 2 ** 5
+Composing...
+-- States: 24 Transitions: 86 Memory used: 10584K
+Composed in 9ms
+After Tau elimination = 12 state
+Tau reduction ON
+P_DETECTED_ACTIONS minimising...
+Minimised States: 3 in 0ms
+make DFA(P_DETECTED_ACTIONS)
+DFA(P_DETECTED_ACTIONS) has 2 states.
+Tau reduction ON
+P_DETECTED_ACTIONS minimising...
+Minimised States: 2 in 0ms
+Formula !P_HIGH_PRIORITY_TO_MISSION = (true U (return2base & !NoBattery))
+GBA 2 states 3 transitions
+Buchi automata:
+P_HIGH_PRIORITY_TO_MISSION = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |return2base&!NoBattery -> S1).
+Composition:P_HIGH_PRIORITY_TO_MISSION = NoBattery || return2base || SYNC || P_HIGH_PRIORITY_TO_MISSION
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10661K
+Composed in 8ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_HIGH_PRIORITY_TO_MISSION minimising...
+Minimised States: 3 in 0ms
+make DFA(P_HIGH_PRIORITY_TO_MISSION)
+DFA(P_HIGH_PRIORITY_TO_MISSION) has 2 states.
+Tau reduction ON
+P_HIGH_PRIORITY_TO_MISSION minimising...
+Minimised States: 2 in 0ms
+Formula !P_HOW_TO_MOVE = (true U (move & ScanProcessing))
+GBA 2 states 3 transitions
+Buchi automata:
+P_HOW_TO_MOVE = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |move&ScanProcessing -> S1).
+Composition:P_HOW_TO_MOVE = ScanProcessing || move || SYNC || P_HOW_TO_MOVE
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 57 Memory used: 10557K
+Composed in 7ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_HOW_TO_MOVE minimising...
+Minimised States: 3 in 0ms
+make DFA(P_HOW_TO_MOVE)
+DFA(P_HOW_TO_MOVE) has 2 states.
+Tau reduction ON
+P_HOW_TO_MOVE minimising...
+Minimised States: 2 in 0ms
+Formula !P_DONT_PICTURE_TWICE = (true U (picture & PictureSent))
+GBA 2 states 3 transitions
+Buchi automata:
+P_DONT_PICTURE_TWICE = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |picture&PictureSent -> S1).
+Composition:P_DONT_PICTURE_TWICE = PictureSent || picture || SYNC || P_DONT_PICTURE_TWICE
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 49 Memory used: 10464K
+Composed in 7ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_DONT_PICTURE_TWICE minimising...
+Minimised States: 3 in 0ms
+make DFA(P_DONT_PICTURE_TWICE)
+DFA(P_DONT_PICTURE_TWICE) has 2 states.
+Tau reduction ON
+P_DONT_PICTURE_TWICE minimising...
+Minimised States: 2 in 0ms
+Formula !P_DONT_SCAN_TWICE = (true U (scan & ZoneScaned))
+GBA 2 states 3 transitions
+Buchi automata:
+P_DONT_SCAN_TWICE = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |scan&ZoneScaned -> S1).
+Composition:P_DONT_SCAN_TWICE = ZoneScaned || scan || SYNC || P_DONT_SCAN_TWICE
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 57 Memory used: 10455K
+Composed in 7ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_DONT_SCAN_TWICE minimising...
+Minimised States: 3 in 0ms
+make DFA(P_DONT_SCAN_TWICE)
+DFA(P_DONT_SCAN_TWICE) has 2 states.
+Tau reduction ON
+P_DONT_SCAN_TWICE minimising...
+Minimised States: 2 in 0ms
+Formula !P_BATTERY_SAFETY_OLD = (true U (BatteryIsEmpty & JustDidEnergyActionOld))
+GBA 2 states 3 transitions
+Buchi automata:
+P_BATTERY_SAFETY_OLD = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |BatteryIsEmpty&JustDidEnergyActionOld -> S1).
+Composition:P_BATTERY_SAFETY_OLD = BatteryIsEmpty || JustDidEnergyActionOld || SYNC || P_BATTERY_SAFETY_OLD
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 121 Memory used: 10501K
+Composed in 7ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_BATTERY_SAFETY_OLD minimising...
+Minimised States: 3 in 1ms
+make DFA(P_BATTERY_SAFETY_OLD)
+DFA(P_BATTERY_SAFETY_OLD) has 2 states.
+Tau reduction ON
+P_BATTERY_SAFETY_OLD minimising...
+Minimised States: 2 in 0ms
+Composition:OldController = OldEnvironment || P_HIGH_PRIORITY_TO_MISSION || P_HOW_TO_MOVE || P_BATTERY_SAFETY_OLD || P_DONT_PICTURE_TWICE || P_DONT_SCAN_TWICE || P_ALWAYS_FLY_HIGH || P_DETECTED_ACTIONS
+State Space: 30 * 2 * 2 * 2 * 2 * 2 * 3 * 2 = 2 ** 13
+Composing...
+-- States: 56 Transitions: 273 Memory used: 10607K
+Composed in 8ms
+Solving the LTS control problem.
+Environment states: 57
+Game states: 57
+Game transitions: 171
+Analysis time: 69ms.
+Controller [56] generated successfully.
+Composition:OldController = OldController || P_HIGH_PRIORITY_TO_MISSION || P_HOW_TO_MOVE || P_BATTERY_SAFETY_OLD || P_DONT_PICTURE_TWICE || P_DONT_SCAN_TWICE || P_ALWAYS_FLY_HIGH || P_DETECTED_ACTIONS
+State Space: 56 * 2 * 2 * 2 * 2 * 2 * 3 * 2 = 2 ** 14
+Composing...
+-- States: 56 Transitions: 111 Memory used: 12723K
+Composed in 15ms
+Compiled: OldController
+Composition:OldEnvironment = OldEnvironment.MISSION || OldEnvironment.BATTERY_COUNTER
+State Space: 5 * 11 = 2 ** 7
+Composing...
+-- States: 30 Transitions: 107 Memory used: 11488K
+Composed in 11ms
+ - Synthesizing Mapping Environment from lists (size=2)...
+INFO: Auto-compiling dependency: NEW_MISSION
+Generating Mapping Environment: MAP_MISSION_NEW_MISSION
+INFO: Auto-compiling dependency: NEW_BATTERY_COUNTER
+Generating Mapping Environment: MAP_BATTERY_COUNTER_NEW_BATTERY_COUNTER
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_MISSION_NEW_MISSION || MAP_BATTERY_COUNTER_NEW_BATTERY_COUNTER
+State Space: 10 * 22 = 2 ** 9
+Composing...
+-- States: 60 Transitions: 253 Memory used: 12524K
+Composed in 14ms
+comp.continueCompilation time : 320ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_ALWAYS_FLY_HIGH_UPD_OLD
+Processing formula for update: P_DETECTED_ACTIONS_UPD_OLD
+Processing formula for update: P_HIGH_PRIORITY_TO_MISSION_UPD_OLD
+Processing formula for update: P_HOW_TO_MOVE_UPD_OLD
+Processing formula for update: P_DONT_PICTURE_TWICE_UPD_OLD
+Processing formula for update: P_DONT_SCAN_TWICE_UPD_OLD
+Processing formula for update: P_BATTERY_SAFETY_OLD_UPD_OLD
+Processing formula for update: P_ALWAYS_FLY_LOW_UPD_NEW
+Processing formula for update: P_FOLLOWING_ACTIONS_UPD_NEW
+Processing formula for update: P_NO_FOLLOW_BEFORE_SCAN_UPD_NEW
+Processing formula for update: P_HIGH_PRIORITY_TO_MISSION_UPD_NEW
+Processing formula for update: P_NEW_HOW_TO_MOVE_UPD_NEW
+Processing formula for update: P_DONT_SCAN_TWICE_UPD_NEW
+Processing formula for update: P_BATTERY_SAFETY_NEW_UPD_NEW
+Processing formula for update: T2_START_AFTER_STOP_AND_RECONFIGURE
+Environment states:27453
+Solving safety goals for the controller synthesis
+Environment states after safety: 10667
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [1771] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+比較用時間（合成全体-CountTime-描画） : 0分19.26秒
+
+[規模]
+最大状態数時の状態数 : 27453 states
+最大状態数時の遷移数 : 188117 transitions
+最大状態数時の段階 : [2. Meta]
+最大遷移数時の状態数 : 27453 states
+最大遷移数時の遷移数 : 188117 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 1771 states
+出力遷移数 : 4070 transitions
+
+[GR(1)]
+final GR input 状態数 : 10667 states
+final GR input 遷移数 : 44065 transitions
+GR(1)合成時間 : 0分01.59秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 0.72 GB
+最初の有効sampleからのヒープ増加 : 0.72 GB
+====================================================
+
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_01\result\Surveillance\Traditional\surveillance_traditional_t2_start_after_stop_and_reconfigure_evaluation_UpdCont_T2.csv
+Tau reduction ON
+UpdCont_T2 minimising.......
+Minimised States: 479 in 76ms
+
+[minimized 出力]
+minimized 出力状態数 : 479 states
+minimized 出力遷移数 : 1226 transitions
+minimize 時間 : 77 ms
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_01\result\Surveillance\Traditional\surveillance_traditional_t2_start_after_stop_and_reconfigure_evaluation_UpdCont_T2.csv

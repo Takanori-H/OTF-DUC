@@ -1,0 +1,12 @@
+{
+  "target": "Stepwise_UpdCont_T1",
+  "expectedMethod": "stepwise_delayed+SBP",
+  "actualMethod": "stepwise_delayed",
+  "expectedSbp": true,
+  "actualSbp": true,
+  "compositeStateClass": "ltsa.updatingControllers.structures.UpdatingControllerCompositeState",
+  "compositeStateName": "Stepwise_UpdCont_T1",
+  "targetMatches": true,
+  "matches": true,
+  "message": "method/target validation passed"
+}

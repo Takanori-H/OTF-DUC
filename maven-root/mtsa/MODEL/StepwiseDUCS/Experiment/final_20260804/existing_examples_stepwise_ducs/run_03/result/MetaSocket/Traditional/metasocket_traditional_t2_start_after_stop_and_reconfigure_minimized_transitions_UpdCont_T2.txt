@@ -1,0 +1,32 @@
+Process:
+	UpdCont_T2
+States:
+	14
+Transitions:
+	UpdCont_T2 = Q0,
+	Q0	= (hotSwapIn -> Q6
+		  |input -> Q8),
+	Q1	= (startNewSpec -> Q2
+		  |input -> Q5),
+	Q2	= (input -> Q4),
+	Q3	= (reconfigure -> Q5),
+	Q4	= (des128 -> Q11),
+	Q5	= (startNewSpec -> Q4),
+	Q6	= (stopOldSpec -> Q9
+		  |input -> Q12),
+	Q7	= (des64 -> Q3
+		  |reconfigure -> Q5
+		  |output -> Q10),
+	Q8	= (hotSwapIn -> Q12
+		  |des64 -> Q13),
+	Q9	= (reconfigure -> Q1
+		  |input -> Q3
+		  |des64 -> Q10),
+	Q10	= (reconfigure -> Q1
+		  |input -> Q3),
+	Q11	= (output -> Q2
+		  |des128 -> Q11),
+	Q12	= (stopOldSpec -> Q7),
+	Q13	= (output -> Q0
+		  |hotSwapIn -> Q12
+		  |des64 -> Q13).

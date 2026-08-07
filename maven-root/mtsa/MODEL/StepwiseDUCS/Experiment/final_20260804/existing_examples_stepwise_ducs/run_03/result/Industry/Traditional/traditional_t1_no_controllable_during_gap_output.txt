@@ -1,0 +1,165 @@
+INFO: Registered Map Environment: MAP_TOR
+INFO: Registered Map Environment: MAP_DSD1
+INFO: Registered Map Environment: MAP_GATEFORM1
+comp.compile time : 91ms
+Compiled: TOR_OLD
+Compiled: DSD1_OLD
+Compiled: GATEFORM1_OLD
+Composition:OldEnvironment = OldEnvironment.TOR_OLD || OldEnvironment.DSD1_OLD || OldEnvironment.GATEFORM1_OLD
+State Space: 5 * 8 * 3 = 2 ** 8
+Composing...
+-- States: 120 Transitions: 494 Memory used: 10430K
+Composed in 20ms
+Formula !P_TOR_POLICY = (true U ((validateDSD1 | validateGF1) & !TORDone))
+GBA 2 states 4 transitions
+Buchi automata:
+P_TOR_POLICY = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |validateDSD1&!TORDone -> S1 |validateGF1&!TORDone -> S1).
+Composition:P_TOR_POLICY = TORDone || validateDSD1 || validateGF1 || SYNC || P_TOR_POLICY
+State Space: 2 * 2 * 2 * 2 * 2 = 2 ** 5
+Composing...
+-- States: 24 Transitions: 86 Memory used: 10647K
+Composed in 10ms
+After Tau elimination = 12 state
+Tau reduction ON
+P_TOR_POLICY minimising...
+Minimised States: 3 in 0ms
+make DFA(P_TOR_POLICY)
+DFA(P_TOR_POLICY) has 2 states.
+Tau reduction ON
+P_TOR_POLICY minimising...
+Minimised States: 2 in 0ms
+Formula !P_DSD1_POLICY = (true U ((DSD1Done & validateTOR) | (validateGF1 & !DSD1Done)))
+GBA 2 states 4 transitions
+Buchi automata:
+P_DSD1_POLICY = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |DSD1Done&validateTOR -> S1 |validateGF1&!DSD1Done -> S1).
+Composition:P_DSD1_POLICY = DSD1Done || validateGF1 || validateTOR || SYNC || P_DSD1_POLICY
+State Space: 2 * 2 * 2 * 2 * 2 = 2 ** 5
+Composing...
+-- States: 24 Transitions: 98 Memory used: 10507K
+Composed in 9ms
+After Tau elimination = 12 state
+Tau reduction ON
+P_DSD1_POLICY minimising...
+Minimised States: 3 in 0ms
+make DFA(P_DSD1_POLICY)
+DFA(P_DSD1_POLICY) has 2 states.
+Tau reduction ON
+P_DSD1_POLICY minimising...
+Minimised States: 2 in 0ms
+Formula !P_DO_NOT_SEND_TWICE = (true U ((Finished & validateGF1) | ((DSD1Done & validateDSD1) | (TORDone & validateTOR))))
+GBA 2 states 5 transitions
+Buchi automata:
+P_DO_NOT_SEND_TWICE = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |DSD1Done&validateDSD1 -> S1 |Finished&validateGF1 -> S1 |TORDone&validateTOR -> S1).
+Composition:P_DO_NOT_SEND_TWICE = TORDone || DSD1Done || Finished || validateTOR || validateDSD1 || validateGF1 || SYNC || P_DO_NOT_SEND_TWICE
+State Space: 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 8
+Composing...
+-- States: 80 Transitions: 404 Memory used: 10846K
+Composed in 8ms
+After Tau elimination = 40 state
+Tau reduction ON
+P_DO_NOT_SEND_TWICE minimising...
+Minimised States: 5 in 0ms
+make DFA(P_DO_NOT_SEND_TWICE)
+DFA(P_DO_NOT_SEND_TWICE) has 4 states.
+Tau reduction ON
+P_DO_NOT_SEND_TWICE minimising...
+Minimised States: 4 in 0ms
+Composition:OldController = OldEnvironment || P_DSD1_POLICY || P_TOR_POLICY || P_DO_NOT_SEND_TWICE
+State Space: 120 * 2 * 2 * 4 = 2 ** 11
+Composing...
+-- States: 64 Transitions: 212 Memory used: 10688K
+Composed in 7ms
+Solving the LTS control problem.
+Environment states: 65
+Game states: 65
+Game transitions: 195
+Analysis time: 69ms.
+Controller [64] generated successfully.
+Composition:OldController = OldController || P_DSD1_POLICY || P_TOR_POLICY || P_DO_NOT_SEND_TWICE
+State Space: 64 * 2 * 2 * 4 = 2 ** 10
+Composing...
+-- States: 64 Transitions: 148 Memory used: 13115K
+Composed in 16ms
+Compiled: OldController
+Composition:OldEnvironment = OldEnvironment.TOR_OLD || OldEnvironment.DSD1_OLD || OldEnvironment.GATEFORM1_OLD
+State Space: 5 * 8 * 3 = 2 ** 8
+Composing...
+-- States: 120 Transitions: 494 Memory used: 11589K
+Composed in 11ms
+ - Synthesizing Mapping Environment from lists (size=3)...
+INFO: Auto-compiling dependency: TOR_NEW
+Generating Mapping Environment: MAP_TOR_OLD_TOR_NEW
+INFO: Auto-compiling dependency: DSD1_NEW
+Generating Mapping Environment: MAP_DSD1_OLD_DSD1_NEW
+INFO: Auto-compiling dependency: GATEFORM1_NEW
+Generating Mapping Environment: MAP_GATEFORM1_OLD_GATEFORM1_NEW
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_TOR_OLD_TOR_NEW || MAP_DSD1_OLD_DSD1_NEW || MAP_GATEFORM1_OLD_GATEFORM1_NEW
+State Space: 10 * 16 * 6 = 2 ** 11
+Composing...
+-- States: 240 Transitions: 1108 Memory used: 13022K
+Composed in 14ms
+comp.continueCompilation time : 287ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_TOR_POLICY_UPD_OLD
+Processing formula for update: P_DSD1_POLICY_UPD_OLD
+Processing formula for update: P_DO_NOT_SEND_TWICE_UPD_OLD
+Processing formula for update: P_NEW_TOR_POLICY_UPD_NEW
+Processing formula for update: P_NEW_DSD1_POLICY_UPD_NEW
+Processing formula for update: P_NEW_DO_NOT_SEND_TWICE_UPD_NEW
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_TOR
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_DSD1
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_GATEFORM1
+Environment states:14763
+Solving safety goals for the controller synthesis
+Environment states after safety: 3134
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [2312] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+比較用時間（合成全体-CountTime-描画） : 0分04.87秒
+
+[規模]
+最大状態数時の状態数 : 14763 states
+最大状態数時の遷移数 : 99676 transitions
+最大状態数時の段階 : [2. Meta]
+最大遷移数時の状態数 : 14763 states
+最大遷移数時の遷移数 : 99676 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 2312 states
+出力遷移数 : 6615 transitions
+
+[GR(1)]
+final GR input 状態数 : 3134 states
+final GR input 遷移数 : 11232 transitions
+GR(1)合成時間 : 0分00.58秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 0.31 GB
+最初の有効sampleからのヒープ増加 : 0.31 GB
+====================================================
+
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_03\result\Industry\Traditional\industry_traditional_t1_no_controllable_during_gap_evaluation_UpdCont_T1.csv
+Tau reduction ON
+UpdCont_T1 minimising.........
+Minimised States: 778 in 135ms
+
+[minimized 出力]
+minimized 出力状態数 : 778 states
+minimized 出力遷移数 : 2363 transitions
+minimize 時間 : 135 ms
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_03\result\Industry\Traditional\industry_traditional_t1_no_controllable_during_gap_evaluation_UpdCont_T1.csv

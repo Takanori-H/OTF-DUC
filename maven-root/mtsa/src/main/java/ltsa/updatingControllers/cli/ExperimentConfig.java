@@ -20,6 +20,17 @@ final class ExperimentConfig {
     boolean runsSpecified = false;
     boolean requirementsCheck = false;
     boolean traceCheck = false;
+    boolean requireFreshOutputDir = false;
+    boolean alternateMethodOrderByRun = false;
+    boolean validateMemoryQuality = false;
+    boolean validateMethodTarget = false;
+    /**
+     * Legacy joint limit.  Keep its original meaning for reproducibility:
+     * when present it is a hard limit for both heap and RSS sampling gaps.
+     */
+    Long maxMemorySamplingGapMillis;
+    Long maxRssSamplingGapMillis;
+    Long maxHeapSamplingGapMillis;
     String slackWebhookUrl;
     String notifyOn = "always";
     int notifyTimeoutSeconds = 30;
@@ -98,6 +109,27 @@ final class ExperimentConfig {
         } else if ("traceCheck".equals(keyValue.key)
                 || "checkTraces".equals(keyValue.key)) {
             config.traceCheck = parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("requireFreshOutputDir".equals(keyValue.key)) {
+            config.requireFreshOutputDir =
+                    parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("alternateMethodOrderByRun".equals(keyValue.key)) {
+            config.alternateMethodOrderByRun =
+                    parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("validateMemoryQuality".equals(keyValue.key)) {
+            config.validateMemoryQuality =
+                    parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("validateMethodTarget".equals(keyValue.key)) {
+            config.validateMethodTarget =
+                    parseBoolean(keyValue.value, keyValue.key, lineNumber);
+        } else if ("maxMemorySamplingGapMillis".equals(keyValue.key)) {
+            config.maxMemorySamplingGapMillis = Long.valueOf(
+                    parsePositiveLong(keyValue.value, keyValue.key, lineNumber));
+        } else if ("maxRssSamplingGapMillis".equals(keyValue.key)) {
+            config.maxRssSamplingGapMillis = Long.valueOf(
+                    parsePositiveLong(keyValue.value, keyValue.key, lineNumber));
+        } else if ("maxHeapSamplingGapMillis".equals(keyValue.key)) {
+            config.maxHeapSamplingGapMillis = Long.valueOf(
+                    parsePositiveLong(keyValue.value, keyValue.key, lineNumber));
         } else if ("slackWebhookUrl".equals(keyValue.key)
                 || "slackIncomingWebhookUrl".equals(keyValue.key)
                 || "slackWebhook".equals(keyValue.key)) {
@@ -143,6 +175,13 @@ final class ExperimentConfig {
     }
 
     private void validate() {
+        if (maxMemorySamplingGapMillis != null
+                && (maxRssSamplingGapMillis != null
+                        || maxHeapSamplingGapMillis != null)) {
+            throw new IllegalArgumentException(
+                    "Legacy maxMemorySamplingGapMillis cannot be combined with "
+                            + "maxRssSamplingGapMillis or maxHeapSamplingGapMillis.");
+        }
         if (cases.isEmpty()) {
             throw new IllegalArgumentException("No cases are defined in " + configFile);
         }
@@ -178,6 +217,28 @@ final class ExperimentConfig {
                         + sanitize(experimentCase.variant);
             }
         }
+    }
+
+    Long effectiveMaxRssSamplingGapMillis() {
+        return maxRssSamplingGapMillis != null
+                ? maxRssSamplingGapMillis
+                : maxMemorySamplingGapMillis;
+    }
+
+    Long effectiveMaxHeapSamplingGapMillis() {
+        return maxHeapSamplingGapMillis != null
+                ? maxHeapSamplingGapMillis
+                : maxMemorySamplingGapMillis;
+    }
+
+    /**
+     * Heap gap warnings use the explicit heap limit when one exists.  In the
+     * RSS-primary configuration, the RSS limit is retained as a diagnostic
+     * comparison threshold without turning the warning into a case failure.
+     */
+    Long heapSamplingGapWarningReferenceMillis() {
+        Long heapLimit = effectiveMaxHeapSamplingGapMillis();
+        return heapLimit != null ? heapLimit : effectiveMaxRssSamplingGapMillis();
     }
 
     private static KeyValue parseKeyValue(String line, int lineNumber) {
@@ -235,6 +296,20 @@ final class ExperimentConfig {
             int result = Integer.parseInt(value);
             if (result < 1) {
                 throw new IllegalArgumentException(key + " must be >= 1 at line " + (lineNumber + 1));
+            }
+            return result;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(key + " must be an integer at line "
+                    + (lineNumber + 1) + ": " + value);
+        }
+    }
+
+    private static long parsePositiveLong(String value, String key, int lineNumber) {
+        try {
+            long result = Long.parseLong(value);
+            if (result < 1L) {
+                throw new IllegalArgumentException(key + " must be >= 1 at line "
+                        + (lineNumber + 1));
             }
             return result;
         } catch (NumberFormatException e) {

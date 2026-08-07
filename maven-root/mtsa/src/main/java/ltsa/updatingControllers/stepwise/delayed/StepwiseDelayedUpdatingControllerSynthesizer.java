@@ -4,6 +4,8 @@ import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.ar.dc.uba.model.condition.Formula;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.controller.util.FluentStateValuation;
+import MTSTools.ac.ic.doc.commons.relations.BinaryRelation;
+import MTSTools.ac.ic.doc.commons.relations.MapSetBinaryRelation;
 import MTSTools.ac.ic.doc.commons.relations.Pair;
 import MTSTools.ac.ic.doc.mtstools.model.MTS;
 import MTSTools.ac.ic.doc.mtstools.model.MTSConstants;
@@ -31,6 +33,7 @@ import ltsa.updatingControllers.synthesis.UpdatingControllersUtils;
 import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 
 import java.math.BigInteger;
+import java.util.AbstractSet;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -39,6 +42,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -61,6 +65,15 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Boolean.parseBoolean(System.getProperty(
                     "stepwise.delayed.indexedHotSwapInConnection",
                     "false"));
+    // Avoid materializing a second copy of every mapping transition while the
+    // connected environment is used only for statistics and the immediate
+    // DontDoTwice conversion. The legacy materialized connector remains
+    // available as an ablation/oracle with
+    // -Dstepwise.delayed.connectedEnvironmentView=false.
+    private static final boolean CONNECTED_ENVIRONMENT_VIEW =
+            Boolean.parseBoolean(System.getProperty(
+                    "stepwise.delayed.connectedEnvironmentView",
+                    "true"));
     // Diagnostic-only instrumentation. It is deliberately disabled by default so
     // paper/evaluation runs do not perform extra graph traversals or emit extra logs.
     private static final boolean DEBUG_ACTION_DIAGNOSTICS =
@@ -139,7 +152,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         } else {
             output.outln("[Stepwise Delayed DUCS] GR result: winning");
             output.outln("[Stepwise Delayed DUCS] output controller states: " + uccs.getComposition().maxStates
-                    + " transitions: " + uccs.getComposition().ntransitions());
+                    + " transitions: " + uccs.getComposition().ntransitionsLong());
         }
     }
 
@@ -189,25 +202,56 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             UpdatingControllerCompositeState uccs,
             LTSOutput output,
             boolean phaseMemoryDiagnostics) {
-        // Keep the mapping/connection construction in a separate frame.  The
-        // LTSA composition used by DontDoTwice starts with a full GC, so the
-        // mapping fragments, metadata, oldMeta, and connection plan can be
-        // reclaimed after buildConnectedEnvironment returns.
+        // End the connected-view frame after conversion but before the LTSA
+        // product starts. The product begins with a full GC, so neither the
+        // view nor the source old/mapping MTS remains a stack root then.
+        DontDoTwiceInputs inputs = prepareDontDoTwiceInputs(
+                uccs,
+                output,
+                phaseMemoryDiagnostics);
+        MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.getDontDoTwiceGoals(
+                inputs.connectedAutomaton,
+                inputs.connectedAlphabet);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Stepwise Delayed DUC",
+                "global DontDoTwice 構築時間",
+                System.currentTimeMillis() - inputs.dontDoTwiceStartMillis);
+        return safetyEnv;
+    }
+
+    private static DontDoTwiceInputs prepareDontDoTwiceInputs(
+            UpdatingControllerCompositeState uccs,
+            LTSOutput output,
+            boolean phaseMemoryDiagnostics) {
         MTS<Long, String> connected = buildConnectedEnvironment(
                 uccs,
                 output,
                 phaseMemoryDiagnostics);
-
-        long dontDoTwiceStart = System.currentTimeMillis();
-        MTS<Long, String> safetyEnv = UpdatingControllerSafetySynthesizer.getDontDoTwiceGoals(connected);
-        UpdatingControllerEvaluationRecorder.recordTime(
-                "Stepwise Delayed DUC",
-                "global DontDoTwice 構築時間",
-                System.currentTimeMillis() - dontDoTwiceStart);
-        return safetyEnv;
+        long dontDoTwiceStartMillis = System.currentTimeMillis();
+        Set<String> connectedAlphabet = new HashSet<String>(connected.getActions());
+        CompactState connectedAutomaton = MTSToAutomataConverter.getInstance().convert(
+                connected,
+                "safetyEnv",
+                false,
+                false);
+        return new DontDoTwiceInputs(
+                connectedAutomaton,
+                connectedAlphabet,
+                dontDoTwiceStartMillis);
     }
 
     private static MTS<Long, String> buildConnectedEnvironment(
+            UpdatingControllerCompositeState uccs,
+            LTSOutput output,
+            boolean phaseMemoryDiagnostics) {
+        ConnectedEnvironmentInputs inputs = prepareConnectedEnvironmentInputs(
+                uccs,
+                output,
+                phaseMemoryDiagnostics);
+        return connectPreparedEnvironment(inputs, output, phaseMemoryDiagnostics);
+    }
+
+    private static ConnectedEnvironmentInputs prepareConnectedEnvironmentInputs(
             UpdatingControllerCompositeState uccs,
             LTSOutput output,
             boolean phaseMemoryDiagnostics) {
@@ -502,7 +546,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     "stepwise-delayed-final-mapping",
                     output);
             failIfInitialLosing(finalMappingPruning, "stepwise-delayed-final-mapping");
-            mappingProduct = rebuildMetadata(mappingProduct, finalMappingPruning.getEnvironment());
+            if (!finalMappingPruning.isInputEnvironmentReused()) {
+                mappingProduct = rebuildMetadata(
+                        mappingProduct,
+                        finalMappingPruning.getEnvironment());
+            }
             if (!mappingProduct.errorStates.isEmpty()) {
                 Diagnostics.fatal("stepwise_delayed final mapping product retained unresolved Error states: "
                         + mappingProduct.errorStates + ".");
@@ -569,12 +617,49 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     + connectionPlan.oldStatesWithoutTargets);
         }
 
-        long connectionEnvironmentStart = System.currentTimeMillis();
-        MTS<Long, String> connected = connectOldAndMapping(
+        // Return only the objects needed by the full connected-environment
+        // copy. Ending this frame first makes classification data, partial
+        // products, fluent valuations, stage metadata, and the unused part of
+        // ConnectionPlan unreachable before that allocation-heavy copy starts.
+        return new ConnectedEnvironmentInputs(
                 oldMeta.env,
                 mappingProduct.env,
                 connectionPlan.connections,
                 uccs.getUpdateGRGoal().getControllableActions());
+    }
+
+    private static MTS<Long, String> connectPreparedEnvironment(
+            ConnectedEnvironmentInputs inputs,
+            LTSOutput output,
+            boolean phaseMemoryDiagnostics) {
+        long connectionEnvironmentStart = System.currentTimeMillis();
+        MTS<Long, String> connected;
+        if (CONNECTED_ENVIRONMENT_VIEW) {
+            try {
+                connected = connectOldAndMappingView(
+                        inputs.oldEnvironment,
+                        inputs.mappingEnvironment,
+                        inputs.connections,
+                        inputs.controllableActions);
+                output.outln("[Stepwise Delayed DUCS] connected environment representation: read-only view");
+            } catch (IllegalArgumentException unsupportedViewInput) {
+                output.outln("[Stepwise Delayed DUCS] connected environment view unavailable: "
+                        + unsupportedViewInput.getMessage()
+                        + "; falling back to materialized copy.");
+                connected = connectOldAndMapping(
+                        inputs.oldEnvironment,
+                        inputs.mappingEnvironment,
+                        inputs.connections,
+                        inputs.controllableActions);
+            }
+        } else {
+            connected = connectOldAndMapping(
+                    inputs.oldEnvironment,
+                    inputs.mappingEnvironment,
+                    inputs.connections,
+                    inputs.controllableActions);
+            output.outln("[Stepwise Delayed DUCS] connected environment representation: materialized copy");
+        }
         UpdatingControllerEvaluationRecorder.recordTime(
                 "Stepwise Delayed DUC",
                 "hotSwapIn connection 後 environment 構築時間",
@@ -1857,6 +1942,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 scope,
                 output);
         failIfInitialLosing(result, scope);
+        if (result.isInputEnvironmentReused()) {
+            return env;
+        }
         return rebuildMetadata(env, result.getEnvironment());
     }
 
@@ -1876,6 +1964,10 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 scope,
                 output);
         failIfInitialLosing(result, scope);
+        if (result.isInputEnvironmentReused()
+                && env.errorStates.equals(result.getErrorStates())) {
+            return env;
+        }
         return rebuildMetadata(env, result.getEnvironment(), result.getErrorStates());
     }
 
@@ -3761,7 +3853,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         return true;
     }
 
-    private static MTS<Long, String> connectOldAndMapping(
+    static MTS<Long, String> connectOldAndMapping(
             MTS<Long, String> oldEnv,
             MTS<Long, String> mappingEnv,
             List<Connection> connections,
@@ -3796,6 +3888,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
         result.removeUnreachableStates();
         return result;
+    }
+
+    static MTS<Long, String> connectOldAndMappingView(
+            MTS<Long, String> oldEnv,
+            MTS<Long, String> mappingEnv,
+            List<Connection> connections,
+            Set<String> controllableActions) {
+        return new ConnectedEnvironmentView(
+                oldEnv,
+                mappingEnv,
+                connections,
+                controllableActions);
     }
 
     private static long nextFreshState(MTS<Long, String> mts) {
@@ -4332,7 +4436,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     private static StateSpaceStats outputStateSpace(LTSOutput output, String label, MTS<Long, String> mts) {
         long countStart = System.currentTimeMillis();
         int states = mts.getStates().size();
-        int transitions = countTransitions(mts);
+        long transitions = countTransitions(mts);
         long countTime = System.currentTimeMillis() - countStart;
         output.outln(label + " states: " + states
                 + " transitions: " + transitions);
@@ -4365,21 +4469,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         StepwiseDelayedEvaluationMetrics.recordScopedFluentCount(label, scope, fluents);
     }
 
-    private static int countTransitions(MTS<Long, String> mts) {
-        int count = 0;
-        for (Long state : mts.getStates()) {
-            count += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
-            count += mts.getTransitions(state, MTS.TransitionType.MAYBE).size();
-        }
-        return count;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequiredAndMaybe(mts);
     }
 
     private static final class StateSpaceStats {
         private final int states;
-        private final int transitions;
+        private final long transitions;
         private final long countTime;
 
-        private StateSpaceStats(int states, int transitions, long countTime) {
+        private StateSpaceStats(int states, long transitions, long countTime) {
             this.states = states;
             this.transitions = transitions;
             this.countTime = countTime;
@@ -4677,13 +4776,456 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
     }
 
-    private static final class Connection {
+    static final class Connection {
         private final Long oldState;
         private final Long mappingState;
 
-        private Connection(Long oldState, Long mappingState) {
+        Connection(Long oldState, Long mappingState) {
             this.oldState = oldState;
             this.mappingState = mappingState;
+        }
+    }
+
+    /**
+     * Immutable logical union of the old-controller meta environment and the
+     * final mapping environment. Mapping states keep the exact logical IDs
+     * used by the materialized connector, but their source relations are read
+     * through an offset adapter instead of being copied into another MTSImpl.
+     *
+     * The current consumer reads this object only to record its size and to
+     * convert it immediately for DontDoTwice. Keeping this view private to the
+     * delayed Stepwise pipeline prevents mutation or ownership assumptions
+     * from leaking into general MTS code.
+     */
+    private static final class ConnectedEnvironmentView implements MTS<Long, String> {
+        private static final BinaryRelation<String, Long> EMPTY_RELATION =
+                new EmptyBinaryRelation();
+
+        private final Long initialState;
+        private final Set<Long> states;
+        private final Set<String> actions;
+        private final Map<Long, BinaryRelation<String, Long>> requiredTransitions;
+        private final Map<Long, BinaryRelation<String, Long>> maybeTransitions;
+
+        private ConnectedEnvironmentView(
+                MTS<Long, String> oldEnv,
+                MTS<Long, String> mappingEnv,
+                List<Connection> connections,
+                Set<String> controllableActions) {
+            this.initialState = oldEnv.getInitialState();
+            long mappingOffset = nextFreshState(oldEnv);
+
+            // Match the insertion and alphabet construction performed by the
+            // legacy connector. In particular, alphabet-only input actions are
+            // not copied, while labels from unreachable REQUIRED transitions
+            // remain after reachability pruning.
+            Set<Long> allStates = new HashSet<Long>();
+            allStates.add(initialState);
+            Map<Long, BinaryRelation<String, Long>> transitions =
+                    new HashMap<Long, BinaryRelation<String, Long>>();
+            Set<String> connectedActions = new HashSet<String>();
+
+            for (Long state : oldEnv.getStates()) {
+                allStates.add(state);
+                transitions.put(state, new MapSetBinaryRelation<String, Long>());
+            }
+            for (Long state : mappingEnv.getStates()) {
+                Long connectedState = mappingOffset + state;
+                if (!allStates.add(connectedState)) {
+                    throw new IllegalArgumentException(
+                            "old/mapping state-ID collision at " + connectedState);
+                }
+                transitions.put(
+                        connectedState,
+                        new OffsetBinaryRelation(
+                                mappingEnv.getTransitions(state, MTS.TransitionType.REQUIRED),
+                                mappingOffset));
+            }
+
+            for (Long state : oldEnv.getStates()) {
+                BinaryRelation<String, Long> oldConnectedTransitions = transitions.get(state);
+                for (Pair<String, Long> transition :
+                        oldEnv.getTransitions(state, MTS.TransitionType.REQUIRED)) {
+                    String action = oldConnectedAction(
+                            transition.getFirst(),
+                            controllableActions);
+                    connectedActions.add(action);
+                    oldConnectedTransitions.addPair(action, transition.getSecond());
+                }
+            }
+            for (Long state : mappingEnv.getStates()) {
+                for (Pair<String, Long> transition :
+                        mappingEnv.getTransitions(state, MTS.TransitionType.REQUIRED)) {
+                    connectedActions.add(transition.getFirst());
+                }
+            }
+
+            connectedActions.add(UpdateConstants.BEGIN_UPDATE);
+            for (Connection connection : connections) {
+                Long mappingTarget = mappingOffset + connection.mappingState;
+                BinaryRelation<String, Long> sourceTransitions =
+                        transitions.get(connection.oldState);
+                if (sourceTransitions == null || !allStates.contains(mappingTarget)) {
+                    throw new IllegalArgumentException(
+                            "invalid hotSwapIn connection " + connection.oldState
+                                    + " -> " + connection.mappingState);
+                }
+                sourceTransitions.addPair(
+                        UpdateConstants.BEGIN_UPDATE,
+                        mappingTarget);
+            }
+
+            Set<Long> reachable = reachableStates(initialState, transitions);
+            allStates.retainAll(reachable);
+            transitions.keySet().retainAll(reachable);
+
+            this.states = Collections.unmodifiableSet(allStates);
+            this.actions = Collections.unmodifiableSet(connectedActions);
+            Map<Long, BinaryRelation<String, Long>> readOnlyRequired =
+                    new HashMap<Long, BinaryRelation<String, Long>>();
+            Map<Long, BinaryRelation<String, Long>> emptyMaybes =
+                    new HashMap<Long, BinaryRelation<String, Long>>();
+            for (Long state : allStates) {
+                readOnlyRequired.put(
+                        state,
+                        new ReadOnlyBinaryRelation(transitions.get(state)));
+                emptyMaybes.put(state, EMPTY_RELATION);
+            }
+            this.requiredTransitions = Collections.unmodifiableMap(readOnlyRequired);
+            this.maybeTransitions = Collections.unmodifiableMap(emptyMaybes);
+        }
+
+        private static String oldConnectedAction(
+                String action,
+                Set<String> controllableActions) {
+            if (controllableActions.contains(action)
+                    && UpdatingControllersUtils.isNotUpdateAction(action)) {
+                return action + UpdateConstants.OLD_LABEL;
+            }
+            return action;
+        }
+
+        private static Set<Long> reachableStates(
+                Long initialState,
+                Map<Long, BinaryRelation<String, Long>> transitions) {
+            Set<Long> reachable = new HashSet<Long>();
+            Queue<Long> pending = new ArrayDeque<Long>();
+            reachable.add(initialState);
+            pending.add(initialState);
+            while (!pending.isEmpty()) {
+                Long state = pending.remove();
+                BinaryRelation<String, Long> outgoing = transitions.get(state);
+                if (outgoing == null) {
+                    continue;
+                }
+                for (Pair<String, Long> transition : outgoing) {
+                    if (reachable.add(transition.getSecond())) {
+                        pending.add(transition.getSecond());
+                    }
+                }
+            }
+            return reachable;
+        }
+
+        public Set<Long> getStates() {
+            return states;
+        }
+
+        public Set<String> getActions() {
+            return actions;
+        }
+
+        public Long getInitialState() {
+            return initialState;
+        }
+
+        public Map<Long, BinaryRelation<String, Long>> getTransitions(
+                MTS.TransitionType type) {
+            if (MTS.TransitionType.MAYBE.equals(type)) {
+                return maybeTransitions;
+            }
+            return requiredTransitions;
+        }
+
+        public BinaryRelation<String, Long> getTransitions(
+                Long state,
+                MTS.TransitionType type) {
+            if (!states.contains(state)) {
+                return null;
+            }
+            if (MTS.TransitionType.MAYBE.equals(type)) {
+                return maybeTransitions.get(state);
+            }
+            return requiredTransitions.get(state);
+        }
+
+        public int getNumberOfTransitions() {
+            // Preserve the historical MTSImpl API result. Despite its name,
+            // MTSImpl counts the state-key entries in all three transition
+            // maps rather than the contained transition pairs.
+            return states.size() * MTS.TransitionType.values().length;
+        }
+
+        public boolean removeUnreachableStates() {
+            return false;
+        }
+
+        public boolean addState(Long state) {
+            throw readOnly();
+        }
+
+        public boolean addStates(Collection<? extends Long> states) {
+            throw readOnly();
+        }
+
+        public boolean addAction(String action) {
+            throw readOnly();
+        }
+
+        public boolean addActions(Collection<? extends String> actions) {
+            throw readOnly();
+        }
+
+        public void removeAction(String action) {
+            throw readOnly();
+        }
+
+        public void setInitialState(Long state) {
+            throw readOnly();
+        }
+
+        public boolean addTransition(
+                Long from,
+                String label,
+                Long to,
+                MTS.TransitionType type) {
+            throw readOnly();
+        }
+
+        public boolean addRequired(Long from, String label, Long to) {
+            throw readOnly();
+        }
+
+        public boolean addPossible(Long from, String label, Long to) {
+            throw readOnly();
+        }
+
+        public boolean removeTransition(
+                Long from,
+                String label,
+                Long to,
+                MTS.TransitionType type) {
+            throw readOnly();
+        }
+
+        public boolean removeRequired(Long from, String label, Long to) {
+            throw readOnly();
+        }
+
+        public boolean removePossible(Long from, String label, Long to) {
+            throw readOnly();
+        }
+
+        public void setWinningStates(Set<Long> winningStatesOfPlant) {
+            throw readOnly();
+        }
+
+        public void setWinningStatesOfOriginalEnv(Set<Long> winningStates) {
+            throw readOnly();
+        }
+
+        public Set<Long> getWinningStatesOfOriginalEnv() {
+            return Collections.emptySet();
+        }
+
+        private static UnsupportedOperationException readOnly() {
+            return new UnsupportedOperationException(
+                    "connected environment view is read-only");
+        }
+    }
+
+    private static final class ReadOnlyBinaryRelation
+            extends AbstractSet<Pair<String, Long>>
+            implements BinaryRelation<String, Long> {
+        private final BinaryRelation<String, Long> source;
+
+        private ReadOnlyBinaryRelation(BinaryRelation<String, Long> source) {
+            this.source = source;
+        }
+
+        public Iterator<Pair<String, Long>> iterator() {
+            final Iterator<Pair<String, Long>> sourceIterator = source.iterator();
+            return new Iterator<Pair<String, Long>>() {
+                public boolean hasNext() {
+                    return sourceIterator.hasNext();
+                }
+
+                public Pair<String, Long> next() {
+                    return sourceIterator.next();
+                }
+
+                public void remove() {
+                    throw readOnlyRelation();
+                }
+            };
+        }
+
+        public int size() {
+            return source.size();
+        }
+
+        public Set<Long> getImage(String action) {
+            return Collections.unmodifiableSet(source.getImage(action));
+        }
+
+        public boolean addPair(Pair<String, Long> pair) {
+            throw readOnlyRelation();
+        }
+
+        public boolean addPair(String first, Long second) {
+            throw readOnlyRelation();
+        }
+
+        public boolean removePair(Pair<String, Long> pair) {
+            throw readOnlyRelation();
+        }
+
+        public boolean removePair(String first, Long second) {
+            throw readOnlyRelation();
+        }
+    }
+
+    private static final class OffsetBinaryRelation
+            extends AbstractSet<Pair<String, Long>>
+            implements BinaryRelation<String, Long> {
+        private final BinaryRelation<String, Long> source;
+        private final long offset;
+
+        private OffsetBinaryRelation(
+                BinaryRelation<String, Long> source,
+                long offset) {
+            this.source = source;
+            this.offset = offset;
+        }
+
+        public Iterator<Pair<String, Long>> iterator() {
+            final Iterator<Pair<String, Long>> sourceIterator = source.iterator();
+            return new Iterator<Pair<String, Long>>() {
+                public boolean hasNext() {
+                    return sourceIterator.hasNext();
+                }
+
+                public Pair<String, Long> next() {
+                    Pair<String, Long> transition = sourceIterator.next();
+                    return Pair.create(
+                            transition.getFirst(),
+                            offset + transition.getSecond());
+                }
+
+                public void remove() {
+                    throw readOnlyRelation();
+                }
+            };
+        }
+
+        public int size() {
+            return source.size();
+        }
+
+        public Set<Long> getImage(String action) {
+            Set<Long> result = new HashSet<Long>();
+            for (Pair<String, Long> transition : this) {
+                if (action.equals(transition.getFirst())) {
+                    result.add(transition.getSecond());
+                }
+            }
+            return Collections.unmodifiableSet(result);
+        }
+
+        public boolean addPair(Pair<String, Long> pair) {
+            throw readOnlyRelation();
+        }
+
+        public boolean addPair(String first, Long second) {
+            throw readOnlyRelation();
+        }
+
+        public boolean removePair(Pair<String, Long> pair) {
+            throw readOnlyRelation();
+        }
+
+        public boolean removePair(String first, Long second) {
+            throw readOnlyRelation();
+        }
+    }
+
+    private static final class EmptyBinaryRelation
+            extends AbstractSet<Pair<String, Long>>
+            implements BinaryRelation<String, Long> {
+        public Iterator<Pair<String, Long>> iterator() {
+            return Collections.<Pair<String, Long>>emptySet().iterator();
+        }
+
+        public int size() {
+            return 0;
+        }
+
+        public Set<Long> getImage(String action) {
+            return Collections.emptySet();
+        }
+
+        public boolean addPair(Pair<String, Long> pair) {
+            throw readOnlyRelation();
+        }
+
+        public boolean addPair(String first, Long second) {
+            throw readOnlyRelation();
+        }
+
+        public boolean removePair(Pair<String, Long> pair) {
+            throw readOnlyRelation();
+        }
+
+        public boolean removePair(String first, Long second) {
+            throw readOnlyRelation();
+        }
+    }
+
+    private static UnsupportedOperationException readOnlyRelation() {
+        return new UnsupportedOperationException(
+                "connected environment transition relation is read-only");
+    }
+
+    private static final class ConnectedEnvironmentInputs {
+        private final MTS<Long, String> oldEnvironment;
+        private final MTS<Long, String> mappingEnvironment;
+        private final List<Connection> connections;
+        private final Set<String> controllableActions;
+
+        private ConnectedEnvironmentInputs(
+                MTS<Long, String> oldEnvironment,
+                MTS<Long, String> mappingEnvironment,
+                List<Connection> connections,
+                Set<String> controllableActions) {
+            this.oldEnvironment = oldEnvironment;
+            this.mappingEnvironment = mappingEnvironment;
+            this.connections = connections;
+            this.controllableActions = controllableActions;
+        }
+    }
+
+    private static final class DontDoTwiceInputs {
+        private final CompactState connectedAutomaton;
+        private final Set<String> connectedAlphabet;
+        private final long dontDoTwiceStartMillis;
+
+        private DontDoTwiceInputs(
+                CompactState connectedAutomaton,
+                Set<String> connectedAlphabet,
+                long dontDoTwiceStartMillis) {
+            this.connectedAutomaton = connectedAutomaton;
+            this.connectedAlphabet = connectedAlphabet;
+            this.dontDoTwiceStartMillis = dontDoTwiceStartMillis;
         }
     }
 

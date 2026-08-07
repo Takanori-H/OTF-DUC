@@ -1,0 +1,88 @@
+Process:
+	Stepwise_UpdCont_T1
+States:
+	43
+Transitions:
+	Stepwise_UpdCont_T1 = Q0,
+	Q0	= (request -> Q5
+		  |stopPump -> Q21
+		  |hotSwapIn -> Q33),
+	Q1	= (reconfigure -> Q2
+		  |endProcedure -> Q6
+		  |procedure -> Q8),
+	Q2	= (procedure -> Q2
+		  |endProcedure -> Q22),
+	Q3	= (startPump -> Q20
+		  |procedure -> Q27),
+	Q4	= (endProcedure -> Q0
+		  |hotSwapIn -> Q31),
+	Q5	= (stopPump -> Q24
+		  |hotSwapIn -> Q37),
+	Q6	= (reconfigure -> Q22
+		  |request -> Q29),
+	Q7	= (reconfigure -> Q3
+		  |startPump -> Q29
+		  |procedure -> Q34),
+	Q8	= (reconfigure -> Q2),
+	Q9	= (stopOldSpec -> Q39),
+	Q10	= (startNewSpec -> Q1
+		  |reconfigure -> Q30),
+	Q11	= (startNewSpec -> Q14
+		  |request -> Q18),
+	Q12	= (startNewSpec -> Q26
+		  |reconfigure -> Q28),
+	Q13	= (request -> Q9
+		  |stopOldSpec -> Q32),
+	Q14	= (request -> Q3
+		  |startPump -> Q22),
+	Q15	= (startNewSpec -> Q22
+		  |request -> Q28),
+	Q16	= (startNewSpec -> Q26),
+	Q17	= (reconfigure -> Q3),
+	Q18	= (startNewSpec -> Q3),
+	Q19	= (startPump -> Q6
+		  |reconfigure -> Q14
+		  |request -> Q17),
+	Q20	= (procedure -> Q2),
+	Q21	= (startPump -> Q0
+		  |hotSwapIn -> Q13
+		  |request -> Q24),
+	Q22	= (request -> Q20),
+	Q23	= (startPump -> Q4
+		  |procedure -> Q23
+		  |hotSwapIn -> Q38),
+	Q24	= (startPump -> Q5
+		  |hotSwapIn -> Q9
+		  |procedure -> Q23),
+	Q25	= (startPump -> Q8
+		  |reconfigure -> Q27
+		  |procedure -> Q34
+		  |endProcedure -> Q42),
+	Q26	= (procedure -> Q8
+		  |reconfigure -> Q20),
+	Q27	= (startPump -> Q2
+		  |endProcedure -> Q14
+		  |procedure -> Q27),
+	Q28	= (startNewSpec -> Q20),
+	Q29	= (reconfigure -> Q20),
+	Q30	= (startNewSpec -> Q2),
+	Q31	= (stopOldSpec -> Q10),
+	Q32	= (reconfigure -> Q11
+		  |startNewSpec -> Q19
+		  |request -> Q41),
+	Q33	= (stopOldSpec -> Q36
+		  |request -> Q37),
+	Q34	= (reconfigure -> Q27),
+	Q35	= (startNewSpec -> Q25
+		  |reconfigure -> Q40),
+	Q36	= (startNewSpec -> Q6
+		  |reconfigure -> Q15
+		  |request -> Q16),
+	Q37	= (stopOldSpec -> Q12),
+	Q38	= (stopOldSpec -> Q35),
+	Q39	= (startNewSpec -> Q7
+		  |reconfigure -> Q18),
+	Q40	= (startNewSpec -> Q27),
+	Q41	= (startNewSpec -> Q7),
+	Q42	= (reconfigure -> Q14
+		  |request -> Q17).

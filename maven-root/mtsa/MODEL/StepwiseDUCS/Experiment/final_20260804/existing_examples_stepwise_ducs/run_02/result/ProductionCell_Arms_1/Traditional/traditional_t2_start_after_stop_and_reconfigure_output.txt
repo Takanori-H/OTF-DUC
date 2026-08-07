@@ -1,0 +1,221 @@
+INFO: Registered Map Environment: MAP_PRODUCTION_CELL_1
+comp.compile time : 94ms
+Compiled: PRODUCTION_CELL_OLD(1)
+Composition:OLD_ENV = OLD_ENV.PRODUCTION_CELL_OLD(1)
+State Space: 7 = 2 ** 3
+Composing...
+-- States: 7 Transitions: 14 Memory used: 9924K
+Composed in 18ms
+Formula !P_OLD_TOOL_ORDER_1 = (true U ((PolishPending.1 & !Drilled.1) | (CleanPending.1 & !Polished.1)))
+GBA 2 states 4 transitions
+Buchi automata:
+P_OLD_TOOL_ORDER_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |CleanPending.1&!Polished.1 -> S1 |PolishPending.1&!Drilled.1 -> S1).
+Composition:P_OLD_TOOL_ORDER_1 = CleanPending.1 || Polished.1 || PolishPending.1 || Drilled.1 || SYNC || P_OLD_TOOL_ORDER_1
+State Space: 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 6
+Composing...
+-- States: 64 Transitions: 327 Memory used: 10684K
+Composed in 12ms
+After Tau elimination = 32 state
+Tau reduction ON
+P_OLD_TOOL_ORDER_1 minimising....
+Minimised States: 17 in 2ms
+make DFA(P_OLD_TOOL_ORDER_1)
+DFA(P_OLD_TOOL_ORDER_1) has 9 states.
+Tau reduction ON
+P_OLD_TOOL_ORDER_1 minimising...
+Minimised States: 9 in 0ms
+Formula !P_OLD_OUT_IF_FINISHED_1 = (true U (out[1] & (!Cleaned.1 | (!Polished.1 | !Drilled.1))))
+GBA 2 states 5 transitions
+Buchi automata:
+P_OLD_OUT_IF_FINISHED_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |out[1]&!Cleaned.1 -> S1 |out[1]&!Drilled.1 -> S1 |out[1]&!Polished.1 -> S1).
+Composition:P_OLD_OUT_IF_FINISHED_1 = Drilled.1 || Polished.1 || Cleaned.1 || out[1] || SYNC || P_OLD_OUT_IF_FINISHED_1
+State Space: 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 6
+Composing...
+-- States: 64 Transitions: 231 Memory used: 10667K
+Composed in 10ms
+After Tau elimination = 32 state
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_1 minimising....
+Minimised States: 9 in 0ms
+make DFA(P_OLD_OUT_IF_FINISHED_1)
+DFA(P_OLD_OUT_IF_FINISHED_1) has 8 states.
+Tau reduction ON
+P_OLD_OUT_IF_FINISHED_1 minimising.....
+Minimised States: 8 in 0ms
+Formula !P_DRILL_ONCE_1 = (true U (drill[1] & Drilled.1))
+GBA 2 states 3 transitions
+Buchi automata:
+P_DRILL_ONCE_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |drill[1]&Drilled.1 -> S1).
+Composition:P_DRILL_ONCE_1 = Drilled.1 || drill[1] || SYNC || P_DRILL_ONCE_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10601K
+Composed in 9ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_DRILL_ONCE_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_DRILL_ONCE_1)
+DFA(P_DRILL_ONCE_1) has 2 states.
+Tau reduction ON
+P_DRILL_ONCE_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_POLISH_ONCE_1 = (true U (polish[1] & Polished.1))
+GBA 2 states 3 transitions
+Buchi automata:
+P_POLISH_ONCE_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |polish[1]&Polished.1 -> S1).
+Composition:P_POLISH_ONCE_1 = Polished.1 || polish[1] || SYNC || P_POLISH_ONCE_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10565K
+Composed in 9ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_POLISH_ONCE_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_POLISH_ONCE_1)
+DFA(P_POLISH_ONCE_1) has 2 states.
+Tau reduction ON
+P_POLISH_ONCE_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_CLEAN_ONCE_1 = (true U (clean[1] & Cleaned.1))
+GBA 2 states 3 transitions
+Buchi automata:
+P_CLEAN_ONCE_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |clean[1]&Cleaned.1 -> S1).
+Composition:P_CLEAN_ONCE_1 = Cleaned.1 || clean[1] || SYNC || P_CLEAN_ONCE_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10544K
+Composed in 7ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_CLEAN_ONCE_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_CLEAN_ONCE_1)
+DFA(P_CLEAN_ONCE_1) has 2 states.
+Tau reduction ON
+P_CLEAN_ONCE_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_AVOID_STAMPING_1 = (true U stamp[1])
+GBA 2 states 3 transitions
+Buchi automata:
+P_AVOID_STAMPING_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |stamp[1] -> S1).
+Composition:P_AVOID_STAMPING_1 = stamp[1] || SYNC || P_AVOID_STAMPING_1
+State Space: 2 * 2 * 2 = 2 ** 3
+Composing...
+-- States: 5 Transitions: 8 Memory used: 10528K
+Composed in 8ms
+After Tau elimination = 3 state
+Tau reduction ON
+P_AVOID_STAMPING_1 minimising..
+Minimised States: 2 in 0ms
+make DFA(P_AVOID_STAMPING_1)
+DFA(P_AVOID_STAMPING_1) has 1 states.
+Tau reduction ON
+P_AVOID_STAMPING_1 minimising..
+Minimised States: 1 in 0ms
+Composition:C_DRILL_POLISH_CLEAN = OLD_ENV || P_OLD_OUT_IF_FINISHED_1 || P_DRILL_ONCE_1 || P_CLEAN_ONCE_1 || P_POLISH_ONCE_1 || P_AVOID_STAMPING_1 || P_OLD_TOOL_ORDER_1
+State Space: 7 * 8 * 2 * 2 * 2 * 1 * 9 = 2 ** 13
+Composing...
+-- States: 9 Transitions: 28 Memory used: 10527K
+Composed in 8ms
+Solving the LTS control problem.
+Environment states: 10
+Game states: 10
+Game transitions: 30
+Analysis time: 59ms.
+Controller [9] generated successfully.
+Composition:C_DRILL_POLISH_CLEAN = C_DRILL_POLISH_CLEAN || P_OLD_OUT_IF_FINISHED_1 || P_DRILL_ONCE_1 || P_CLEAN_ONCE_1 || P_POLISH_ONCE_1 || P_AVOID_STAMPING_1 || P_OLD_TOOL_ORDER_1
+State Space: 9 * 8 * 2 * 2 * 2 * 1 * 9 = 2 ** 14
+Composing...
+-- States: 9 Transitions: 12 Memory used: 12449K
+Composed in 15ms
+Compiled: C_DRILL_POLISH_CLEAN
+Composition:OLD_ENV = OLD_ENV.PRODUCTION_CELL_OLD(1)
+State Space: 7 = 2 ** 3
+Composing...
+-- States: 7 Transitions: 14 Memory used: 11475K
+Composed in 11ms
+ - Synthesizing Mapping Environment from lists (size=1)...
+INFO: Auto-compiling dependency: PRODUCTION_CELL_NEW(1)
+Generating Mapping Environment: MAP_PRODUCTION_CELL_OLD(1)_PRODUCTION_CELL_NEW(1)
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_PRODUCTION_CELL_OLD(1)_PRODUCTION_CELL_NEW(1)
+State Space: 14 = 2 ** 4
+Composing...
+-- States: 14 Transitions: 35 Memory used: 12351K
+Composed in 14ms
+comp.continueCompilation time : 298ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_OLD_TOOL_ORDER_1_UPD_OLD
+Processing formula for update: P_OLD_OUT_IF_FINISHED_1_UPD_OLD
+Processing formula for update: P_DRILL_ONCE_1_UPD_OLD
+Processing formula for update: P_POLISH_ONCE_1_UPD_OLD
+Processing formula for update: P_CLEAN_ONCE_1_UPD_OLD
+Processing formula for update: P_AVOID_STAMPING_1_UPD_OLD
+Processing formula for update: P_NEW_TOOL_ORDER_1_UPD_NEW
+Processing formula for update: P_NEW_OUT_IF_FINISHED_1_UPD_NEW
+Processing formula for update: P_DRILL_ONCE_1_UPD_NEW
+Processing formula for update: P_CLEAN_ONCE_1_UPD_NEW
+Processing formula for update: P_PAINT_ONCE_1_UPD_NEW
+Processing formula for update: P_AVOID_STAMPING_1_UPD_NEW
+Processing formula for update: T2_START_AFTER_STOP_AND_RECONFIGURE
+Environment states:1935
+Solving safety goals for the controller synthesis
+Environment states after safety: 868
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [256] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+比較用時間（合成全体-CountTime-描画） : 0分00.99秒
+
+[規模]
+最大状態数時の状態数 : 1935 states
+最大状態数時の遷移数 : 8132 transitions
+最大状態数時の段階 : [2. Meta]
+最大遷移数時の状態数 : 1935 states
+最大遷移数時の遷移数 : 8132 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 256 states
+出力遷移数 : 428 transitions
+
+[GR(1)]
+final GR input 状態数 : 868 states
+final GR input 遷移数 : 2385 transitions
+GR(1)合成時間 : 0分00.12秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 0.04 GB
+最初の有効sampleからのヒープ増加 : 0.03 GB
+====================================================
+
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_02\result\ProductionCell_Arms_1\Traditional\production_cell_arms1_traditional_t2_start_after_stop_and_reconfigure_evaluation_UpdCont_T2.csv
+Tau reduction ON
+UpdCont_T2 minimising......
+Minimised States: 74 in 6ms
+
+[minimized 出力]
+minimized 出力状態数 : 74 states
+minimized 出力遷移数 : 159 transitions
+minimize 時間 : 6 ms
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_02\result\ProductionCell_Arms_1\Traditional\production_cell_arms1_traditional_t2_start_after_stop_and_reconfigure_evaluation_UpdCont_T2.csv

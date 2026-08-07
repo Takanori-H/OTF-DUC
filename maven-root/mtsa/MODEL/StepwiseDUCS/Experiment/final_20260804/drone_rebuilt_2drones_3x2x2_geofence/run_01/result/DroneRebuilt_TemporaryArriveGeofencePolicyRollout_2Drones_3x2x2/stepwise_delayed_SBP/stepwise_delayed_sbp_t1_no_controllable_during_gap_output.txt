@@ -1,0 +1,1027 @@
+comp.compile time : 141ms
+Compiled: BATTERY_OLD(1)
+Compiled: MOVE_OLD(1)
+Compiled: BATTERY_OLD(2)
+Compiled: MOVE_OLD(2)
+Composition:OLD_ENV = OLD_ENV.BATTERY_OLD(1) || OLD_ENV.MOVE_OLD(1) || OLD_ENV.BATTERY_OLD(2) || OLD_ENV.MOVE_OLD(2)
+State Space: 2 * 54 * 2 * 54 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 52442 Memory used: 37721K
+-- States: 11664 Transitions: 61344 Memory used: 35042K
+Composed in 131ms
+Formula !P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 = (true U (!GROUNDED.drone.1 & drone[1].battery.safe))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 = S0,
+S1@ =(true -> S1),
+S0 =(!GROUNDED.drone.1&drone[1].battery.safe -> S1 |true -> S0).
+Composition:P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 = GROUNDED.drone.1 || drone[1].battery.safe || SYNC || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25643K
+Composed in 46ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1)
+DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_TAKEOFF_1 = (true U (LOW_BATTERY.drone.1 & drone[1].takeoff))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_TAKEOFF_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].takeoff -> S1).
+Composition:P_OLD_LOW_BATTERY_TAKEOFF_1 = LOW_BATTERY.drone.1 || drone[1].takeoff || SYNC || P_OLD_LOW_BATTERY_TAKEOFF_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25801K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_TAKEOFF_1)
+DFA(P_OLD_LOW_BATTERY_TAKEOFF_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_UP_1 = (true U (LOW_BATTERY.drone.1 & drone[1].up))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_UP_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].up -> S1).
+Composition:P_OLD_LOW_BATTERY_UP_1 = LOW_BATTERY.drone.1 || drone[1].up || SYNC || P_OLD_LOW_BATTERY_UP_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25746K
+Composed in 33ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_UP_1)
+DFA(P_OLD_LOW_BATTERY_UP_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_E_1 = (true U (LOW_BATTERY.drone.1 & drone[1].move.e))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_E_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].move.e -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_E_1 = LOW_BATTERY.drone.1 || drone[1].move.e || SYNC || P_OLD_LOW_BATTERY_MOVE_E_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25660K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_E_1)
+DFA(P_OLD_LOW_BATTERY_MOVE_E_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_N_1 = (true U (LOW_BATTERY.drone.1 & drone[1].move.n))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_N_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.1&drone[1].move.n -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_N_1 = LOW_BATTERY.drone.1 || drone[1].move.n || SYNC || P_OLD_LOW_BATTERY_MOVE_N_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25648K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_N_1)
+DFA(P_OLD_LOW_BATTERY_MOVE_N_1) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 = (true U (!GROUNDED.drone.2 & drone[2].battery.safe))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 = S0,
+S1@ =(true -> S1),
+S0 =(!GROUNDED.drone.2&drone[2].battery.safe -> S1 |true -> S0).
+Composition:P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 = GROUNDED.drone.2 || drone[2].battery.safe || SYNC || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25609K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2)
+DFA(P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_TAKEOFF_2 = (true U (LOW_BATTERY.drone.2 & drone[2].takeoff))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_TAKEOFF_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].takeoff -> S1).
+Composition:P_OLD_LOW_BATTERY_TAKEOFF_2 = LOW_BATTERY.drone.2 || drone[2].takeoff || SYNC || P_OLD_LOW_BATTERY_TAKEOFF_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25613K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_TAKEOFF_2)
+DFA(P_OLD_LOW_BATTERY_TAKEOFF_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_TAKEOFF_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_UP_2 = (true U (LOW_BATTERY.drone.2 & drone[2].up))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_UP_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].up -> S1).
+Composition:P_OLD_LOW_BATTERY_UP_2 = LOW_BATTERY.drone.2 || drone[2].up || SYNC || P_OLD_LOW_BATTERY_UP_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25597K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_UP_2)
+DFA(P_OLD_LOW_BATTERY_UP_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_UP_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_E_2 = (true U (LOW_BATTERY.drone.2 & drone[2].move.e))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_E_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].move.e -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_E_2 = LOW_BATTERY.drone.2 || drone[2].move.e || SYNC || P_OLD_LOW_BATTERY_MOVE_E_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25607K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_E_2)
+DFA(P_OLD_LOW_BATTERY_MOVE_E_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_E_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_LOW_BATTERY_MOVE_N_2 = (true U (LOW_BATTERY.drone.2 & drone[2].move.n))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_LOW_BATTERY_MOVE_N_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |LOW_BATTERY.drone.2&drone[2].move.n -> S1).
+Composition:P_OLD_LOW_BATTERY_MOVE_N_2 = LOW_BATTERY.drone.2 || drone[2].move.n || SYNC || P_OLD_LOW_BATTERY_MOVE_N_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 25603K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_LOW_BATTERY_MOVE_N_2)
+DFA(P_OLD_LOW_BATTERY_MOVE_N_2) has 2 states.
+Tau reduction ON
+P_OLD_LOW_BATTERY_MOVE_N_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 = (true U (AT_H1.drone.1.1.1 & drone[2].arrive[1][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.1.1&drone[2].arrive[1][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 = AT_H1.drone.1.1.1 || drone[2].arrive[1][1][1] || SYNC || P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25675K
+Composed in 33ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 = (true U (AT_H1.drone.1.1.2 & drone[2].arrive[1][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.1.2&drone[2].arrive[1][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 = AT_H1.drone.1.1.2 || drone[2].arrive[1][2][1] || SYNC || P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25681K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 = (true U (AT_H1.drone.1.2.1 & drone[2].arrive[2][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.2.1&drone[2].arrive[2][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 = AT_H1.drone.1.2.1 || drone[2].arrive[2][1][1] || SYNC || P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25698K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 = (true U (AT_H1.drone.1.2.2 & drone[2].arrive[2][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.2.2&drone[2].arrive[2][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 = AT_H1.drone.1.2.2 || drone[2].arrive[2][2][1] || SYNC || P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25707K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 = (true U (AT_H1.drone.1.3.1 & drone[2].arrive[3][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.3.1&drone[2].arrive[3][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 = AT_H1.drone.1.3.1 || drone[2].arrive[3][1][1] || SYNC || P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25723K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 = (true U (AT_H1.drone.1.3.2 & drone[2].arrive[3][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.1.3.2&drone[2].arrive[3][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 = AT_H1.drone.1.3.2 || drone[2].arrive[3][2][1] || SYNC || P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25735K
+Composed in 37ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 = (true U (AT_H2.drone.1.1.1 & drone[2].arrive[1][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.1.1&drone[2].arrive[1][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 = AT_H2.drone.1.1.1 || drone[2].arrive[1][1][2] || SYNC || P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25751K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 = (true U (AT_H2.drone.1.1.2 & drone[2].arrive[1][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.1.2&drone[2].arrive[1][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 = AT_H2.drone.1.1.2 || drone[2].arrive[1][2][2] || SYNC || P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25763K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 = (true U (AT_H2.drone.1.2.1 & drone[2].arrive[2][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.2.1&drone[2].arrive[2][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 = AT_H2.drone.1.2.1 || drone[2].arrive[2][1][2] || SYNC || P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25780K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 = (true U (AT_H2.drone.1.2.2 & drone[2].arrive[2][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.2.2&drone[2].arrive[2][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 = AT_H2.drone.1.2.2 || drone[2].arrive[2][2][2] || SYNC || P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 26015K
+Composed in 36ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 = (true U (AT_H2.drone.1.3.1 & drone[2].arrive[3][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.3.1&drone[2].arrive[3][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 = AT_H2.drone.1.3.1 || drone[2].arrive[3][1][2] || SYNC || P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25808K
+Composed in 38ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 = (true U (AT_H2.drone.1.3.2 & drone[2].arrive[3][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.1.3.2&drone[2].arrive[3][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 = AT_H2.drone.1.3.2 || drone[2].arrive[3][2][2] || SYNC || P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25820K
+Composed in 38ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2)
+DFA(P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 = (true U (AT_H1.drone.2.1.1 & drone[1].arrive[1][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.1.1&drone[1].arrive[1][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 = AT_H1.drone.2.1.1 || drone[1].arrive[1][1][1] || SYNC || P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25837K
+Composed in 37ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 = (true U (AT_H1.drone.2.1.2 & drone[1].arrive[1][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.1.2&drone[1].arrive[1][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 = AT_H1.drone.2.1.2 || drone[1].arrive[1][2][1] || SYNC || P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25849K
+Composed in 38ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 = (true U (AT_H1.drone.2.2.1 & drone[1].arrive[2][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.2.1&drone[1].arrive[2][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 = AT_H1.drone.2.2.1 || drone[1].arrive[2][1][1] || SYNC || P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25866K
+Composed in 37ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 minimising...
+Minimised States: 3 in 1ms
+make DFA(P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 = (true U (AT_H1.drone.2.2.2 & drone[1].arrive[2][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.2.2&drone[1].arrive[2][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 = AT_H1.drone.2.2.2 || drone[1].arrive[2][2][1] || SYNC || P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25877K
+Composed in 38ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 = (true U (AT_H1.drone.2.3.1 & drone[1].arrive[3][1][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.3.1&drone[1].arrive[3][1][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 = AT_H1.drone.2.3.1 || drone[1].arrive[3][1][1] || SYNC || P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25894K
+Composed in 37ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 = (true U (AT_H1.drone.2.3.2 & drone[1].arrive[3][2][1]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H1.drone.2.3.2&drone[1].arrive[3][2][1] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 = AT_H1.drone.2.3.2 || drone[1].arrive[3][2][1] || SYNC || P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25906K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 minimising...
+Minimised States: 2 in 1ms
+Formula !P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 = (true U (AT_H2.drone.2.1.1 & drone[1].arrive[1][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.1.1&drone[1].arrive[1][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 = AT_H2.drone.2.1.1 || drone[1].arrive[1][1][2] || SYNC || P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25923K
+Composed in 36ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 = (true U (AT_H2.drone.2.1.2 & drone[1].arrive[1][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.1.2&drone[1].arrive[1][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 = AT_H2.drone.2.1.2 || drone[1].arrive[1][2][2] || SYNC || P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25935K
+Composed in 36ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 = (true U (AT_H2.drone.2.2.1 & drone[1].arrive[2][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.2.1&drone[1].arrive[2][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 = AT_H2.drone.2.2.1 || drone[1].arrive[2][1][2] || SYNC || P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25952K
+Composed in 36ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 = (true U (AT_H2.drone.2.2.2 & drone[1].arrive[2][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.2.2&drone[1].arrive[2][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 = AT_H2.drone.2.2.2 || drone[1].arrive[2][2][2] || SYNC || P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25964K
+Composed in 36ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 = (true U (AT_H2.drone.2.3.1 & drone[1].arrive[3][1][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.3.1&drone[1].arrive[3][1][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 = AT_H2.drone.2.3.1 || drone[1].arrive[3][1][2] || SYNC || P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25981K
+Composed in 34ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Formula !P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 = (true U (AT_H2.drone.2.3.2 & drone[1].arrive[3][2][2]))
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |AT_H2.drone.2.3.2&drone[1].arrive[3][2][2] -> S1).
+Composition:P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 = AT_H2.drone.2.3.2 || drone[1].arrive[3][2][2] || SYNC || P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 129 Memory used: 25992K
+Composed in 35ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 minimising...
+Minimised States: 3 in 0ms
+make DFA(P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1)
+DFA(P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1) has 2 states.
+Tau reduction ON
+P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 minimising...
+Minimised States: 2 in 0ms
+Composition:OldController = OLD_ENV || P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 || P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 || P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 || P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 || P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 || P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 || P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 || P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 || P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 || P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 || P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 || P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_E_2 || P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 || P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 || P_OLD_LOW_BATTERY_UP_1 || P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 || P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 || P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 || P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 || P_OLD_LOW_BATTERY_MOVE_N_2 || P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 || P_OLD_LOW_BATTERY_TAKEOFF_1 || P_OLD_LOW_BATTERY_MOVE_E_1 || P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 || P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 || P_OLD_LOW_BATTERY_UP_2 || P_OLD_LOW_BATTERY_TAKEOFF_2 || P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_N_1 || P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 || P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2
+State Space: 11664 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 48
+Composing...
+-- States: 10000 Transitions: 52601 Memory used: 62964K
+-- States: 10752 Transitions: 56496 Memory used: 77408K
+Composed in 140ms
+Solving the LTS control problem.
+Environment states: 10753
+Game states: 10753
+Game transitions: 32259
+Analysis time: 999ms.
+Controller [9060] generated successfully.
+Composition:OldController = OldController || P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 || P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 || P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 || P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 || P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 || P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 || P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 || P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 || P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 || P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 || P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 || P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 || P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_E_2 || P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 || P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 || P_OLD_LOW_BATTERY_UP_1 || P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 || P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 || P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 || P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 || P_OLD_LOW_BATTERY_MOVE_N_2 || P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 || P_OLD_LOW_BATTERY_TAKEOFF_1 || P_OLD_LOW_BATTERY_MOVE_E_1 || P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 || P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 || P_OLD_LOW_BATTERY_UP_2 || P_OLD_LOW_BATTERY_TAKEOFF_2 || P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 || P_OLD_LOW_BATTERY_MOVE_N_1 || P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 || P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2
+State Space: 9060 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 48
+Composing...
+-- States: 9060 Transitions: 34584 Memory used: 170843K
+Composed in 117ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.BATTERY_OLD(1) || OLD_ENV.MOVE_OLD(1) || OLD_ENV.BATTERY_OLD(2) || OLD_ENV.MOVE_OLD(2)
+State Space: 2 * 54 * 2 * 54 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 52442 Memory used: 65851K
+-- States: 11664 Transitions: 61344 Memory used: 63426K
+Composed in 88ms
+ - Synthesizing Mapping Environment from lists (size=4)...
+INFO: Auto-compiling dependency: BATTERY_NEW(1)
+Generating Mapping Environment: MAP_BATTERY_OLD(1)_BATTERY_NEW(1)
+INFO: Auto-compiling dependency: MOVE_NEW(1)
+Generating Mapping Environment: MAP_MOVE_OLD(1)_MOVE_NEW(1)
+INFO: Auto-compiling dependency: BATTERY_NEW(2)
+Generating Mapping Environment: MAP_BATTERY_OLD(2)_BATTERY_NEW(2)
+INFO: Auto-compiling dependency: MOVE_NEW(2)
+Generating Mapping Environment: MAP_MOVE_OLD(2)_MOVE_NEW(2)
+Mode: Stepwise Delayed Updating Controller Synthesis (baseline) + safety backward pruning
+comp.continueCompilation time : 3596ms
+=========================================
+Mode: Stepwise Delayed DUC (local-only)
+=========================================
+[Stepwise Delayed DUCS]
+oldController is used as global OldCon: OldCon
+
+[Stepwise DUCS] Requirement classification:
+  P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1 (OLD_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.battery.safe=[0], drone.1.land=[1], drone.1.takeoff=[1]}
+  P_OLD_LOW_BATTERY_TAKEOFF_1 (OLD_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.takeoff=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_OLD_LOW_BATTERY_UP_1 (OLD_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.up=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_OLD_LOW_BATTERY_MOVE_E_1 (OLD_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.move.e=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_OLD_LOW_BATTERY_MOVE_N_1 (OLD_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.move.n=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2 (OLD_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.land=[3], drone.2.takeoff=[3], drone.2.battery.safe=[2]}
+  P_OLD_LOW_BATTERY_TAKEOFF_2 (OLD_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.takeoff=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_OLD_LOW_BATTERY_UP_2 (OLD_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.up=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_OLD_LOW_BATTERY_MOVE_E_2 (OLD_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.move.e=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_OLD_LOW_BATTERY_MOVE_N_2 (OLD_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.move.n=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.1.1=[3], drone.1.arrive.1.1.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.1.2.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.1.2.1=[3]}
+  P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.1.1=[3], drone.1.arrive.2.1.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.2.2.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.2.2.1=[3]}
+  P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.1.1=[3], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.2.1=[3], drone.1.arrive.3.2.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.1.2=[3], drone.1.arrive.1.1.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.1.2.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.2.arrive.1.2.2=[3]}
+  P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.2.1.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.2.1.2=[3]}
+  P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.2.2=[3], drone.1.arrive.2.2.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.1.2=[3], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.3.2.2=[3]}
+  P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.1.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.1.1.1=[1]}
+  P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.2.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.1.2.1=[1]}
+  P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.1.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.2.1.1=[1]}
+  P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.2.2.1=[1]}
+  P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.1.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.3.1.1=[1]}
+  P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.2.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.3.2.1=[1]}
+  P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.1.1.2=[1], drone.2.arrive.1.1.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3]}
+  P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.2.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.1.arrive.1.2.2=[1]}
+  P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.1.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.2.1.2=[1]}
+  P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.2.2.2=[1], drone.2.arrive.2.2.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3]}
+  P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.3.1.2=[1], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3]}
+  P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1 (OLD_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.2.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.3.2.2=[1]}
+  P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.battery.safe=[0], drone.1.land=[1], drone.1.takeoff=[1]}
+  P_NEW_LOW_BATTERY_TAKEOFF_1 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.takeoff=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_NEW_LOW_BATTERY_UP_1 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.up=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_NEW_LOW_BATTERY_MOVE_E_1 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.move.e=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_NEW_LOW_BATTERY_MOVE_N_1 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.move.n=[1], drone.1.battery.low=[0], drone.1.battery.safe=[0]}
+  P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2 (NEW_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.land=[3], drone.2.takeoff=[3], drone.2.battery.safe=[2]}
+  P_NEW_LOW_BATTERY_TAKEOFF_2 (NEW_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.takeoff=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_NEW_LOW_BATTERY_UP_2 (NEW_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.up=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_NEW_LOW_BATTERY_MOVE_E_2 (NEW_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.move.e=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_NEW_LOW_BATTERY_MOVE_N_2 (NEW_SAFETY) -> cross scope [3, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.move.n=[3], drone.2.battery.low=[2], drone.2.battery.safe=[2]}
+  P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.1.1=[3], drone.1.arrive.1.1.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.1.2.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.1.2.1=[3]}
+  P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.1.1=[3], drone.1.arrive.2.1.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.2.2.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.2.2.1=[3]}
+  P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.1.1=[3], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.2.1=[3], drone.1.arrive.3.2.1=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.1.2=[3], drone.1.arrive.1.1.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.1.2.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.2.arrive.1.2.2=[3]}
+  P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.2.1.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.2.1.2=[3]}
+  P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.2.2=[3], drone.1.arrive.2.2.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.1.2=[3], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_2 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.3.2.2=[1], drone.1.arrive.3.1.1=[1], drone.1.arrive.3.1.2=[1], drone.1.arrive.3.2.1=[1], drone.1.arrive.1.1.1=[1], drone.1.arrive.1.1.2=[1], drone.1.arrive.1.2.1=[1], drone.1.arrive.2.1.1=[1], drone.1.arrive.2.1.2=[1], drone.1.arrive.2.2.1=[1], drone.1.land=[1], drone.1.arrive.2.2.2=[1], drone.1.arrive.1.2.2=[1], drone.2.arrive.3.2.2=[3]}
+  P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.1.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.1.1.1=[1]}
+  P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.2.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.1.2.1=[1]}
+  P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.1.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.2.1.1=[1]}
+  P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.2.2.1=[1]}
+  P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.1.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.3.1.1=[1]}
+  P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.2.1=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.3.2.1=[1]}
+  P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.1.1.2=[1], drone.2.arrive.1.1.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3]}
+  P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.1.2.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.1.arrive.1.2.2=[1]}
+  P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.2.1.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.2.1.2=[1]}
+  P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.2.2.2=[1], drone.2.arrive.2.2.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3]}
+  P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.1.arrive.3.1.2=[1], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.3.2.2=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3]}
+  P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_1 (NEW_SAFETY) -> cross scope [2, 4] GOAL_SPANS_MULTIPLE_STAGES actions={drone.2.arrive.3.2.2=[3], drone.2.arrive.3.1.2=[3], drone.2.arrive.3.2.1=[3], drone.2.arrive.2.2.2=[3], drone.2.arrive.2.1.1=[3], drone.2.arrive.2.1.2=[3], drone.2.arrive.2.2.1=[3], drone.2.arrive.3.1.1=[3], drone.2.arrive.1.1.1=[3], drone.2.arrive.1.1.2=[3], drone.2.arrive.1.2.1=[3], drone.2.land=[3], drone.2.arrive.1.2.2=[3], drone.1.arrive.3.2.2=[1]}
+  P_NEW_GEOFENCE_1 (NEW_SAFETY) -> stage 2
+  P_NEW_GEOFENCE_2 (NEW_SAFETY) -> stage 4
+  T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1 (TRANSITION) -> stage 1
+  T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1 (TRANSITION) -> stage 2
+  T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2 (TRANSITION) -> stage 3
+  T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2 (TRANSITION) -> stage 4
+[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true incrementalPruning=false incrementalPruningCleanup=false safetyBackwardPruning=true
+
+[Stepwise Delayed DUCS] Requirement classification summary
+  stages: 4
+  goals: total=74 local=6 cross=68 crossRatio=91.89%
+  local goals by type: oldSafety=0 newSafety=2 transition=4
+  cross goals by type: oldSafety=34 newSafety=34 transition=0
+  cross components: count=1 maxGoalScopeSize=2 maxComponentScopeSize=4 allStageCrossGoals=0 allStageCrossComponents=1
+  requirement fluents: unique=74
+  scope requirement counts:
+    scope {1} total=1 oldSafety=0 newSafety=0 transition=1 requirementFluents=3
+    scope {1,2} total=10 oldSafety=5 newSafety=5 transition=0 requirementFluents=9
+    scope {2} total=2 oldSafety=0 newSafety=1 transition=1 requirementFluents=12
+    scope {2,4} total=48 oldSafety=24 newSafety=24 transition=0 requirementFluents=50
+    scope {3} total=1 oldSafety=0 newSafety=0 transition=1 requirementFluents=3
+    scope {3,4} total=10 oldSafety=5 newSafety=5 transition=0 requirementFluents=9
+    scope {4} total=2 oldSafety=0 newSafety=1 transition=1 requirementFluents=12
+[Stepwise Delayed DUCS] classification statistics CountTime: 11 ms
+[Stepwise Delayed DUCS] cross component build time: 1 ms
+
+[Stepwise Delayed DUCS] Stage 1 old=BATTERY_OLD(1) new=BATTERY_NEW(1) relation=R_BATTERY_1
+  local old safety: []
+  local new safety: []
+  local transition: [T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_1(TRANSITION)]
+  mapping before pruning states: 4 transitions: 14
+  mapping meta states: 24 transitions: 1092
+  safety pruning kept states: 24 transitions: 1001
+  deferred safety backward pruning scope: local stage 1
+    component scope: [0]
+    before states: 24 transitions: 1001
+    explicit Error seeds: 2
+    definite losing states: 2
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 2
+    input environment reused: false
+    after states: 22 transitions: 999
+    elapsed: 2 ms
+  mapping safety states: 22 transitions: 999
+
+[Stepwise Delayed DUCS] Stage 2 old=MOVE_OLD(1) new=MOVE_NEW(1) relation=R_MOVE_1
+  local old safety: []
+  local new safety: [P_NEW_GEOFENCE_1(NEW_SAFETY)]
+  local transition: [T1_NO_CONTROLLABLE_DURING_GAP_MOVE_1(TRANSITION)]
+  mapping before pruning states: 108 transitions: 446
+  mapping meta states: 776 transitions: 21628
+  safety pruning kept states: 776 transitions: 19200
+  deferred safety backward pruning scope: local stage 2
+    component scope: [1]
+    before states: 776 transitions: 19200
+    explicit Error seeds: 88
+    definite losing states: 112
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 130
+    input environment reused: false
+    after states: 664 transitions: 18410
+    elapsed: 56 ms
+  mapping safety states: 664 transitions: 18410
+
+[Stepwise Delayed DUCS] Stage 3 old=BATTERY_OLD(2) new=BATTERY_NEW(2) relation=R_BATTERY_2
+  local old safety: []
+  local new safety: []
+  local transition: [T1_NO_CONTROLLABLE_DURING_GAP_BATTERY_2(TRANSITION)]
+  mapping before pruning states: 4 transitions: 14
+  mapping meta states: 24 transitions: 1092
+  safety pruning kept states: 24 transitions: 1001
+  deferred safety backward pruning scope: local stage 3
+    component scope: [2]
+    before states: 24 transitions: 1001
+    explicit Error seeds: 2
+    definite losing states: 2
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 2
+    input environment reused: false
+    after states: 22 transitions: 999
+    elapsed: 2 ms
+  mapping safety states: 22 transitions: 999
+
+[Stepwise Delayed DUCS] Stage 4 old=MOVE_OLD(2) new=MOVE_NEW(2) relation=R_MOVE_2
+  local old safety: []
+  local new safety: [P_NEW_GEOFENCE_2(NEW_SAFETY)]
+  local transition: [T1_NO_CONTROLLABLE_DURING_GAP_MOVE_2(TRANSITION)]
+  mapping before pruning states: 108 transitions: 446
+  mapping meta states: 776 transitions: 21628
+  safety pruning kept states: 776 transitions: 19200
+  deferred safety backward pruning scope: local stage 4
+    component scope: [3]
+    before states: 776 transitions: 19200
+    explicit Error seeds: 88
+    definite losing states: 112
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 130
+    input environment reused: false
+    after states: 664 transitions: 18410
+    elapsed: 51 ms
+  mapping safety states: 664 transitions: 18410
+
+[Stepwise Delayed DUCS] Cross components:
+  component 1 stages={1,2,3,4} goals=[P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1(OLD_SAFETY), P_OLD_LOW_BATTERY_TAKEOFF_1(OLD_SAFETY), P_OLD_LOW_BATTERY_UP_1(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_E_1(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_N_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2(OLD_SAFETY), P_OLD_LOW_BATTERY_TAKEOFF_2(OLD_SAFETY), P_OLD_LOW_BATTERY_UP_2(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_E_2(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_N_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1(OLD_SAFETY), P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1(NEW_SAFETY), P_NEW_LOW_BATTERY_TAKEOFF_1(NEW_SAFETY), P_NEW_LOW_BATTERY_UP_1(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_E_1(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_N_1(NEW_SAFETY), P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2(NEW_SAFETY), P_NEW_LOW_BATTERY_TAKEOFF_2(NEW_SAFETY), P_NEW_LOW_BATTERY_UP_2(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_E_2(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_N_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_1(NEW_SAFETY)]
+
+[Stepwise Delayed DUCS] Staged cross component 1
+  stages: {1,2,3,4}
+  goals: [P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1(OLD_SAFETY), P_OLD_LOW_BATTERY_TAKEOFF_1(OLD_SAFETY), P_OLD_LOW_BATTERY_UP_1(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_E_1(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_N_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2(OLD_SAFETY), P_OLD_LOW_BATTERY_TAKEOFF_2(OLD_SAFETY), P_OLD_LOW_BATTERY_UP_2(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_E_2(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_N_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1(OLD_SAFETY), P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1(NEW_SAFETY), P_NEW_LOW_BATTERY_TAKEOFF_1(NEW_SAFETY), P_NEW_LOW_BATTERY_UP_1(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_E_1(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_N_1(NEW_SAFETY), P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2(NEW_SAFETY), P_NEW_LOW_BATTERY_TAKEOFF_2(NEW_SAFETY), P_NEW_LOW_BATTERY_UP_2(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_E_2(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_N_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_1(NEW_SAFETY)]
+  cross goal scheduler: cost-guided
+  initial fragment stage 1 states: 22 transitions: 999
+  initial fragment stage 2 states: 664 transitions: 18410
+  initial fragment stage 3 states: 22 transitions: 999
+  initial fragment stage 4 states: 664 transitions: 18410
+  selected cross goal: P_OLD_LOW_BATTERY_MOVE_E_1 scope={1,2} schedulingCost=14608 candidateBatchGoals=10 estimatedMergedScope={1,2}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_1_MERGE_{1,2}
+
+[Stepwise Delayed DUCS] staged cross step 1
+  product scope: {1,2}
+  added stages: {1,2}
+    batch goals: [P_OLD_LOW_BATTERY_MOVE_E_1(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_N_1(OLD_SAFETY), P_OLD_LOW_BATTERY_TAKEOFF_1(OLD_SAFETY), P_OLD_LOW_BATTERY_UP_1(OLD_SAFETY), P_OLD_NO_RECOVERY_WHILE_AIRBORNE_1(OLD_SAFETY), P_NEW_LOW_BATTERY_MOVE_E_1(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_N_1(NEW_SAFETY), P_NEW_LOW_BATTERY_TAKEOFF_1(NEW_SAFETY), P_NEW_LOW_BATTERY_UP_1(NEW_SAFETY), P_NEW_NO_RECOVERY_WHILE_AIRBORNE_1(NEW_SAFETY)]
+  before staged cross pruning states: 1640 transitions: 43836
+  safety pruning kept states: 1640 transitions: 32310
+  deferred safety backward pruning scope: cross component 1 staged step 1 productScope={1,2}
+    component scope: [0, 1]
+    before states: 1640 transitions: 32310
+    explicit Error seeds: 428
+    definite losing states: 428
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 552
+    input environment reused: false
+    after states: 1212 transitions: 31758
+    elapsed: 75 ms
+  after staged cross pruning states: 1212 transitions: 31758
+  selected cross goal: P_OLD_LOW_BATTERY_MOVE_E_2 scope={3,4} schedulingCost=14608 candidateBatchGoals=10 estimatedMergedScope={3,4}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_2_MERGE_{3,4}
+
+[Stepwise Delayed DUCS] staged cross step 2
+  product scope: {3,4}
+  added stages: {3,4}
+    batch goals: [P_OLD_LOW_BATTERY_MOVE_E_2(OLD_SAFETY), P_OLD_LOW_BATTERY_MOVE_N_2(OLD_SAFETY), P_OLD_LOW_BATTERY_TAKEOFF_2(OLD_SAFETY), P_OLD_LOW_BATTERY_UP_2(OLD_SAFETY), P_OLD_NO_RECOVERY_WHILE_AIRBORNE_2(OLD_SAFETY), P_NEW_LOW_BATTERY_MOVE_E_2(NEW_SAFETY), P_NEW_LOW_BATTERY_MOVE_N_2(NEW_SAFETY), P_NEW_LOW_BATTERY_TAKEOFF_2(NEW_SAFETY), P_NEW_LOW_BATTERY_UP_2(NEW_SAFETY), P_NEW_NO_RECOVERY_WHILE_AIRBORNE_2(NEW_SAFETY)]
+  before staged cross pruning states: 1640 transitions: 43836
+  safety pruning kept states: 1640 transitions: 32310
+  deferred safety backward pruning scope: cross component 1 staged step 2 productScope={3,4}
+    component scope: [2, 3]
+    before states: 1640 transitions: 32310
+    explicit Error seeds: 428
+    definite losing states: 428
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 552
+    input environment reused: false
+    after states: 1212 transitions: 31758
+    elapsed: 64 ms
+  after staged cross pruning states: 1212 transitions: 31758
+  selected cross goal: P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2 scope={2,4} schedulingCost=1468944 candidateBatchGoals=48 estimatedMergedScope={1,2,3,4}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_3_MERGE_{1,2,3,4}
+
+[Stepwise Delayed DUCS] staged cross step 3
+  product scope: {1,2,3,4}
+  added stages: {}
+    batch goals: [P_OLD_NO_COLLISION_X1_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X1_Y2_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X2_Y2_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y1_H2_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H1_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H1_2_TO_1(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H2_1_TO_2(OLD_SAFETY), P_OLD_NO_COLLISION_X3_Y2_H2_2_TO_1(OLD_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X1_Y2_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X2_Y2_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y1_H2_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H1_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H1_2_TO_1(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H2_1_TO_2(NEW_SAFETY), P_NEW_NO_COLLISION_X3_Y2_H2_2_TO_1(NEW_SAFETY)]
+  before staged cross pruning states: 199837 transitions: 1225606
+  safety pruning kept states: 191537 transitions: 1157431
+  deferred safety backward pruning scope: cross component 1 staged step 3 productScope={1,2,3,4}
+    component scope: [0, 1, 2, 3]
+    before states: 191537 transitions: 1157431
+    explicit Error seeds: 2272
+    definite losing states: 26441
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 26246
+    input environment reused: false
+    after states: 156720 transitions: 947314
+    elapsed: 64238 ms
+  after staged cross pruning states: 156720 transitions: 947314
+  deferred safety backward pruning scope: cross component 1 final merge
+    component scope: [0, 1, 2, 3]
+    before states: 156720 transitions: 947314
+    explicit Error seeds: 0
+    definite losing states: 0
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 0
+    input environment reused: true
+    after states: 156720 transitions: 947314
+    elapsed: 522 ms
+  staged cross component safety states: 156720 transitions: 947314
+
+[Stepwise Delayed DUCS] Final product inputs: [cross component 1 stages={1,2,3,4}]
+  safety backward pruning scope: stepwise-delayed-final-mapping
+    before states: 156720 transitions: 947314
+    dead-end seed states: 0
+    backward losing states: 0
+    losing controllable action groups: 0
+    input environment reused: true
+    after backward states: 156720 transitions: 947314
+    after cleanup states: 156720 transitions: 947314
+[Stepwise Delayed DUCS] Product after final mapping safety backward pruning states: 156720 transitions: 947314
+[Stepwise Delayed DUCS] Product before delayed connection states: 156720 transitions: 947314
+[Stepwise Delayed DUCS] OldCon fluent meta states: 21728 transitions: 82984
+[Stepwise Delayed DUCS] hotSwapIn connection mode: legacy
+[Stepwise Delayed DUCS] hotSwapIn connection time: total=293.777 ms, setup=0.370 ms, traversal=281.205 ms
+[Stepwise Delayed DUCS] hotSwapIn connection pairs: visited=21728, enqueued=82985, duplicateSkipped=61257, synchronizedSuccessorPairs=82984
+[Stepwise Delayed DUCS] hotSwapIn connection result: connections=21728, oldStatesWithoutTargets=0, comparisonFluents=75
+[Stepwise Delayed DUCS] hotSwapIn connection unique states: old=21728, mapping=21728, eligibleMappingVisited=21728, eligibleMappingTotal=21728
+[Stepwise Delayed DUCS] hotSwapIn connection cache stats: eligibilityComputations=0, signatureBuilds=0, transitionIndexStateBuilds=0
+[Stepwise Delayed DUCS] hotSwapIn connection legacy stats: transitionComparisons=608602, actionMatches=82984, oldTransitionsScanned=82984, mappingTransitionsScanned=145798
+[Stepwise Delayed DUCS] all old-controller states: 21728
+[Stepwise Delayed DUCS] reachable old-controller states: 21728
+[Stepwise Delayed DUCS] hotSwapIn connections: 21728
+[Stepwise Delayed DUCS] reachable states without connection target: 0
+[Stepwise Delayed DUCS] all states without connection target: 0
+[Stepwise Delayed DUCS] connected environment representation: read-only view
+[Stepwise Delayed DUCS] After delayed hotSwapIn connection states: 178448 transitions: 1052026
+[Stepwise Delayed DUCS] After global DontDoTwice states: 178449 transitions: 1052026
+  safety backward pruning scope: stepwise-delayed-final
+    before states: 178449 transitions: 1052026
+    dead-end seed states: 1
+    backward losing states: 1
+    losing controllable action groups: 153000
+    input environment reused: false
+    after backward states: 178448 transitions: 899026
+    after cleanup states: 178448 transitions: 899026
+[Stepwise Delayed DUCS] After final safety backward pruning states: 178448 transitions: 899026
+
+[Stepwise Delayed DUCS] GR(1)
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis

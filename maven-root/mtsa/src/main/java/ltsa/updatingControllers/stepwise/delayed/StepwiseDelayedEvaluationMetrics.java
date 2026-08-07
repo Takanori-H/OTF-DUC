@@ -28,7 +28,7 @@ final class StepwiseDelayedEvaluationMetrics {
             String label,
             Set<Integer> scope,
             int states,
-            int transitions,
+            long transitions,
             long countTime) {
         String scopedLabel = scopedMetricLabel(label, scope);
         UpdatingControllerEvaluationRecorder.recordCount(

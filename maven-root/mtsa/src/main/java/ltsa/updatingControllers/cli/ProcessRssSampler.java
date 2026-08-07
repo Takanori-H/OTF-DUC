@@ -84,9 +84,14 @@ public final class ProcessRssSampler implements AutoCloseable {
     private long synthesisWindowStartedAtNanos = -1L;
     private long synthesisWindowStartedAtEpochMillis = -1L;
     private long synthesisWindowCompletedAtEpochMillis = -1L;
+    private long synthesisWindowStartRssBytes = RSS_UNAVAILABLE;
     private long synthesisWindowSampleCount;
     private long synthesisWindowSampleFailureCount;
     private long synthesisWindowProviderFailureCount;
+    private long synthesisWindowProviderTimeoutCount;
+    private boolean synthesisWindowProviderCircuitOpened;
+    private long synthesisWindowLastAttemptAtNanos = -1L;
+    private long synthesisWindowMaxSampleGapNanos;
     private long synthesisWindowSamplingWallTimeNanos;
     private long synthesisWindowProviderThreadCpuTimeNanos;
     private boolean synthesisWindowProviderThreadCpuTimeAvailable;
@@ -275,6 +280,13 @@ public final class ProcessRssSampler implements AutoCloseable {
             synchronized (stateLock) {
                 synthesisWindowStartBoundarySampleSucceeded =
                         boundarySampleSucceeded;
+                if (boundarySampleSucceeded) {
+                    // No periodic read can interleave here because
+                    // providerReadLock is held. The only synthesis-window
+                    // reading so far is therefore the synchronous START
+                    // boundary sample, which is also the current peak.
+                    synthesisWindowStartRssBytes = synthesisWindowPeakRssBytes;
+                }
             }
             return true;
         }
@@ -470,6 +482,12 @@ public final class ProcessRssSampler implements AutoCloseable {
             }
             if (synthesisWindowOpen) {
                 synthesisWindowProviderFailureCount++;
+                if (timedOut) {
+                    synthesisWindowProviderTimeoutCount++;
+                    if (opensDefaultProviderCircuitOnTimeout) {
+                        synthesisWindowProviderCircuitOpened = true;
+                    }
+                }
             }
             running = false;
         }
@@ -542,6 +560,13 @@ public final class ProcessRssSampler implements AutoCloseable {
                 totalSamplingWallTimeNanos,
                 samplingWallTimeNanos);
         if (synthesisWindowOpen) {
+            if (synthesisWindowLastAttemptAtNanos >= 0L) {
+                long gap = attemptAtNanos - synthesisWindowLastAttemptAtNanos;
+                if (gap > synthesisWindowMaxSampleGapNanos) {
+                    synthesisWindowMaxSampleGapNanos = gap;
+                }
+            }
+            synthesisWindowLastAttemptAtNanos = attemptAtNanos;
             synthesisWindowSamplingWallTimeNanos = saturatedAdd(
                     synthesisWindowSamplingWallTimeNanos,
                     samplingWallTimeNanos);
@@ -599,12 +624,16 @@ public final class ProcessRssSampler implements AutoCloseable {
                 synthesisWindowCompleted,
                 synthesisWindowStartedAtEpochMillis,
                 synthesisWindowCompletedAtEpochMillis,
+                synthesisWindowStartRssBytes,
                 synthesisAvailable ? synthesisWindowPeakRssBytes : RSS_UNAVAILABLE,
                 synthesisWindowPeakAtEpochMillis,
                 synthesisWindowPeakAtElapsedMillis,
                 synthesisWindowSampleCount,
                 synthesisWindowSampleFailureCount,
                 synthesisWindowProviderFailureCount,
+                synthesisWindowProviderTimeoutCount,
+                synthesisWindowProviderCircuitOpened,
+                TimeUnit.NANOSECONDS.toMillis(synthesisWindowMaxSampleGapNanos),
                 synthesisWindowSamplingWallTimeNanos,
                 synthesisWindowProviderThreadCpuTimeNanos,
                 synthesisWindowProviderThreadCpuTimeAvailable,
@@ -739,12 +768,16 @@ public final class ProcessRssSampler implements AutoCloseable {
         private final boolean synthesisWindowCompleted;
         private final long synthesisWindowStartedAtEpochMillis;
         private final long synthesisWindowCompletedAtEpochMillis;
+        private final long synthesisWindowStartRssBytes;
         private final long synthesisWindowPeakRssBytes;
         private final long synthesisWindowPeakAtEpochMillis;
         private final long synthesisWindowPeakAtElapsedMillis;
         private final long synthesisWindowSampleCount;
         private final long synthesisWindowSampleFailureCount;
         private final long synthesisWindowProviderFailureCount;
+        private final long synthesisWindowProviderTimeoutCount;
+        private final boolean synthesisWindowProviderCircuitOpened;
+        private final long synthesisWindowMaxSampleGapMillis;
         private final long synthesisWindowSamplingWallTimeNanos;
         private final long synthesisWindowProviderThreadCpuTimeNanos;
         private final boolean synthesisWindowProviderThreadCpuTimeAvailable;
@@ -777,12 +810,16 @@ public final class ProcessRssSampler implements AutoCloseable {
                 boolean synthesisWindowCompleted,
                 long synthesisWindowStartedAtEpochMillis,
                 long synthesisWindowCompletedAtEpochMillis,
+                long synthesisWindowStartRssBytes,
                 long synthesisWindowPeakRssBytes,
                 long synthesisWindowPeakAtEpochMillis,
                 long synthesisWindowPeakAtElapsedMillis,
                 long synthesisWindowSampleCount,
                 long synthesisWindowSampleFailureCount,
                 long synthesisWindowProviderFailureCount,
+                long synthesisWindowProviderTimeoutCount,
+                boolean synthesisWindowProviderCircuitOpened,
+                long synthesisWindowMaxSampleGapMillis,
                 long synthesisWindowSamplingWallTimeNanos,
                 long synthesisWindowProviderThreadCpuTimeNanos,
                 boolean synthesisWindowProviderThreadCpuTimeAvailable,
@@ -815,12 +852,16 @@ public final class ProcessRssSampler implements AutoCloseable {
             this.synthesisWindowCompleted = synthesisWindowCompleted;
             this.synthesisWindowStartedAtEpochMillis = synthesisWindowStartedAtEpochMillis;
             this.synthesisWindowCompletedAtEpochMillis = synthesisWindowCompletedAtEpochMillis;
+            this.synthesisWindowStartRssBytes = synthesisWindowStartRssBytes;
             this.synthesisWindowPeakRssBytes = synthesisWindowPeakRssBytes;
             this.synthesisWindowPeakAtEpochMillis = synthesisWindowPeakAtEpochMillis;
             this.synthesisWindowPeakAtElapsedMillis = synthesisWindowPeakAtElapsedMillis;
             this.synthesisWindowSampleCount = synthesisWindowSampleCount;
             this.synthesisWindowSampleFailureCount = synthesisWindowSampleFailureCount;
             this.synthesisWindowProviderFailureCount = synthesisWindowProviderFailureCount;
+            this.synthesisWindowProviderTimeoutCount = synthesisWindowProviderTimeoutCount;
+            this.synthesisWindowProviderCircuitOpened = synthesisWindowProviderCircuitOpened;
+            this.synthesisWindowMaxSampleGapMillis = synthesisWindowMaxSampleGapMillis;
             this.synthesisWindowSamplingWallTimeNanos =
                     synthesisWindowSamplingWallTimeNanos;
             this.synthesisWindowProviderThreadCpuTimeNanos =
@@ -962,9 +1003,24 @@ public final class ProcessRssSampler implements AutoCloseable {
             return synthesisWindowCompletedAtEpochMillis;
         }
 
+        /** Returns the synchronous START-boundary RSS sample, or -1 on failure. */
+        public long getSynthesisWindowStartRssBytes() {
+            return synthesisWindowStartRssBytes;
+        }
+
         /** Returns -1 when {@link #isSynthesisWindowAvailable()} is false. */
         public long getSynthesisWindowPeakRssBytes() {
             return synthesisWindowPeakRssBytes;
+        }
+
+        /** Peak RSS minus START-boundary RSS, or -1 when either is unavailable. */
+        public long getSynthesisWindowPeakIncreaseRssBytes() {
+            if (synthesisWindowStartRssBytes <= 0L
+                    || synthesisWindowPeakRssBytes < 0L) {
+                return RSS_UNAVAILABLE;
+            }
+            return Math.max(0L,
+                    synthesisWindowPeakRssBytes - synthesisWindowStartRssBytes);
         }
 
         public long getSynthesisWindowPeakAtEpochMillis() {
@@ -986,6 +1042,19 @@ public final class ProcessRssSampler implements AutoCloseable {
 
         public long getSynthesisWindowProviderFailureCount() {
             return synthesisWindowProviderFailureCount;
+        }
+
+        public long getSynthesisWindowProviderTimeoutCount() {
+            return synthesisWindowProviderTimeoutCount;
+        }
+
+        public boolean isSynthesisWindowProviderCircuitOpened() {
+            return synthesisWindowProviderCircuitOpened;
+        }
+
+        /** Largest gap between sample-attempt starts while the synthesis window is open. */
+        public long getSynthesisWindowMaxSampleGapMillis() {
+            return synthesisWindowMaxSampleGapMillis;
         }
 
         /** Provider-result wait wall time accumulated while the window is open. */

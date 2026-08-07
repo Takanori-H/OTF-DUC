@@ -109,13 +109,8 @@ public final class TraditionalDUCDebugLogger {
         return stats;
     }
 
-    private static int countTransitions(MTS<Long, String> mts) {
-        int count = 0;
-        for (Long state : mts.getStates()) {
-            count += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
-            count += mts.getTransitions(state, MTS.TransitionType.MAYBE).size();
-        }
-        return count;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequiredAndMaybe(mts);
     }
 
     private static long countOldIdMatches(MTS<Long, String> mts, Set<Long> originalOldControllerStates) {
@@ -152,7 +147,7 @@ public final class TraditionalDUCDebugLogger {
 
     private static final class StageStats {
         private int totalStates;
-        private int totalTransitions;
+        private long totalTransitions;
         private long oldIdMatchedStates = -1;
         private int preBeginStates;
         private int beginUpdateSourceStates;

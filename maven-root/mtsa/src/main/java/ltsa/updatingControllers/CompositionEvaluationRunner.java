@@ -14,6 +14,11 @@ import ltsa.updatingControllers.memory.MemoryMeasurementProtocol;
 import ltsa.updatingControllers.memory.RunHeapMemorySampler;
 import ltsa.updatingControllers.synthesis.UpdatePhaseEvaluator;
 
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * GUI と CLI の両方から使える、合成 1 回分の評価計測 runner。
  */
@@ -129,7 +134,7 @@ public final class CompositionEvaluationRunner {
             Request request,
             MemoryMeasurementSession memoryMeasurement) {
 
-        long runStart = System.currentTimeMillis();
+        long runStart = System.nanoTime();
         System.gc();
         UpdatingControllerEvaluationRecorder.reset();
         UpdatingControllerEvaluationRecorder.recordRunEnvironmentMetadata();
@@ -152,15 +157,15 @@ public final class CompositionEvaluationRunner {
         Throwable failure = null;
 
         memoryMeasurement.start();
-        long compileStart = System.currentTimeMillis();
+        long compileStart = System.nanoTime();
         try {
             current = request.compilationStep.compile(request.output);
-            compileTime = System.currentTimeMillis() - compileStart;
+            compileTime = elapsedMillis(compileStart);
             UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("構文解析・合成問題準備後");
             UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
                     "run.compilation_ready");
         } catch (OutOfMemoryError e) {
-            compileTime = System.currentTimeMillis() - compileStart;
+            compileTime = elapsedMillis(compileStart);
             failure = e;
             memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailure(
@@ -170,7 +175,7 @@ public final class CompositionEvaluationRunner {
             finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         } catch (RuntimeException e) {
-            compileTime = System.currentTimeMillis() - compileStart;
+            compileTime = elapsedMillis(compileStart);
             failure = e;
             memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
@@ -180,7 +185,7 @@ public final class CompositionEvaluationRunner {
             finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         } catch (Exception e) {
-            compileTime = System.currentTimeMillis() - compileStart;
+            compileTime = elapsedMillis(compileStart);
             failure = e;
             memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
@@ -192,12 +197,12 @@ public final class CompositionEvaluationRunner {
         }
 
         if (current != null) {
-            long synthesisStart = System.currentTimeMillis();
+            long synthesisStart = System.nanoTime();
             try {
                 TransitionSystemDispatcher.applyComposition(current, request.output);
-                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                synthesisTime = elapsedMillis(synthesisStart);
             } catch (OutOfMemoryError e) {
-                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                synthesisTime = elapsedMillis(synthesisStart);
                 failure = e;
                 memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailure(
@@ -207,7 +212,7 @@ public final class CompositionEvaluationRunner {
                 finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (LTSCompositionException e) {
-                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                synthesisTime = elapsedMillis(synthesisStart);
                 failure = e;
                 memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
@@ -217,7 +222,7 @@ public final class CompositionEvaluationRunner {
                 finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (RuntimeException e) {
-                synthesisTime = System.currentTimeMillis() - synthesisStart;
+                synthesisTime = elapsedMillis(synthesisStart);
                 failure = e;
                 memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
@@ -233,7 +238,7 @@ public final class CompositionEvaluationRunner {
             // callbacks are covered only by the parent child-lifetime RSS.
             memoryMeasurement.finishAndRecord();
 
-            long postCompositionStart = System.currentTimeMillis();
+            long postCompositionStart = System.nanoTime();
             try {
                 if (current.composition == null) {
                     UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
@@ -247,9 +252,9 @@ public final class CompositionEvaluationRunner {
                 if (request.successfulCompositionCallback != null) {
                     request.successfulCompositionCallback.afterSuccessfulComposition(current);
                 }
-                postCompositionTime = System.currentTimeMillis() - postCompositionStart;
+                postCompositionTime = elapsedMillis(postCompositionStart);
             } catch (OutOfMemoryError e) {
-                postCompositionTime = System.currentTimeMillis() - postCompositionStart;
+                postCompositionTime = elapsedMillis(postCompositionStart);
                 failure = e;
                 UpdatingControllerEvaluationRecorder.recordFailure(
                         ResultStatus.OUT_OF_MEMORY,
@@ -258,7 +263,7 @@ public final class CompositionEvaluationRunner {
                 finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (RuntimeException e) {
-                postCompositionTime = System.currentTimeMillis() - postCompositionStart;
+                postCompositionTime = elapsedMillis(postCompositionStart);
                 failure = e;
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                         ResultStatus.EXCEPTION,
@@ -267,7 +272,7 @@ public final class CompositionEvaluationRunner {
                 finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (Exception e) {
-                postCompositionTime = System.currentTimeMillis() - postCompositionStart;
+                postCompositionTime = elapsedMillis(postCompositionStart);
                 failure = e;
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                         ResultStatus.EXCEPTION,
@@ -399,9 +404,9 @@ public final class CompositionEvaluationRunner {
                 boolean compileOnlyRecorded = false;
                 boolean continueCompilationRecorded = false;
                 try {
-                    compileOnlyStart = System.currentTimeMillis();
+                    compileOnlyStart = System.nanoTime();
                     compiler.compile();
-                    long compileOnlyTime = System.currentTimeMillis() - compileOnlyStart;
+                    long compileOnlyTime = elapsedMillis(compileOnlyStart);
                     if (UpdatingControllerEvaluationRecorder.isEnabled()) {
                         output.outln("comp.compile time : " + compileOnlyTime + "ms");
                         UpdatingControllerEvaluationRecorder.recordTime(
@@ -411,9 +416,9 @@ public final class CompositionEvaluationRunner {
                     }
                     compileOnlyRecorded = true;
 
-                    continueCompilationStart = System.currentTimeMillis();
+                    continueCompilationStart = System.nanoTime();
                     CompositeState current = compiler.continueCompilation(targetName);
-                    long continueCompilationTime = System.currentTimeMillis() - continueCompilationStart;
+                    long continueCompilationTime = elapsedMillis(continueCompilationStart);
                     if (UpdatingControllerEvaluationRecorder.isEnabled()) {
                         output.outln("comp.continueCompilation time : " + continueCompilationTime + "ms");
                         UpdatingControllerEvaluationRecorder.recordTime(
@@ -452,7 +457,7 @@ public final class CompositionEvaluationRunner {
             CompositeState current,
             MemoryMeasurementSession memoryMeasurement) {
 
-        long runTime = System.currentTimeMillis() - runStart;
+        long runTime = elapsedMillis(runStart);
         memoryMeasurement.finishAndRecord();
         UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
         long overallPeakMemory = EvaluationProfiler.getPeakMemoryUsage();
@@ -501,10 +506,10 @@ public final class CompositionEvaluationRunner {
                 netPeakMemory);
 
         if (current != null && current.composition != null) {
-            long outputCountStart = System.currentTimeMillis();
+            long outputCountStart = System.nanoTime();
             long outputStates = current.composition.maxStates;
-            long outputTransitions = current.composition.ntransitions();
-            long outputCountTime = System.currentTimeMillis() - outputCountStart;
+            long outputTransitions = current.composition.ntransitionsLong();
+            long outputCountTime = elapsedMillis(outputCountStart);
             UpdatingControllerEvaluationRecorder.recordOutputController(
                     outputStates,
                     outputTransitions,
@@ -533,11 +538,11 @@ public final class CompositionEvaluationRunner {
                         null);
             }
 
-            long beginUpdateCountStart = System.currentTimeMillis();
+            long beginUpdateCountStart = System.nanoTime();
             long beginUpdateStates = countStatesWithOutgoingAction(
                     current.composition,
                     UpdateConstants.BEGIN_UPDATE);
-            long beginUpdateCountTime = System.currentTimeMillis() - beginUpdateCountStart;
+            long beginUpdateCountTime = elapsedMillis(beginUpdateCountStart);
             if (beginUpdateStates > 0 || UpdatingControllerEvaluationRecorder.hasOldControllerStateSpace()) {
                 UpdatingControllerEvaluationRecorder.recordBeginUpdateCoverage(
                         beginUpdateStates,
@@ -554,6 +559,7 @@ public final class CompositionEvaluationRunner {
         private final boolean heapSamplingEnabled;
         private final long intervalMillis;
         private RunHeapMemorySampler heapSampler;
+        private GcSnapshot gcStart;
         private boolean started;
         private boolean finished;
 
@@ -577,6 +583,7 @@ public final class CompositionEvaluationRunner {
             // this boundary before compilation is allowed to begin.
             MemoryMeasurementProtocol.emitSynthesisWindowStart();
             started = true;
+            gcStart = GcSnapshot.capture();
             if (heapSamplingEnabled) {
                 recordHeapSamplingStatusSafely(true, false, "");
                 try {
@@ -604,6 +611,7 @@ public final class CompositionEvaluationRunner {
             if (finished) {
                 return;
             }
+            GcSnapshot gcEnd = GcSnapshot.capture();
             UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
                     "run.synthesis_window_end");
             finished = true;
@@ -626,6 +634,9 @@ public final class CompositionEvaluationRunner {
                 // acknowledges this boundary and lets post-processing begin.
                 MemoryMeasurementProtocol.emitSynthesisWindowEnd();
             }
+            // Persist the MXBean deltas only after closing the sampled window,
+            // so recorder allocations cannot inflate its heap/RSS peak.
+            recordGcDelta(gcStart, gcEnd);
             if (sampledHeap != null) {
                 try {
                     UpdatingControllerEvaluationRecorder.recordSampledHeapMemory(sampledHeap);
@@ -646,6 +657,177 @@ public final class CompositionEvaluationRunner {
                 // Best effort only when the measured JVM is exhausted.
             }
         }
+
+        private static void recordGcDelta(GcSnapshot start, GcSnapshot end) {
+            final String section = "Controller synthesis GC measurement";
+            final String formula = "Difference between GC MXBean counters at the measured window boundaries "
+                    + "(compilation/problem preparation plus controller composition). Diagnostic only; "
+                    + "it is not subtracted from controller synthesis time.";
+            if (start == null || end == null || !start.available || !end.available) {
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_measurement_available",
+                        section,
+                        "GC measurement available",
+                        "false",
+                        "boolean",
+                        formula);
+                String error = firstNonEmpty(
+                        start == null ? "start snapshot missing" : start.error,
+                        end == null ? "end snapshot missing" : end.error);
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_measurement_error",
+                        section,
+                        "GC measurement error",
+                        error,
+                        "text",
+                        formula);
+                return;
+            }
+
+            long totalCount = 0L;
+            long totalTime = 0L;
+            int comparableCollectors = 0;
+            for (Map.Entry<String, GcCounters> entry : end.counters.entrySet()) {
+                GcCounters before = start.counters.get(entry.getKey());
+                if (before == null) {
+                    continue;
+                }
+                GcCounters after = entry.getValue();
+                long countDelta = nonNegativeDelta(after.collectionCount, before.collectionCount);
+                long timeDelta = nonNegativeDelta(after.collectionTimeMillis, before.collectionTimeMillis);
+                totalCount += countDelta;
+                totalTime += timeDelta;
+                comparableCollectors++;
+                String collectorToken = metricToken(entry.getKey());
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_" + collectorToken + "_collection_count",
+                        section,
+                        entry.getKey() + " collection count",
+                        Long.toString(countDelta),
+                        "collections",
+                        formula);
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_" + collectorToken + "_collection_time",
+                        section,
+                        entry.getKey() + " collection time",
+                        Long.toString(timeDelta),
+                        "ms",
+                        formula);
+            }
+            boolean available = comparableCollectors > 0;
+            UpdatingControllerEvaluationRecorder.recordStableMetric(
+                    "controller_synthesis_gc_measurement_available",
+                    section,
+                    "GC measurement available",
+                    Boolean.toString(available),
+                    "boolean",
+                    formula);
+            if (available) {
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_collection_count",
+                        section,
+                        "GC collection count",
+                        Long.toString(totalCount),
+                        "collections",
+                        formula);
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_collection_time",
+                        section,
+                        "GC collection time",
+                        Long.toString(totalTime),
+                        "ms",
+                        formula);
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_collector_count",
+                        section,
+                        "comparable GC collector count",
+                        Integer.toString(comparableCollectors),
+                        "collectors",
+                        formula);
+            } else {
+                UpdatingControllerEvaluationRecorder.recordStableMetric(
+                        "controller_synthesis_gc_measurement_error",
+                        section,
+                        "GC measurement error",
+                        "No collector exposed comparable non-negative counters.",
+                        "text",
+                        formula);
+            }
+        }
+    }
+
+    private static final class GcSnapshot {
+        private final Map<String, GcCounters> counters;
+        private final boolean available;
+        private final String error;
+
+        private GcSnapshot(Map<String, GcCounters> counters, boolean available, String error) {
+            this.counters = counters;
+            this.available = available;
+            this.error = error == null ? "" : error;
+        }
+
+        private static GcSnapshot capture() {
+            Map<String, GcCounters> counters = new LinkedHashMap<String, GcCounters>();
+            try {
+                for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
+                    long count = bean.getCollectionCount();
+                    long time = bean.getCollectionTime();
+                    if (count >= 0L && time >= 0L) {
+                        counters.put(bean.getName(), new GcCounters(count, time));
+                    }
+                }
+                return new GcSnapshot(
+                        counters,
+                        !counters.isEmpty(),
+                        counters.isEmpty() ? "No GC MXBean exposed supported counters." : "");
+            } catch (RuntimeException e) {
+                return new GcSnapshot(counters, false, e.toString());
+            } catch (LinkageError e) {
+                return new GcSnapshot(counters, false, e.toString());
+            }
+        }
+    }
+
+    private static final class GcCounters {
+        private final long collectionCount;
+        private final long collectionTimeMillis;
+
+        private GcCounters(long collectionCount, long collectionTimeMillis) {
+            this.collectionCount = collectionCount;
+            this.collectionTimeMillis = collectionTimeMillis;
+        }
+    }
+
+    private static long nonNegativeDelta(long after, long before) {
+        return after >= before ? after - before : 0L;
+    }
+
+    private static String firstNonEmpty(String first, String second) {
+        if (first != null && !first.isEmpty()) {
+            return first;
+        }
+        return second == null ? "" : second;
+    }
+
+    private static String metricToken(String value) {
+        StringBuilder result = new StringBuilder();
+        boolean underscore = false;
+        String source = value == null ? "" : value;
+        for (int index = 0; index < source.length(); index++) {
+            char ch = Character.toLowerCase(source.charAt(index));
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+                result.append(ch);
+                underscore = false;
+            } else if (!underscore && result.length() > 0) {
+                result.append('_');
+                underscore = true;
+            }
+        }
+        if (result.length() > 0 && result.charAt(result.length() - 1) == '_') {
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.length() == 0 ? "unknown" : result.toString();
     }
 
     private static long configuredMemorySamplingInterval() {
@@ -669,19 +851,22 @@ public final class CompositionEvaluationRunner {
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
             return;
         }
-        long now = System.currentTimeMillis();
         if (compileOnlyStart >= 0 && !compileOnlyRecorded) {
             UpdatingControllerEvaluationRecorder.recordTime(
                     COMMON_SECTION,
                     "構文解析時間",
-                    now - compileOnlyStart);
+                    elapsedMillis(compileOnlyStart));
         }
         if (continueCompilationStart >= 0 && !continueCompilationRecorded) {
             UpdatingControllerEvaluationRecorder.recordTime(
                     COMMON_SECTION,
                     "合成問題準備時間",
-                    now - continueCompilationStart);
+                    elapsedMillis(continueCompilationStart));
         }
+    }
+
+    private static long elapsedMillis(long startNanos) {
+        return Math.max(0L, (System.nanoTime() - startNanos) / 1_000_000L);
     }
 
     private static long countStatesWithOutgoingAction(CompactState machine, String actionName) {

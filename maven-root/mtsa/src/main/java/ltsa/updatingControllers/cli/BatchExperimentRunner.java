@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import ltsa.updatingControllers.checks.TraceLanguageChecker;
@@ -38,6 +39,11 @@ public final class BatchExperimentRunner {
     private static final String STATUS_NO_COMPOSITION = "NO_COMPOSITION";
     private static final String STATUS_NO_TRANSITION_OUTPUT = "NO_TRANSITION_OUTPUT";
     private static final String STATUS_MEASUREMENT_FAILED = "MEASUREMENT_FAILED";
+    private static final String STATUS_METHOD_MISMATCH = "METHOD_MISMATCH";
+    private static final String STATUS_ARTIFACT_VALIDATION_FAILED =
+            "ARTIFACT_VALIDATION_FAILED";
+    private static final String MEMORY_QUALITY_POLICY =
+            "2026-08-06-rss-primary-v1";
     private static final String MEMORY_SAMPLING_ENABLED_PROPERTY =
             "mtsa.evaluation.memorySampling.enabled";
     private static final String MEMORY_SAMPLING_INTERVAL_PROPERTY =
@@ -66,8 +72,13 @@ public final class BatchExperimentRunner {
         ExperimentConfig config = null;
         boolean dryRun = false;
         int failures = 0;
+        int exitCode = 1;
         String batchStartedAt = now();
         long batchStartedMillis = System.currentTimeMillis();
+        String runnerError = null;
+        ExperimentCampaignProvenance.Snapshot provenance = null;
+        List<CompletedCase> allCompletedCases = new ArrayList<CompletedCase>();
+        List<String> campaignValidationErrors = new ArrayList<String>();
         try {
             Map<String, String> options = parseArgs(args);
             if (options.containsKey("help")) {
@@ -82,6 +93,42 @@ public final class BatchExperimentRunner {
             applyBooleanOverride(options, "trace-check", config, "traceCheck");
 
             boolean useRunDirectories = config.runsSpecified;
+            List<File> plannedRunOutputDirectories = new ArrayList<File>();
+            List<File> plannedArtifacts = new ArrayList<File>();
+            for (int runIndex = 1; runIndex <= config.runs; runIndex++) {
+                String runLabel = useRunDirectories ? runLabel(runIndex, config.runs) : null;
+                File runOutputDir = outputDirForRun(config.outputDir, runLabel);
+                plannedRunOutputDirectories.add(runOutputDir);
+                for (ExperimentCase experimentCase
+                        : ExperimentCampaignProvenance.orderedCasesForRun(config, runIndex)) {
+                    CasePaths planned = CasePaths.create(
+                            runOutputDir,
+                            experimentCase,
+                            config.requirementsCheck,
+                            runIndex,
+                            config.runs,
+                            runLabel);
+                    plannedArtifacts.addAll(planned.artifactFiles());
+                }
+            }
+            ExperimentCampaignProvenance.requireFreshOutputs(
+                    config,
+                    plannedRunOutputDirectories,
+                    plannedArtifacts);
+            if (!dryRun) {
+                provenance = ExperimentCampaignProvenance.capture(config);
+                writeCampaignManifest(
+                        config,
+                        provenance,
+                        "RUNNING",
+                        batchStartedAt,
+                        null,
+                        0,
+                        allCompletedCases,
+                        campaignValidationErrors,
+                        null);
+            }
+
             for (int runIndex = 1; runIndex <= config.runs; runIndex++) {
                 String runLabel = useRunDirectories ? runLabel(runIndex, config.runs) : null;
                 File runOutputDir = outputDirForRun(config.outputDir, runLabel);
@@ -90,7 +137,8 @@ public final class BatchExperimentRunner {
                     System.out.println("=== " + runLabel + " / " + config.runs + " ===");
                 }
 
-                for (ExperimentCase experimentCase : config.cases) {
+                for (ExperimentCase experimentCase
+                        : ExperimentCampaignProvenance.orderedCasesForRun(config, runIndex)) {
                     for (String warning : experimentCase.validationWarnings()) {
                         System.err.println("[WARN] " + experimentCase.id + ": " + warning);
                     }
@@ -112,7 +160,9 @@ public final class BatchExperimentRunner {
 
                     CaseResult result = runCase(config, experimentCase, paths);
                     writeMetaJson(config, experimentCase, paths, result);
-                    completedCases.add(new CompletedCase(experimentCase, paths, result));
+                    CompletedCase completed = new CompletedCase(experimentCase, paths, result);
+                    completedCases.add(completed);
+                    allCompletedCases.add(completed);
                     System.out.println("[" + result.status + "] "
                             + (runLabel == null ? "" : runLabel + " ")
                             + experimentCase.id);
@@ -125,7 +175,18 @@ public final class BatchExperimentRunner {
                 }
             }
 
-            int exitCode = failures == 0 ? 0 : 1;
+            if (!dryRun) {
+                campaignValidationErrors.addAll(validateCampaignArtifacts(
+                        config,
+                        allCompletedCases));
+                if (!campaignValidationErrors.isEmpty()) {
+                    failures += campaignValidationErrors.size();
+                    for (String error : campaignValidationErrors) {
+                        System.err.println("[CAMPAIGN-VALIDATION] " + error);
+                    }
+                }
+            }
+            exitCode = failures == 0 ? 0 : 1;
             if (!dryRun) {
                 notifyBatchCompletion(
                         config,
@@ -136,10 +197,10 @@ public final class BatchExperimentRunner {
                         System.currentTimeMillis() - batchStartedMillis,
                         null);
             }
-            return exitCode;
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             printUsage(System.err);
+            runnerError = e.toString();
             if (config != null && !dryRun) {
                 notifyBatchCompletion(
                         config,
@@ -150,9 +211,10 @@ public final class BatchExperimentRunner {
                         System.currentTimeMillis() - batchStartedMillis,
                         e.toString());
             }
-            return 64;
+            exitCode = 64;
         } catch (Throwable e) {
             e.printStackTrace(System.err);
+            runnerError = e.toString();
             if (config != null && !dryRun) {
                 notifyBatchCompletion(
                         config,
@@ -163,8 +225,30 @@ public final class BatchExperimentRunner {
                         System.currentTimeMillis() - batchStartedMillis,
                         e.toString());
             }
-            return 1;
+            exitCode = 1;
+        } finally {
+            if (config != null && provenance != null && !dryRun) {
+                try {
+                    writeCampaignManifest(
+                            config,
+                            provenance,
+                            exitCode == 0 ? "COMPLETE" : "FAILED",
+                            batchStartedAt,
+                            now(),
+                            failures,
+                            allCompletedCases,
+                            campaignValidationErrors,
+                            runnerError);
+                } catch (IOException e) {
+                    System.err.println("[CAMPAIGN-VALIDATION] Failed to finalize campaign manifest: "
+                            + e);
+                    if (exitCode == 0) {
+                        exitCode = 1;
+                    }
+                }
+            }
         }
+        return exitCode;
     }
 
     private static CaseResult runCase(
@@ -275,6 +359,7 @@ public final class BatchExperimentRunner {
 
             if (!finished) {
                 result.timedOut = true;
+                result.timeoutObservedAtEpochMillis = System.currentTimeMillis();
                 result.status = STATUS_TIMEOUT;
                 process.destroy();
                 if (!process.waitFor(
@@ -376,10 +461,149 @@ public final class BatchExperimentRunner {
                 }
             }
             result.endedAt = now();
+            if (result.timedOut) {
+                result.timeoutPhase = determineTimeoutPhase(paths, result);
+            }
+            if (STATUS_SUCCESS.equals(result.status)) {
+                List<String> artifactErrors = validateCaseArtifactsBeforeFinalize(
+                        experimentCase,
+                        paths);
+                if (!artifactErrors.isEmpty()) {
+                    result.status = STATUS_ARTIFACT_VALIDATION_FAILED;
+                    result.errorMessage = appendError(
+                            result.errorMessage,
+                            "Case artifact validation failed: " + artifactErrors);
+                }
+            }
             appendProcessMemoryMetrics(config, paths, experimentCase, result);
         }
 
         return result;
+    }
+
+    private static List<String> validateCaseArtifactsBeforeFinalize(
+            ExperimentCase experimentCase,
+            CasePaths paths) {
+        List<String> errors = new ArrayList<String>();
+        requireNonEmptyFile(errors, "", paths.outputFile);
+        requireNonEmptyFile(errors, "", paths.transitionsFile);
+        requireNonEmptyFile(errors, "", paths.minimizedTransitionsFile);
+        requireNonEmptyFile(errors, "", paths.minimizedCountsFile);
+        requireNonEmptyFile(errors, "", paths.evaluationCsvFile);
+        requireNonEmptyFile(errors, "", paths.executionMetadataFile);
+        if (paths.requirementsCheckEnabled) {
+            requireNonEmptyFile(errors, "", paths.requirementsCheckFile);
+        }
+        Map<String, String> metrics = readEvaluationCsvValues(paths.evaluationCsvFile);
+        requireKey(errors, "", metrics, "mode");
+        requireKey(errors, "", metrics, "result");
+        requireKey(errors, "", metrics, "failure_reason");
+        String normalizedMethod = safeLower(experimentCase.method);
+        String expectedMode = null;
+        if (normalizedMethod.contains("traditional")) {
+            expectedMode = "Traditional DUC";
+        } else if (normalizedMethod.contains("stepwise")) {
+            expectedMode = "Stepwise Delayed DUC";
+        }
+        if (expectedMode != null && !expectedMode.equals(metrics.get("mode"))) {
+            errors.add("mode=" + metrics.get("mode") + ", expected=" + expectedMode);
+        }
+        requireMetrics(errors, "", metrics,
+                "peak_state_space_states",
+                "peak_state_space_transitions",
+                "peak_state_space_states_stage",
+                "peak_state_space_states_stage_transitions",
+                "peak_state_space_transitions_stage",
+                "peak_state_space_transitions_stage_states",
+                "synthesis_problem_preparation_time",
+                "update_controller_generation_time",
+                "controller_synthesis_related_time",
+                "comparison_primary_controller_synthesis_time",
+                "controller_synthesis_gc_measurement_available",
+                "output_update_controller_states",
+                "output_update_controller_transitions",
+                "minimized_output_update_controller_states",
+                "minimized_output_update_controller_transitions");
+        if (normalizedMethod.contains("traditional")) {
+            requireMetrics(errors, "", metrics,
+                    "traditional_gr1_solving_time",
+                    "traditional_mapping_environment_states",
+                    "traditional_mapping_environment_transitions",
+                    "traditional_eu_states",
+                    "traditional_eu_transitions",
+                    "traditional_meta_states",
+                    "traditional_meta_transitions",
+                    "traditional_pruned_states",
+                    "traditional_pruned_transitions",
+                    "traditional_final_states",
+                    "traditional_final_transitions",
+                    "traditional_final_gr_input_states",
+                    "traditional_final_gr_input_transitions");
+        } else if (normalizedMethod.contains("stepwise")) {
+            requireMetrics(errors, "", metrics,
+                    "stepwise_delayed_gr1_solving_time",
+                    "stepwise_delayed_stage_count",
+                    "stepwise_delayed_goal_count",
+                    "stepwise_delayed_local_goal_count",
+                    "stepwise_delayed_cross_goal_count",
+                    "stepwise_delayed_cross_component_count",
+                    "stepwise_delayed_deferred_sbp_call_count",
+                    "stepwise_delayed_deferred_sbp_before_states_sum",
+                    "stepwise_delayed_deferred_sbp_before_transitions_sum",
+                    "stepwise_delayed_deferred_sbp_after_states_sum",
+                    "stepwise_delayed_deferred_sbp_after_transitions_sum",
+                    "stepwise_delayed_deferred_sbp_removed_states_sum",
+                    "stepwise_delayed_deferred_sbp_removed_transitions_sum",
+                    "stepwise_delayed_deferred_sbp_elapsed_time",
+                    "stepwise_delayed_final_states",
+                    "stepwise_delayed_final_transitions",
+                    "stepwise_delayed_final_gr_input_states",
+                    "stepwise_delayed_final_gr_input_transitions",
+                    "stepwise_delayed_intermediate_after_final_sbp_states",
+                    "stepwise_delayed_intermediate_after_final_sbp_transitions");
+            requireMetricPrefix(
+                    errors,
+                    "",
+                    metrics,
+                    "stepwise_delayed_scope_requirements_",
+                    "_goal");
+            requirePositiveMetric(
+                    errors,
+                    metrics,
+                    "stepwise_delayed_deferred_sbp_call_count");
+            requireDeferredSbpMetricGroup(errors, "", metrics);
+        }
+        if ("true".equalsIgnoreCase(metrics.get(
+                "controller_synthesis_gc_measurement_available"))) {
+            requireMetrics(errors, "", metrics,
+                    "controller_synthesis_gc_collection_count",
+                    "controller_synthesis_gc_collection_time",
+                    "controller_synthesis_gc_collector_count");
+        }
+        validateEvaluationCsvSchemaAndKeys(errors, "", paths.evaluationCsvFile);
+        if (!fileContains(paths.executionMetadataFile, "\"matches\": true")) {
+            errors.add("method/target execution validation did not pass");
+        }
+        return errors;
+    }
+
+    private static String determineTimeoutPhase(CasePaths paths, CaseResult result) {
+        MemoryWindowHandshakeCoordinator.Result protocol = result.memoryProtocolResult;
+        if (protocol != null && protocol.getEndMarkerCount() > 0) {
+            return "POST_SYNTHESIS_EVALUATION_OR_ARTIFACT_GENERATION";
+        }
+        Map<String, String> metrics = readEvaluationCsvValues(paths.evaluationCsvFile);
+        if (metrics.containsKey("controller_synthesis_related_time")
+                || metrics.containsKey("update_controller_generation_time")) {
+            return "POST_SYNTHESIS_EVALUATION_OR_ARTIFACT_GENERATION";
+        }
+        if (protocol != null && protocol.getStartMarkerCount() > 0) {
+            return "SYNTHESIS_OR_PROBLEM_PREPARATION";
+        }
+        if (paths.executionMetadataFile.isFile()) {
+            return "SYNTHESIS_BEFORE_COMPLETION_MARKER";
+        }
+        return "JVM_STARTUP_OR_COMPILATION";
     }
 
     private static boolean terminateIfAlive(Process process) {
@@ -459,6 +683,7 @@ public final class BatchExperimentRunner {
         boolean completeSynthesisRssWindow = rss != null
                 && rss.isSynthesisWindowAvailable()
                 && rss.isSynthesisWindowCompleted()
+                && rss.getSynthesisWindowStartRssBytes() > 0L
                 && boundarySamplesComplete;
         boolean heapMeasurementComplete = !result.heapSamplingEnabled
                 || Boolean.parseBoolean(existingMetrics.get(
@@ -474,6 +699,36 @@ public final class BatchExperimentRunner {
                     "Required memory measurement incomplete"
                             + " (heap=" + heapMeasurementComplete
                             + ", rss=" + rssMeasurementComplete + ")");
+        }
+        List<String> memoryQualityErrors = memoryQualityErrors(
+                config,
+                result,
+                existingMetrics,
+                completeSynthesisRssWindow);
+        Long rssGapLimit = config.effectiveMaxRssSamplingGapMillis();
+        Long heapGapLimit = config.effectiveMaxHeapSamplingGapMillis();
+        Long heapGapWarningReference =
+                config.heapSamplingGapWarningReferenceMillis();
+        Long observedHeapGap = parseLong(existingMetrics.get(
+                "heap_memory_sampling_max_gap_ms"));
+        boolean heapGapWarning = result.heapSamplingEnabled
+                && observedHeapGap != null
+                && heapGapWarningReference != null
+                && observedHeapGap.longValue()
+                        > heapGapWarningReference.longValue();
+        if (heapGapWarning) {
+            System.err.println("[WARN] Heap sampling maximum gap "
+                    + observedHeapGap + " ms exceeds diagnostic reference "
+                    + heapGapWarningReference + " ms; case status is governed "
+                    + "by RSS gap quality unless a heap gap hard limit is effective.");
+        }
+        if (config.validateMemoryQuality
+                && STATUS_SUCCESS.equals(result.status)
+                && !memoryQualityErrors.isEmpty()) {
+            result.status = STATUS_MEASUREMENT_FAILED;
+            result.errorMessage = appendError(
+                    result.errorMessage,
+                    "Memory quality validation failed: " + memoryQualityErrors);
         }
         String childRecordedResult = existingMetrics.get("result");
         if (UpdatingControllerEvaluationRecorder.PARENT_FINALIZATION_PENDING
@@ -508,6 +763,83 @@ public final class BatchExperimentRunner {
                         "有効化された主メモリ指標が完結",
                         Boolean.toString(requiredMemoryDataComplete),
                         "boolean"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "batch_memory_quality_policy",
+                        section,
+                        "batch memory quality policy",
+                        MEMORY_QUALITY_POLICY,
+                        "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "batch_memory_quality_validation_enabled",
+                        section,
+                        "batch memory quality validation enabled",
+                        Boolean.toString(config.validateMemoryQuality),
+                        "boolean"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric(
+                        "batch_memory_quality_validation_passed",
+                        section,
+                        "batch memory quality validation passed",
+                        Boolean.toString(memoryQualityErrors.isEmpty()),
+                        "boolean"));
+        if (config.maxMemorySamplingGapMillis != null) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_memory_sampling_max_gap_limit_ms",
+                            section,
+                            "legacy joint heap and RSS maximum gap limit",
+                            Long.toString(config.maxMemorySamplingGapMillis.longValue()),
+                            "ms"));
+        }
+        if (rssGapLimit != null) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_rss_sampling_max_gap_limit_ms",
+                            section,
+                            "batch RSS sample maximum gap limit",
+                            Long.toString(rssGapLimit.longValue()),
+                            "ms"));
+        }
+        if (heapGapLimit != null) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_heap_sampling_max_gap_limit_ms",
+                            section,
+                            "batch heap sample maximum gap hard limit",
+                            Long.toString(heapGapLimit.longValue()),
+                            "ms"));
+        }
+        if (result.heapSamplingEnabled && heapGapWarningReference != null) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_heap_sampling_gap_warning_reference_ms",
+                            section,
+                            "batch heap sample gap warning reference",
+                            Long.toString(heapGapWarningReference.longValue()),
+                            "ms"));
+        }
+        if (result.heapSamplingEnabled
+                && observedHeapGap != null
+                && heapGapWarningReference != null) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_heap_sampling_gap_warning",
+                            section,
+                            "heap sample gap exceeded warning reference",
+                            Boolean.toString(heapGapWarning),
+                            "boolean"));
+        }
+        if (!memoryQualityErrors.isEmpty()) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_memory_quality_validation_errors",
+                            section,
+                            "batch memory quality validation errors",
+                            memoryQualityErrors.toString(),
+                            "text"));
+        }
         if (childRecordedResult != null
                 && !childRecordedResult.equals(result.status)) {
             addExternalMetricIfAbsent(metrics, existingMetrics,
@@ -546,6 +878,23 @@ public final class BatchExperimentRunner {
         addExternalMetricIfAbsent(metrics, existingMetrics,
                 externalMetric("batch_target", "Run", "batch target",
                         experimentCase.target, "text"));
+        addExternalMetricIfAbsent(metrics, existingMetrics,
+                externalMetric("batch_timeout_limit_ms", "Run", "batch timeout limit",
+                        Long.toString(experimentCase.timeoutMillisOrDefault(config.timeoutMillis)),
+                        "ms"));
+        if (result.timedOut) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric("batch_timeout_phase", "Run", "batch timeout phase",
+                            result.timeoutPhase == null ? "UNKNOWN" : result.timeoutPhase,
+                            "text"));
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric(
+                            "batch_timeout_observed_at_epoch_ms",
+                            "Run",
+                            "batch timeout observed epoch",
+                            Long.toString(result.timeoutObservedAtEpochMillis),
+                            "epoch_ms"));
+        }
         addExternalMetricIfAbsent(metrics, existingMetrics,
                 externalMetric("batch_lts_file", "Run", "batch LTS file",
                         experimentCase.lts.getPath(), "path"));
@@ -802,6 +1151,15 @@ public final class BatchExperimentRunner {
             metrics.add(externalMetric("process_rss_synthesis_window_provider_failure_count", section,
                     "合成区間RSS provider例外数",
                     Long.toString(rss.getSynthesisWindowProviderFailureCount()), "samples"));
+            metrics.add(externalMetric("process_rss_synthesis_window_provider_timeout_count", section,
+                    "合成区間RSS provider timeout数",
+                    Long.toString(rss.getSynthesisWindowProviderTimeoutCount()), "samples"));
+            metrics.add(externalMetric("process_rss_synthesis_window_provider_circuit_open", section,
+                    "合成区間内RSS provider circuit breaker作動",
+                    Boolean.toString(rss.isSynthesisWindowProviderCircuitOpened()), "boolean"));
+            metrics.add(externalMetric("process_rss_synthesis_window_max_gap_ms", section,
+                    "合成区間RSS sample開始間隔の最大値",
+                    Long.toString(rss.getSynthesisWindowMaxSampleGapMillis()), "ms"));
             metrics.add(externalMetric(
                     "process_rss_synthesis_window_sampling_wait_wall_time_ns",
                     section,
@@ -851,6 +1209,16 @@ public final class BatchExperimentRunner {
                         Long.toString(rss.getLifetimePeakAtElapsedMillis()),
                         "ms"));
             }
+            if (rss.isSynthesisWindowStartBoundarySampleSucceeded()
+                    && rss.getSynthesisWindowStartRssBytes() > 0L) {
+                metrics.add(externalMetric(
+                        "controller_synthesis_sampled_base_process_rss",
+                        section,
+                        "合成開始時process RSS",
+                        Long.toString(rss.getSynthesisWindowStartRssBytes()),
+                        "B",
+                        "合成開始境界で同期取得した子JVMのprocess RSS。"));
+            }
             if (completeSynthesisRssWindow) {
                 metrics.add(externalMetric(
                         "controller_synthesis_sampled_peak_process_rss",
@@ -871,6 +1239,15 @@ public final class BatchExperimentRunner {
                         "合成区間開始からsampled peak RSSまでの時間",
                         Long.toString(rss.getSynthesisWindowPeakAtElapsedMillis()),
                         "ms"));
+                metrics.add(externalMetric(
+                        "controller_synthesis_sampled_process_rss_increase",
+                        section,
+                        "合成開始時からpeakまでのprocess RSS増加量",
+                        Long.toString(
+                                rss.getSynthesisWindowPeakIncreaseRssBytes()),
+                        "B",
+                        "max(0, 合成区間sampled peak process RSS"
+                                + " - 合成開始境界process RSS)。"));
             } else if (rss.isSynthesisWindowAvailable()) {
                 metrics.add(externalMetric(
                         "controller_synthesis_partial_sampled_peak_process_rss",
@@ -965,6 +1342,153 @@ public final class BatchExperimentRunner {
         System.err.println("[WARN] Memory metric CSV finalize failed: " + failure);
     }
 
+    private static List<String> memoryQualityErrors(
+            ExperimentConfig config,
+            CaseResult result,
+            Map<String, String> childMetrics,
+            boolean completeSynthesisRssWindow) {
+        List<String> errors = new ArrayList<String>();
+        if (!config.validateMemoryQuality) {
+            return errors;
+        }
+        if (result.heapSamplingEnabled) {
+            requireBooleanMetric(
+                    errors,
+                    childMetrics,
+                    "heap_memory_sampling_available",
+                    true);
+            requirePositiveMetric(
+                    errors,
+                    childMetrics,
+                    "controller_synthesis_sampled_peak_heap_used");
+            requirePositiveMetric(
+                    errors,
+                    childMetrics,
+                    "heap_memory_sampling_sample_count");
+            requireZeroMetric(
+                    errors,
+                    childMetrics,
+                    "heap_memory_sampling_failure_count");
+            Long heapGapLimit = config.effectiveMaxHeapSamplingGapMillis();
+            if (heapGapLimit != null) {
+                requireAtMostMetric(
+                        errors,
+                        childMetrics,
+                        "heap_memory_sampling_max_gap_ms",
+                        heapGapLimit.longValue());
+            }
+        }
+        if (result.rssSamplingEnabled) {
+            if (!completeSynthesisRssWindow) {
+                errors.add("process_rss_synthesis_window_complete_and_valid=false");
+            }
+            ProcessRssSampler.Result rss = result.rssResult;
+            if (rss == null) {
+                errors.add("process_rss_result=missing");
+            } else {
+                if (rss.getSynthesisWindowStartRssBytes() <= 0L) {
+                    errors.add("controller_synthesis_sampled_base_process_rss<=0");
+                }
+                if (rss.getSynthesisWindowPeakRssBytes() <= 0L) {
+                    errors.add("controller_synthesis_sampled_peak_process_rss<=0");
+                }
+                if (rss.getSynthesisWindowPeakRssBytes()
+                        < rss.getSynthesisWindowStartRssBytes()) {
+                    errors.add("controller_synthesis_sampled_peak_process_rss"
+                            + "<controller_synthesis_sampled_base_process_rss");
+                }
+                if (completeSynthesisRssWindow
+                        && rss.getSynthesisWindowPeakIncreaseRssBytes() < 0L) {
+                    errors.add("controller_synthesis_sampled_process_rss_increase<0");
+                }
+                if (rss.getSynthesisWindowSampleCount() <= 0L) {
+                    errors.add("process_rss_synthesis_window_sample_count<=0");
+                }
+                if (rss.getSynthesisWindowSampleFailureCount() != 0L) {
+                    errors.add("process_rss_synthesis_window_failure_count="
+                            + rss.getSynthesisWindowSampleFailureCount());
+                }
+                if (rss.getSynthesisWindowProviderFailureCount() != 0L) {
+                    errors.add("process_rss_synthesis_window_provider_failure_count="
+                            + rss.getSynthesisWindowProviderFailureCount());
+                }
+                if (rss.getSynthesisWindowProviderTimeoutCount() != 0L) {
+                    errors.add("process_rss_synthesis_window_provider_timeout_count="
+                            + rss.getSynthesisWindowProviderTimeoutCount());
+                }
+                if (rss.isSynthesisWindowProviderCircuitOpened()) {
+                    errors.add("process_rss_synthesis_window_provider_circuit_open=true");
+                }
+                if (rss.isProviderDisabledByCircuitBreaker()) {
+                    errors.add("process_rss_provider_disabled_by_circuit_breaker=true");
+                }
+                Long rssGapLimit = config.effectiveMaxRssSamplingGapMillis();
+                if (rssGapLimit != null
+                        && rss.getSynthesisWindowMaxSampleGapMillis()
+                                > rssGapLimit.longValue()) {
+                    errors.add("process_rss_synthesis_window_max_gap_ms="
+                            + rss.getSynthesisWindowMaxSampleGapMillis()
+                            + ">" + rssGapLimit);
+                }
+            }
+        }
+        return errors;
+    }
+
+    private static void requireBooleanMetric(
+            List<String> errors,
+            Map<String, String> metrics,
+            String key,
+            boolean expected) {
+        String value = metrics.get(key);
+        if (value == null || Boolean.parseBoolean(value) != expected) {
+            errors.add(key + "=" + (value == null ? "missing" : value));
+        }
+    }
+
+    private static void requirePositiveMetric(
+            List<String> errors,
+            Map<String, String> metrics,
+            String key) {
+        Long value = parseLong(metrics.get(key));
+        if (value == null || value.longValue() <= 0L) {
+            errors.add(key + "=" + (value == null ? "missing" : value));
+        }
+    }
+
+    private static void requireZeroMetric(
+            List<String> errors,
+            Map<String, String> metrics,
+            String key) {
+        Long value = parseLong(metrics.get(key));
+        if (value == null || value.longValue() != 0L) {
+            errors.add(key + "=" + (value == null ? "missing" : value));
+        }
+    }
+
+    private static void requireAtMostMetric(
+            List<String> errors,
+            Map<String, String> metrics,
+            String key,
+            long maximum) {
+        Long value = parseLong(metrics.get(key));
+        if (value == null || value.longValue() > maximum) {
+            errors.add(key + "=" + (value == null ? "missing" : value)
+                    + ">" + maximum);
+        }
+    }
+
+    private static Long parseLong(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private static ExternalDataMetric externalMetric(
             String key,
             String section,
@@ -1017,7 +1541,8 @@ public final class BatchExperimentRunner {
             return result.errorMessage;
         }
         if (result.timedOut) {
-            return "Batch timeout";
+            return "Batch timeout"
+                    + (result.timeoutPhase == null ? "" : " (phase=" + result.timeoutPhase + ")");
         }
         String childFailureReason = existingMetrics == null
                 ? null
@@ -1083,6 +1608,12 @@ public final class BatchExperimentRunner {
         command.add(experimentCase.lts.getPath());
         command.add("--target");
         command.add(experimentCase.target);
+        if (config.validateMethodTarget) {
+            command.add("--expected-method");
+            command.add(experimentCase.method);
+        }
+        command.add("--execution-metadata");
+        command.add(paths.executionMetadataFile.getPath());
         command.add("--output");
         command.add(paths.outputFile.getPath());
         command.add("--transitions");
@@ -1208,6 +1739,7 @@ public final class BatchExperimentRunner {
             if (paths.transitionsFile.exists()
                     && paths.minimizedTransitionsFile.exists()
                     && paths.minimizedCountsFile.exists()
+                    && paths.executionMetadataFile.exists()
                     && (!paths.requirementsCheckEnabled || paths.requirementsCheckFile.exists())) {
                 return STATUS_SUCCESS;
             }
@@ -1221,6 +1753,9 @@ public final class BatchExperimentRunner {
         }
         if (exitCode == SingleCompositionRunner.EXIT_OUT_OF_MEMORY) {
             return STATUS_OUT_OF_MEMORY;
+        }
+        if (exitCode == SingleCompositionRunner.EXIT_METHOD_MISMATCH) {
+            return STATUS_METHOD_MISMATCH;
         }
         if (stderrIndicatesOutOfMemory(paths.stderrFile)) {
             return STATUS_OUT_OF_MEMORY;
@@ -1272,6 +1807,7 @@ public final class BatchExperimentRunner {
         values.put("requirementsCheck",
                 paths.requirementsCheckFile == null ? null : paths.requirementsCheckFile.getPath());
         values.put("evaluationCsv", paths.evaluationCsvFile.getPath());
+        values.put("executionMetadata", paths.executionMetadataFile.getPath());
         values.put("memoryMetricSchemaVersion",
                 UpdatingControllerEvaluationRecorder.getMetricSchemaVersion());
         values.put("memoryMetricsWriteAttempted",
@@ -1290,8 +1826,14 @@ public final class BatchExperimentRunner {
                 "controller_synthesis_sampled_heap_increase",
                 "controllerSynthesisSampledHeapIncreaseBytes");
         putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_sampled_base_process_rss",
+                "controllerSynthesisSampledBaseProcessRssBytes");
+        putMetricIfPresent(values, evaluationMetrics,
                 "controller_synthesis_sampled_peak_process_rss",
                 "controllerSynthesisSampledPeakProcessRssBytes");
+        putMetricIfPresent(values, evaluationMetrics,
+                "controller_synthesis_sampled_process_rss_increase",
+                "controllerSynthesisSampledProcessRssIncreaseBytes");
         putMetricIfPresent(values, evaluationMetrics,
                 "controller_synthesis_partial_sampled_peak_process_rss",
                 "controllerSynthesisPartialSampledPeakProcessRssBytes");
@@ -1417,6 +1959,12 @@ public final class BatchExperimentRunner {
                     Long.valueOf(result.rssResult.getProviderTimeoutCount()));
             values.put("rssSamplingMaxGapMillis",
                     Long.valueOf(result.rssResult.getMaxSampleGapMillis()));
+            values.put("rssSynthesisWindowProviderTimeoutCount",
+                    Long.valueOf(result.rssResult.getSynthesisWindowProviderTimeoutCount()));
+            values.put("rssSynthesisWindowProviderCircuitOpen",
+                    Boolean.valueOf(result.rssResult.isSynthesisWindowProviderCircuitOpened()));
+            values.put("rssSynthesisWindowMaxGapMillis",
+                    Long.valueOf(result.rssResult.getSynthesisWindowMaxSampleGapMillis()));
             values.put("rssSamplingTotalWallTimeNanos",
                     Long.valueOf(result.rssResult.getTotalSamplingWallTimeNanos()));
             values.put("rssSamplerThreadCpuTimeNanos",
@@ -1494,6 +2042,11 @@ public final class BatchExperimentRunner {
         values.put("timeoutMillis", Long.valueOf(experimentCase.timeoutMillisOrDefault(config.timeoutMillis)));
         values.put("exitCode", result.exitCode);
         values.put("timedOut", Boolean.valueOf(result.timedOut));
+        values.put("timeoutPhase", result.timeoutPhase);
+        values.put("timeoutObservedAtEpochMillis",
+                result.timeoutObservedAtEpochMillis < 0L
+                        ? null
+                        : Long.valueOf(result.timeoutObservedAtEpochMillis));
         values.put("javaOptions", config.javaOptions);
         values.put("command", result.command);
         if (result.errorMessage != null) {
@@ -1501,7 +2054,404 @@ public final class BatchExperimentRunner {
         }
 
         CliFileLTSOutput.ensureParentDirectory(paths.metaFile);
-        Files.write(paths.metaFile.toPath(), toJson(values).getBytes(StandardCharsets.UTF_8));
+        ExperimentCampaignProvenance.writeUtf8Atomically(paths.metaFile, toJson(values));
+    }
+
+    private static List<String> validateCampaignArtifacts(
+            ExperimentConfig config,
+            List<CompletedCase> completedCases) {
+        List<String> errors = new ArrayList<String>();
+        int expectedCount = config.runs * config.cases.size();
+        if (completedCases.size() != expectedCount) {
+            errors.add("completed case count=" + completedCases.size()
+                    + ", expected=" + expectedCount);
+        }
+        for (CompletedCase completed : completedCases) {
+            String prefix = "run=" + completed.paths.runIndex
+                    + ", case=" + completed.experimentCase.id + ": ";
+            requireNonEmptyFile(errors, prefix, completed.paths.metaFile);
+            requireNonEmptyFile(errors, prefix, completed.paths.evaluationCsvFile);
+            requireExistingFile(errors, prefix, completed.paths.stdoutFile);
+            requireExistingFile(errors, prefix, completed.paths.stderrFile);
+
+            Map<String, String> metrics = readEvaluationCsvValues(
+                    completed.paths.evaluationCsvFile);
+            String batchResult = metrics.get("batch_result");
+            if (!completed.result.status.equals(batchResult)) {
+                errors.add(prefix + "batch_result=" + batchResult
+                        + ", expected=" + completed.result.status);
+            }
+            if (!completed.experimentCase.target.equals(metrics.get("batch_target"))) {
+                errors.add(prefix + "batch_target=" + metrics.get("batch_target")
+                        + ", expected=" + completed.experimentCase.target);
+            }
+            if (!completed.experimentCase.method.equals(metrics.get("batch_method"))) {
+                errors.add(prefix + "batch_method=" + metrics.get("batch_method")
+                        + ", expected=" + completed.experimentCase.method);
+            }
+            if (UpdatingControllerEvaluationRecorder.PARENT_FINALIZATION_PENDING.equals(
+                    metrics.get("result"))) {
+                errors.add(prefix + "evaluation CSV remains PARENT_FINALIZATION_PENDING");
+            }
+            validateEvaluationCsvSchemaAndKeys(
+                    errors,
+                    prefix,
+                    completed.paths.evaluationCsvFile);
+
+            if (STATUS_SUCCESS.equals(completed.result.status)) {
+                requireNonEmptyFile(errors, prefix, completed.paths.outputFile);
+                requireNonEmptyFile(errors, prefix, completed.paths.transitionsFile);
+                requireNonEmptyFile(errors, prefix, completed.paths.minimizedTransitionsFile);
+                requireNonEmptyFile(errors, prefix, completed.paths.minimizedCountsFile);
+                requireNonEmptyFile(errors, prefix, completed.paths.executionMetadataFile);
+                if (completed.paths.requirementsCheckEnabled) {
+                    requireNonEmptyFile(errors, prefix, completed.paths.requirementsCheckFile);
+                }
+                requireMetric(errors, prefix, metrics, "peak_state_space_states");
+                requireMetric(errors, prefix, metrics, "peak_state_space_transitions");
+                requireMetric(errors, prefix, metrics, "controller_synthesis_related_time");
+                if (completed.result.heapSamplingEnabled) {
+                    requireMetrics(errors, prefix, metrics,
+                            "controller_synthesis_sampled_peak_heap_used",
+                            "heap_memory_sampling_available",
+                            "heap_memory_sampling_sample_count",
+                            "heap_memory_sampling_failure_count",
+                            "heap_memory_sampling_max_gap_ms");
+                }
+                if (completed.result.rssSamplingEnabled) {
+                    requireMetrics(errors, prefix, metrics,
+                            "controller_synthesis_sampled_base_process_rss",
+                            "controller_synthesis_sampled_peak_process_rss",
+                            "controller_synthesis_sampled_process_rss_increase",
+                            "memory_protocol_handshake_complete",
+                            "memory_protocol_boundary_samples_complete",
+                            "process_rss_synthesis_window_complete_and_valid",
+                            "process_rss_synthesis_window_sample_count",
+                            "process_rss_synthesis_window_failure_count",
+                            "process_rss_synthesis_window_provider_failure_count",
+                            "process_rss_synthesis_window_provider_timeout_count",
+                            "process_rss_synthesis_window_provider_circuit_open",
+                            "process_rss_synthesis_window_max_gap_ms");
+                }
+                if (config.validateMemoryQuality
+                        && !"true".equalsIgnoreCase(metrics.get(
+                                "batch_memory_quality_validation_passed"))) {
+                    errors.add(prefix + "memory quality validation did not pass");
+                }
+                if (config.validateMemoryQuality) {
+                    requireMetricValue(
+                            errors,
+                            prefix,
+                            metrics,
+                            "batch_memory_quality_policy",
+                            MEMORY_QUALITY_POLICY);
+                    Long rssGapLimit = config.effectiveMaxRssSamplingGapMillis();
+                    if (rssGapLimit != null) {
+                        requireMetricValue(
+                                errors,
+                                prefix,
+                                metrics,
+                                "batch_rss_sampling_max_gap_limit_ms",
+                                Long.toString(rssGapLimit.longValue()));
+                    }
+                    Long heapGapLimit = config.effectiveMaxHeapSamplingGapMillis();
+                    if (heapGapLimit != null) {
+                        requireMetricValue(
+                                errors,
+                                prefix,
+                                metrics,
+                                "batch_heap_sampling_max_gap_limit_ms",
+                                Long.toString(heapGapLimit.longValue()));
+                    }
+                    Long heapWarningReference =
+                            config.heapSamplingGapWarningReferenceMillis();
+                    if (completed.result.heapSamplingEnabled
+                            && heapWarningReference != null) {
+                        requireMetricValue(
+                                errors,
+                                prefix,
+                                metrics,
+                                "batch_heap_sampling_gap_warning_reference_ms",
+                                Long.toString(heapWarningReference.longValue()));
+                        requireMetric(
+                                errors,
+                                prefix,
+                                metrics,
+                                "batch_heap_sampling_gap_warning");
+                    }
+                }
+                if (!fileContains(
+                        completed.paths.executionMetadataFile,
+                        "\"matches\": true")) {
+                    errors.add(prefix + "method/target execution validation did not pass");
+                }
+            }
+            if (!fileContains(
+                    completed.paths.metaFile,
+                    "\"status\": \"" + completed.result.status + "\"")) {
+                errors.add(prefix + "meta status does not match final case status");
+            }
+        }
+        return errors;
+    }
+
+    private static void validateEvaluationCsvSchemaAndKeys(
+            List<String> errors,
+            String prefix,
+            File csvFile) {
+        if (csvFile == null || !csvFile.isFile()) {
+            return;
+        }
+        try {
+            List<List<String>> records = parseCsvRecords(new String(
+                    Files.readAllBytes(csvFile.toPath()),
+                    StandardCharsets.UTF_8));
+            if (records.isEmpty()) {
+                errors.add(prefix + "evaluation CSV has no header");
+                return;
+            }
+            List<String> header = records.get(0);
+            int metricKeyColumn = header.indexOf("metric_key");
+            int schemaColumn = header.indexOf("metric_schema_version");
+            if (metricKeyColumn < 0 || schemaColumn < 0) {
+                errors.add(prefix + "evaluation CSV header is incomplete");
+                return;
+            }
+            Set<String> keys = new java.util.LinkedHashSet<String>();
+            String expectedSchema = UpdatingControllerEvaluationRecorder.getMetricSchemaVersion();
+            for (int i = 1; i < records.size(); i++) {
+                List<String> record = records.get(i);
+                if (record.size() <= Math.max(metricKeyColumn, schemaColumn)) {
+                    errors.add(prefix + "evaluation CSV contains a partial record at row "
+                            + (i + 1));
+                    continue;
+                }
+                String key = record.get(metricKeyColumn);
+                if (!key.isEmpty() && !keys.add(key)) {
+                    errors.add(prefix + "duplicate evaluation metric key: " + key);
+                }
+                if (!expectedSchema.equals(record.get(schemaColumn))) {
+                    errors.add(prefix + "metric schema=" + record.get(schemaColumn)
+                            + ", expected=" + expectedSchema + " at row " + (i + 1));
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            errors.add(prefix + "failed to read evaluation CSV: " + e);
+        }
+    }
+
+    private static void requireMetric(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics,
+            String key) {
+        String value = metrics.get(key);
+        if (value == null || value.trim().isEmpty()) {
+            errors.add(prefix + "missing evaluation metric: " + key);
+        }
+    }
+
+    private static void requireMetricValue(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics,
+            String key,
+            String expected) {
+        String actual = metrics.get(key);
+        if (!expected.equals(actual)) {
+            errors.add(prefix + "evaluation metric " + key + "="
+                    + (actual == null ? "missing" : actual)
+                    + ", expected=" + expected);
+        }
+    }
+
+    private static void requireMetrics(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics,
+            String... keys) {
+        for (String key : keys) {
+            requireMetric(errors, prefix, metrics, key);
+        }
+    }
+
+    private static void requireKey(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics,
+            String key) {
+        if (!metrics.containsKey(key)) {
+            errors.add(prefix + "missing evaluation metric key: " + key);
+        }
+    }
+
+    private static void requireMetricPrefix(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics,
+            String startsWith,
+            String endsWith) {
+        for (String key : metrics.keySet()) {
+            if (key.startsWith(startsWith) && key.endsWith(endsWith)) {
+                return;
+            }
+        }
+        errors.add(prefix + "missing metric matching " + startsWith + "*" + endsWith);
+    }
+
+    private static void requireDeferredSbpMetricGroup(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics) {
+        for (String key : metrics.keySet()) {
+            String suffix = "_before_states";
+            if (!key.startsWith("stepwise_delayed_deferred_sbp_")
+                    || !key.endsWith(suffix)) {
+                continue;
+            }
+            String base = key.substring(0, key.length() - suffix.length());
+            String[] requiredSuffixes = {
+                    "_before_states",
+                    "_before_transitions",
+                    "_after_states",
+                    "_after_transitions",
+                    "_removed_states",
+                    "_removed_transitions",
+                    "_elapsed_time"
+            };
+            boolean complete = true;
+            for (String requiredSuffix : requiredSuffixes) {
+                complete &= metrics.containsKey(base + requiredSuffix);
+            }
+            if (complete) {
+                return;
+            }
+        }
+        errors.add(prefix + "missing complete stepwise_delayed deferred SBP metric group");
+    }
+
+    private static void requireExistingFile(
+            List<String> errors,
+            String prefix,
+            File file) {
+        if (file == null || !file.isFile()) {
+            errors.add(prefix + "missing artifact: " + file);
+        }
+    }
+
+    private static void requireNonEmptyFile(
+            List<String> errors,
+            String prefix,
+            File file) {
+        if (file == null || !file.isFile() || file.length() <= 0L) {
+            errors.add(prefix + "missing or empty artifact: " + file);
+        }
+    }
+
+    private static boolean fileContains(File file, String expected) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        try {
+            return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8)
+                    .contains(expected);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static void writeCampaignManifest(
+            ExperimentConfig config,
+            ExperimentCampaignProvenance.Snapshot provenance,
+            String status,
+            String startedAt,
+            String endedAt,
+            int failureCount,
+            List<CompletedCase> completedCases,
+            List<String> validationErrors,
+            String runnerError) throws IOException {
+        Map<String, Object> values = new LinkedHashMap<String, Object>();
+        values.put("schemaVersion", ExperimentCampaignProvenance.MANIFEST_SCHEMA);
+        values.put("status", status);
+        values.put("startedAt", startedAt);
+        values.put("endedAt", endedAt);
+        values.put("configFile", config.configFile.getCanonicalPath());
+        values.put("configSha256", provenance.originalConfigSha256);
+        values.put("sanitizedConfigSnapshot",
+                provenance.configSnapshotFile.getCanonicalPath());
+        values.put("sanitizedConfigSnapshotSha256", provenance.sanitizedConfigSha256);
+        values.put("inputHashes", provenance.hashFile.getCanonicalPath());
+        values.put("environment", provenance.environmentFile.getCanonicalPath());
+        values.put("effectiveJvmFlags", provenance.effectiveJvmFlagsFile.getCanonicalPath());
+        values.put("launcherArtifact", provenance.launcherArtifact);
+        values.put("launcherArtifactSha256", provenance.launcherArtifactSha256);
+        values.put("gitRepository", provenance.git.repository);
+        values.put("gitCommit", provenance.git.commit);
+        values.put("gitDirty", provenance.git.dirty);
+        values.put("outputDir", config.outputDir.getCanonicalPath());
+        values.put("requireFreshOutputDir", Boolean.valueOf(config.requireFreshOutputDir));
+        values.put("alternateMethodOrderByRun",
+                Boolean.valueOf(config.alternateMethodOrderByRun));
+        values.put("validateMemoryQuality", Boolean.valueOf(config.validateMemoryQuality));
+        values.put("validateMethodTarget", Boolean.valueOf(config.validateMethodTarget));
+        values.put("memoryQualityPolicy", MEMORY_QUALITY_POLICY);
+        values.put("maxMemorySamplingGapMillis", config.maxMemorySamplingGapMillis);
+        values.put("maxRssSamplingGapMillis", config.maxRssSamplingGapMillis);
+        values.put("maxHeapSamplingGapMillis", config.maxHeapSamplingGapMillis);
+        values.put("effectiveMaxRssSamplingGapMillis",
+                config.effectiveMaxRssSamplingGapMillis());
+        values.put("effectiveMaxHeapSamplingGapMillis",
+                config.effectiveMaxHeapSamplingGapMillis());
+        values.put("heapSamplingGapWarningReferenceMillis",
+                config.heapSamplingGapWarningReferenceMillis());
+        values.put("runCount", Integer.valueOf(config.runs));
+        values.put("caseCountPerRun", Integer.valueOf(config.cases.size()));
+        values.put("expectedCaseCount", Integer.valueOf(config.runs * config.cases.size()));
+        values.put("completedCaseCount", Integer.valueOf(completedCases.size()));
+        values.put("failureCount", Integer.valueOf(failureCount));
+        values.put("validationPassed", Boolean.valueOf(validationErrors.isEmpty()));
+        values.put("validationErrors", validationErrors);
+        values.put("runnerError", runnerError);
+
+        List<Map<String, Object>> cases = new ArrayList<Map<String, Object>>();
+        for (CompletedCase completed : completedCases) {
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("runIndex", Integer.valueOf(completed.paths.runIndex));
+            item.put("runLabel", completed.paths.runLabel);
+            item.put("id", completed.experimentCase.id);
+            item.put("example", completed.experimentCase.example);
+            item.put("method", completed.experimentCase.method);
+            item.put("variant", completed.experimentCase.variant);
+            item.put("target", completed.experimentCase.target);
+            item.put("status", completed.result.status);
+            item.put("timeoutPhase", completed.result.timeoutPhase);
+            item.put("exitCode", completed.result.exitCode);
+            item.put("evaluationCsv", artifactSummary(completed.paths.evaluationCsvFile));
+            item.put("meta", artifactSummary(completed.paths.metaFile));
+            item.put("executionMetadata",
+                    artifactSummary(completed.paths.executionMetadataFile));
+            item.put("transitions", artifactSummary(completed.paths.transitionsFile));
+            item.put("minimizedTransitions",
+                    artifactSummary(completed.paths.minimizedTransitionsFile));
+            item.put("minimizedCounts", artifactSummary(completed.paths.minimizedCountsFile));
+            item.put("stdout", artifactSummary(completed.paths.stdoutFile));
+            item.put("stderr", artifactSummary(completed.paths.stderrFile));
+            item.put("effectiveChildCommand", completed.result.command);
+            cases.add(item);
+        }
+        values.put("cases", cases);
+        ExperimentCampaignProvenance.writeUtf8Atomically(
+                provenance.manifestFile,
+                ExperimentCampaignProvenance.toJson(values));
+    }
+
+    private static Map<String, Object> artifactSummary(File file) throws IOException {
+        Map<String, Object> summary = new LinkedHashMap<String, Object>();
+        summary.put("path", file == null ? null : file.getCanonicalPath());
+        summary.put("exists", Boolean.valueOf(file != null && file.isFile()));
+        summary.put("sizeBytes", Long.valueOf(file != null && file.isFile() ? file.length() : 0L));
+        return summary;
     }
 
     private static void notifyBatchCompletion(
@@ -2110,6 +3060,13 @@ public final class BatchExperimentRunner {
         out.println("  timeoutHours: 16");
         out.println("  requirementsCheck: true  # optional; default false");
         out.println("  traceCheck: true         # optional; default false");
+        out.println("  requireFreshOutputDir: true       # fail before any case if outputs exist");
+        out.println("  alternateMethodOrderByRun: true   # odd Stepwise-first, even Traditional-first");
+        out.println("  validateMethodTarget: true        # verify target's actual DUCS mode/SBP flags");
+        out.println("  validateMemoryQuality: true       # fail incomplete/failed primary sampling");
+        out.println("  maxRssSamplingGapMillis: 1000   # optional hard RSS synthesis-window limit");
+        out.println("  maxHeapSamplingGapMillis: 2000 # optional hard heap limit; omit for warning only");
+        out.println("  # maxMemorySamplingGapMillis: 1000 # legacy hard limit for both; do not mix");
         out.println("  notifyOn: always         # optional; always, success, failure, never");
         out.println("  slackWebhookUrl: https://hooks.slack.com/services/...  # optional; keep out of Git");
         out.println("  notifyTimeoutSeconds: 30 # optional; default 30");
@@ -2186,6 +3143,7 @@ public final class BatchExperimentRunner {
         final File requirementsCheckFile;
         final boolean requirementsCheckEnabled;
         final File evaluationCsvFile;
+        final File executionMetadataFile;
         final File stdoutFile;
         final File stderrFile;
         final File metaFile;
@@ -2202,6 +3160,7 @@ public final class BatchExperimentRunner {
                 File requirementsCheckFile,
                 boolean requirementsCheckEnabled,
                 File evaluationCsvFile,
+                File executionMetadataFile,
                 File stdoutFile,
                 File stderrFile,
                 File metaFile,
@@ -2216,6 +3175,7 @@ public final class BatchExperimentRunner {
             this.requirementsCheckFile = requirementsCheckFile;
             this.requirementsCheckEnabled = requirementsCheckEnabled;
             this.evaluationCsvFile = evaluationCsvFile;
+            this.executionMetadataFile = executionMetadataFile;
             this.stdoutFile = stdoutFile;
             this.stderrFile = stderrFile;
             this.metaFile = metaFile;
@@ -2250,12 +3210,30 @@ public final class BatchExperimentRunner {
                             : null,
                     requirementsCheckEnabled,
                     new File(caseDirectory, caseId + "_evaluation_" + target + ".csv"),
+                    new File(caseDirectory, caseId + "_execution_" + target + ".json"),
                     new File(caseDirectory, prefix + "_stdout.txt"),
                     new File(caseDirectory, prefix + "_stderr.txt"),
                     new File(caseDirectory, prefix + "_meta.json"),
                     runIndex,
                     runCount,
                     runLabel);
+        }
+
+        List<File> artifactFiles() {
+            List<File> files = new ArrayList<File>();
+            files.add(outputFile);
+            files.add(transitionsFile);
+            files.add(minimizedTransitionsFile);
+            files.add(minimizedCountsFile);
+            if (requirementsCheckFile != null) {
+                files.add(requirementsCheckFile);
+            }
+            files.add(evaluationCsvFile);
+            files.add(executionMetadataFile);
+            files.add(stdoutFile);
+            files.add(stderrFile);
+            files.add(metaFile);
+            return files;
         }
 
         void ensureDirectories() throws IOException {
@@ -2269,6 +3247,8 @@ public final class BatchExperimentRunner {
         String status = STATUS_EXCEPTION;
         Integer exitCode;
         boolean timedOut;
+        String timeoutPhase;
+        long timeoutObservedAtEpochMillis = -1L;
         String startedAt;
         String endedAt;
         String errorMessage;

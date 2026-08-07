@@ -1,0 +1,11 @@
+Game state size:730
+Winning state size:729
+Exception in thread "MTSA-Run-Heap-Sampler-1" java.lang.OutOfMemoryError: Java heap space
+	at java.management/sun.management.MemoryImpl.getMemoryUsage0(Native Method)
+	at java.management/sun.management.MemoryImpl.getHeapMemoryUsage(MemoryImpl.java:72)
+	at ltsa.updatingControllers.memory.RunHeapMemorySampler$4.getAsLong(RunHeapMemorySampler.java:367)
+	at ltsa.updatingControllers.memory.RunHeapMemorySampler.takeSample(RunHeapMemorySampler.java:250)
+	at ltsa.updatingControllers.memory.RunHeapMemorySampler.runSamplingLoop(RunHeapMemorySampler.java:229)
+	at ltsa.updatingControllers.memory.RunHeapMemorySampler.access$000(RunHeapMemorySampler.java:23)
+	at ltsa.updatingControllers.memory.RunHeapMemorySampler$3.run(RunHeapMemorySampler.java:146)
+	at java.base/java.lang.Thread.run(Thread.java:833)

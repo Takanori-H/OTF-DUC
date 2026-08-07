@@ -16,6 +16,7 @@ maven-root/mtsa/dependency-reduced-pom.xml
 maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_local.yaml
 maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_private.yaml
 maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/local/
+maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/final/*_final_evaluation_windows.yaml
 maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_local.yaml
 maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_private.yaml
 

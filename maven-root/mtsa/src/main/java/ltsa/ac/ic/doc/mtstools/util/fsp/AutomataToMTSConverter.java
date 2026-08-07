@@ -15,49 +15,53 @@ import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 
 
 public class AutomataToMTSConverter {
-	
-	private static AutomataToMTSConverter instance;
-	 
-	private String[] indexToAction;
-	private MTS<Long,String> mts;
-	private TransitionType[] indexToTransitionType;
-	private ModelConverterUtils modelConverterUtils;
+
+	private static final AutomataToMTSConverter INSTANCE =
+			new AutomataToMTSConverter();
 
 	private AutomataToMTSConverter() {
-		modelConverterUtils = new ModelConverterUtils();
 	}
 
 	public static AutomataToMTSConverter getInstance() {
-		if (instance == null) {
-			instance = new AutomataToMTSConverter();
-		}
-		return instance;
+		return INSTANCE;
 	}
 
 	public MTS<Long, String> convert(CompactState automata) {
-		// TODO this isn't converting anything about the probabilistic transitions yet. 
-		this.mts = new MTSImpl<>(modelConverterUtils.rank(automata.START()), automata);
+		// TODO this isn't converting anything about the probabilistic transitions yet.
+		ModelConverterUtils modelConverterUtils = new ModelConverterUtils();
+		MTS<Long, String> mts = new MTSImpl<Long, String>(
+				modelConverterUtils.rank(automata.START()),
+				automata);
+		String[] indexToAction = new String[automata.getTransitionsLabels().length];
+		TransitionType[] indexToTransitionType =
+				new TransitionType[automata.getTransitionsLabels().length];
 
-		indexToAction = new String[automata.getTransitionsLabels().length];
-		indexToTransitionType = new TransitionType[automata.getTransitionsLabels().length];
-		
-		this.addActions(automata);
-		this.addTransitions(automata);
+		this.addActions(automata, mts, indexToAction, indexToTransitionType);
+		this.addTransitions(
+				automata,
+				mts,
+				indexToAction,
+				indexToTransitionType,
+				modelConverterUtils);
 
 		return mts;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param automata
 	 */
-	private void addActions(CompactState automata) {
+	private void addActions(
+			CompactState automata,
+			MTS<Long, String> mts,
+			String[] indexToAction,
+			TransitionType[] indexToTransitionType) {
 		String[] alphabet = automata.getTransitionsLabels();
 		Map<String,Integer> reverseMap = new HashMap<String,Integer>();
 
 		for(int i = 0; i<alphabet.length; i++) {
 			String action = MTSUtils.getAction(alphabet[i]);
-		
+
 			if (reverseMap.containsKey(action)) {
 				indexToAction[i] = indexToAction[reverseMap.get(action)];
 			} else {
@@ -74,9 +78,14 @@ public class AutomataToMTSConverter {
 	}
 
 
-	private void addTransitions(CompactState automata) {
+	private void addTransitions(
+			CompactState automata,
+			MTS<Long, String> mts,
+			String[] indexToAction,
+			TransitionType[] indexToTransitionType,
+			ModelConverterUtils modelConverterUtils) {
 		Queue<Long> toProcess = new LinkedList<Long>();
-		
+
 		toProcess.offer(mts.getInitialState());
 		while(!toProcess.isEmpty()) {
 			Long actualState = toProcess.poll();
@@ -92,7 +101,7 @@ public class AutomataToMTSConverter {
 						indexToAction[transitions.getAction()], //aca podria guardar de donde viene cada action
 						rank,
 						indexToTransitionType[transitions.getAction()]);
-				
+
 				transitions.next();
 			}
 		}

@@ -1,0 +1,52 @@
+# Windows acceptance preflight for the final Stepwise DUCS evaluation JAR.
+#
+# Run this from the StepwiseDUCS distribution root: the directory that
+# directly contains Experiment/. Use the exact same packaged JAR that will be
+# used for the final campaign.
+#
+# This intentionally uses a fresh output directory. If the preflight must be
+# repeated, change outputDir to a new directory instead of reusing old files.
+outputDir: "Experiment/preflight_windows_evaluation_v4_20260804/result"
+runs: 1
+timeoutMinutes: 10
+requireFreshOutputDir: true
+alternateMethodOrderByRun: true
+validateMethodTarget: true
+validateMemoryQuality: true
+maxMemorySamplingGapMillis: 1000
+requirementsCheck: false
+traceCheck: false
+notifyOn: never
+
+javaOptions:
+  - -Djava.awt.headless=true
+  - -Dmtsa.evaluation.enabled=true
+  - -Dupdating.controller.evaluation.profile=paper
+  - -Dmtsa.evaluation.memorySampling.enabled=true
+  - -Dmtsa.evaluation.memorySampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.enabled=true
+  - -Dmtsa.evaluation.rssSampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000
+  - -Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000
+  - -Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false
+  - -Dmtsa.evaluation.phaseMemoryDiagnostics=false
+  - -Dstepwise.delayed.connectedEnvironmentView=true
+  - -XX:+UseG1GC
+  - -XX:+UnlockExperimentalVMOptions
+  - -XX:G1MaxNewSizePercent=20
+  - -Xmx220g
+
+cases:
+  - id: evaluation_v4_preflight_stepwise_delayed_sbp
+    example: EVCharging_WindowsEvaluationV4Preflight
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/EVCharging/EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts"
+    target: Stepwise_UpdCont
+
+  - id: evaluation_v4_preflight_traditional
+    example: EVCharging_WindowsEvaluationV4Preflight
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/EVCharging/EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts"
+    target: UpdCont

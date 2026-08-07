@@ -184,7 +184,7 @@ public class StepwiseUpdatingControllerSynthesizer {
         } else {
             output.outln("[Stepwise DUCS] GR result: winning");
             output.outln("[Stepwise DUCS] output controller states: " + uccs.getComposition().maxStates
-                    + " transitions: " + uccs.getComposition().ntransitions());
+                    + " transitions: " + uccs.getComposition().ntransitionsLong());
         }
     }
 
@@ -301,7 +301,7 @@ public class StepwiseUpdatingControllerSynthesizer {
         relabelOldControllableActions(controller, controllableActions);
         output.outln("  cross old controllable actions: " + controllableActions.size());
         output.outln("  cross old Controller states: " + controller.maxStates
-                + " transitions: " + controller.ntransitions());
+                + " transitions: " + controller.ntransitionsLong());
         return controller;
     }
 
@@ -537,7 +537,7 @@ public class StepwiseUpdatingControllerSynthesizer {
                     + stage.getDisplayIndex() + ".");
         }
         output.outln("  local Controller_i states: " + controllerProblem.getComposition().maxStates
-                + " transitions: " + controllerProblem.getComposition().ntransitions());
+                + " transitions: " + controllerProblem.getComposition().ntransitionsLong());
 
         Vector<CompactState> closedMachines = new Vector<CompactState>();
         closedMachines.add(controllerProblem.getComposition().myclone());
@@ -546,7 +546,7 @@ public class StepwiseUpdatingControllerSynthesizer {
                 new CompositeState("STEPWISE_OLD_CLOSED_STAGE_" + stage.getDisplayIndex(), closedMachines);
         closedLoop.compose(output);
         output.outln("  OldCon_i states: " + closedLoop.getComposition().maxStates
-                + " transitions: " + closedLoop.getComposition().ntransitions());
+                + " transitions: " + closedLoop.getComposition().ntransitionsLong());
         return AutomataToMTSConverter.getInstance().convert(closedLoop.getComposition());
     }
 
@@ -714,13 +714,8 @@ public class StepwiseUpdatingControllerSynthesizer {
                 + " transitions: " + countTransitions(mts));
     }
 
-    private static int countTransitions(MTS<Long, String> mts) {
-        int count = 0;
-        for (Long state : mts.getStates()) {
-            count += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
-            count += mts.getTransitions(state, MTS.TransitionType.MAYBE).size();
-        }
-        return count;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequiredAndMaybe(mts);
     }
 
     private static MTS<Long, String> trimActionsToTransitionLabels(MTS<Long, String> source) {

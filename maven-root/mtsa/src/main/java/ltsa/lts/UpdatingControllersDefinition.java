@@ -122,7 +122,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         if (UpdatingControllerEvaluationRecorder.isEnabled() && oldC != null && oldC.composition != null) {
             long oldCCountStart = System.currentTimeMillis();
             int oldControllerStates = oldC.composition.maxStates;
-            int oldControllerTransitions = oldC.composition.ntransitions();
+            long oldControllerTransitions = oldC.composition.ntransitionsLong();
             long oldCCountTime = System.currentTimeMillis() - oldCCountStart;
             UpdatingControllerEvaluationRecorder.recordOldControllerStateSpace(
                     oldControllerStates,
@@ -466,7 +466,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
             if (UpdatingControllerEvaluationRecorder.isEnabled()) {
                 long newCCountStart = System.currentTimeMillis();
                 int newControllerStates = newC.composition.maxStates;
-                int newControllerTransitions = newC.composition.ntransitions();
+                long newControllerTransitions = newC.composition.ntransitionsLong();
                 long newCCountTime = System.currentTimeMillis() - newCCountStart;
                 UpdatingControllerEvaluationRecorder.recordStateSpace(
                         "入力規模 / 事前合成",
@@ -1217,15 +1217,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                 "Traditional DUC で Mapping Environment Component 群を並列合成した Mapping Environment。旧コントローラとはまだ合成していない。");
     }
 
-    private static int countTransitions(MTS<Long, String> mts) {
-        if (mts == null || mts.getStates() == null) {
-            return 0;
-        }
-        int transitions = 0;
-        for (Long state : mts.getStates()) {
-            transitions += mts.getTransitions(state, MTS.TransitionType.REQUIRED).size();
-        }
-        return transitions;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequired(mts);
     }
 
     private static long compactStateCount(CompactState machine) {
@@ -1236,7 +1229,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         if (machine == null || machine.states == null) {
             return 0;
         }
-        return machine.ntransitions();
+        return machine.ntransitionsLong();
     }
 
     private static String compactStateName(CompactState machine) {

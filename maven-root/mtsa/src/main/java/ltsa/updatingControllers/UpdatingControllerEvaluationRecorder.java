@@ -57,7 +57,7 @@ public final class UpdatingControllerEvaluationRecorder {
             + "metric_schema_version,metric_description_id,"
             + "section_readable_ja,metric_readable_ja,metric_category,artifact,phase,action,event,stat";
     private static final int DATA_CSV_COLUMN_COUNT = 19;
-    private static final String METRIC_SCHEMA_VERSION = "2026-08-01-memory-v2";
+    private static final String METRIC_SCHEMA_VERSION = "2026-08-04-evaluation-v4";
 
     public enum ResultStatus {
         NOT_RECORDED,
@@ -272,7 +272,7 @@ public final class UpdatingControllerEvaluationRecorder {
         if (!isEnabled()) {
             return;
         }
-        activeTimers.put(timerKey(section, label), new ActiveTimer(section, label, System.currentTimeMillis()));
+        activeTimers.put(timerKey(section, label), new ActiveTimer(section, label, System.nanoTime()));
         putOrReplace(section, label, label + " : 計測中");
     }
 
@@ -283,7 +283,7 @@ public final class UpdatingControllerEvaluationRecorder {
         ActiveTimer timer = activeTimers.remove(timerKey(section, label));
         if (timer != null) {
             putOrReplaceTime(timer.section, timer.label,
-                    System.currentTimeMillis() - timer.startMillis,
+                    elapsedMillis(timer.startNanos),
                     "");
         }
     }
@@ -336,6 +336,96 @@ public final class UpdatingControllerEvaluationRecorder {
         String formatted = formatDouble(value);
         add(section, label + " : " + formatted + (unit == null || unit.isEmpty() ? "" : " " + unit));
         recordDataMetric(section, label, formatted, unit == null ? "number" : unit);
+    }
+
+    /**
+     * Records a metric under a caller-supplied stable key.  This is reserved
+     * for repeated/indexed evaluation stages whose labels cannot be covered by
+     * the static known-key table without falling back to hash-derived keys.
+     */
+    public static synchronized void recordStableMetric(
+            String metricKey,
+            String section,
+            String label,
+            String value,
+            String unit,
+            String formula) {
+        if (!isEnabled()) {
+            return;
+        }
+        if (metricKey == null || metricKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("metricKey must not be empty");
+        }
+        String safeSection = section == null ? "" : section;
+        String safeLabel = label == null ? "" : label;
+        String safeValue = value == null ? "" : value;
+        String safeUnit = unit == null ? "text" : unit;
+        add(safeSection, safeLabel + " : " + safeValue
+                + (safeUnit.isEmpty() ? "" : " " + safeUnit));
+        recordDataMetricWithFormula(
+                metricKey.trim(),
+                safeSection,
+                safeLabel,
+                safeValue,
+                safeUnit,
+                formula == null ? "" : formula);
+    }
+
+    /** Adds a non-negative value to a fixed-key diagnostic metric. */
+    public static synchronized void addStableLongMetric(
+            String metricKey,
+            String section,
+            String label,
+            long delta,
+            String unit,
+            String formula) {
+        if (!isEnabled()) {
+            return;
+        }
+        if (metricKey == null || metricKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("metricKey must not be empty");
+        }
+        long safeDelta = Math.max(0L, delta);
+        Long previous = dataMetricLong(metricKey.trim());
+        long safePrevious = previous == null ? 0L : Math.max(0L, previous.longValue());
+        long value = safePrevious > Long.MAX_VALUE - safeDelta
+                ? Long.MAX_VALUE
+                : safePrevious + safeDelta;
+        String safeSection = section == null ? "" : section;
+        String safeLabel = label == null ? "" : label;
+        String safeUnit = unit == null ? "number" : unit;
+        putOrReplace(
+                safeSection,
+                safeLabel,
+                safeLabel + " : " + value + (safeUnit.isEmpty() ? "" : " " + safeUnit));
+        recordDataMetricWithFormula(
+                metricKey.trim(),
+                safeSection,
+                safeLabel,
+                Long.toString(value),
+                safeUnit,
+                formula == null ? "" : formula);
+    }
+
+    /** Records a fixed-key evaluation CountTime and includes it in overhead totals. */
+    public static synchronized void recordStableEvaluationCountTime(
+            String metricKey,
+            String section,
+            String label,
+            long countTimeMillis,
+            String formula) {
+        if (!isEnabled()) {
+            return;
+        }
+        long safeCountTime = Math.max(0L, countTimeMillis);
+        addStateSpaceCountOverhead(safeCountTime);
+        recordStableMetric(
+                metricKey,
+                section,
+                label,
+                Long.toString(safeCountTime),
+                "ms",
+                formula);
     }
 
     public static synchronized void beginCountScope(String section, String label) {
@@ -537,6 +627,19 @@ public final class UpdatingControllerEvaluationRecorder {
         recordDataMetric(safeMethodKey + "_final_gr_input_transitions",
                 section,
                 safeMethodLabel + " final safety environment / Transitions",
+                Long.toString(transitions),
+                "transitions");
+        // Symmetric fixed aliases used by the Traditional/Stepwise campaign
+        // validator and comparison scripts.  Both aliases describe exactly
+        // the same final GR(1) input as the explicit keys above.
+        recordDataMetric(safeMethodKey + "_final_states",
+                section,
+                safeMethodLabel + " final GR(1) input / States",
+                Long.toString(states),
+                "states");
+        recordDataMetric(safeMethodKey + "_final_transitions",
+                section,
+                safeMethodLabel + " final GR(1) input / Transitions",
                 Long.toString(transitions),
                 "transitions");
         if (sourceStage != null && !sourceStage.isEmpty()) {
@@ -1686,7 +1789,7 @@ public final class UpdatingControllerEvaluationRecorder {
         refreshStateSpaceCountOverheadDataMetrics();
         evaluationHeaderOutputMillis = 0;
 
-        long detailedReportOutputStart = System.currentTimeMillis();
+        long detailedReportOutputStart = System.nanoTime();
         if (shouldPrintDetailedReport()) {
             output.outln("");
             output.outln("================ DETAILED EVALUATION METRICS ================");
@@ -1701,11 +1804,11 @@ public final class UpdatingControllerEvaluationRecorder {
             output.outln("==============================================================");
             output.outln("");
         }
-        evaluationDetailedReportOutputMillis = System.currentTimeMillis() - detailedReportOutputStart;
+        evaluationDetailedReportOutputMillis = elapsedMillis(detailedReportOutputStart);
 
-        long summaryOutputStart = System.currentTimeMillis();
+        long summaryOutputStart = System.nanoTime();
         printEvaluationSummary(output);
-        evaluationSummaryOutputMillis = System.currentTimeMillis() - summaryOutputStart;
+        evaluationSummaryOutputMillis = elapsedMillis(summaryOutputStart);
 
         recordEvaluationOutputMetrics(false);
         recordCountScopeMetrics();
@@ -2079,7 +2182,7 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("大枠比較用時間: 実測総時間から構文解析、評価用カウント、評価出力、GUI描画を除いた時間。");
             notes.add("厳密比較用時間: 大枠比較用時間からさらに共通前処理時間を除いた時間。");
             notes.add("手法固有時間: 各 DUC 手法に固有の準備・中核・後処理を合計した時間。");
-            notes.add("内部計測の中核処理時間（参考）: OTF-DUC では on-the-fly探索から出力UC反映まで、Traditional DUC では更新用環境構築から最終コントローラ合成までを対象にした内部タイマー値。評価用カウント時間を含み得るため、主比較には実測時間から評価用オーバーヘッドを差し引いた項目を使う。");
+            notes.add("手法別中核内訳は区間が非対称: Traditional DUC は更新用環境構築+最終合成、Stepwise Delayed DUC は最終GR(1)のみ。手法間の主比較には controller_synthesis_related_time を使う。");
         } else if ("OTF-DUC 方針1 時間・メモリ内訳".equals(section)) {
             notes.add("通常OTF探索+簡単マージ時間: on-the-fly探索開始から、belief repair 直前の簡単マージ完了までの時間。");
             notes.add("通常OTF探索+簡単マージ中増加メモリ: 同区間のピークメモリ - 同区間直前メモリ。");
@@ -2338,11 +2441,19 @@ public final class UpdatingControllerEvaluationRecorder {
         return (section == null ? "" : section) + "\u0000" + (label == null ? "" : label);
     }
 
+    private static long elapsedMillis(long startNanos) {
+        return nanosToMillis(System.nanoTime() - startNanos);
+    }
+
+    private static long nanosToMillis(long nanos) {
+        return Math.max(0L, nanos) / 1_000_000L;
+    }
+
     private static void flushActiveTimers() {
         if (activeTimers.isEmpty()) {
             return;
         }
-        long now = System.currentTimeMillis();
+        long now = System.nanoTime();
         if (isFailureStatus(resultStatus)) {
             int index = 0;
             String lastActiveTimer = "";
@@ -2374,7 +2485,7 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         for (ActiveTimer timer : activeTimers.values()) {
             putOrReplaceTime(timer.section, timer.label,
-                    now - timer.startMillis,
+                    nanosToMillis(now - timer.startNanos),
                     " (失敗時点まで)");
         }
         activeTimers.clear();
@@ -2506,8 +2617,6 @@ public final class UpdatingControllerEvaluationRecorder {
         long parseTime = optionalTime("共通 / HPWindow", "構文解析時間");
         long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         long methodSpecificTime = methodSpecificTime();
-        long methodCoreTime = methodCoreTime();
-        long evaluationOutputTime = Math.max(0, evaluationOutputOverheadMillis);
         boolean hasControllerSynthesisTime = hasRecordedTime("共通 / HPWindow", "コントローラ合成時間");
         Long controllerSynthesisTime = hasRecordedTime("共通 / HPWindow", "コントローラ合成時間")
                 ? optionalTime("共通 / HPWindow", "コントローラ合成時間")
@@ -2515,7 +2624,7 @@ public final class UpdatingControllerEvaluationRecorder {
         long broadObservedTime = totalTime == null
                 ? -1
                 : Math.max(0, totalTime - parseTime - stateSpaceCountOverheadObservedMillis
-                        - evaluationOutputTime - drawTime);
+                        - drawTime);
         long strictObservedTime = totalTime == null
                 ? -1
                 : Math.max(0, broadObservedTime - commonPreprocessTime);
@@ -2551,9 +2660,10 @@ public final class UpdatingControllerEvaluationRecorder {
                 stateSpaceCountOverheadPostObservedMillis,
                 "実測総時間を確定した後に、出力 controller や post-synthesis 診断のために数えた CountTime。主比較用時間からは差し引かない。");
         addMetric(comparisonSection,
-                "評価結果出力時間（比較から除外）",
-                evaluationOutputTime,
+                "評価結果出力時間（実測総時間外・参考）",
+                Math.max(0, evaluationOutputOverheadMillis),
                 "評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間。"
+                        + "これらは実測総時間の確定後に実行されるため、実測総時間からは差し引かない。"
                         + " CSV 出力時間は CSV 出力後に追加行として記録する。");
         addMetric(comparisonSection,
                 "入力規模集計時間（評価用・参考）",
@@ -2567,11 +2677,12 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if (totalTime != null) {
             addMetric(comparisonSection,
-                    "大枠比較用時間（構文解析・評価・描画除外）",
+                    "大枠比較用時間（構文解析・カウント・描画除外）",
                     broadObservedTime,
-                    "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - 評価結果出力時間 - GUI描画時間。共通前処理は差し引かない。");
+                    "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - GUI描画時間。"
+                            + "評価結果出力は実測総時間の確定後なので差し引かない。共通前処理は差し引かない。");
             addMetric(comparisonSection,
-                    "厳密比較用時間（共通前処理も除外）",
+                    "厳密比較用時間（構文解析・共通前処理・カウント・描画除外）",
                     strictObservedTime,
                     "大枠比較用時間 - 除外する共通前処理時間。");
             addMetric(comparisonSection,
@@ -2585,6 +2696,11 @@ public final class UpdatingControllerEvaluationRecorder {
                 methodSpecificTime,
                 methodSpecificFormula());
         if (hasControllerSynthesisTime) {
+            addMetric(comparisonSection,
+                    "主比較用コントローラ合成時間",
+                    controllerSynthesisTime,
+                    "共通 / HPWindow のコントローラ合成時間と同値。"
+                            + "Traditional DUC と Stepwise Delayed DUC の主時間比較にはこの対称な区間を使う。");
             long controllerSynthesisWithoutCommon = controllerSynthesisTime - commonPreprocessTime;
             long unclassifiedNonCommonTime = controllerSynthesisWithoutCommon - methodSpecificTime;
             addMetric(comparisonSection,
@@ -2605,10 +2721,11 @@ public final class UpdatingControllerEvaluationRecorder {
                     "未記録",
                     "共通処理を除いたコントローラ合成時間 - 手法固有として個別計測できた時間。");
         }
-        addMetric(comparisonSection,
-                "内部計測の中核処理時間（参考）",
-                methodCoreTime,
-                methodCoreFormula());
+        addMetricValue(comparisonSection,
+                "手法別中核内訳の手法間比較可能性",
+                "false",
+                "Traditional は E_u 構築+最終合成、Stepwise Delayed は最終GR(1)のみを表すため、"
+                        + "手法別中核内訳同士を比較しない。主比較には主比較用コントローラ合成時間を使う。");
         recordModeSpecificComparisonDetails(comparisonSection);
     }
 
@@ -3198,11 +3315,15 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static void recordTraditionalPeakStateSpaceSummaryMetrics() {
         PeakValue peakStates = maxDataMetric(
+                new PeakCandidate("traditional_mapping_environment_states",
+                        "traditional_mapping_environment_transitions", "[0. Mapping product]"),
                 new PeakCandidate("traditional_eu_states", "traditional_eu_transitions", "[1. E_u]"),
                 new PeakCandidate("traditional_meta_states", "traditional_meta_transitions", "[2. Meta]"),
                 new PeakCandidate("traditional_pruned_states", "traditional_pruned_transitions", "[3. Pruned]"),
                 new PeakCandidate("traditional_final_states", "traditional_final_transitions", "[4. Final]"));
         PeakValue peakTransitions = maxDataMetric(
+                new PeakCandidate("traditional_mapping_environment_transitions",
+                        "traditional_mapping_environment_states", "[0. Mapping product]"),
                 new PeakCandidate("traditional_eu_transitions", "traditional_eu_states", "[1. E_u]"),
                 new PeakCandidate("traditional_meta_transitions", "traditional_meta_states", "[2. Meta]"),
                 new PeakCandidate("traditional_pruned_transitions", "traditional_pruned_states", "[3. Pruned]"),
@@ -3648,7 +3769,7 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static void printDataCsv(LTSOutput output) {
-        long csvOutputStart = System.currentTimeMillis();
+        long csvOutputStart = System.nanoTime();
         output.outln("================ EVALUATION DATA CSV ================");
         output.outln(DATA_CSV_HEADER);
         outputDataRow(output, new DataMetric("mode", "Run", "mode", mode, "text"));
@@ -3669,7 +3790,7 @@ public final class UpdatingControllerEvaluationRecorder {
             }
             outputDataRow(output, metric);
         }
-        evaluationDataCsvOutputMillis = System.currentTimeMillis() - csvOutputStart;
+        evaluationDataCsvOutputMillis = elapsedMillis(csvOutputStart);
         long totalEvaluationOutputIncludingCsv = evaluationOutputOverheadMillis
                 + Math.max(0, evaluationDataCsvOutputMillis);
         outputDataRow(output, new DataMetric(
@@ -3689,7 +3810,7 @@ public final class UpdatingControllerEvaluationRecorder {
         outputDataRow(output, new DataMetric(
                 "comparison_evaluation_output_time",
                 "比較用時間集計",
-                "評価結果出力時間（比較から除外）",
+                "評価結果出力時間（実測総時間外・参考）",
                 Long.toString(totalEvaluationOutputIncludingCsv),
                 "ms",
                 "評価ヘッダ出力時間 + 詳細評価レポート出力時間 + 評価サマリ出力時間 + 評価CSV出力時間。"));
@@ -4051,13 +4172,10 @@ public final class UpdatingControllerEvaluationRecorder {
     }
 
     private static boolean isRecomputedAfterDataCsvMetric(String metricKey) {
-        return "comparison_evaluation_output_time".equals(metricKey)
-                || "comparison_observed_time_without_parse_count_evaluation_output_and_draw".equals(metricKey)
-                || "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw".equals(metricKey)
-                || "comparison_observed_total_based_unclassified_time".equals(metricKey);
+        return "comparison_evaluation_output_time".equals(metricKey);
     }
 
-    private static void outputStrictComparisonRows(LTSOutput output, long evaluationOutputMillis) {
+    private static void outputStrictComparisonRows(LTSOutput output, long ignoredEvaluationOutputMillis) {
         Long totalTime = firstRecordedTime(
                 timeKey("共通 / HPWindow", "合成ボタンを押してから合成完了までの時間"),
                 timeKey("一時 runner", "合成全体実行時間"));
@@ -4072,22 +4190,23 @@ public final class UpdatingControllerEvaluationRecorder {
         long parseTime = optionalTime("共通 / HPWindow", "構文解析時間");
         long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         long methodSpecificTime = methodSpecificTime();
-        long observedWithoutParseCountOutputAndDraw = Math.max(0, totalTime - parseTime
-                - stateSpaceCountOverheadObservedMillis - evaluationOutputMillis - drawTime);
-        long strictObservedTime = Math.max(0, observedWithoutParseCountOutputAndDraw - commonPreprocessTime);
+        long observedWithoutParseCountAndDraw = Math.max(0, totalTime - parseTime
+                - stateSpaceCountOverheadObservedMillis - drawTime);
+        long strictObservedTime = Math.max(0, observedWithoutParseCountAndDraw - commonPreprocessTime);
         long strictUnclassifiedTime = Math.max(0, strictObservedTime - methodSpecificTime);
 
         outputDataRow(output, new DataMetric(
-                "comparison_observed_time_without_parse_count_evaluation_output_and_draw",
+                "comparison_observed_time_without_parse_count_and_draw",
                 "比較用時間集計",
-                "大枠比較用時間（構文解析・評価・描画除外）",
-                Long.toString(observedWithoutParseCountOutputAndDraw),
+                "大枠比較用時間（構文解析・カウント・描画除外）",
+                Long.toString(observedWithoutParseCountAndDraw),
                 "ms",
-                "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - 評価出力時間合計（CSV含む） - GUI描画時間。共通前処理は差し引かない。"));
+                "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - GUI描画時間。"
+                        + "評価出力は実測総時間の確定後なので差し引かない。共通前処理は差し引かない。"));
         outputDataRow(output, new DataMetric(
-                "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw",
+                "comparison_strict_observed_time_without_parse_common_preprocess_count_and_draw",
                 "比較用時間集計",
-                "厳密比較用時間（共通前処理も除外）",
+                "厳密比較用時間（構文解析・共通前処理・カウント・描画除外）",
                 Long.toString(strictObservedTime),
                 "ms",
                 "大枠比較用時間 - 除外する共通前処理時間。"));
@@ -4482,18 +4601,31 @@ public final class UpdatingControllerEvaluationRecorder {
     private static String metricCategory(String section, String label, String key, String unit) {
         String text = lower(section + " " + label + " " + key + " " + unit);
         String normalizedUnit = lower(unit);
-        if ("ms".equals(normalizedUnit)
-                || "ns".equals(normalizedUnit)
-                || "epoch_ms".equals(normalizedUnit)) {
+        if (isTimeUnit(normalizedUnit)) {
             return "時間";
+        }
+        if (isMemoryUnit(normalizedUnit)) {
+            return "メモリ";
+        }
+        if (isStateUnit(normalizedUnit)) {
+            return "状態数";
+        }
+        if (isTransitionUnit(normalizedUnit)) {
+            return "遷移数";
+        }
+        if ("ratio".equals(normalizedUnit) || "percent".equals(normalizedUnit)) {
+            return text.contains("reduction") || text.contains("削減率")
+                    || text.contains("remain rate")
+                    ? "削減率"
+                    : "割合";
         }
         if ("parent process memory measurement".equals(lower(section))) {
             return "メモリ";
         }
-        if (text.contains("time") || text.contains("時間") || text.contains("counttime") || "ms".equals(unit)) {
+        if (text.contains("time") || text.contains("時間") || text.contains("counttime")) {
             return "時間";
         }
-        if (text.contains("memory") || text.contains("メモリ") || "mb".equals(lower(unit))) {
+        if (text.contains("memory") || text.contains("メモリ")) {
             return "メモリ";
         }
         if (text.contains("reduction") || text.contains("削減率") || text.contains("remain rate")) {
@@ -4511,7 +4643,7 @@ public final class UpdatingControllerEvaluationRecorder {
         if (text.contains("updateorder") || text.contains("更新順序")) {
             return "更新順序";
         }
-        if (text.contains("rate") || "ratio".equals(lower(unit))) {
+        if (containsMetricToken(text, "rate")) {
             return "割合";
         }
         if (text.contains("transition") || text.contains("遷移")) {
@@ -4525,13 +4657,27 @@ public final class UpdatingControllerEvaluationRecorder {
 
     private static String readableStat(String label, String key, String unit) {
         String text = lower(label + " " + key);
+        String normalizedUnit = lower(unit);
+        if (isTimeUnit(normalizedUnit)) {
+            if (text.contains("counttime") || text.contains("評価用カウント時間")) {
+                return "評価用カウント時間";
+            }
+            return "時間";
+        }
+        if (isMemoryUnit(normalizedUnit)) {
+            return "メモリ";
+        }
+        if ("ratio".equals(normalizedUnit) || "percent".equals(normalizedUnit)) {
+            return text.contains("normal transition rate") ? "通常遷移率" : "割合";
+        }
         if (text.contains("評価用カウント時間除外後")) {
             return "時間";
         }
         if (text.contains("counttime") || text.contains("評価用カウント時間")) {
             return "評価用カウント時間";
         }
-        if (text.contains("states/value")
+        if ("states/value".equals(normalizedUnit)
+                || text.contains("states/value")
                 || text.contains("states per projection value")
                 || text.contains("states_per_projection_value")) {
             return "射影値あたりの状態数";
@@ -4541,6 +4687,24 @@ public final class UpdatingControllerEvaluationRecorder {
         }
         if (text.contains("split_projection_values")) {
             return "複数状態に分裂した射影値の数";
+        }
+        if (isStateUnit(normalizedUnit)) {
+            if (text.contains("unreachable")) {
+                return "到達不能状態数";
+            }
+            if (text.contains("reachable")) {
+                return "到達可能状態数";
+            }
+            return "状態数";
+        }
+        if (isTransitionUnit(normalizedUnit)) {
+            if (text.contains("normal")) {
+                return "通常遷移数";
+            }
+            if (text.contains("update event")) {
+                return "更新事象遷移数";
+            }
+            return "遷移数";
         }
         if (text.contains("states") || text.contains("状態数")) {
             if (text.contains("unreachable")) {
@@ -4569,16 +4733,16 @@ public final class UpdatingControllerEvaluationRecorder {
         if (text.contains("max out-degree")) {
             return "最大分岐数";
         }
-        if (text.contains("min")) {
+        if (containsMetricToken(text, "min") || containsMetricToken(text, "minimum")) {
             return "最小値";
         }
-        if (text.contains("max")) {
+        if (containsMetricToken(text, "max") || containsMetricToken(text, "maximum")) {
             return "最大値";
         }
         if (text.contains("avg") || text.contains("average")) {
             return "平均値";
         }
-        if (text.contains("rate")) {
+        if (containsMetricToken(text, "rate") || "ratio".equals(normalizedUnit)) {
             return "割合";
         }
         if (text.contains("samples")) {
@@ -4590,16 +4754,63 @@ public final class UpdatingControllerEvaluationRecorder {
         if (text.contains("phase")) {
             return "更新段階";
         }
-        if ("ms".equals(unit)) {
-            return "時間";
-        }
-        if ("mb".equals(lower(unit))) {
-            return "メモリ";
-        }
         if (!unit.isEmpty() && !"text".equals(unit)) {
             return unit;
         }
         return readableFallback(label);
+    }
+
+    private static boolean isTimeUnit(String normalizedUnit) {
+        return "ms".equals(normalizedUnit)
+                || "ns".equals(normalizedUnit)
+                || "epoch_ms".equals(normalizedUnit)
+                || "ms/call".equals(normalizedUnit);
+    }
+
+    private static boolean isMemoryUnit(String normalizedUnit) {
+        return "b".equals(normalizedUnit)
+                || "byte".equals(normalizedUnit)
+                || "bytes".equals(normalizedUnit)
+                || "kb".equals(normalizedUnit)
+                || "mb".equals(normalizedUnit)
+                || "gb".equals(normalizedUnit)
+                || "kib".equals(normalizedUnit)
+                || "mib".equals(normalizedUnit)
+                || "gib".equals(normalizedUnit);
+    }
+
+    private static boolean isStateUnit(String normalizedUnit) {
+        return "state".equals(normalizedUnit)
+                || "states".equals(normalizedUnit)
+                || normalizedUnit.startsWith("states/");
+    }
+
+    private static boolean isTransitionUnit(String normalizedUnit) {
+        return "transition".equals(normalizedUnit)
+                || "transitions".equals(normalizedUnit)
+                || normalizedUnit.startsWith("transitions/");
+    }
+
+    private static boolean containsMetricToken(String text, String token) {
+        if (text == null || token == null || token.isEmpty()) {
+            return false;
+        }
+        int from = 0;
+        while (from < text.length()) {
+            int index = text.indexOf(token, from);
+            if (index < 0) {
+                return false;
+            }
+            int before = index - 1;
+            int after = index + token.length();
+            boolean startsToken = before < 0 || !Character.isLetterOrDigit(text.charAt(before));
+            boolean endsToken = after >= text.length() || !Character.isLetterOrDigit(text.charAt(after));
+            if (startsToken && endsToken) {
+                return true;
+            }
+            from = index + 1;
+        }
+        return false;
     }
 
     private static String metricDescriptionId(
@@ -5389,11 +5600,11 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("評価用カウント時間（実測時間外）".equals(label)) {
                 return "comparison_count_overhead_after_observed_time";
             }
-            if ("大枠比較用時間（構文解析・評価・描画除外）".equals(label)) {
-                return "comparison_observed_time_without_parse_count_evaluation_output_and_draw";
+            if ("大枠比較用時間（構文解析・カウント・描画除外）".equals(label)) {
+                return "comparison_observed_time_without_parse_count_and_draw";
             }
-            if ("厳密比較用時間（共通前処理も除外）".equals(label)) {
-                return "comparison_strict_observed_time_without_parse_common_preprocess_count_evaluation_output_and_draw";
+            if ("厳密比較用時間（構文解析・共通前処理・カウント・描画除外）".equals(label)) {
+                return "comparison_strict_observed_time_without_parse_common_preprocess_count_and_draw";
             }
             if ("共通前処理などを除いた実測時間".equals(label)) {
                 return "comparison_observed_time_without_common_preprocess";
@@ -5404,7 +5615,8 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("実測総時間ベースの未分類時間（参考）".equals(label)) {
                 return "comparison_observed_total_based_unclassified_time";
             }
-            if ("評価結果出力時間（比較から除外）".equals(label)) {
+            if ("評価結果出力時間（実測総時間外・参考）".equals(label)
+                    || "評価結果出力時間（比較から除外）".equals(label)) {
                 return "comparison_evaluation_output_time";
             }
             if ("共通処理を除いたコントローラ合成時間".equals(label)) {
@@ -5416,14 +5628,11 @@ public final class UpdatingControllerEvaluationRecorder {
             if ("未分類の非共通時間".equals(label)) {
                 return "comparison_unclassified_non_common_time";
             }
-            if ("内部計測の中核処理時間（参考）".equals(label)) {
-                return "comparison_core_synthesis_time";
+            if ("主比較用コントローラ合成時間".equals(label)) {
+                return "comparison_primary_controller_synthesis_time";
             }
-            if ("手法本体の中核合成時間".equals(label)) {
-                return "comparison_core_synthesis_time";
-            }
-            if ("主比較対象の中核合成時間".equals(label)) {
-                return "comparison_core_synthesis_time";
+            if ("手法別中核内訳の手法間比較可能性".equals(label)) {
+                return "comparison_internal_core_time_cross_method_comparable";
             }
             if ("OTF-DUC 固有準備時間".equals(label)) {
                 return "comparison_otf_specific_preparation_time";
@@ -5697,12 +5906,12 @@ public final class UpdatingControllerEvaluationRecorder {
     private static final class ActiveTimer {
         private final String section;
         private final String label;
-        private final long startMillis;
+        private final long startNanos;
 
-        private ActiveTimer(String section, String label, long startMillis) {
+        private ActiveTimer(String section, String label, long startNanos) {
             this.section = section;
             this.label = label;
-            this.startMillis = startMillis;
+            this.startNanos = startNanos;
         }
     }
 

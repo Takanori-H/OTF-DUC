@@ -685,7 +685,7 @@ public class CompactState implements Automata {
         if (states[0] instanceof ProbabilisticEventState)
             out.print("// probabilistic\n");
 
-        out.print("des(0," + ntransitions() + "," + maxStates + ")\n");
+        out.print("des(0," + ntransitionsLong() + "," + maxStates + ")\n");
         for (int i = 0; i < states.length; i++)
             EventStateUtils.printAUT(states[i], i, alphabet, out);
     }
@@ -731,6 +731,17 @@ public class CompactState implements Automata {
 
     public int ntransitions() {
         int count = 0;
+        for (int i = 0; i < states.length; i++)
+            count += EventStateUtils.count(states[i]);
+        return count;
+    }
+
+    /**
+     * Long-valued counterpart used by evaluation code.  The historical
+     * {@link #ntransitions()} signature is retained for source compatibility.
+     */
+    public long ntransitionsLong() {
+        long count = 0L;
         for (int i = 0; i < states.length; i++)
             count += EventStateUtils.count(states[i]);
         return count;

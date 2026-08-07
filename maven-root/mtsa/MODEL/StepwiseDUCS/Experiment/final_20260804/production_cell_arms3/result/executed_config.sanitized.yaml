@@ -1,0 +1,76 @@
+# Final paper-evaluation trial for ProductionCell with three robot arms.
+#
+# This scale previously exhausted memory under an older experiment setup. Run
+# it again with the current final evaluation jar and G1 configuration; timeout
+# or OOM remains a failed outcome and is never recorded as a successful value.
+# Existing matching artifacts may be overwritten on an intentional rerun.
+outputDir: "Experiment/final_20260804/production_cell_arms3/result"
+runs: 3
+timeoutHours: 12
+requireFreshOutputDir: false
+alternateMethodOrderByRun: true
+validateMethodTarget: true
+validateMemoryQuality: true
+maxMemorySamplingGapMillis: 1000
+requirementsCheck: false
+traceCheck: false
+notifyOn: always
+slackWebhookUrl: "<redacted>"
+notifyTimeoutSeconds: 30
+
+javaOptions:
+  - -Djava.awt.headless=true
+  - -Dmtsa.evaluation.enabled=true
+  - -Dupdating.controller.evaluation.profile=paper
+  - -Dmtsa.evaluation.memorySampling.enabled=true
+  - -Dmtsa.evaluation.memorySampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.enabled=true
+  - -Dmtsa.evaluation.rssSampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000
+  - -Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000
+  - -Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false
+  - -Dmtsa.evaluation.phaseMemoryDiagnostics=false
+  - -Dstepwise.delayed.connectedEnvironmentView=true
+  - -XX:+UseG1GC
+  - -XX:+UnlockExperimentalVMOptions
+  - -XX:G1MaxNewSizePercent=20
+  - -Xmx220g
+
+cases:
+  - id: production_cell_arms3_stepwise_delayed_sbp_no_tr
+    example: ProductionCell_Arms=3
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/ProductionCell_Arms=3.lts"
+    target: Stepwise_UpdCont
+  - id: production_cell_arms3_stepwise_delayed_sbp_t1_no_controllable_during_gap
+    example: ProductionCell_Arms=3
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/ProductionCell_Arms=3.lts"
+    target: Stepwise_UpdCont_T1
+  - id: production_cell_arms3_stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure
+    example: ProductionCell_Arms=3
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/ProductionCell_Arms=3.lts"
+    target: Stepwise_UpdCont_T2
+
+  - id: production_cell_arms3_traditional_no_tr
+    example: ProductionCell_Arms=3
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/ProductionCell_Arms=3.lts"
+    target: UpdCont
+  - id: production_cell_arms3_traditional_t1_no_controllable_during_gap
+    example: ProductionCell_Arms=3
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/ProductionCell_Arms=3.lts"
+    target: UpdCont_T1
+  - id: production_cell_arms3_traditional_t2_start_after_stop_and_reconfigure
+    example: ProductionCell_Arms=3
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/ProductionCell_Arms=3.lts"
+    target: UpdCont_T2

@@ -1,0 +1,1346 @@
+Process:
+	UpdCont_T1
+States:
+	617
+Transitions:
+	UpdCont_T1 = Q0,
+	Q0	= (takeoff -> Q376
+		  |hotSwapIn -> Q565),
+	Q1	= (scan.val[0] -> Q204
+		  |scan.val[1] -> Q615),
+	Q2	= (low -> Q217
+		  |follow -> Q430),
+	Q3	= (lowBattery -> Q611),
+	Q4	= (lowBattery -> Q613),
+	Q5	= (high -> Q375),
+	Q6	= (move -> Q327
+		  |high -> Q447),
+	Q7	= (high -> Q220
+		  |move -> Q245),
+	Q8	= (low -> Q207
+		  |follow -> Q421),
+	Q9	= (lowBattery -> Q613),
+	Q10	= (lowBattery -> Q607),
+	Q11	= (scan.val[0] -> Q242
+		  |scan.val[1] -> Q469),
+	Q12	= (lowBattery -> Q607),
+	Q13	= (move -> Q206
+		  |low -> Q418),
+	Q14	= (high -> Q384
+		  |move -> Q580),
+	Q15	= (low -> Q4
+		  |follow -> Q423
+		  |picture -> Q428),
+	Q16	= (lowBattery -> Q155),
+	Q17	= (pictureOk[0] -> Q231
+		  |pictureOk[1] -> Q453),
+	Q18	= (high -> Q70
+		  |hotSwapIn -> Q237
+		  |move -> Q251
+		  |scan -> Q477),
+	Q19	= (move -> Q212
+		  |low -> Q422),
+	Q20	= (lowBattery -> Q427),
+	Q21	= (stopOldSpec -> Q153),
+	Q22	= (picture -> Q24
+		  |low -> Q235
+		  |follow -> Q425),
+	Q23	= (move -> Q202
+		  |low -> Q415),
+	Q24	= (pictureOk[0] -> Q240
+		  |pictureOk[1] -> Q455),
+	Q25	= (lowBattery -> Q11
+		  |scan.val[0] -> Q458
+		  |scan.val[1] -> Q483),
+	Q26	= (low -> Q12
+		  |follow -> Q432
+		  |picture -> Q433),
+	Q27	= (hotSwapIn -> Q16
+		  |lowBattery -> Q255),
+	Q28	= (pictureOk[0..1] -> Q427),
+	Q29	= (picture -> Q32
+		  |low -> Q244
+		  |follow -> Q430),
+	Q30	= (hotSwapIn -> Q469
+		  |return2base -> Q474),
+	Q31	= (picture -> Q17
+		  |low -> Q228
+		  |follow -> Q421),
+	Q32	= (pictureOk[0] -> Q230
+		  |pictureOk[1] -> Q449),
+	Q33	= (lowBattery -> Q436),
+	Q34	= (follow -> Q419
+		  |picture -> Q420
+		  |low -> Q616),
+	Q35	= (pictureOk[0..1] -> Q436),
+	Q36	= (hotSwapIn -> Q138
+		  |move -> Q246
+		  |high -> Q351
+		  |scan -> Q365),
+	Q37	= (pictureOk[0..1] -> Q424),
+	Q38	= (hotSwapIn -> Q78
+		  |move -> Q252
+		  |high -> Q294
+		  |scan -> Q312),
+	Q39	= (lowBattery -> Q424),
+	Q40	= (low -> Q19
+		  |move -> Q437),
+	Q41	= (low -> Q23
+		  |move -> Q443),
+	Q42	= (high -> Q55
+		  |move -> Q248),
+	Q43	= (follow -> Q29
+		  |picture -> Q62
+		  |low -> Q260),
+	Q44	= (hotSwapIn -> Q171
+		  |return2base -> Q474),
+	Q45	= (move -> Q280
+		  |high -> Q282
+		  |hotSwapIn -> Q363),
+	Q46	= (picture -> Q24
+		  |follow -> Q26
+		  |low -> Q235),
+	Q47	= (picture -> Q32
+		  |follow -> Q34
+		  |low -> Q244),
+	Q48	= (low -> Q13
+		  |move -> Q429),
+	Q49	= (pictureOk[0] -> Q273
+		  |pictureOk[1] -> Q363),
+	Q50	= (pictureOk[0..1] -> Q453),
+	Q51	= (follow -> Q31
+		  |picture -> Q69
+		  |low -> Q267),
+	Q52	= (scan.val[0] -> Q584
+		  |scan.val[1] -> Q590),
+	Q53	= (pictureOk[0] -> Q269
+		  |pictureOk[1] -> Q478),
+	Q54	= (high -> Q70
+		  |hotSwapIn -> Q237
+		  |move -> Q251
+		  |scan -> Q477),
+	Q55	= (lowBattery -> Q242),
+	Q56	= (low -> Q33
+		  |picture -> Q451),
+	Q57	= (low -> Q39
+		  |picture -> Q459),
+	Q58	= (follow -> Q15
+		  |picture -> Q17
+		  |low -> Q228),
+	Q59	= (scan.val[0] -> Q261
+		  |scan.val[1] -> Q273),
+	Q60	= (pictureOk[0..1] -> Q455),
+	Q61	= (hotSwapIn -> Q71
+		  |lowBattery -> Q243),
+	Q62	= (pictureOk[0] -> Q276
+		  |pictureOk[1] -> Q487),
+	Q63	= (lowBattery -> Q242),
+	Q64	= (pictureOk[0] -> Q30
+		  |pictureOk[1] -> Q243
+		  |hotSwapIn -> Q530),
+	Q65	= (low -> Q20
+		  |picture -> Q446),
+	Q66	= (low -> Q41
+		  |move -> Q467),
+	Q67	= (follow -> Q22
+		  |picture -> Q53
+		  |low -> Q253),
+	Q68	= (scan.val[1] -> Q539
+		  |scan.val[0] -> Q556),
+	Q69	= (pictureOk[0] -> Q256
+		  |pictureOk[1] -> Q471),
+	Q70	= (high -> Q27
+		  |hotSwapIn -> Q258
+		  |move -> Q444
+		  |scan -> Q470),
+	Q71	= (lowBattery -> Q304),
+	Q72	= (hotSwapIn -> Q208
+		  |high -> Q307
+		  |move -> Q439),
+	Q73	= (follow -> Q47
+		  |picture -> Q62
+		  |low -> Q260),
+	Q74	= (high -> Q262
+		  |hotSwapIn -> Q302
+		  |picture -> Q468),
+	Q75	= (pictureOk[0..1] -> Q449),
+	Q76	= (high -> Q5),
+	Q77	= (move -> Q279
+		  |high -> Q287),
+	Q78	= (move -> Q279
+		  |high -> Q287),
+	Q79	= (pictureOk[0] -> Q293
+		  |pictureOk[1] -> Q510),
+	Q80	= (scan.val[1] -> Q273
+		  |scan.val[0] -> Q481),
+	Q81	= (low -> Q57
+		  |picture -> Q60),
+	Q82	= (low -> Q48
+		  |move -> Q475),
+	Q83	= (hotSwapIn -> Q224
+		  |picture -> Q310
+		  |high -> Q509),
+	Q84	= (follow -> Q51
+		  |picture -> Q88
+		  |low -> Q298),
+	Q85	= (high -> Q295
+		  |move -> Q327),
+	Q86	= (move -> Q266
+		  |high -> Q288
+		  |hotSwapIn -> Q290
+		  |scan -> Q523),
+	Q87	= (high -> Q320
+		  |move -> Q513),
+	Q88	= (pictureOk[0] -> Q300
+		  |pictureOk[1] -> Q519),
+	Q89	= (follow -> Q58
+		  |picture -> Q69
+		  |low -> Q267),
+	Q90	= (low -> Q40
+		  |move -> Q452),
+	Q91	= (pictureOk[0..1] -> Q478),
+	Q92	= (high -> Q95
+		  |move -> Q266
+		  |hotSwapIn -> Q377),
+	Q93	= (follow -> Q67
+		  |picture -> Q97
+		  |low -> Q305),
+	Q94	= (follow -> Q43
+		  |picture -> Q79
+		  |low -> Q289),
+	Q95	= (move -> Q280
+		  |high -> Q282
+		  |hotSwapIn -> Q306),
+	Q96	= (lowBattery -> Q469),
+	Q97	= (pictureOk[0] -> Q291
+		  |pictureOk[1] -> Q503),
+	Q98	= (hotSwapIn -> Q272
+		  |scan.val[0] -> Q303
+		  |scan.val[1] -> Q479
+		  |lowBattery -> Q489),
+	Q99	= (low -> Q65
+		  |picture -> Q75),
+	Q100	= (follow -> Q46
+		  |picture -> Q53
+		  |low -> Q253),
+	Q101	= (high -> Q14
+		  |move -> Q213),
+	Q102	= (hotSwapIn -> Q413
+		  |return2base -> Q474),
+	Q103	= (pictureOk[0..1] -> Q487),
+	Q104	= (move -> Q266
+		  |high -> Q338
+		  |hotSwapIn -> Q555),
+	Q105	= (pictureOk[0..1] -> Q471),
+	Q106	= (move -> Q266
+		  |high -> Q288
+		  |hotSwapIn -> Q290
+		  |scan -> Q523),
+	Q107	= (move -> Q245
+		  |high -> Q334),
+	Q108	= (picture -> Q50
+		  |low -> Q56),
+	Q109	= (low -> Q82
+		  |move -> Q490),
+	Q110	= (hotSwapIn -> Q78
+		  |move -> Q252
+		  |high -> Q294
+		  |scan -> Q312),
+	Q111	= (follow -> Q93
+		  |picture -> Q130
+		  |low -> Q318),
+	Q112	= (scan.val[0] -> Q372
+		  |scan.val[1] -> Q374),
+	Q113	= (pictureOk[1] -> Q85
+		  |pictureOk[0] -> Q224),
+	Q114	= (picture -> Q88
+		  |follow -> Q89
+		  |low -> Q298),
+	Q115	= (low -> Q90
+		  |move -> Q495),
+	Q116	= (picture -> Q97
+		  |follow -> Q100
+		  |low -> Q305),
+	Q117	= (pictureOk[0..1] -> Q510),
+	Q118	= (low -> Q66
+		  |move -> Q488),
+	Q119	= (high -> Q337
+		  |move -> Q513),
+	Q120	= (follow -> Q94
+		  |picture -> Q139
+		  |low -> Q328),
+	Q121	= (high -> Q375),
+	Q122	= (pictureOk[0] -> Q321
+		  |pictureOk[1] -> Q533),
+	Q123	= (lowBattery -> Q413),
+	Q124	= (low -> Q99
+		  |picture -> Q103),
+	Q125	= (high -> Q583
+		  |move -> Q603),
+	Q126	= (picture -> Q105
+		  |low -> Q108),
+	Q127	= (follow -> Q73
+		  |picture -> Q79
+		  |low -> Q289),
+	Q128	= (pictureOk[0] -> Q83
+		  |hotSwapIn -> Q113
+		  |pictureOk[1] -> Q326),
+	Q129	= (pictureOk[0..1] -> Q519),
+	Q130	= (pictureOk[0] -> Q336
+		  |pictureOk[1] -> Q541),
+	Q131	= (hotSwapIn -> Q297
+		  |scan.val[0] -> Q507
+		  |scan.val[1] -> Q517),
+	Q132	= (high -> Q307
+		  |hotSwapIn -> Q331
+		  |move -> Q439),
+	Q133	= (low -> Q81
+		  |picture -> Q91),
+	Q134	= (high -> Q369
+		  |hotSwapIn -> Q411
+		  |move -> Q441),
+	Q135	= (low -> Q340
+		  |move -> Q548),
+	Q136	= (picture -> Q361
+		  |hotSwapIn -> Q402
+		  |high -> Q577),
+	Q137	= (follow -> Q84
+		  |picture -> Q122
+		  |low -> Q317),
+	Q138	= (high -> Q250
+		  |move -> Q434),
+	Q139	= (pictureOk[0] -> Q314
+		  |pictureOk[1] -> Q526),
+	Q140	= (scan.val[0] -> Q6
+		  |scan.val[1] -> Q224),
+	Q141	= (follow -> Q346
+		  |low -> Q527),
+	Q142	= (low -> Q348
+		  |move -> Q550),
+	Q143	= (pictureOk[0..1] -> Q503),
+	Q144	= (move -> Q325
+		  |high -> Q341
+		  |hotSwapIn -> Q343
+		  |scan -> Q570),
+	Q145	= (high -> Q150
+		  |hotSwapIn -> Q162
+		  |move -> Q325),
+	Q146	= (low -> Q353
+		  |picture -> Q366),
+	Q147	= (follow -> Q354
+		  |low -> Q535),
+	Q148	= (scan.val[1] -> Q268
+		  |hotSwapIn -> Q319
+		  |scan.val[0] -> Q537),
+	Q149	= (high -> Q101
+		  |move -> Q279),
+	Q150	= (high -> Q333
+		  |hotSwapIn -> Q359
+		  |move -> Q518),
+	Q151	= (picture -> Q128
+		  |high -> Q335
+		  |hotSwapIn -> Q352),
+	Q152	= (low -> Q332
+		  |move -> Q543),
+	Q153	= (startNewSpec -> Q364
+		  |reconfigure -> Q573),
+	Q154	= (move -> Q266
+		  |high -> Q338
+		  |hotSwapIn -> Q356),
+	Q155	= (return2base -> Q559),
+	Q156	= (low -> Q178
+		  |scan -> Q311
+		  |move -> Q548),
+	Q157	= (startNewSpec -> Q566),
+	Q158	= (low -> Q362
+		  |picture -> Q370),
+	Q159	= (follow -> Q339
+		  |low -> Q520),
+	Q160	= (high -> Q76),
+	Q161	= (low -> Q188
+		  |scan -> Q322
+		  |move -> Q550),
+	Q162	= (high -> Q371
+		  |move -> Q380),
+	Q163	= (low -> Q345
+		  |picture -> Q347),
+	Q164	= (return2base -> Q191),
+	Q165	= (high -> Q160),
+	Q166	= (low -> Q176
+		  |scan -> Q301
+		  |move -> Q543),
+	Q167	= (move -> Q245
+		  |high -> Q378),
+	Q168	= (high -> Q371
+		  |move -> Q380),
+	Q169	= (return2base -> Q193),
+	Q170	= (return2base -> Q185),
+	Q171	= (return2base -> Q559),
+	Q172	= (reconfigure -> Q157
+		  |startNewSpec -> Q373),
+	Q173	= (reconfigure -> Q462),
+	Q174	= (high -> Q101
+		  |move -> Q279),
+	Q175	= (low -> Q387),
+	Q176	= (scan -> Q284
+		  |low -> Q389
+		  |move -> Q524),
+	Q177	= (low -> Q390
+		  |move -> Q437
+		  |scan -> Q614),
+	Q178	= (scan -> Q286
+		  |low -> Q391
+		  |move -> Q531),
+	Q179	= (low -> Q392),
+	Q180	= (lowBattery -> Q169),
+	Q181	= (scan -> Q1
+		  |low -> Q393
+		  |move -> Q443),
+	Q182	= (scan.val[0] -> Q394
+		  |scan.val[1] -> Q398),
+	Q183	= (low -> Q383),
+	Q184	= (lowBattery -> Q170),
+	Q185	= (takeoff -> Q179),
+	Q186	= (low -> Q385
+		  |move -> Q429
+		  |scan -> Q612),
+	Q187	= (scan.val[0] -> Q397
+		  |scan.val[1] -> Q403),
+	Q188	= (scan -> Q277
+		  |low -> Q386
+		  |move -> Q508),
+	Q189	= (high -> Q174
+		  |move -> Q368),
+	Q190	= (lowBattery -> Q164),
+	Q191	= (takeoff -> Q183),
+	Q192	= (lowBattery -> Q394),
+	Q193	= (takeoff -> Q175),
+	Q194	= (scan.val[0] -> Q388
+		  |scan.val[1] -> Q395),
+	Q195	= (lowBattery -> Q397),
+	Q196	= (lowBattery -> Q394),
+	Q197	= (high -> Q160),
+	Q198	= (low -> Q409
+		  |follow -> Q410),
+	Q199	= (lowBattery -> Q397),
+	Q200	= (lowBattery -> Q388),
+	Q201	= (follow -> Q414
+		  |low -> Q416),
+	Q202	= (low -> Q184
+		  |scan -> Q599
+		  |move -> Q604),
+	Q203	= (lowBattery -> Q388),
+	Q204	= (move -> Q206
+		  |low -> Q418),
+	Q205	= (low -> Q406
+		  |follow -> Q408),
+	Q206	= (low -> Q190
+		  |scan -> Q602
+		  |move -> Q609),
+	Q207	= (low -> Q409
+		  |follow -> Q423),
+	Q208	= (high -> Q14
+		  |move -> Q213),
+	Q209	= (high -> Q426
+		  |move -> Q431),
+	Q210	= (move -> Q212
+		  |low -> Q422),
+	Q211	= (lowBattery -> Q427),
+	Q212	= (low -> Q180
+		  |scan -> Q591
+		  |move -> Q601),
+	Q213	= (high -> Q119
+		  |move -> Q580),
+	Q214	= (move -> Q202
+		  |low -> Q415),
+	Q215	= (low -> Q416
+		  |follow -> Q432),
+	Q216	= (pictureOk[1] -> Q427
+		  |pictureOk[0] -> Q611),
+	Q217	= (low -> Q406
+		  |follow -> Q419),
+	Q218	= (lowBattery -> Q436),
+	Q219	= (scan.val[1] -> Q227
+		  |scan.val[0] -> Q440),
+	Q220	= (high -> Q583
+		  |move -> Q603),
+	Q221	= (lowBattery -> Q424),
+	Q222	= (pictureOk[1] -> Q436
+		  |pictureOk[0] -> Q613),
+	Q223	= (pictureOk[1] -> Q424
+		  |pictureOk[0] -> Q607),
+	Q224	= (high -> Q5),
+	Q225	= (follow -> Q29
+		  |low -> Q450),
+	Q226	= (scan.val[1] -> Q232
+		  |scan.val[0] -> Q445),
+	Q227	= (follow -> Q31
+		  |low -> Q454),
+	Q228	= (low -> Q4
+		  |follow -> Q423
+		  |picture -> Q428),
+	Q229	= (scan.val[1] -> Q225
+		  |scan.val[0] -> Q435),
+	Q230	= (low -> Q4
+		  |follow -> Q410
+		  |picture -> Q428),
+	Q231	= (low -> Q12
+		  |follow -> Q414
+		  |picture -> Q433),
+	Q232	= (follow -> Q22
+		  |low -> Q442),
+	Q233	= (hotSwapIn -> Q458
+		  |lowBattery -> Q476),
+	Q234	= (hotSwapIn -> Q261
+		  |move -> Q444
+		  |high -> Q482),
+	Q235	= (low -> Q12
+		  |follow -> Q432
+		  |picture -> Q433),
+	Q236	= (startNewSpec -> Q448),
+	Q237	= (high -> Q337
+		  |move -> Q513),
+	Q238	= (lowBattery -> Q413),
+	Q239	= (hotSwapIn -> Q273
+		  |high -> Q275
+		  |picture -> Q460),
+	Q240	= (follow -> Q408
+		  |picture -> Q420
+		  |low -> Q616),
+	Q241	= (scan.val[1] -> Q263
+		  |scan.val[0] -> Q465),
+	Q242	= (return2base -> Q559),
+	Q243	= (hotSwapIn -> Q304
+		  |return2base -> Q474),
+	Q244	= (follow -> Q419
+		  |picture -> Q420
+		  |low -> Q616),
+	Q245	= (high -> Q254
+		  |move -> Q603),
+	Q246	= (hotSwapIn -> Q316
+		  |move -> Q441
+		  |high -> Q538
+		  |scan -> Q553),
+	Q247	= (follow -> Q51
+		  |low -> Q472),
+	Q248	= (lowBattery -> Q155),
+	Q249	= (scan.val[1] -> Q270
+		  |scan.val[0] -> Q473),
+	Q250	= (move -> Q396
+		  |high -> Q484),
+	Q251	= (high -> Q27
+		  |hotSwapIn -> Q258
+		  |move -> Q444
+		  |scan -> Q470),
+	Q252	= (hotSwapIn -> Q259
+		  |move -> Q439
+		  |high -> Q491
+		  |scan -> Q501),
+	Q253	= (picture -> Q24
+		  |follow -> Q26
+		  |low -> Q235),
+	Q254	= (move -> Q558
+		  |high -> Q606),
+	Q255	= (hotSwapIn -> Q155
+		  |return2base -> Q474),
+	Q256	= (picture -> Q24
+		  |low -> Q235
+		  |follow -> Q425),
+	Q257	= (hotSwapIn -> Q11
+		  |scan.val[1] -> Q30
+		  |scan.val[0] -> Q476),
+	Q258	= (move -> Q248
+		  |high -> Q562),
+	Q259	= (move -> Q213
+		  |high -> Q516),
+	Q260	= (picture -> Q32
+		  |follow -> Q34
+		  |low -> Q244),
+	Q261	= (high -> Q55
+		  |move -> Q248),
+	Q262	= (high -> Q275
+		  |picture -> Q460
+		  |hotSwapIn -> Q498),
+	Q263	= (follow -> Q67
+		  |low -> Q480),
+	Q264	= (scan.val[1] -> Q247
+		  |scan.val[0] -> Q457),
+	Q265	= (move -> Q18
+		  |high -> Q506
+		  |hotSwapIn -> Q584),
+	Q266	= (scan -> Q98
+		  |move -> Q280
+		  |hotSwapIn -> Q485
+		  |high -> Q486),
+	Q267	= (follow -> Q15
+		  |picture -> Q17
+		  |low -> Q228),
+	Q268	= (high -> Q74
+		  |picture -> Q502
+		  |hotSwapIn -> Q590),
+	Q269	= (picture -> Q32
+		  |low -> Q244
+		  |follow -> Q430),
+	Q270	= (follow -> Q43
+		  |low -> Q464),
+	Q271	= (high -> Q101
+		  |move -> Q279),
+	Q272	= (scan.val[0] -> Q400
+		  |scan.val[1] -> Q483
+		  |lowBattery -> Q595),
+	Q273	= (high -> Q96),
+	Q274	= (high -> Q119
+		  |move -> Q580),
+	Q275	= (lowBattery -> Q30
+		  |hotSwapIn -> Q461),
+	Q276	= (picture -> Q17
+		  |low -> Q228
+		  |follow -> Q421),
+	Q277	= (scan.val[1] -> Q292
+		  |scan.val[0] -> Q499),
+	Q278	= (move -> Q251
+		  |high -> Q463
+		  |hotSwapIn -> Q556),
+	Q279	= (move -> Q213
+		  |high -> Q516),
+	Q280	= (lowBattery -> Q44
+		  |hotSwapIn -> Q496),
+	Q281	= (high -> Q262
+		  |picture -> Q468
+		  |hotSwapIn -> Q539),
+	Q282	= (lowBattery -> Q243
+		  |hotSwapIn -> Q500),
+	Q283	= (follow -> Q93
+		  |low -> Q504),
+	Q284	= (scan.val[1] -> Q296
+		  |scan.val[0] -> Q505),
+	Q285	= (move -> Q280
+		  |hotSwapIn -> Q481
+		  |high -> Q532),
+	Q286	= (scan.val[1] -> Q283
+		  |scan.val[0] -> Q493),
+	Q287	= (move -> Q213
+		  |high -> Q516),
+	Q288	= (scan -> Q98
+		  |move -> Q280
+		  |hotSwapIn -> Q485
+		  |high -> Q486),
+	Q289	= (follow -> Q47
+		  |picture -> Q62
+		  |low -> Q260),
+	Q290	= (high -> Q254
+		  |move -> Q603),
+	Q291	= (follow -> Q29
+		  |picture -> Q62
+		  |low -> Q260),
+	Q292	= (follow -> Q94
+		  |low -> Q512),
+	Q293	= (follow -> Q31
+		  |picture -> Q69
+		  |low -> Q267),
+	Q294	= (hotSwapIn -> Q259
+		  |move -> Q439
+		  |high -> Q491
+		  |scan -> Q501),
+	Q295	= (high -> Q220
+		  |move -> Q245),
+	Q296	= (follow -> Q84
+		  |low -> Q497),
+	Q297	= (scan.val[0] -> Q271
+		  |scan.val[1] -> Q308),
+	Q298	= (follow -> Q58
+		  |picture -> Q69
+		  |low -> Q267),
+	Q299	= (pictureOk[1] -> Q7
+		  |pictureOk[0] -> Q590),
+	Q300	= (follow -> Q22
+		  |picture -> Q53
+		  |low -> Q253),
+	Q301	= (scan.val[1] -> Q315
+		  |scan.val[0] -> Q521),
+	Q302	= (high -> Q357),
+	Q303	= (lowBattery -> Q102
+		  |hotSwapIn -> Q400),
+	Q304	= (return2base -> Q559),
+	Q305	= (follow -> Q46
+		  |picture -> Q53
+		  |low -> Q253),
+	Q306	= (move -> Q558
+		  |high -> Q576),
+	Q307	= (move -> Q18
+		  |high -> Q506
+		  |hotSwapIn -> Q525),
+	Q308	= (high -> Q76),
+	Q309	= (follow -> Q120
+		  |low -> Q527),
+	Q310	= (pictureOk[0] -> Q268
+		  |hotSwapIn -> Q299
+		  |pictureOk[1] -> Q522),
+	Q311	= (scan.val[1] -> Q330
+		  |scan.val[0] -> Q529),
+	Q312	= (scan.val[0] -> Q72
+		  |scan.val[1] -> Q83
+		  |hotSwapIn -> Q492),
+	Q313	= (move -> Q38
+		  |hotSwapIn -> Q372
+		  |high -> Q557),
+	Q314	= (follow -> Q51
+		  |picture -> Q88
+		  |low -> Q298),
+	Q315	= (follow -> Q137
+		  |low -> Q535),
+	Q316	= (move -> Q396
+		  |high -> Q484),
+	Q317	= (picture -> Q88
+		  |follow -> Q89
+		  |low -> Q298),
+	Q318	= (picture -> Q97
+		  |follow -> Q100
+		  |low -> Q305),
+	Q319	= (scan.val[0] -> Q581
+		  |scan.val[1] -> Q590),
+	Q320	= (high -> Q55
+		  |move -> Q248),
+	Q321	= (follow -> Q67
+		  |picture -> Q97
+		  |low -> Q305),
+	Q322	= (scan.val[1] -> Q309
+		  |scan.val[0] -> Q514),
+	Q323	= (high -> Q151
+		  |hotSwapIn -> Q374
+		  |picture -> Q551),
+	Q324	= (high -> Q238
+		  |move -> Q558),
+	Q325	= (scan -> Q148
+		  |move -> Q518
+		  |high -> Q534
+		  |hotSwapIn -> Q536),
+	Q326	= (hotSwapIn -> Q85
+		  |high -> Q333
+		  |move -> Q518),
+	Q327	= (move -> Q245
+		  |high -> Q334),
+	Q328	= (follow -> Q73
+		  |picture -> Q79
+		  |low -> Q289),
+	Q329	= (scan.val[0] -> Q104
+		  |scan.val[1] -> Q281
+		  |hotSwapIn -> Q515),
+	Q330	= (follow -> Q111
+		  |low -> Q520),
+	Q331	= (high -> Q14
+		  |move -> Q213),
+	Q332	= (low -> Q115
+		  |move -> Q524),
+	Q333	= (move -> Q86
+		  |high -> Q528
+		  |hotSwapIn -> Q547),
+	Q334	= (high -> Q254
+		  |move -> Q603),
+	Q335	= (picture -> Q310
+		  |high -> Q509
+		  |hotSwapIn -> Q544),
+	Q336	= (follow -> Q43
+		  |picture -> Q79
+		  |low -> Q289),
+	Q337	= (move -> Q248
+		  |high -> Q562),
+	Q338	= (move -> Q280
+		  |high -> Q532
+		  |hotSwapIn -> Q545),
+	Q339	= (follow -> Q116
+		  |picture -> Q130
+		  |low -> Q318),
+	Q340	= (low -> Q118
+		  |move -> Q531),
+	Q341	= (scan -> Q148
+		  |move -> Q518
+		  |high -> Q534
+		  |hotSwapIn -> Q536),
+	Q342	= (follow -> Q120
+		  |picture -> Q358
+		  |low -> Q560),
+	Q343	= (move -> Q380
+		  |high -> Q417),
+	Q344	= (hotSwapIn -> Q6
+		  |move -> Q518
+		  |high -> Q578),
+	Q345	= (low -> Q126
+		  |picture -> Q129),
+	Q346	= (follow -> Q127
+		  |picture -> Q139
+		  |low -> Q328),
+	Q347	= (pictureOk[0..1] -> Q533),
+	Q348	= (low -> Q109
+		  |move -> Q508),
+	Q349	= (pictureOk[1] -> Q209
+		  |pictureOk[0] -> Q374),
+	Q350	= (pictureOk[1] -> Q158
+		  |pictureOk[0] -> Q567),
+	Q351	= (hotSwapIn -> Q316
+		  |move -> Q441
+		  |high -> Q538
+		  |scan -> Q553),
+	Q352	= (high -> Q76),
+	Q353	= (low -> Q133
+		  |picture -> Q143),
+	Q354	= (follow -> Q114
+		  |picture -> Q122
+		  |low -> Q317),
+	Q355	= (follow -> Q137
+		  |picture -> Q360
+		  |low -> Q571),
+	Q356	= (high -> Q324
+		  |move -> Q603),
+	Q357	= (high -> Q96),
+	Q358	= (pictureOk[1] -> Q163
+		  |pictureOk[0] -> Q574),
+	Q359	= (high -> Q295
+		  |move -> Q327),
+	Q360	= (pictureOk[1] -> Q146
+		  |pictureOk[0] -> Q561),
+	Q361	= (pictureOk[0] -> Q323
+		  |hotSwapIn -> Q349
+		  |pictureOk[1] -> Q569),
+	Q362	= (picture -> Q117
+		  |low -> Q124),
+	Q363	= (move -> Q558
+		  |high -> Q576),
+	Q364	= (takeoff -> Q173
+		  |reconfigure -> Q597),
+	Q365	= (scan.val[0] -> Q134
+		  |scan.val[1] -> Q136
+		  |hotSwapIn -> Q540),
+	Q366	= (pictureOk[0..1] -> Q541),
+	Q367	= (follow -> Q111
+		  |picture -> Q350
+		  |low -> Q549),
+	Q368	= (move -> Q279
+		  |high -> Q287),
+	Q369	= (move -> Q38
+		  |high -> Q557
+		  |hotSwapIn -> Q572),
+	Q370	= (pictureOk[0..1] -> Q526),
+	Q371	= (high -> Q295
+		  |move -> Q327),
+	Q372	= (high -> Q174
+		  |move -> Q368),
+	Q373	= (takeoff -> Q173
+		  |reconfigure -> Q579),
+	Q374	= (high -> Q160),
+	Q375	= (high -> Q357),
+	Q376	= (high -> Q36
+		  |hotSwapIn -> Q582),
+	Q377	= (high -> Q583
+		  |move -> Q603),
+	Q378	= (high -> Q324
+		  |move -> Q603),
+	Q379	= (reconfigure -> Q236
+		  |startNewSpec -> Q381),
+	Q380	= (move -> Q327
+		  |high -> Q382),
+	Q381	= (reconfigure -> Q462
+		  |low -> Q588),
+	Q382	= (move -> Q245
+		  |high -> Q334),
+	Q383	= (move -> Q161
+		  |scan -> Q554
+		  |low -> Q592),
+	Q384	= (high -> Q320
+		  |move -> Q513),
+	Q385	= (move -> Q206
+		  |scan -> Q405
+		  |low -> Q593),
+	Q386	= (scan -> Q249
+		  |move -> Q490
+		  |low -> Q594),
+	Q387	= (move -> Q166
+		  |scan -> Q564
+		  |low -> Q596),
+	Q388	= (return2base -> Q191),
+	Q389	= (scan -> Q264
+		  |move -> Q495
+		  |low -> Q598),
+	Q390	= (move -> Q212
+		  |scan -> Q412
+		  |low -> Q600),
+	Q391	= (scan -> Q241
+		  |move -> Q488
+		  |low -> Q585),
+	Q392	= (move -> Q156
+		  |scan -> Q546
+		  |low -> Q586),
+	Q393	= (move -> Q202
+		  |scan -> Q401
+		  |low -> Q589),
+	Q394	= (return2base -> Q193),
+	Q395	= (return2base -> Q191),
+	Q396	= (high -> Q77
+		  |move -> Q368),
+	Q397	= (return2base -> Q185),
+	Q398	= (return2base -> Q193),
+	Q399	= (lowBattery -> Q398),
+	Q400	= (lowBattery -> Q413),
+	Q401	= (scan.val[1] -> Q201
+		  |scan.val[0] -> Q608),
+	Q402	= (high -> Q197),
+	Q403	= (return2base -> Q185),
+	Q404	= (lowBattery -> Q403),
+	Q405	= (scan.val[1] -> Q205
+		  |scan.val[0] -> Q610),
+	Q406	= (lowBattery -> Q398),
+	Q407	= (lowBattery -> Q395),
+	Q408	= (lowBattery -> Q611),
+	Q409	= (lowBattery -> Q403),
+	Q410	= (lowBattery -> Q613),
+	Q411	= (high -> Q189
+		  |move -> Q396),
+	Q412	= (scan.val[1] -> Q198
+		  |scan.val[0] -> Q605),
+	Q413	= (return2base -> Q559),
+	Q414	= (lowBattery -> Q607),
+	Q415	= (low -> Q199
+		  |move -> Q604),
+	Q416	= (lowBattery -> Q395),
+	Q417	= (move -> Q327
+		  |high -> Q382),
+	Q418	= (low -> Q203
+		  |move -> Q609),
+	Q419	= (lowBattery -> Q611),
+	Q420	= (pictureOk[0] -> Q9
+		  |pictureOk[1] -> Q218
+		  |lowBattery -> Q222),
+	Q421	= (low -> Q4
+		  |follow -> Q410
+		  |picture -> Q428),
+	Q422	= (low -> Q196
+		  |move -> Q601),
+	Q423	= (lowBattery -> Q613),
+	Q424	= (return2base -> Q191),
+	Q425	= (low -> Q12
+		  |follow -> Q414
+		  |picture -> Q433),
+	Q426	= (high -> Q371
+		  |move -> Q380),
+	Q427	= (return2base -> Q193),
+	Q428	= (pictureOk[0] -> Q10
+		  |pictureOk[1] -> Q221
+		  |lowBattery -> Q223),
+	Q429	= (move -> Q206
+		  |scan -> Q405
+		  |low -> Q593),
+	Q430	= (follow -> Q408
+		  |picture -> Q420
+		  |low -> Q616),
+	Q431	= (move -> Q380
+		  |high -> Q417),
+	Q432	= (lowBattery -> Q607),
+	Q433	= (pictureOk[0] -> Q3
+		  |pictureOk[1] -> Q211
+		  |lowBattery -> Q216),
+	Q434	= (move -> Q396
+		  |high -> Q484),
+	Q435	= (low -> Q19
+		  |move -> Q437),
+	Q436	= (return2base -> Q185),
+	Q437	= (move -> Q212
+		  |scan -> Q412
+		  |low -> Q600),
+	Q438	= (move -> Q156
+		  |scan -> Q546
+		  |low -> Q586),
+	Q439	= (move -> Q18
+		  |high -> Q54
+		  |hotSwapIn -> Q274
+		  |scan -> Q466),
+	Q440	= (low -> Q23
+		  |move -> Q443),
+	Q441	= (move -> Q38
+		  |high -> Q110
+		  |scan -> Q131
+		  |hotSwapIn -> Q511),
+	Q442	= (follow -> Q26
+		  |low -> Q215),
+	Q443	= (move -> Q202
+		  |scan -> Q401
+		  |low -> Q589),
+	Q444	= (hotSwapIn -> Q16
+		  |lowBattery -> Q255),
+	Q445	= (low -> Q13
+		  |move -> Q429),
+	Q446	= (lowBattery -> Q35
+		  |pictureOk[0..1] -> Q218),
+	Q447	= (move -> Q245
+		  |high -> Q378),
+	Q448	= (low -> Q392),
+	Q449	= (low -> Q33
+		  |picture -> Q451),
+	Q450	= (follow -> Q34
+		  |low -> Q217),
+	Q451	= (lowBattery -> Q37
+		  |pictureOk[0..1] -> Q221),
+	Q452	= (low -> Q390
+		  |move -> Q437
+		  |scan -> Q614),
+	Q453	= (low -> Q39
+		  |picture -> Q459),
+	Q454	= (follow -> Q15
+		  |low -> Q207),
+	Q455	= (low -> Q20
+		  |picture -> Q446),
+	Q456	= (pictureOk[1] -> Q71
+		  |pictureOk[0] -> Q483
+		  |lowBattery -> Q530),
+	Q457	= (low -> Q41
+		  |move -> Q467),
+	Q458	= (lowBattery -> Q242),
+	Q459	= (lowBattery -> Q28
+		  |pictureOk[0..1] -> Q211),
+	Q460	= (pictureOk[1] -> Q61
+		  |lowBattery -> Q64
+		  |hotSwapIn -> Q456
+		  |pictureOk[0] -> Q479),
+	Q461	= (lowBattery -> Q469),
+	Q462	= (low -> Q383),
+	Q463	= (hotSwapIn -> Q42
+		  |move -> Q444
+		  |high -> Q482),
+	Q464	= (follow -> Q47
+		  |low -> Q450),
+	Q465	= (low -> Q48
+		  |move -> Q475),
+	Q466	= (hotSwapIn -> Q68
+		  |scan.val[0] -> Q278
+		  |scan.val[1] -> Q281),
+	Q467	= (scan -> Q1
+		  |low -> Q393
+		  |move -> Q443),
+	Q468	= (pictureOk[1] -> Q45
+		  |hotSwapIn -> Q49
+		  |pictureOk[0] -> Q239),
+	Q469	= (return2base -> Q559),
+	Q470	= (hotSwapIn -> Q25
+		  |scan.val[0] -> Q233
+		  |lowBattery -> Q257
+		  |scan.val[1] -> Q479),
+	Q471	= (low -> Q57
+		  |picture -> Q60),
+	Q472	= (follow -> Q58
+		  |low -> Q454),
+	Q473	= (low -> Q40
+		  |move -> Q452),
+	Q474	= (hotSwapIn -> Q21
+		  |takeoff -> Q376),
+	Q475	= (low -> Q385
+		  |move -> Q429
+		  |scan -> Q612),
+	Q476	= (hotSwapIn -> Q242
+		  |return2base -> Q474),
+	Q477	= (hotSwapIn -> Q59
+		  |scan.val[0] -> Q234
+		  |scan.val[1] -> Q239),
+	Q478	= (low -> Q65
+		  |picture -> Q75),
+	Q479	= (lowBattery -> Q30
+		  |hotSwapIn -> Q483),
+	Q480	= (follow -> Q46
+		  |low -> Q442),
+	Q481	= (high -> Q238
+		  |move -> Q558),
+	Q482	= (hotSwapIn -> Q63
+		  |lowBattery -> Q476),
+	Q483	= (lowBattery -> Q469),
+	Q484	= (high -> Q77
+		  |move -> Q368),
+	Q485	= (move -> Q558
+		  |high -> Q606),
+	Q486	= (lowBattery -> Q44
+		  |hotSwapIn -> Q496),
+	Q487	= (picture -> Q50
+		  |low -> Q56),
+	Q488	= (low -> Q181
+		  |scan -> Q226
+		  |move -> Q467),
+	Q489	= (scan.val[1] -> Q30
+		  |scan.val[0] -> Q102
+		  |hotSwapIn -> Q595),
+	Q490	= (low -> Q186
+		  |scan -> Q229
+		  |move -> Q475),
+	Q491	= (move -> Q18
+		  |high -> Q54
+		  |hotSwapIn -> Q274
+		  |scan -> Q466),
+	Q492	= (scan.val[0] -> Q208
+		  |scan.val[1] -> Q224),
+	Q493	= (low -> Q82
+		  |move -> Q490),
+	Q494	= (pictureOk[1] -> Q377
+		  |pictureOk[0] -> Q539),
+	Q495	= (low -> Q177
+		  |scan -> Q219
+		  |move -> Q452),
+	Q496	= (lowBattery -> Q171),
+	Q497	= (follow -> Q89
+		  |low -> Q472),
+	Q498	= (high -> Q96),
+	Q499	= (low -> Q90
+		  |move -> Q495),
+	Q500	= (lowBattery -> Q304),
+	Q501	= (hotSwapIn -> Q52
+		  |scan.val[0] -> Q265
+		  |scan.val[1] -> Q268),
+	Q502	= (pictureOk[1] -> Q92
+		  |pictureOk[0] -> Q281
+		  |hotSwapIn -> Q494),
+	Q503	= (low -> Q99
+		  |picture -> Q103),
+	Q504	= (follow -> Q100
+		  |low -> Q480),
+	Q505	= (low -> Q66
+		  |move -> Q488),
+	Q506	= (hotSwapIn -> Q87
+		  |move -> Q251
+		  |high -> Q463),
+	Q507	= (high -> Q132
+		  |move -> Q252
+		  |hotSwapIn -> Q271),
+	Q508	= (scan -> Q249
+		  |move -> Q490
+		  |low -> Q594),
+	Q509	= (high -> Q74
+		  |hotSwapIn -> Q121
+		  |picture -> Q502),
+	Q510	= (picture -> Q105
+		  |low -> Q108),
+	Q511	= (high -> Q77
+		  |move -> Q368),
+	Q512	= (follow -> Q73
+		  |low -> Q464),
+	Q513	= (move -> Q248
+		  |high -> Q562),
+	Q514	= (low -> Q115
+		  |move -> Q524),
+	Q515	= (scan.val[1] -> Q539
+		  |scan.val[0] -> Q555),
+	Q516	= (high -> Q119
+		  |move -> Q580),
+	Q517	= (picture -> Q128
+		  |hotSwapIn -> Q308
+		  |high -> Q335),
+	Q518	= (move -> Q86
+		  |high -> Q106
+		  |hotSwapIn -> Q107
+		  |scan -> Q329),
+	Q519	= (low -> Q81
+		  |picture -> Q91),
+	Q520	= (follow -> Q116
+		  |low -> Q504),
+	Q521	= (low -> Q118
+		  |move -> Q531),
+	Q522	= (hotSwapIn -> Q7
+		  |move -> Q86
+		  |high -> Q528),
+	Q523	= (hotSwapIn -> Q80
+		  |scan.val[1] -> Q239
+		  |scan.val[0] -> Q285),
+	Q524	= (scan -> Q264
+		  |move -> Q495
+		  |low -> Q598),
+	Q525	= (high -> Q384
+		  |move -> Q580),
+	Q526	= (low -> Q126
+		  |picture -> Q129),
+	Q527	= (follow -> Q127
+		  |low -> Q512),
+	Q528	= (high -> Q95
+		  |hotSwapIn -> Q125
+		  |move -> Q266),
+	Q529	= (low -> Q109
+		  |move -> Q508),
+	Q530	= (pictureOk[1] -> Q304
+		  |pictureOk[0] -> Q469),
+	Q531	= (scan -> Q241
+		  |move -> Q488
+		  |low -> Q585),
+	Q532	= (lowBattery -> Q102
+		  |hotSwapIn -> Q123),
+	Q533	= (low -> Q133
+		  |picture -> Q143),
+	Q534	= (move -> Q86
+		  |high -> Q106
+		  |hotSwapIn -> Q107
+		  |scan -> Q329),
+	Q535	= (follow -> Q114
+		  |low -> Q497),
+	Q536	= (move -> Q327
+		  |high -> Q382),
+	Q537	= (move -> Q86
+		  |high -> Q154
+		  |hotSwapIn -> Q581),
+	Q538	= (move -> Q38
+		  |high -> Q110
+		  |scan -> Q131
+		  |hotSwapIn -> Q511),
+	Q539	= (high -> Q357),
+	Q540	= (scan.val[1] -> Q402
+		  |scan.val[0] -> Q411),
+	Q541	= (picture -> Q117
+		  |low -> Q124),
+	Q542	= (pictureOk[1] -> Q162
+		  |pictureOk[0] -> Q308),
+	Q543	= (scan -> Q284
+		  |low -> Q389
+		  |move -> Q524),
+	Q544	= (high -> Q5),
+	Q545	= (high -> Q238
+		  |move -> Q558),
+	Q546	= (scan.val[0] -> Q142
+		  |scan.val[1] -> Q563),
+	Q547	= (high -> Q220
+		  |move -> Q245),
+	Q548	= (scan -> Q286
+		  |low -> Q391
+		  |move -> Q531),
+	Q549	= (follow -> Q116
+		  |picture -> Q130
+		  |low -> Q318),
+	Q550	= (scan -> Q277
+		  |low -> Q386
+		  |move -> Q508),
+	Q551	= (pictureOk[1] -> Q145
+		  |pictureOk[0] -> Q517
+		  |hotSwapIn -> Q542),
+	Q552	= (low -> Q147
+		  |follow -> Q355),
+	Q553	= (hotSwapIn -> Q112
+		  |scan.val[0] -> Q313
+		  |scan.val[1] -> Q323),
+	Q554	= (scan.val[0] -> Q152
+		  |scan.val[1] -> Q568),
+	Q555	= (high -> Q324
+		  |move -> Q603),
+	Q556	= (high -> Q320
+		  |move -> Q513),
+	Q557	= (high -> Q132
+		  |hotSwapIn -> Q149
+		  |move -> Q252),
+	Q558	= (lowBattery -> Q171),
+	Q559	= (stopOldSpec -> Q153),
+	Q560	= (follow -> Q127
+		  |picture -> Q139
+		  |low -> Q328),
+	Q561	= (follow -> Q93
+		  |picture -> Q130
+		  |low -> Q318),
+	Q562	= (lowBattery -> Q155),
+	Q563	= (low -> Q159
+		  |follow -> Q367),
+	Q564	= (scan.val[0] -> Q135
+		  |scan.val[1] -> Q552),
+	Q565	= (stopOldSpec -> Q172),
+	Q566	= (takeoff -> Q183),
+	Q567	= (follow -> Q94
+		  |picture -> Q139
+		  |low -> Q328),
+	Q568	= (low -> Q141
+		  |follow -> Q342),
+	Q569	= (move -> Q144
+		  |hotSwapIn -> Q209
+		  |high -> Q575),
+	Q570	= (scan.val[1] -> Q83
+		  |hotSwapIn -> Q140
+		  |scan.val[0] -> Q344),
+	Q571	= (follow -> Q114
+		  |picture -> Q122
+		  |low -> Q317),
+	Q572	= (high -> Q174
+		  |move -> Q368),
+	Q573	= (startNewSpec -> Q587),
+	Q574	= (follow -> Q84
+		  |picture -> Q122
+		  |low -> Q317),
+	Q575	= (high -> Q150
+		  |hotSwapIn -> Q168
+		  |move -> Q325),
+	Q576	= (lowBattery -> Q304),
+	Q577	= (high -> Q151
+		  |hotSwapIn -> Q165
+		  |picture -> Q551),
+	Q578	= (move -> Q86
+		  |high -> Q154
+		  |hotSwapIn -> Q167),
+	Q579	= (takeoff -> Q175),
+	Q580	= (high -> Q337
+		  |move -> Q513),
+	Q581	= (move -> Q245
+		  |high -> Q378),
+	Q582	= (stopOldSpec -> Q379),
+	Q583	= (move -> Q558
+		  |high -> Q576),
+	Q584	= (high -> Q384
+		  |move -> Q580),
+	Q585	= (low -> Q181
+		  |scan -> Q226
+		  |move -> Q467),
+	Q586	= (low -> Q178
+		  |scan -> Q311
+		  |move -> Q548),
+	Q587	= (takeoff -> Q183),
+	Q588	= (reconfigure -> Q438),
+	Q589	= (low -> Q184
+		  |scan -> Q599
+		  |move -> Q604),
+	Q590	= (high -> Q375),
+	Q591	= (lowBattery -> Q187
+		  |scan.val[0] -> Q195
+		  |scan.val[1] -> Q404),
+	Q592	= (low -> Q188
+		  |scan -> Q322
+		  |move -> Q550),
+	Q593	= (low -> Q190
+		  |scan -> Q602
+		  |move -> Q609),
+	Q594	= (low -> Q186
+		  |scan -> Q229
+		  |move -> Q475),
+	Q595	= (scan.val[0] -> Q413
+		  |scan.val[1] -> Q469),
+	Q596	= (low -> Q176
+		  |scan -> Q301
+		  |move -> Q543),
+	Q597	= (takeoff -> Q175),
+	Q598	= (low -> Q177
+		  |scan -> Q219
+		  |move -> Q452),
+	Q599	= (lowBattery -> Q194
+		  |scan.val[0] -> Q200
+		  |scan.val[1] -> Q407),
+	Q600	= (low -> Q180
+		  |scan -> Q591
+		  |move -> Q601),
+	Q601	= (lowBattery -> Q169),
+	Q602	= (lowBattery -> Q182
+		  |scan.val[0] -> Q192
+		  |scan.val[1] -> Q399),
+	Q603	= (move -> Q558
+		  |high -> Q606),
+	Q604	= (lowBattery -> Q170),
+	Q605	= (low -> Q199
+		  |move -> Q604),
+	Q606	= (lowBattery -> Q171),
+	Q607	= (return2base -> Q191),
+	Q608	= (low -> Q203
+		  |move -> Q609),
+	Q609	= (lowBattery -> Q164),
+	Q610	= (low -> Q196
+		  |move -> Q601),
+	Q611	= (return2base -> Q193),
+	Q612	= (scan.val[1] -> Q2
+		  |scan.val[0] -> Q210),
+	Q613	= (return2base -> Q185),
+	Q614	= (scan.val[1] -> Q8
+		  |scan.val[0] -> Q214),
+	Q615	= (low -> Q215
+		  |follow -> Q425),
+	Q616	= (lowBattery -> Q611)+{{mid, weather}.

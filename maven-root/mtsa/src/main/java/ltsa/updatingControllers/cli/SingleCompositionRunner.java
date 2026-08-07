@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import ltsa.lts.CompactState;
 import ltsa.lts.CompositeState;
@@ -15,6 +16,7 @@ import ltsa.dispatcher.TransitionSystemDispatcher;
 import ltsa.updatingControllers.CompositionEvaluationRunner;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder;
 import ltsa.updatingControllers.checks.UpdateRequirementChecker;
+import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 
 public final class SingleCompositionRunner {
 
@@ -23,6 +25,7 @@ public final class SingleCompositionRunner {
     static final int EXIT_NO_TRANSITION_OUTPUT = 3;
     static final int EXIT_EXCEPTION = 4;
     static final int EXIT_OUT_OF_MEMORY = 5;
+    static final int EXIT_METHOD_MISMATCH = 6;
     static final int EXIT_USAGE = 64;
 
     private SingleCompositionRunner() {
@@ -49,6 +52,8 @@ public final class SingleCompositionRunner {
             File minimizedTransitionsFile = optionalFile(options, "minimized-transitions");
             File minimizedCountsFile = optionalFile(options, "minimized-counts");
             File requirementsCheckFile = optionalFile(options, "requirements-check");
+            File executionMetadataFile = optionalFile(options, "execution-metadata");
+            String expectedMethod = options.get("expected-method");
             boolean minimize = booleanOption(options, "minimize");
             boolean writeSeparateMinimizedOutput = minimizedTransitionsFile != null || minimizedCountsFile != null;
 
@@ -59,17 +64,40 @@ public final class SingleCompositionRunner {
                     ? new File(".").getAbsolutePath()
                     : parent.getAbsolutePath();
 
+            final CompositionEvaluationRunner.CompilationStep compilerStep =
+                    CompositionEvaluationRunner.ltsCompilerStep(
+                            new LTSInputString(source),
+                            target,
+                            currentDirectory);
             CompositionEvaluationRunner.Request request =
                     new CompositionEvaluationRunner.Request(
                             output,
-                            CompositionEvaluationRunner.ltsCompilerStep(
-                                    new LTSInputString(source),
-                                    target,
-                                    currentDirectory))
+                            new CompositionEvaluationRunner.CompilationStep() {
+                                @Override
+                                public CompositeState compile(ltsa.lts.LTSOutput compilerOutput)
+                                        throws Exception {
+                                    CompositeState compiled = compilerStep.compile(compilerOutput);
+                                    MethodValidation validation = MethodValidation.inspect(
+                                            compiled,
+                                            target,
+                                            expectedMethod);
+                                    if (executionMetadataFile != null) {
+                                        validation.write(executionMetadataFile);
+                                    }
+                                    if (!validation.matches) {
+                                        throw new MethodMismatchException(validation.message);
+                                    }
+                                    return compiled;
+                                }
+                            })
                             .withOpenFileName(ltsFile.getAbsolutePath());
 
             CompositionEvaluationRunner.Result result = CompositionEvaluationRunner.run(request);
             Throwable failure = result.getFailure();
+            if (failure instanceof MethodMismatchException) {
+                System.err.println(failure.getMessage());
+                return EXIT_METHOD_MISMATCH;
+            }
             if (failure instanceof OutOfMemoryError) {
                 return EXIT_OUT_OF_MEMORY;
             }
@@ -90,7 +118,7 @@ public final class SingleCompositionRunner {
             }
 
             long rawStates = selected.maxStates;
-            long rawTransitions = selected.ntransitions();
+            long rawTransitions = selected.ntransitionsLong();
             if (!minimize || writeSeparateMinimizedOutput || requirementsCheckFile != null) {
                 writeTransitions(selected, transitionsFile);
             }
@@ -99,14 +127,14 @@ public final class SingleCompositionRunner {
             }
 
             if (minimize || writeSeparateMinimizedOutput) {
-                long minimizeStart = System.currentTimeMillis();
+                long minimizeStart = System.nanoTime();
                 CompactState minimized = TransitionSystemDispatcher.minimise(selected, output);
-                long minimizeTimeMillis = System.currentTimeMillis() - minimizeStart;
+                long minimizeTimeMillis = elapsedMillis(minimizeStart);
 
-                long countStart = System.currentTimeMillis();
+                long countStart = System.nanoTime();
                 long minimizedStates = minimized.maxStates;
-                long minimizedTransitions = minimized.ntransitions();
-                long countTimeMillis = System.currentTimeMillis() - countStart;
+                long minimizedTransitions = minimized.ntransitionsLong();
+                long countTimeMillis = elapsedMillis(countStart);
 
                 UpdatingControllerEvaluationRecorder.recordMinimizedOutputController(
                         minimizedStates,
@@ -177,7 +205,7 @@ public final class SingleCompositionRunner {
             }
         }
 
-        return current.composition;
+        return null;
     }
 
     private static boolean namesMatch(String machineName, String target) {
@@ -223,7 +251,7 @@ public final class SingleCompositionRunner {
                 "Minimized output update controller count time", Math.max(0, countTimeMillis), "ms");
         appendMinimizedCountRow(builder, target, "minimized_output_update_controller_minimize_time",
                 "Minimized output update controller minimize time", Math.max(0, minimizeTimeMillis), "ms");
-        Files.write(countsFile.toPath(), builder.toString().getBytes(StandardCharsets.UTF_8));
+        ExperimentCampaignProvenance.writeUtf8Atomically(countsFile, builder.toString());
     }
 
     private static void appendMinimizedCountRow(
@@ -243,6 +271,11 @@ public final class SingleCompositionRunner {
                 .append(',')
                 .append(csv(unit))
                 .append('\n');
+    }
+
+    private static long elapsedMillis(long startedAtNanos) {
+        return TimeUnit.NANOSECONDS.toMillis(
+                Math.max(0L, System.nanoTime() - startedAtNanos));
     }
 
     private static String csv(String value) {
@@ -325,7 +358,9 @@ public final class SingleCompositionRunner {
                 + "[--minimize true] "
                 + "[--minimized-transitions minimized_transitions.txt] "
                 + "[--minimized-counts minimized_counts.csv] "
-                + "[--requirements-check requirements_check.csv]");
+                + "[--requirements-check requirements_check.csv] "
+                + "[--expected-method Traditional|stepwise_delayed+SBP|OTF] "
+                + "[--execution-metadata execution.json]");
     }
 
     private static void writeRequirementsCheck(
@@ -337,5 +372,163 @@ public final class SingleCompositionRunner {
                 UpdateRequirementChecker.check(transitionsFile, ltsFile, target);
         CliFileLTSOutput.ensureParentDirectory(requirementsCheckFile);
         Files.write(requirementsCheckFile.toPath(), report.toCsv().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static final class MethodMismatchException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        MethodMismatchException(String message) {
+            super(message);
+        }
+    }
+
+    static final class MethodValidation {
+        final String target;
+        final String expectedMethod;
+        final String actualMethod;
+        final boolean expectedSbp;
+        final boolean actualSbp;
+        final String compositeStateClass;
+        final String compositeStateName;
+        final boolean targetMatches;
+        final boolean matches;
+        final String message;
+
+        private MethodValidation(
+                String target,
+                String expectedMethod,
+                String actualMethod,
+                boolean expectedSbp,
+                boolean actualSbp,
+                String compositeStateClass,
+                String compositeStateName,
+                boolean targetMatches,
+                boolean matches,
+                String message) {
+            this.target = target;
+            this.expectedMethod = expectedMethod;
+            this.actualMethod = actualMethod;
+            this.expectedSbp = expectedSbp;
+            this.actualSbp = actualSbp;
+            this.compositeStateClass = compositeStateClass;
+            this.compositeStateName = compositeStateName;
+            this.targetMatches = targetMatches;
+            this.matches = matches;
+            this.message = message;
+        }
+
+        static MethodValidation inspect(
+                CompositeState current,
+                String target,
+                String expectedMethod) {
+            String expected = normalizeMethod(expectedMethod);
+            String actual = "non_updating_controller";
+            boolean actualSbp = false;
+            if (current instanceof UpdatingControllerCompositeState) {
+                UpdatingControllerCompositeState update =
+                        (UpdatingControllerCompositeState) current;
+                actualSbp = update.isSafetyBackwardPruning();
+                if (update.isOTF()) {
+                    actual = "otf";
+                } else if (update.isStepwiseDelayed()) {
+                    actual = "stepwise_delayed";
+                } else if (update.isStepwise()) {
+                    actual = "stepwise";
+                } else {
+                    actual = "traditional";
+                }
+            }
+            boolean expectedSbp = expectsSbp(expectedMethod);
+            boolean methodKnown = !"unknown".equals(expected);
+            boolean targetMatches = current != null && namesMatch(current.name, target);
+            boolean methodMatches = expectedMethod == null || expectedMethod.trim().isEmpty()
+                    || (methodKnown && expected.equals(actual) && expectedSbp == actualSbp);
+            boolean matches = targetMatches && methodMatches;
+            String message = matches
+                    ? "method/target validation passed"
+                    : "Configured method/target does not match compiled semantics: target=" + target
+                            + ", compiledTarget="
+                            + (current == null ? "null" : current.name)
+                            + ", targetMatches=" + targetMatches
+                            + ", expectedMethod=" + expectedMethod
+                            + ", expectedMode=" + expected
+                            + ", expectedSBP=" + expectedSbp
+                            + ", actualMode=" + actual
+                            + ", actualSBP=" + actualSbp
+                            + ", compositeState="
+                            + (current == null ? "null" : current.name);
+            return new MethodValidation(
+                    target,
+                    expectedMethod,
+                    actual,
+                    expectedSbp,
+                    actualSbp,
+                    current == null ? null : current.getClass().getName(),
+                    current == null ? null : current.name,
+                    targetMatches,
+                    matches,
+                    message);
+        }
+
+        private static String normalizeMethod(String method) {
+            String normalized = method == null
+                    ? ""
+                    : method.toLowerCase(java.util.Locale.ROOT);
+            if (normalized.contains("traditional")) {
+                return "traditional";
+            }
+            if (normalized.contains("stepwise") && normalized.contains("delayed")) {
+                return "stepwise_delayed";
+            }
+            if (normalized.contains("stepwise")) {
+                // Paper YAML uses stepwise_delayed+SBP, while some older YAML
+                // shortened the label to Stepwise.
+                return "stepwise_delayed";
+            }
+            if (normalized.contains("otf")) {
+                return "otf";
+            }
+            return "unknown";
+        }
+
+        private static boolean expectsSbp(String method) {
+            String normalized = method == null
+                    ? ""
+                    : method.toLowerCase(java.util.Locale.ROOT);
+            return normalized.contains("sbp")
+                    || normalized.contains("safetybackward")
+                    || normalized.contains("safety_backward")
+                    || normalized.contains("safety-backward");
+        }
+
+        void write(File file) throws Exception {
+            CliFileLTSOutput.ensureParentDirectory(file);
+            StringBuilder json = new StringBuilder();
+            json.append("{\n")
+                    .append("  \"target\": ").append(json(target)).append(",\n")
+                    .append("  \"expectedMethod\": ").append(json(expectedMethod)).append(",\n")
+                    .append("  \"actualMethod\": ").append(json(actualMethod)).append(",\n")
+                    .append("  \"expectedSbp\": ").append(expectedSbp).append(",\n")
+                    .append("  \"actualSbp\": ").append(actualSbp).append(",\n")
+                    .append("  \"compositeStateClass\": ")
+                    .append(json(compositeStateClass)).append(",\n")
+                    .append("  \"compositeStateName\": ")
+                    .append(json(compositeStateName)).append(",\n")
+                    .append("  \"targetMatches\": ").append(targetMatches).append(",\n")
+                    .append("  \"matches\": ").append(matches).append(",\n")
+                    .append("  \"message\": ").append(json(message)).append('\n')
+                    .append("}\n");
+            ExperimentCampaignProvenance.writeUtf8Atomically(file, json.toString());
+        }
+
+        private static String json(String value) {
+            if (value == null) {
+                return "null";
+            }
+            return "\"" + value.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r") + "\"";
+        }
     }
 }

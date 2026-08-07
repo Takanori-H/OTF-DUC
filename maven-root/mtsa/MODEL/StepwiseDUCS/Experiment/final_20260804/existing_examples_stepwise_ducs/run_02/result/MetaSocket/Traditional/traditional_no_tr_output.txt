@@ -1,0 +1,114 @@
+INFO: Registered Map Environment: MAPPING_IO
+INFO: Registered Map Environment: MAPPING_64_128
+comp.compile time : 92ms
+Compiled: DES64
+Compiled: IO_OLD
+Composition:ENV_DES64 = ENV_DES64.DES64 || ENV_DES64.IO_OLD
+State Space: 1 * 2 = 2 ** 1
+Composing...
+-- States: 2 Transitions: 4 Memory used: 9300K
+Composed in 16ms
+Formula !P_DES64 = (true U ((output & !EncriptionDone64) | (des64 & !InputRecieve)))
+GBA 2 states 4 transitions
+Buchi automata:
+P_DES64 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |des64&!InputRecieve -> S1 |output&!EncriptionDone64 -> S1).
+Composition:P_DES64 = InputRecieve || EncriptionDone64 || des64 || output || SYNC || P_DES64
+State Space: 2 * 2 * 2 * 2 * 2 * 2 = 2 ** 6
+Composing...
+-- States: 21 Transitions: 55 Memory used: 10064K
+Composed in 9ms
+After Tau elimination = 11 state
+Tau reduction ON
+P_DES64 minimising...
+Minimised States: 5 in 0ms
+make DFA(P_DES64)
+DFA(P_DES64) has 4 states.
+Tau reduction ON
+P_DES64 minimising...
+Minimised States: 4 in 0ms
+Composition:CONTROLLER64 = ENV_DES64 || P_DES64
+State Space: 2 * 4 = 2 ** 3
+Composing...
+-- States: 4 Transitions: 8 Memory used: 10122K
+Composed in 8ms
+Solving the LTS control problem.
+Environment states: 5
+Game states: 5
+Game transitions: 15
+Analysis time: 55ms.
+Controller [4] generated successfully.
+Composition:CONTROLLER64 = CONTROLLER64 || P_DES64
+State Space: 4 * 4 = 2 ** 4
+Composing...
+-- States: 4 Transitions: 5 Memory used: 11737K
+Composed in 13ms
+Compiled: CONTROLLER64
+Composition:ENV_DES64 = ENV_DES64.DES64 || ENV_DES64.IO_OLD
+State Space: 1 * 2 = 2 ** 1
+Composing...
+-- States: 2 Transitions: 4 Memory used: 10793K
+Composed in 10ms
+ - Synthesizing Mapping Environment from lists (size=2)...
+INFO: Auto-compiling dependency: IO_NEW
+Generating Mapping Environment: MAP_IO_OLD_IO_NEW
+INFO: Auto-compiling dependency: DES128
+Generating Mapping Environment: MAP_DES64_DES128
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_IO_OLD_IO_NEW || MAP_DES64_DES128
+State Space: 4 * 2 = 2 ** 3
+Composing...
+-- States: 4 Transitions: 10 Memory used: 11632K
+Composed in 10ms
+comp.continueCompilation time : 199ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_DES64_UPD_OLD
+Processing formula for update: P_DES128_UPD_NEW
+Environment states:96
+Solving safety goals for the controller synthesis
+Environment states after safety: 97
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [49] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+比較用時間（合成全体-CountTime-描画） : 0分00.56秒
+
+[規模]
+最大状態数時の状態数 : 97 states
+最大状態数時の遷移数 : 330 transitions
+最大状態数時の段階 : [4. Final]
+最大遷移数時の状態数 : 96 states
+最大遷移数時の遷移数 : 409 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 49 states
+出力遷移数 : 86 transitions
+
+[GR(1)]
+final GR input 状態数 : 97 states
+final GR input 遷移数 : 330 transitions
+GR(1)合成時間 : 0分00.03秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 0.01 GB
+最初の有効sampleからのヒープ増加 : 0.01 GB
+====================================================
+
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_02\result\MetaSocket\Traditional\metasocket_traditional_no_tr_evaluation_UpdCont.csv
+Tau reduction ON
+UpdCont minimising...
+Minimised States: 18 in 1ms
+
+[minimized 出力]
+minimized 出力状態数 : 18 states
+minimized 出力遷移数 : 36 transitions
+minimize 時間 : 0 ms
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_02\result\MetaSocket\Traditional\metasocket_traditional_no_tr_evaluation_UpdCont.csv

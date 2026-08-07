@@ -1,0 +1,7 @@
+target,metric_key,metric_label,value,unit
+Stepwise_UpdCont_T2,raw_output_update_controller_states,Raw output update controller states,14002,states
+Stepwise_UpdCont_T2,raw_output_update_controller_transitions,Raw output update controller transitions,38990,transitions
+Stepwise_UpdCont_T2,minimized_output_update_controller_states,Minimized output update controller states,928,states
+Stepwise_UpdCont_T2,minimized_output_update_controller_transitions,Minimized output update controller transitions,3017,transitions
+Stepwise_UpdCont_T2,minimized_output_update_controller_count_time,Minimized output update controller count time,0,ms
+Stepwise_UpdCont_T2,minimized_output_update_controller_minimize_time,Minimized output update controller minimize time,3398,ms

@@ -48,6 +48,9 @@ public class MemoryWindowHandshakeCoordinatorTest {
         assertTrue(result.isEndBoundarySampleSucceeded());
         assertTrue(rssResult.isSynthesisWindowCompleted());
         assertEquals(2L, rssResult.getSynthesisWindowSampleCount());
+        assertEquals(100L, rssResult.getSynthesisWindowStartRssBytes());
+        assertEquals(200L, rssResult.getSynthesisWindowPeakRssBytes());
+        assertEquals(100L, rssResult.getSynthesisWindowPeakIncreaseRssBytes());
         coordinator.close();
     }
 

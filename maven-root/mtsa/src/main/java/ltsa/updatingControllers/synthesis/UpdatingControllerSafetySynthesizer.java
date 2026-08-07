@@ -110,7 +110,7 @@ public class UpdatingControllerSafetySynthesizer {
         // ▼▼▼ 評価実験用: [3] 枝刈り(Pruning)直後の状態数・遷移数 ▼▼▼
         long prunedCountStart = 0;
         int prunedStates = 0;
-        int prunedTrans = 0;
+        long prunedTrans = 0;
         long prunedCountTime = 0;
         if (UpdatingControllerEvaluationRecorder.isEnabled()) {
             prunedCountStart = System.currentTimeMillis();
@@ -391,16 +391,62 @@ public class UpdatingControllerSafetySynthesizer {
                 Arrays.asList(UpdateConstants.STOP_OLD_SPEC, UpdateConstants.START_NEW_SPEC));
     }
 
+    /**
+     * Variant for read-only synthesized views that intentionally carry no
+     * LTSA composition-role metadata. Traditional DUCS keeps the historical
+     * transferRolesInfo=true path through the existing overloads.
+     */
+    public static MTS<Long, String> getDontDoTwiceGoals(
+            MTS<Long, String> SafetyEnv,
+            boolean transferRolesInfo) {
+        return getDontDoTwiceGoals(
+                SafetyEnv,
+                Arrays.asList(UpdateConstants.STOP_OLD_SPEC, UpdateConstants.START_NEW_SPEC),
+                transferRolesInfo);
+    }
+
+    public static MTS<Long, String> getDontDoTwiceGoals(
+            CompactState safetyEnvironment,
+            Set<String> safetyAlphabet) {
+        return getDontDoTwiceGoals(
+                safetyEnvironment,
+                safetyAlphabet,
+                Arrays.asList(UpdateConstants.STOP_OLD_SPEC, UpdateConstants.START_NEW_SPEC));
+    }
+
     public static MTS<Long, String> getDontDoTwiceGoals(
             MTS<Long, String> SafetyEnv,
             Collection<String> dontDoTwiceActions) {
 
+        return getDontDoTwiceGoals(SafetyEnv, dontDoTwiceActions, true);
+    }
+
+    private static MTS<Long, String> getDontDoTwiceGoals(
+            MTS<Long, String> SafetyEnv,
+            Collection<String> dontDoTwiceActions,
+            boolean transferRolesInfo) {
+
+        CompactState safetyEnvironment = MTSToAutomataConverter.getInstance().convert(
+                SafetyEnv,
+                "safetyEnv",
+                transferRolesInfo);
+        return getDontDoTwiceGoals(
+                safetyEnvironment,
+                SafetyEnv.getActions(),
+                dontDoTwiceActions);
+    }
+
+    private static MTS<Long, String> getDontDoTwiceGoals(
+            CompactState safetyEnvironment,
+            Set<String> safetyAlphabet,
+            Collection<String> dontDoTwiceActions) {
+
         Vector<CompactState> machinesToCompose = new Vector<CompactState>();
-        machinesToCompose.add(MTSToAutomataConverter.getInstance().convert(SafetyEnv, "safetyEnv", true));
+        machinesToCompose.add(safetyEnvironment);
 
         // add machines from models that specify that special events cant be done twice
         for (String action : dontDoTwiceActions) {
-            machinesToCompose.add(dontDoTwiceModel(action, SafetyEnv.getActions()));
+            machinesToCompose.add(dontDoTwiceModel(action, safetyAlphabet));
         }
 
         CompositeState c = new CompositeState(machinesToCompose);
@@ -438,14 +484,8 @@ public class UpdatingControllerSafetySynthesizer {
     }
 
     // ▼▼▼ 評価実験用: MTSの遷移数をカウントするヘルパーメソッド ▼▼▼
-    private static int countTransitions(MTS<Long, String> mts) {
-        int count = 0;
-        for (Long state : mts.getStates()) {
-            // REQUIRED と MAYBE の両方の遷移をカウントする（通常はREQUIREDのみですが念のため両方）
-            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.REQUIRED).size();
-            count += mts.getTransitions(state, MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.MAYBE).size();
-        }
-        return count;
+    private static long countTransitions(MTS<Long, String> mts) {
+        return ltsa.updatingControllers.EvaluationTransitionCounter.countRequiredAndMaybe(mts);
     }
     // ▲▲▲ 追加ここまで ▲▲▲
 

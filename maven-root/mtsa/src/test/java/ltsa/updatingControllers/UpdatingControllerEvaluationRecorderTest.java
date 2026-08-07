@@ -1,8 +1,10 @@
 package ltsa.updatingControllers;
 
+import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 import ltsa.lts.LTSOutput;
 import ltsa.updatingControllers.UpdatingControllerEvaluationRecorder.ExternalDataMetric;
 import ltsa.updatingControllers.memory.RunHeapMemorySampler;
+import ltsa.updatingControllers.synthesis.SafetyBackwardPruner;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -17,6 +19,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -134,6 +138,188 @@ public class UpdatingControllerEvaluationRecorderTest {
         assertEquals(
                 Arrays.asList("500"),
                 stableBaseValues(rows, "repeated stage / Transitions", "transitions"));
+    }
+
+    @Test
+    public void traditionalPeakIncludesMappingEnvironmentProduct() throws Exception {
+        UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "入力規模 / Traditional Mapping Environment",
+                "Traditional Mapping Environment",
+                200L,
+                300L,
+                0L);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "Traditional DUC 最大状態数と遷移数",
+                "[1. E_u] (Old Controller || Mapping Environment)",
+                100L,
+                500L,
+                0L);
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertEquals("200", metrics.get("peak_state_space_states"));
+        assertEquals("300", metrics.get("peak_state_space_states_stage_transitions"));
+        assertEquals("[0. Mapping product]", metrics.get("peak_state_space_states_stage"));
+        assertEquals("500", metrics.get("peak_state_space_transitions"));
+        assertEquals("100", metrics.get("peak_state_space_transitions_stage_states"));
+        assertEquals("[1. E_u]", metrics.get("peak_state_space_transitions_stage"));
+    }
+
+    @Test
+    public void observedTimeDoesNotSubtractOutputProducedAfterTotalTimeWasFrozen()
+            throws Exception {
+        UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "合成ボタンを押してから合成完了までの時間", 1000L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "構文解析時間", 100L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "コントローラ描画時間", 50L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "コントローラ合成時間", 700L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Old Controller 合成時間", 20L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間", 30L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Mapping Environment Component 合成時間", 40L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間", 40L);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "test", "count overhead", 1L, 1L, 10L);
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertEquals("840", metrics.get("comparison_observed_time_without_parse_count_and_draw"));
+        assertEquals("750", metrics.get(
+                "comparison_strict_observed_time_without_parse_common_preprocess_count_and_draw"));
+        assertEquals("710", metrics.get("comparison_observed_total_based_unclassified_time"));
+        assertEquals("700", metrics.get("comparison_primary_controller_synthesis_time"));
+        assertEquals("false", metrics.get(
+                "comparison_internal_core_time_cross_method_comparable"));
+        assertFalse(metrics.containsKey("comparison_core_synthesis_time"));
+    }
+
+    @Test
+    public void deferredSbpWritesStablePerScopeBeforeAfterRemovalAndTimeKeys()
+            throws Exception {
+        UpdatingControllerEvaluationRecorder.setMode("Stepwise Delayed DUC");
+        MTSImpl<Long, String> environment = new MTSImpl<Long, String>(0L);
+        environment.addState(1L);
+        environment.addAction("controlled");
+        environment.addRequired(0L, "controlled", 1L);
+        Map<String, Set<Integer>> owners = new HashMap<String, Set<Integer>>();
+        owners.put("controlled", Collections.singleton(0));
+
+        SafetyBackwardPruner.pruneDeferred(
+                environment,
+                Collections.singleton(1L),
+                Collections.singleton("controlled"),
+                owners,
+                Collections.singleton(0),
+                "local stage 1",
+                null);
+        SafetyBackwardPruner.pruneDeferred(
+                environment,
+                Collections.singleton(1L),
+                Collections.singleton("controlled"),
+                owners,
+                Collections.singleton(0),
+                "cross component 1",
+                null);
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        String prefix = "stepwise_delayed_deferred_sbp_local_stage_1_";
+        assertEquals("2", metrics.get(prefix + "before_states"));
+        assertEquals("1", metrics.get(prefix + "before_transitions"));
+        assertEquals("1", metrics.get(prefix + "after_states"));
+        assertEquals("0", metrics.get(prefix + "after_transitions"));
+        assertEquals("1", metrics.get(prefix + "removed_states"));
+        assertEquals("1", metrics.get(prefix + "removed_transitions"));
+        assertTrue(metrics.containsKey(prefix + "elapsed_time"));
+        assertEquals("2", metrics.get("stepwise_delayed_deferred_sbp_call_count"));
+        assertEquals("1", metrics.get("stepwise_delayed_deferred_sbp_local_call_count"));
+        assertEquals("1", metrics.get("stepwise_delayed_deferred_sbp_cross_call_count"));
+        assertEquals("2", metrics.get("stepwise_delayed_deferred_sbp_local_before_states_sum"));
+        assertEquals("1", metrics.get("stepwise_delayed_deferred_sbp_local_after_states_sum"));
+        assertEquals("1", metrics.get("stepwise_delayed_deferred_sbp_local_removed_states_sum"));
+        assertEquals("1", metrics.get(
+                "stepwise_delayed_deferred_sbp_local_removed_transitions_sum"));
+        assertEquals("2", metrics.get("stepwise_delayed_deferred_sbp_cross_before_states_sum"));
+        assertEquals("1", metrics.get("stepwise_delayed_deferred_sbp_cross_after_states_sum"));
+    }
+
+    @Test
+    public void finalGrInputWritesSymmetricTraditionalStepwiseAliases() throws Exception {
+        UpdatingControllerEvaluationRecorder.recordFinalGrInputStateSpace(
+                "stepwise_delayed",
+                "Stepwise Delayed DUC",
+                123L,
+                456L,
+                "test stage");
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertEquals("123", metrics.get("stepwise_delayed_final_gr_input_states"));
+        assertEquals("456", metrics.get("stepwise_delayed_final_gr_input_transitions"));
+        assertEquals("123", metrics.get("stepwise_delayed_final_states"));
+        assertEquals("456", metrics.get("stepwise_delayed_final_transitions"));
+    }
+
+    @Test
+    public void metricMetadataPrioritizesUnitAndUsesWholeTokens() throws Exception {
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "peak_state_space_states_stage_transitions",
+                "Evaluation Summary / 全体",
+                "状態数ピーク時の遷移数",
+                "10",
+                "transitions",
+                "test");
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "minimized_output_update_controller_minimize_time",
+                "Output Update Controller",
+                "minimize time",
+                "20",
+                "ms",
+                "test");
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "generate_action_fluent_count",
+                "test",
+                "generate action fluent count",
+                "3",
+                "fluents",
+                "test");
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "sample_heap_bytes",
+                "test",
+                "sample heap",
+                "1024",
+                "B",
+                "test");
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        List<List<String>> rows = readCsvRows(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertMetricMetadata(rows, "peak_state_space_states_stage_transitions", "遷移数", "遷移数");
+        assertMetricMetadata(rows, "minimized_output_update_controller_minimize_time", "時間", "時間");
+        assertMetricMetadata(rows, "sample_heap_bytes", "メモリ", "メモリ");
+        List<String> actionFluent = rowByMetricKey(rows, "generate_action_fluent_count");
+        assertFalse("割合".equals(actionFluent.get(13)));
+        assertFalse("割合".equals(actionFluent.get(18)));
+        for (int index = 1; index < rows.size(); index++) {
+            assertEquals("2026-08-04-evaluation-v4", rows.get(index).get(9));
+        }
     }
 
     @Test
@@ -525,6 +711,25 @@ public class UpdatingControllerEvaluationRecorderTest {
         }
         fields.add(current.toString());
         return fields;
+    }
+
+    private static void assertMetricMetadata(
+            List<List<String>> rows,
+            String metricKey,
+            String category,
+            String stat) {
+        List<String> row = rowByMetricKey(rows, metricKey);
+        assertEquals(category, row.get(13));
+        assertEquals(stat, row.get(18));
+    }
+
+    private static List<String> rowByMetricKey(List<List<String>> rows, String metricKey) {
+        for (List<String> row : rows) {
+            if (row.size() > 18 && metricKey.equals(row.get(4))) {
+                return row;
+            }
+        }
+        throw new AssertionError("Metric not found: " + metricKey);
     }
 
     private static void restoreProperty(String key, String value) {

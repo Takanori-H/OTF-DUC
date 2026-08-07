@@ -9,26 +9,34 @@ import MTSTools.ac.ic.doc.commons.relations.Pair;
 import MTSTools.ac.ic.doc.mtstools.model.MTS;
 import MTSTools.ac.ic.doc.mtstools.model.MTSConstants;
 import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
+import ltsa.ac.ic.doc.mtstools.util.fsp.AutomataToMTSConverter;
+import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
+import ltsa.lts.CompactState;
 import ltsa.lts.LTSException;
 import ltsa.lts.LTSOutput;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.synthesis.SafetyBackwardPruner;
+import ltsa.updatingControllers.synthesis.UpdatingControllerSafetySynthesizer;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class StepwiseDelayedUpdatingControllerSynthesizerTest {
 
@@ -590,6 +598,193 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                 "stay"));
     }
 
+    @Test
+    public void connectedEnvironmentViewMatchesMaterializedGraphAndCompactStateConversion() {
+        MTS<Long, String> oldEnvironment = new MTSImpl<Long, String>(5L);
+        oldEnvironment.addState(9L);
+        oldEnvironment.addState(100L);
+        oldEnvironment.addActions(set(
+                "control",
+                "observe",
+                UpdateConstants.STOP_OLD_SPEC,
+                "oldMaybeOnly",
+                "oldAlphabetOnly",
+                "unreachableOld"));
+        oldEnvironment.addRequired(5L, "control", 9L);
+        oldEnvironment.addRequired(5L, "observe", 5L);
+        oldEnvironment.addRequired(9L, UpdateConstants.STOP_OLD_SPEC, 9L);
+        oldEnvironment.addRequired(100L, "unreachableOld", 100L);
+        oldEnvironment.addPossible(5L, "oldMaybeOnly", 9L);
+
+        MTS<Long, String> mappingEnvironment = new MTSImpl<Long, String>(3L);
+        mappingEnvironment.addState(7L);
+        mappingEnvironment.addState(11L);
+        mappingEnvironment.addState(90L);
+        mappingEnvironment.addActions(set(
+                "control",
+                "passive",
+                "branch",
+                UpdateConstants.RECONFIGURE,
+                "mappingMaybeOnly",
+                "mappingAlphabetOnly",
+                "unreachableMapping"));
+        mappingEnvironment.addRequired(3L, "control", 11L);
+        mappingEnvironment.addRequired(3L, "passive", 7L);
+        mappingEnvironment.addRequired(3L, "branch", 7L);
+        mappingEnvironment.addRequired(3L, "branch", 11L);
+        mappingEnvironment.addRequired(7L, UpdateConstants.RECONFIGURE, 11L);
+        mappingEnvironment.addRequired(11L, "passive", 11L);
+        mappingEnvironment.addRequired(90L, "unreachableMapping", 90L);
+        mappingEnvironment.addPossible(3L, "mappingMaybeOnly", 11L);
+
+        List<StepwiseDelayedUpdatingControllerSynthesizer.Connection> connections =
+                Arrays.asList(
+                        new StepwiseDelayedUpdatingControllerSynthesizer.Connection(5L, 3L),
+                        new StepwiseDelayedUpdatingControllerSynthesizer.Connection(5L, 7L));
+        Set<String> controllableActions = set(
+                "control",
+                UpdateConstants.STOP_OLD_SPEC,
+                UpdateConstants.RECONFIGURE);
+
+        List<String> oldBefore = canonicalMtsSnapshot(oldEnvironment);
+        List<String> mappingBefore = canonicalMtsSnapshot(mappingEnvironment);
+        MTS<Long, String> materialized =
+                StepwiseDelayedUpdatingControllerSynthesizer.connectOldAndMapping(
+                        oldEnvironment,
+                        mappingEnvironment,
+                        connections,
+                        controllableActions);
+        MTS<Long, String> view =
+                StepwiseDelayedUpdatingControllerSynthesizer.connectOldAndMappingView(
+                        oldEnvironment,
+                        mappingEnvironment,
+                        connections,
+                        controllableActions);
+
+        assertEquals(5L, materialized.getInitialState().longValue());
+        assertEquals(set(5L, 9L, 104L, 108L, 112L), materialized.getStates());
+        assertEquals(set(
+                        "control" + UpdateConstants.OLD_LABEL,
+                        "observe",
+                        UpdateConstants.STOP_OLD_SPEC,
+                        "unreachableOld",
+                        "control",
+                        "passive",
+                        "branch",
+                        UpdateConstants.RECONFIGURE,
+                        "unreachableMapping",
+                        UpdateConstants.BEGIN_UPDATE),
+                materialized.getActions());
+        assertEquals(set(
+                        "5 --control.old--> 9",
+                        "5 --observe--> 5",
+                        "5 --hotSwapIn--> 104",
+                        "5 --hotSwapIn--> 108",
+                        "9 --stopOldSpec--> 9",
+                        "104 --branch--> 108",
+                        "104 --branch--> 112",
+                        "104 --control--> 112",
+                        "104 --passive--> 108",
+                        "108 --reconfigure--> 112",
+                        "112 --passive--> 112"),
+                transitionSnapshot(materialized, MTS.TransitionType.REQUIRED));
+        assertEquals(
+                transitionSnapshot(materialized, MTS.TransitionType.REQUIRED),
+                transitionSnapshot(materialized, MTS.TransitionType.POSSIBLE));
+        assertTrue(transitionSnapshot(
+                materialized,
+                MTS.TransitionType.MAYBE).isEmpty());
+        assertEquals(set(104L, 108L), targets(
+                materialized,
+                5L,
+                UpdateConstants.BEGIN_UPDATE));
+        assertEquals(set(108L, 112L), targets(materialized, 104L, "branch"));
+        assertFalse(materialized.getActions().contains("oldMaybeOnly"));
+        assertFalse(materialized.getActions().contains("mappingMaybeOnly"));
+        assertFalse(materialized.getActions().contains("oldAlphabetOnly"));
+        assertFalse(materialized.getActions().contains("mappingAlphabetOnly"));
+
+        assertEquals(
+                "The read-only view must expose exactly the materialized connected MTS, "
+                        + "including numeric state IDs and empty transition relations.",
+                canonicalMtsSnapshot(materialized),
+                canonicalMtsSnapshot(view));
+        assertEquals(materialized.getNumberOfTransitions(), view.getNumberOfTransitions());
+        for (MTS.TransitionType type : MTS.TransitionType.values()) {
+            assertEquals(
+                    "The transition-map state domain must match for " + type,
+                    materialized.getTransitions(type).keySet(),
+                    view.getTransitions(type).keySet());
+        }
+        try {
+            view.getTransitions(5L, MTS.TransitionType.REQUIRED)
+                    .addPair("mutate", 5L);
+            fail("The connected-environment view exposed a mutable old-side relation.");
+        } catch (UnsupportedOperationException expected) {
+            // Expected: the view must be read-only through both MTS and relation APIs.
+        }
+
+        CompactState materializedCompact = MTSToAutomataConverter.getInstance().convert(
+                materialized,
+                "MATERIALIZED_CONNECTED",
+                false,
+                false);
+        CompactState viewCompact = MTSToAutomataConverter.getInstance().convert(
+                view,
+                "VIEW_CONNECTED",
+                false,
+                false);
+        assertEquals(materializedCompact.maxStates, viewCompact.maxStates);
+        assertArrayEquals(
+                materializedCompact.getTransitionsLabels(),
+                viewCompact.getTransitionsLabels());
+
+        MTS<Long, String> materializedRoundTrip =
+                AutomataToMTSConverter.getInstance().convert(materializedCompact);
+        MTS<Long, String> viewRoundTrip =
+                AutomataToMTSConverter.getInstance().convert(viewCompact);
+        assertEquals(
+                canonicalMtsSnapshot(materializedRoundTrip),
+                canonicalMtsSnapshot(viewRoundTrip));
+
+        assertEquals("Building either representation must not mutate the old input MTS.",
+                oldBefore,
+                canonicalMtsSnapshot(oldEnvironment));
+        assertEquals("Building either representation must not mutate the mapping input MTS.",
+                mappingBefore,
+                canonicalMtsSnapshot(mappingEnvironment));
+    }
+
+    @Test
+    public void compactDontDoTwiceEntryMatchesTheMtsEntry() {
+        MTS<Long, String> environment = new MTSImpl<Long, String>(0L);
+        environment.addActions(set(
+                "work",
+                UpdateConstants.STOP_OLD_SPEC,
+                UpdateConstants.START_NEW_SPEC));
+        environment.addRequired(0L, "work", 0L);
+        environment.addRequired(0L, UpdateConstants.STOP_OLD_SPEC, 0L);
+        environment.addRequired(0L, UpdateConstants.START_NEW_SPEC, 0L);
+
+        MTS<Long, String> throughMts =
+                UpdatingControllerSafetySynthesizer.getDontDoTwiceGoals(
+                        environment,
+                        false);
+        CompactState compactEnvironment = MTSToAutomataConverter.getInstance().convert(
+                environment,
+                "DONT_DO_TWICE_INPUT",
+                false,
+                false);
+        MTS<Long, String> throughCompact =
+                UpdatingControllerSafetySynthesizer.getDontDoTwiceGoals(
+                        compactEnvironment,
+                        new HashSet<String>(environment.getActions()));
+
+        assertEquals(
+                canonicalMtsSnapshot(throughMts),
+                canonicalMtsSnapshot(throughCompact));
+    }
+
     private static MTS<Long, String> oneStateEnvironment(String... actions) {
         MTS<Long, String> result = new MTSImpl<Long, String>(0L);
         for (String action : actions) {
@@ -690,6 +885,54 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                     state, MTS.TransitionType.REQUIRED).size();
         }
         return count;
+    }
+
+    private static List<String> canonicalMtsSnapshot(MTS<Long, String> environment) {
+        List<String> result = new ArrayList<String>();
+        result.add("INITIAL=" + environment.getInitialState());
+
+        List<Long> states = new ArrayList<Long>(environment.getStates());
+        Collections.sort(states);
+        for (Long state : states) {
+            result.add("STATE=" + state);
+        }
+
+        List<String> actions = new ArrayList<String>(environment.getActions());
+        Collections.sort(actions);
+        for (String action : actions) {
+            result.add("ACTION=" + action);
+        }
+
+        for (MTS.TransitionType type : Arrays.asList(
+                MTS.TransitionType.REQUIRED,
+                MTS.TransitionType.POSSIBLE,
+                MTS.TransitionType.MAYBE)) {
+            for (Long state : states) {
+                result.add("TRANSITION_SET=" + type + "@" + state);
+                Set<String> transitions = new TreeSet<String>();
+                for (Pair<String, Long> transition : environment.getTransitions(state, type)) {
+                    transitions.add(state + " --" + transition.getFirst()
+                            + "--> " + transition.getSecond());
+                }
+                for (String transition : transitions) {
+                    result.add("TRANSITION=" + type + ":" + transition);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static Set<String> transitionSnapshot(
+            MTS<Long, String> environment,
+            MTS.TransitionType type) {
+        Set<String> result = new TreeSet<String>();
+        for (Long state : environment.getStates()) {
+            for (Pair<String, Long> transition : environment.getTransitions(state, type)) {
+                result.add(state + " --" + transition.getFirst()
+                        + "--> " + transition.getSecond());
+            }
+        }
+        return result;
     }
 
     private static Fluent fluent(

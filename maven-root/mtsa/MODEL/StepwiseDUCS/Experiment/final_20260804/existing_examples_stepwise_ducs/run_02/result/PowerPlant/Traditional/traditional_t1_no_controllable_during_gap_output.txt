@@ -1,0 +1,181 @@
+INFO: Registered Map Environment: MAP_MAINTENANCE
+INFO: Registered Map Environment: MAP_ENV
+comp.compile time : 89ms
+Compiled: MAINTENANCE_OLD
+Compiled: ENV_OLD
+Composition:OldEnvironment = OldEnvironment.MAINTENANCE_OLD || OldEnvironment.ENV_OLD
+State Space: 2 * 2 = 2 ** 2
+Composing...
+-- States: 4 Transitions: 12 Memory used: 9821K
+Composed in 17ms
+Formula !P_PROCEDURE_WHILE_STOPPED = (true U (procedure & !PumpOff))
+GBA 2 states 3 transitions
+Buchi automata:
+P_PROCEDURE_WHILE_STOPPED = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |procedure&!PumpOff -> S1).
+Composition:P_PROCEDURE_WHILE_STOPPED = PumpOff || procedure || SYNC || P_PROCEDURE_WHILE_STOPPED
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10229K
+Composed in 9ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_PROCEDURE_WHILE_STOPPED minimising...
+Minimised States: 3 in 0ms
+make DFA(P_PROCEDURE_WHILE_STOPPED)
+DFA(P_PROCEDURE_WHILE_STOPPED) has 2 states.
+Tau reduction ON
+P_PROCEDURE_WHILE_STOPPED minimising...
+Minimised States: 2 in 0ms
+Formula !P_MAINTEINANCE_GUARANTEED = (true U (endProcedure & (PumpOff | !MainteinanceFinished)))
+GBA 2 states 4 transitions
+Buchi automata:
+P_MAINTEINANCE_GUARANTEED = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |endProcedure&!MainteinanceFinished -> S1 |endProcedure&PumpOff -> S1).
+Composition:P_MAINTEINANCE_GUARANTEED = MainteinanceFinished || PumpOff || endProcedure || SYNC || P_MAINTEINANCE_GUARANTEED
+State Space: 2 * 2 * 2 * 2 * 2 = 2 ** 5
+Composing...
+-- States: 32 Transitions: 115 Memory used: 10203K
+Composed in 8ms
+After Tau elimination = 16 state
+Tau reduction ON
+P_MAINTEINANCE_GUARANTEED minimising....
+Minimised States: 5 in 0ms
+make DFA(P_MAINTEINANCE_GUARANTEED)
+DFA(P_MAINTEINANCE_GUARANTEED) has 4 states.
+Tau reduction ON
+P_MAINTEINANCE_GUARANTEED minimising....
+Minimised States: 4 in 0ms
+Formula !P_PROCEDURE_IF_REQUEST = (true U (procedure & !RequestPending))
+GBA 2 states 3 transitions
+Buchi automata:
+P_PROCEDURE_IF_REQUEST = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |procedure&!RequestPending -> S1).
+Composition:P_PROCEDURE_IF_REQUEST = RequestPending || procedure || SYNC || P_PROCEDURE_IF_REQUEST
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10361K
+Composed in 8ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_PROCEDURE_IF_REQUEST minimising...
+Minimised States: 3 in 0ms
+make DFA(P_PROCEDURE_IF_REQUEST)
+DFA(P_PROCEDURE_IF_REQUEST) has 2 states.
+Tau reduction ON
+P_PROCEDURE_IF_REQUEST minimising...
+Minimised States: 2 in 0ms
+Formula !P_PUMP_OFF_ONLY_OK_NOT_PENDING = (true U (stopPump & PendingOk))
+GBA 2 states 3 transitions
+Buchi automata:
+P_PUMP_OFF_ONLY_OK_NOT_PENDING = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |stopPump&PendingOk -> S1).
+Composition:P_PUMP_OFF_ONLY_OK_NOT_PENDING = PendingOk || stopPump || SYNC || P_PUMP_OFF_ONLY_OK_NOT_PENDING
+State Space: 2 * 2 * 2 * 2 = 2 ** 4
+Composing...
+-- States: 16 Transitions: 41 Memory used: 10109K
+Composed in 7ms
+After Tau elimination = 8 state
+Tau reduction ON
+P_PUMP_OFF_ONLY_OK_NOT_PENDING minimising...
+Minimised States: 3 in 0ms
+make DFA(P_PUMP_OFF_ONLY_OK_NOT_PENDING)
+DFA(P_PUMP_OFF_ONLY_OK_NOT_PENDING) has 2 states.
+Tau reduction ON
+P_PUMP_OFF_ONLY_OK_NOT_PENDING minimising...
+Minimised States: 2 in 0ms
+Composition:OldController = OldEnvironment || P_PUMP_OFF_ONLY_OK_NOT_PENDING || P_PROCEDURE_IF_REQUEST || P_MAINTEINANCE_GUARANTEED || P_PROCEDURE_WHILE_STOPPED
+State Space: 4 * 2 * 2 * 4 * 2 = 2 ** 7
+Composing...
+-- States: 8 Transitions: 24 Memory used: 10083K
+Composed in 7ms
+Solving the LTS control problem.
+Environment states: 9
+Game states: 9
+Game transitions: 27
+Analysis time: 59ms.
+Controller [8] generated successfully.
+Composition:OldController = OldController || P_PUMP_OFF_ONLY_OK_NOT_PENDING || P_PROCEDURE_IF_REQUEST || P_MAINTEINANCE_GUARANTEED || P_PROCEDURE_WHILE_STOPPED
+State Space: 8 * 2 * 2 * 4 * 2 = 2 ** 8
+Composing...
+-- States: 8 Transitions: 14 Memory used: 11918K
+Composed in 14ms
+Compiled: OldController
+Composition:OldEnvironment = OldEnvironment.MAINTENANCE_OLD || OldEnvironment.ENV_OLD
+State Space: 2 * 2 = 2 ** 2
+Composing...
+-- States: 4 Transitions: 12 Memory used: 10964K
+Composed in 10ms
+ - Synthesizing Mapping Environment from lists (size=2)...
+INFO: Auto-compiling dependency: MAINTENANCE_NEW
+Generating Mapping Environment: MAP_MAINTENANCE_OLD_MAINTENANCE_NEW
+INFO: Auto-compiling dependency: ENV_NEW
+Generating Mapping Environment: MAP_ENV_OLD_ENV_NEW
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_MAINTENANCE_OLD_MAINTENANCE_NEW || MAP_ENV_OLD_ENV_NEW
+State Space: 4 * 4 = 2 ** 4
+Composing...
+-- States: 8 Transitions: 28 Memory used: 11836K
+Composed in 11ms
+comp.continueCompilation time : 245ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_PROCEDURE_WHILE_STOPPED_UPD_OLD
+Processing formula for update: P_MAINTEINANCE_GUARANTEED_UPD_OLD
+Processing formula for update: P_PROCEDURE_IF_REQUEST_UPD_OLD
+Processing formula for update: P_PUMP_OFF_ONLY_OK_NOT_PENDING_UPD_OLD
+Processing formula for update: P_NEVER_STOP_UPD_NEW
+Processing formula for update: P_MAINTEINANCE_GUARANTEED_NEW_UPD_NEW
+Processing formula for update: P_PROCEDURE_IF_REQUEST_UPD_NEW
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_MAINTENANCE
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_ENV
+Environment states:266
+Solving safety goals for the controller synthesis
+Environment states after safety: 205
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [97] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+比較用時間（合成全体-CountTime-描画） : 0分00.68秒
+
+[規模]
+最大状態数時の状態数 : 266 states
+最大状態数時の遷移数 : 1429 transitions
+最大状態数時の段階 : [2. Meta]
+最大遷移数時の状態数 : 266 states
+最大遷移数時の遷移数 : 1429 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 97 states
+出力遷移数 : 184 transitions
+
+[GR(1)]
+final GR input 状態数 : 205 states
+final GR input 遷移数 : 638 transitions
+GR(1)合成時間 : 0分00.06秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 0.01 GB
+最初の有効sampleからのヒープ増加 : 0.01 GB
+====================================================
+
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_02\result\PowerPlant\Traditional\powerplant_traditional_t1_no_controllable_during_gap_evaluation_UpdCont_T1.csv
+Tau reduction ON
+UpdCont_T1 minimising....
+Minimised States: 43 in 1ms
+
+[minimized 出力]
+minimized 出力状態数 : 43 states
+minimized 出力遷移数 : 82 transitions
+minimize 時間 : 1 ms
+Evaluation data CSV written to: Experiment\final_20260804\existing_examples_stepwise_ducs\run_02\result\PowerPlant\Traditional\powerplant_traditional_t1_no_controllable_during_gap_evaluation_UpdCont_T1.csv

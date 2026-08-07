@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "2026-08-04-campaign-v1",
+  "status": "COMPLETE",
+  "startedAt": "2026-08-04T17:08:30.9870639+09:00",
+  "endedAt": "2026-08-04T17:08:58.2998691+09:00",
+  "configFile": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\configs\\final\\windows_evaluation_v4_preflight.yaml",
+  "configSha256": "bed82a860b49f939c3d4e976284957b39b2e91b83f8057ccb67cc64c8f49eb97",
+  "sanitizedConfigSnapshot": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\result\\executed_config.sanitized.yaml",
+  "sanitizedConfigSnapshotSha256": "bed82a860b49f939c3d4e976284957b39b2e91b83f8057ccb67cc64c8f49eb97",
+  "inputHashes": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\result\\input_hashes.csv",
+  "environment": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\result\\campaign_environment.json",
+  "effectiveJvmFlags": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\result\\effective_jvm_flags.txt",
+  "launcherArtifact": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\mtsa-1.0-SNAPSHOT.jar",
+  "launcherArtifactSha256": "6430f5d5f8b57cf044c9803c7421d7d9d493912e2284b324a19e0ae5a54aa5d8",
+  "gitRepository": null,
+  "gitCommit": null,
+  "gitDirty": null,
+  "outputDir": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\result",
+  "requireFreshOutputDir": true,
+  "alternateMethodOrderByRun": true,
+  "validateMemoryQuality": true,
+  "validateMethodTarget": true,
+  "maxMemorySamplingGapMillis": 1000,
+  "runCount": 1,
+  "caseCountPerRun": 2,
+  "expectedCaseCount": 2,
+  "completedCaseCount": 2,
+  "failureCount": 0,
+  "validationPassed": true,
+  "validationErrors": [],
+  "runnerError": null,
+  "cases": [{
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "evaluation_v4_preflight_stepwise_delayed_sbp",
+    "example": "EVCharging_WindowsEvaluationV4Preflight",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_evaluation_Stepwise_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 308412
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 9436
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_execution_Stepwise_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 394
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 1058525
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_minimized_transitions_Stepwise_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 529242
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_minimized_counts_Stepwise_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 738
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 92
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_evaluation_Stepwise_UpdCont.csv", "-Dmtsa.evaluation.caseId=evaluation_v4_preflight_stepwise_delayed_sbp", "-Dmtsa.evaluation.example=EVCharging_WindowsEvaluationV4Preflight", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\EVCharging\\EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=Experiment\\configs\\final\\windows_evaluation_v4_preflight.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=1", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\EVCharging\\EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_execution_Stepwise_UpdCont.json", "--output", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont.txt", "--minimized-transitions", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_minimized_transitions_Stepwise_UpdCont.txt", "--minimized-counts", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\stepwise_delayed_SBP\\evaluation_v4_preflight_stepwise_delayed_sbp_minimized_counts_Stepwise_UpdCont.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "evaluation_v4_preflight_traditional",
+    "example": "EVCharging_WindowsEvaluationV4Preflight",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 127328
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 9031
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 1058679
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 529164
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 684
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 92
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=evaluation_v4_preflight_traditional", "-Dmtsa.evaluation.example=EVCharging_WindowsEvaluationV4Preflight", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\EVCharging\\EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=Experiment\\configs\\final\\windows_evaluation_v4_preflight.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=1", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\EVCharging\\EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_execution_UpdCont.json", "--output", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\traditional_no_tr_output.txt", "--transitions", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_minimized_transitions_UpdCont.txt", "--minimized-counts", "Experiment\\preflight_windows_evaluation_v4_20260804\\run_01\\result\\EVCharging_WindowsEvaluationV4Preflight\\Traditional\\evaluation_v4_preflight_traditional_minimized_counts_UpdCont.csv"]
+  }]
+}
