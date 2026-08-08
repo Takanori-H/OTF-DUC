@@ -12,13 +12,11 @@ maven-root/.idea
 .idea
 maven-root/mtsa/dependency-reduced-pom.xml
 
-# Local/private experiment configs with secrets
-maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_local.yaml
-maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_private.yaml
-maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/local/
-maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/final/*_final_evaluation_windows.yaml
-maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_local.yaml
-maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/*_private.yaml
+# Local-only research artifacts and documentation
+/Experiment/
+/docs/
+/maven-root/mtsa/Experiment/
+/maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/
 
 # Created by https://www.gitignore.io/api/eclipse,intellij,java,maven
 

@@ -1,5 +1,0 @@
-role,path,sha256,size_bytes
-"config_original","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\configs\final\production_cell_arms2_final_evaluation_windows.yaml","7c9f6db59f6c2a17519637e3698b171992ad49443b27e95bb6e8ae1075874662",3144
-"config_sanitized_snapshot","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\final_20260804\production_cell_arms2\result\executed_config.sanitized.yaml","218c5ab9c1e499eb438b7cffbeb9d546759f3992608df9505d98e34f3e8c3a1d",3033
-"lts","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\LTS\ProductionCell_Arms=2.lts","688f4d69caa77e7b2ba49f4b82634565db6facd083ea23c369097962a291e517",13973
-"launcher_artifact","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\mtsa-1.0-SNAPSHOT.jar","6430f5d5f8b57cf044c9803c7421d7d9d493912e2284b324a19e0ae5a54aa5d8",353847554

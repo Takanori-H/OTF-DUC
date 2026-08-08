@@ -1,7 +1,0 @@
-target,metric_key,metric_label,value,unit
-UpdCont_T1,raw_output_update_controller_states,Raw output update controller states,53965,states
-UpdCont_T1,raw_output_update_controller_transitions,Raw output update controller transitions,197924,transitions
-UpdCont_T1,minimized_output_update_controller_states,Minimized output update controller states,19297,states
-UpdCont_T1,minimized_output_update_controller_transitions,Minimized output update controller transitions,73471,transitions
-UpdCont_T1,minimized_output_update_controller_count_time,Minimized output update controller count time,1,ms
-UpdCont_T1,minimized_output_update_controller_minimize_time,Minimized output update controller minimize time,57889,ms

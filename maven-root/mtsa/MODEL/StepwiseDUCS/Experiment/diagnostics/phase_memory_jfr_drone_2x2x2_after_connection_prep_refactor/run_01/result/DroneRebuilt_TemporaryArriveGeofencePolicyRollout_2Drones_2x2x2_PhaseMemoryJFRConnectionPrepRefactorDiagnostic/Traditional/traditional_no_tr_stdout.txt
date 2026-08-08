@@ -1,5 +1,0 @@
-[0.352s][info][jfr,startup] Started recording 1.
-[0.352s][info][jfr,startup] 
-[0.352s][info][jfr,startup] Use jcmd 1780 JFR.dump name=1 to copy recording data to file.
-@@MTSA_MEMORY_SYNTHESIS_WINDOW_START@@
-@@MTSA_MEMORY_SYNTHESIS_WINDOW_END@@
