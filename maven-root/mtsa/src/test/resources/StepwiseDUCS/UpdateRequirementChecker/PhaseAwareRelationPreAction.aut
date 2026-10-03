@@ -1,0 +1,12 @@
+Process:
+	PHASE_A
+States:
+	5
+Transitions:
+	PHASE_A = Q0,
+	Q0	= ({a, z} -> Q0
+		  |hotSwapIn -> Q1),
+	Q1	= (stopOldSpec -> Q2),
+	Q2	= (reconfigure -> Q3),
+	Q3	= (startNewSpec -> Q4),
+	Q4	= (a -> Q4).

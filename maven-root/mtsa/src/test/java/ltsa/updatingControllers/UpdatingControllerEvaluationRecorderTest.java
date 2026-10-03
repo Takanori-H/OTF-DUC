@@ -141,6 +141,39 @@ public class UpdatingControllerEvaluationRecorderTest {
     }
 
     @Test
+    public void preservationPhaseMetaParticipatesInStepwisePeakSelection()
+            throws Exception {
+        UpdatingControllerEvaluationRecorder.setMode("Stepwise Delayed DUC");
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                STEPWISE_STATE_SPACE_SECTION,
+                "[Stepwise Delayed DUCS] Connection-shadow stage 1 phase meta",
+                600,
+                40,
+                0);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                STEPWISE_STATE_SPACE_SECTION,
+                "[Stepwise Delayed DUCS] Raw connection-shadow product before delayed connection",
+                500,
+                700,
+                0);
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertEquals("600", metrics.get("peak_state_space_states"));
+        assertEquals("40", metrics.get("peak_state_space_states_stage_transitions"));
+        assertEquals(
+                "[Stepwise Delayed DUCS] Connection-shadow stage 1 phase meta",
+                metrics.get("peak_state_space_states_stage"));
+        assertEquals("700", metrics.get("peak_state_space_transitions"));
+        assertEquals("500", metrics.get("peak_state_space_transitions_stage_states"));
+        assertEquals(
+                "[Stepwise Delayed DUCS] Raw connection-shadow product before delayed connection",
+                metrics.get("peak_state_space_transitions_stage"));
+    }
+
+    @Test
     public void traditionalPeakIncludesMappingEnvironmentProduct() throws Exception {
         UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
         UpdatingControllerEvaluationRecorder.recordStateSpace(
@@ -188,21 +221,94 @@ public class UpdatingControllerEvaluationRecorderTest {
                 "UpdatingControllersDefinition", "Mapping Environment Component 合成時間", 40L);
         UpdatingControllerEvaluationRecorder.recordTime(
                 "UpdatingControllersDefinition", "Traditional DUC Mapping Environment Component 並列合成時間", 40L);
+        UpdatingControllerEvaluationRecorder.beginPrimaryComparisonCountScope();
         UpdatingControllerEvaluationRecorder.recordStateSpace(
                 "test", "count overhead", 1L, 1L, 10L);
+        UpdatingControllerEvaluationRecorder.endPrimaryComparisonCountScope();
+        UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "test", "post-generation count overhead", 1L, 1L, 20L);
         UpdatingControllerEvaluationRecorder.markSuccess();
         UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
 
         Map<String, String> metrics = readMetricValues(
                 new File(System.getProperty(CSV_FILE_PROPERTY)));
-        assertEquals("840", metrics.get("comparison_observed_time_without_parse_count_and_draw"));
-        assertEquals("750", metrics.get(
+        assertEquals("890", metrics.get("comparison_observed_time_without_parse_count_and_draw"));
+        assertEquals("800", metrics.get(
                 "comparison_strict_observed_time_without_parse_common_preprocess_count_and_draw"));
-        assertEquals("710", metrics.get("comparison_observed_total_based_unclassified_time"));
-        assertEquals("700", metrics.get("comparison_primary_controller_synthesis_time"));
+        assertEquals("760", metrics.get("comparison_observed_total_based_unclassified_time"));
+        assertEquals("990", metrics.get("comparison_primary_controller_synthesis_time"));
         assertEquals("false", metrics.get(
                 "comparison_internal_core_time_cross_method_comparable"));
         assertFalse(metrics.containsKey("comparison_core_synthesis_time"));
+    }
+
+    @Test
+    public void primaryTimeIncludesParsingWindowAndExcludesPostGenerationCountOverhead()
+            throws Exception {
+        UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "合成ボタンを押してから合成完了までの時間", 700L);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "コントローラ合成時間", 500L);
+
+        UpdatingControllerEvaluationRecorder.beginPrimaryComparisonCountScope();
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "test", "parse scoped count", 1L, 1L, 4L);
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "test", "controller generation scoped count", 1L, 1L, 6L);
+        UpdatingControllerEvaluationRecorder.endPrimaryComparisonCountScope();
+        UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "test", "post-observed count", 1L, 1L, 20L);
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        List<List<String>> rows = readCsvRows(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertEquals("700", metrics.get("total_time"));
+        assertEquals("10", metrics.get(
+                "total_time_scope_count_overhead_time"));
+        assertEquals("690", metrics.get(
+                "total_time_time_without_scope_count_overhead"));
+        assertEquals("690", metrics.get(
+                "comparison_primary_controller_synthesis_time"));
+        assertEquals("10", metrics.get("comparison_count_overhead_time"));
+        assertEquals("30", metrics.get("comparison_count_overhead_total"));
+        assertEquals("20", metrics.get(
+                "comparison_count_overhead_after_observed_time"));
+
+        String primaryFormula = rowByMetricKey(
+                rows,
+                "comparison_primary_controller_synthesis_time").get(8);
+        assertTrue(primaryFormula,
+                primaryFormula.contains("total_time"));
+        assertTrue(primaryFormula,
+                primaryFormula.contains(
+                        "total_time_scope_count_overhead_time"));
+    }
+
+    @Test
+    public void primaryControllerSynthesisTimeIsClampedAtZero()
+            throws Exception {
+        UpdatingControllerEvaluationRecorder.setMode("Traditional DUC");
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "共通 / HPWindow", "合成ボタンを押してから合成完了までの時間", 5L);
+        UpdatingControllerEvaluationRecorder.beginPrimaryComparisonCountScope();
+        UpdatingControllerEvaluationRecorder.recordStateSpace(
+                "test", "count larger than rounded raw time", 1L, 1L, 10L);
+        UpdatingControllerEvaluationRecorder.endPrimaryComparisonCountScope();
+        UpdatingControllerEvaluationRecorder.markSuccess();
+        UpdatingControllerEvaluationRecorder.printSummary(new RecordingOutput());
+
+        Map<String, String> metrics = readMetricValues(
+                new File(System.getProperty(CSV_FILE_PROPERTY)));
+        assertEquals("0", metrics.get(
+                "total_time_time_without_scope_count_overhead"));
+        assertEquals("0", metrics.get(
+                "comparison_primary_controller_synthesis_time"));
     }
 
     @Test
@@ -318,7 +424,7 @@ public class UpdatingControllerEvaluationRecorderTest {
         assertFalse("割合".equals(actionFluent.get(13)));
         assertFalse("割合".equals(actionFluent.get(18)));
         for (int index = 1; index < rows.size(); index++) {
-            assertEquals("2026-08-04-evaluation-v4", rows.get(index).get(9));
+            assertEquals("2026-08-11-evaluation-v6", rows.get(index).get(9));
         }
     }
 

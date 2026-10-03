@@ -123,6 +123,8 @@ public class MappingEnvironmentGenerator {
                 }
             }
         }
+        validateOldStatePreActionConflicts(oldM, flatRules, mapEnvName);
+
         if (updateProtocolSpec != null) {
             if (componentReconfigureAction == null) {
                 componentReconfigureAction = UpdateConstants.RECONFIGURE_PREFIX + mapEnvName;
@@ -284,6 +286,33 @@ public class MappingEnvironmentGenerator {
         for (String s : actions) {
             if (!alpha.contains(s))
                 alpha.add(s);
+        }
+    }
+
+    /**
+     * Reject only a state-local ambiguity between an existing old-environment
+     * transition and the first pre-reconfigure action of a relation rule.
+     * Reusing the same action at another old state remains valid.
+     */
+    private void validateOldStatePreActionConflicts(
+            CompactState oldM,
+            Vector<FlattenedRule> flatRules,
+            String mapEnvName) {
+        for (FlattenedRule rule : flatRules) {
+            if (rule.preActions == null || rule.preActions.isEmpty()) {
+                continue;
+            }
+            Integer oldState = oldM.getStateId(rule.oldLabel);
+            if (oldState == null || oldState < 0 || oldState >= oldM.states.length) {
+                continue;
+            }
+            String firstPreAction = rule.preActions.firstElement();
+            int oldAction = getIndex(firstPreAction, oldM.alphabet);
+            if (oldAction >= 0 && EventState.hasEvent(oldM.states[oldState], oldAction)) {
+                Diagnostics.fatal("Relation pre-action '" + firstPreAction
+                        + "' conflicts with an old-environment transition from state '"
+                        + rule.oldLabel + "' in mapping component " + mapEnvName + ".");
+            }
         }
     }
 

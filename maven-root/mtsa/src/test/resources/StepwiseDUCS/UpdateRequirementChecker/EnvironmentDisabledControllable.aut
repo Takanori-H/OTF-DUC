@@ -1,0 +1,23 @@
+Process:
+	PROBE_B
+States:
+	11
+Transitions:
+	PROBE_B = Q0,
+	Q0	= (a -> Q0
+		  |z -> Q1
+		  |hotSwapIn -> Q2),
+	Q1	= (a -> Q1
+		  |x -> Q1
+		  |reset -> Q0
+		  |hotSwapIn -> Q7),
+	Q2	= (stopOldSpec -> Q3),
+	Q3	= (x -> Q4
+		  |reconfigure -> Q5),
+	Q4	= (reconfigure -> Q5),
+	Q5	= (startNewSpec -> Q6),
+	Q6	= (a -> Q6),
+	Q7	= (stopOldSpec -> Q8),
+	Q8	= (reconfigure -> Q9),
+	Q9	= (startNewSpec -> Q10),
+	Q10	= (a -> Q10).

@@ -2252,6 +2252,7 @@ public class HPWindow extends JFrame implements Runnable {
     // ------------------------------------------------------------------------
 
     private void doComposition() {
+        long compositionStartNanos = System.nanoTime();
         CompositionEvaluationRunner.Request request =
                 new CompositionEvaluationRunner.Request(
                         ltsOutput,
@@ -2263,6 +2264,7 @@ public class HPWindow extends JFrame implements Runnable {
                             }
                         })
                         .withOpenFileName(openFile)
+                        .withCompositionStartNanos(compositionStartNanos)
                         .withSuccessfulCompositionCallback(
                                 new CompositionEvaluationRunner.SuccessfulCompositionCallback() {
                                     @Override

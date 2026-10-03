@@ -1,0 +1,110 @@
+comp.compile time : 97ms
+Compiled: NODE_OLD(1)
+Compiled: NODE_OLD(2)
+Compiled: NODE_OLD(3)
+Compiled: NODE_OLD(4)
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 10 * 10 * 10 * 10 = 2 ** 16
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 94711K
+-- States: 10000 Transitions: 360000 Memory used: 125311K
+Composed in 377ms
+Composition:OldController = OLD_ENV
+State Space: 10000 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 183899K
+-- States: 10000 Transitions: 360000 Memory used: 198168K
+Composed in 312ms
+Solving the LTS control problem.
+Environment states: 10000
+Game states: 10000
+Game transitions: 30000
+Analysis time: 4532ms.
+Controller [10000] generated successfully.
+Composition:OldController = OldController
+State Space: 10000 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 623824K
+-- States: 10000 Transitions: 360000 Memory used: 674158K
+Composed in 299ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 10 * 10 * 10 * 10 = 2 ** 16
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 239437K
+-- States: 10000 Transitions: 360000 Memory used: 286785K
+Composed in 286ms
+ - Synthesizing Mapping Environment from lists (size=4)...
+INFO: Auto-compiling dependency: NODE_NEW(1)
+Generating Mapping Environment: MAP_NODE_OLD(1)_NODE_NEW(1)
+INFO: Auto-compiling dependency: NODE_NEW(2)
+Generating Mapping Environment: MAP_NODE_OLD(2)_NODE_NEW(2)
+INFO: Auto-compiling dependency: NODE_NEW(3)
+Generating Mapping Environment: MAP_NODE_OLD(3)_NODE_NEW(3)
+INFO: Auto-compiling dependency: NODE_NEW(4)
+Generating Mapping Environment: MAP_NODE_OLD(4)_NODE_NEW(4)
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_NODE_OLD(1)_NODE_NEW(1) || MAP_NODE_OLD(2)_NODE_NEW(2) || MAP_NODE_OLD(3)_NODE_NEW(3) || MAP_NODE_OLD(4)_NODE_NEW(4)
+State Space: 20 * 20 * 20 * 20 = 2 ** 20
+Composing...
+-- States: 10000 Transitions: 360093 Memory used: 355075K
+-- States: 20000 Transitions: 730000 Memory used: 431232K
+-- States: 20000 Transitions: 730000 Memory used: 463516K
+Composed in 524ms
+comp.continueCompilation time : 9398ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_NEW_NODE_POWER_CAP_1_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_2_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_3_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_4_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_1_2_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_2_3_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_3_4_UPD_NEW
+Processing formula for update: T2_START_AFTER_STOP_AND_RECONFIGURE
+Environment states:130000
+Solving safety goals for the controller synthesis
+Environment states after safety: 93453
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [52364] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+主比較時間（合成開始から生成終了まで-CountTime） : 136分14.36秒
+
+[規模]
+最大状態数時の状態数 : 130000 states
+最大状態数時の遷移数 : 4990000 transitions
+最大状態数時の段階 : [2. Meta]
+最大遷移数時の状態数 : 130000 states
+最大遷移数時の遷移数 : 4990000 transitions
+最大遷移数時の段階 : [2. Meta]
+出力状態数 : 52364 states
+出力遷移数 : 999487 transitions
+
+[GR(1)]
+final GR input 状態数 : 93453 states
+final GR input 遷移数 : 1948364 transitions
+GR(1)合成時間 : 92分42.55秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 32.78 GB
+最初の有効sampleからのヒープ増加 : 32.77 GB
+====================================================
+
+Evaluation data CSV written to: out\h6\cc8\run_03\result\CC_HalfCap_N4_L8\Traditional\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv
+Tau reduction ON
+UpdCont_T2 minimising.......
+Minimised States: 12595 in 89586ms
+
+[minimized 出力]
+minimized 出力状態数 : 12595 states
+minimized 出力遷移数 : 228830 transitions
+minimize 時間 : 89618 ms
+Evaluation data CSV written to: out\h6\cc8\run_03\result\CC_HalfCap_N4_L8\Traditional\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv

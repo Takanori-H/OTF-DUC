@@ -459,6 +459,8 @@ public class Symbol {
 				return "incrementalPruningCleanup";
 			case SAFETY_BACKWARD_PRUNING:
 				return "safetyBackwardPruning";
+			case TRADITIONAL_HOT_SWAP_MONITOR_SEMANTICS:
+				return "traditionalHotSwapMonitorSemantics";
 
 		// _______________________________________________________________________________________
 		// Probabilistic
@@ -689,6 +691,7 @@ public class Symbol {
 		public static final int INCREMENTAL_PRUNING = 3511;
 		public static final int INCREMENTAL_PRUNING_CLEANUP = 3512;
 		public static final int SAFETY_BACKWARD_PRUNING = 3513;
+		public static final int TRADITIONAL_HOT_SWAP_MONITOR_SEMANTICS = 3514;
 	
 	static {
 		blueSymbols.add(OPTIMISTIC);
@@ -763,6 +766,7 @@ public class Symbol {
 			blueSymbols.add(INCREMENTAL_PRUNING);
 			blueSymbols.add(INCREMENTAL_PRUNING_CLEANUP);
 			blueSymbols.add(SAFETY_BACKWARD_PRUNING);
+			blueSymbols.add(TRADITIONAL_HOT_SWAP_MONITOR_SEMANTICS);
 			blueSymbols.add(NEW_CONTROLLER);
 		blueSymbols.add(RELATION);
 		blueSymbols.add(OLD_ENVIRONMENT);

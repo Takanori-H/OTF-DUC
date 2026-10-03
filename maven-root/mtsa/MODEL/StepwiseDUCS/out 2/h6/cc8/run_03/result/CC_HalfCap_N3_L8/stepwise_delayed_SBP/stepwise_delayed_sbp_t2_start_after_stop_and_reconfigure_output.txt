@@ -1,0 +1,286 @@
+comp.compile time : 93ms
+Compiled: NODE_OLD(1)
+Compiled: NODE_OLD(2)
+Compiled: NODE_OLD(3)
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3)
+State Space: 10 * 10 * 10 = 2 ** 12
+Composing...
+-- States: 1000 Transitions: 27000 Memory used: 25167K
+Composed in 68ms
+Composition:OldController = OLD_ENV
+State Space: 1000 = 2 ** 10
+Composing...
+-- States: 1000 Transitions: 27000 Memory used: 28660K
+Composed in 53ms
+Solving the LTS control problem.
+Environment states: 1000
+Game states: 1000
+Game transitions: 3000
+Analysis time: 597ms.
+Controller [1000] generated successfully.
+Composition:OldController = OldController
+State Space: 1000 = 2 ** 10
+Composing...
+-- States: 1000 Transitions: 27000 Memory used: 65409K
+Composed in 84ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3)
+State Space: 10 * 10 * 10 = 2 ** 12
+Composing...
+-- States: 1000 Transitions: 27000 Memory used: 37085K
+Composed in 59ms
+ - Synthesizing Mapping Environment from lists (size=3)...
+INFO: Auto-compiling dependency: NODE_NEW(1)
+Generating Mapping Environment: MAP_NODE_OLD(1)_NODE_NEW(1)
+INFO: Auto-compiling dependency: NODE_NEW(2)
+Generating Mapping Environment: MAP_NODE_OLD(2)_NODE_NEW(2)
+INFO: Auto-compiling dependency: NODE_NEW(3)
+Generating Mapping Environment: MAP_NODE_OLD(3)_NODE_NEW(3)
+Mode: Stepwise Delayed Updating Controller Synthesis (baseline) + safety backward pruning + traditional hotSwap monitor semantics
+comp.continueCompilation time : 1340ms
+=========================================
+Mode: Stepwise Delayed DUC (local-only)
+=========================================
+[Stepwise Delayed DUCS]
+oldController is used as global OldCon: OldCon
+
+[Stepwise DUCS] Requirement classification:
+  P_NEW_NODE_POWER_CAP_1 (NEW_SAFETY) -> stage 1
+  P_NEW_NODE_POWER_CAP_2 (NEW_SAFETY) -> stage 2
+  P_NEW_NODE_POWER_CAP_3 (NEW_SAFETY) -> stage 3
+  P_NEW_ADJACENT_POWER_BUDGET_1_2 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={node.1.start.6=[0], node.1.start.7=[0], node.1.setLevel.8=[0], node.1.start.8=[0], node.1.setLevel.5=[0], node.1.setLevel.4=[0], node.1.setLevel.7=[0], node.1.setLevel.6=[0], node.1.setLevel.1=[0], node.1.setLevel.3=[0], node.1.start.1=[0], node.1.setLevel.2=[0], node.1.start.2=[0], node.1.start.3=[0], node.1.start.4=[0], node.1.start.5=[0], node.1.finish=[0], node.1.stop=[0], node.2.setLevel.8=[1], node.2.setLevel.7=[1], node.2.setLevel.6=[1], node.2.setLevel.5=[1], node.2.setLevel.4=[1], node.2.setLevel.3=[1], node.2.setLevel.2=[1], node.2.setLevel.1=[1], node.2.start.5=[1], node.2.start.6=[1], node.2.start.7=[1], node.2.start.8=[1], node.2.start.1=[1], node.2.start.2=[1], node.2.start.3=[1], node.2.start.4=[1], node.2.finish=[1], node.2.stop=[1]}
+  P_NEW_ADJACENT_POWER_BUDGET_2_3 (NEW_SAFETY) -> cross scope [2, 3] GOAL_SPANS_MULTIPLE_STAGES actions={node.3.setLevel.3=[2], node.3.setLevel.2=[2], node.3.start.3=[2], node.3.setLevel.5=[2], node.3.start.2=[2], node.3.setLevel.4=[2], node.3.start.5=[2], node.3.setLevel.7=[2], node.3.start.4=[2], node.3.setLevel.6=[2], node.3.start.7=[2], node.3.start.6=[2], node.3.setLevel.8=[2], node.3.start.8=[2], node.3.setLevel.1=[2], node.3.finish=[2], node.3.stop=[2], node.2.setLevel.8=[1], node.2.setLevel.7=[1], node.2.setLevel.6=[1], node.2.setLevel.5=[1], node.2.setLevel.4=[1], node.2.setLevel.3=[1], node.2.setLevel.2=[1], node.2.setLevel.1=[1], node.2.start.5=[1], node.2.start.6=[1], node.2.start.7=[1], node.2.start.8=[1], node.2.start.1=[1], node.2.start.2=[1], node.2.start.3=[1], node.2.start.4=[1], node.2.finish=[1], node.2.stop=[1], node.3.start.1=[2]}
+  T2_START_AFTER_STOP_AND_RECONFIGURE (TRANSITION) -> cross scope [1, 2, 3] GOAL_UPDATE_EVENTS_ONLY
+  post-hotSwapIn Traditional monitor semantics: [T2_START_AFTER_STOP_AND_RECONFIGURE(TRANSITION)]
+[Stepwise Delayed DUCS] Traditional hotSwapIn monitor semantics: 1 hotSwapIn-sensitive goal(s) deferred until after delayed connection.
+[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true incrementalPruning=false incrementalPruningCleanup=false safetyBackwardPruning=true traditionalHotSwapMonitorSemantics=true
+
+[Stepwise Delayed DUCS] Requirement classification summary
+  stages: 3
+  goals: total=6 local=3 cross=3 crossRatio=50.00%
+  local goals by type: oldSafety=0 newSafety=3 transition=0
+  cross goals by type: oldSafety=0 newSafety=2 transition=1
+  cross components: count=1 maxGoalScopeSize=3 maxComponentScopeSize=3 allStageCrossGoals=1 allStageCrossComponents=1
+  requirement fluents: unique=19
+  scope requirement counts:
+    scope {1} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=2
+    scope {1,2} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=9
+    scope {1,2,3} total=1 oldSafety=0 newSafety=0 transition=1 requirementFluents=3
+    scope {2} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=2
+    scope {2,3} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=9
+    scope {3} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=2
+[Stepwise Delayed DUCS] classification statistics CountTime: 15 ms
+[Stepwise Delayed DUCS] cross component build time: 2 ms
+
+[Stepwise Delayed DUCS] Stage 1 old=NODE_OLD(1) new=NODE_NEW(1) relation=R_NODE_1
+  local old safety: []
+  local new safety: [P_NEW_NODE_POWER_CAP_1(NEW_SAFETY)]
+  local transition: []
+  mapping before pruning states: 20 transitions: 230
+  mapping meta states: 80 transitions: 3960
+  safety pruning kept states: 80 transitions: 3152
+  deferred safety backward pruning scope: local stage 1
+    component scope: [0]
+    before states: 80 transitions: 3152
+    explicit Error seeds: 16
+    definite losing states: 16
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 96
+    input environment reused: false
+    after states: 64 transitions: 3056
+    elapsed: 10 ms
+  mapping safety states: 64 transitions: 3056
+
+[Stepwise Delayed DUCS] Stage 2 old=NODE_OLD(2) new=NODE_NEW(2) relation=R_NODE_2
+  local old safety: []
+  local new safety: [P_NEW_NODE_POWER_CAP_2(NEW_SAFETY)]
+  local transition: []
+  mapping before pruning states: 20 transitions: 230
+  mapping meta states: 80 transitions: 3960
+  safety pruning kept states: 80 transitions: 3152
+  deferred safety backward pruning scope: local stage 2
+    component scope: [1]
+    before states: 80 transitions: 3152
+    explicit Error seeds: 16
+    definite losing states: 16
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 96
+    input environment reused: false
+    after states: 64 transitions: 3056
+    elapsed: 6 ms
+  mapping safety states: 64 transitions: 3056
+
+[Stepwise Delayed DUCS] Stage 3 old=NODE_OLD(3) new=NODE_NEW(3) relation=R_NODE_3
+  local old safety: []
+  local new safety: [P_NEW_NODE_POWER_CAP_3(NEW_SAFETY)]
+  local transition: []
+  mapping before pruning states: 20 transitions: 230
+  mapping meta states: 80 transitions: 3960
+  safety pruning kept states: 80 transitions: 3152
+  deferred safety backward pruning scope: local stage 3
+    component scope: [2]
+    before states: 80 transitions: 3152
+    explicit Error seeds: 16
+    definite losing states: 16
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 96
+    input environment reused: false
+    after states: 64 transitions: 3056
+    elapsed: 6 ms
+  mapping safety states: 64 transitions: 3056
+
+[Stepwise Delayed DUCS] Cross components:
+  component 1 stages={1,2,3} goals=[P_NEW_ADJACENT_POWER_BUDGET_1_2(NEW_SAFETY), P_NEW_ADJACENT_POWER_BUDGET_2_3(NEW_SAFETY)]
+
+[Stepwise Delayed DUCS] Staged cross component 1
+  stages: {1,2,3}
+  goals: [P_NEW_ADJACENT_POWER_BUDGET_1_2(NEW_SAFETY), P_NEW_ADJACENT_POWER_BUDGET_2_3(NEW_SAFETY)]
+  cross goal scheduler: cost-guided
+  initial fragment stage 1 states: 64 transitions: 3056
+  initial fragment stage 2 states: 64 transitions: 3056
+  initial fragment stage 3 states: 64 transitions: 3056
+  selected cross goal: P_NEW_ADJACENT_POWER_BUDGET_1_2 scope={1,2} schedulingCost=4096 candidateBatchGoals=1 estimatedMergedScope={1,2}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_1_MERGE_{1,2}
+
+[Stepwise Delayed DUCS] staged cross step 1
+  product scope: {1,2}
+  added stages: {1,2}
+    batch goals: [P_NEW_ADJACENT_POWER_BUDGET_1_2(NEW_SAFETY)]
+  before staged cross pruning states: 544 transitions: 20080
+  safety pruning kept states: 544 transitions: 18740
+  deferred safety backward pruning scope: cross component 1 staged step 1 productScope={1,2}
+    component scope: [0, 1]
+    before states: 544 transitions: 18740
+    explicit Error seeds: 40
+    definite losing states: 40
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 200
+    input environment reused: false
+    after states: 504 transitions: 18540
+    elapsed: 42 ms
+  after staged cross pruning states: 504 transitions: 18540
+  selected cross goal: P_NEW_ADJACENT_POWER_BUDGET_2_3 scope={2,3} schedulingCost=32256 candidateBatchGoals=1 estimatedMergedScope={1,2,3}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_2_MERGE_{1,2,3}
+
+[Stepwise Delayed DUCS] staged cross step 2
+  product scope: {1,2,3}
+  added stages: {3}
+    batch goals: [P_NEW_ADJACENT_POWER_BUDGET_2_3(NEW_SAFETY)]
+  before staged cross pruning states: 4624 transitions: 124104
+  safety pruning kept states: 4624 transitions: 122144
+  deferred safety backward pruning scope: cross component 1 staged step 2 productScope={1,2,3}
+    component scope: [0, 1, 2]
+    before states: 4624 transitions: 122144
+    explicit Error seeds: 120
+    definite losing states: 120
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 620
+    input environment reused: false
+    after states: 4504 transitions: 121524
+    elapsed: 293 ms
+  after staged cross pruning states: 4504 transitions: 121524
+  deferred safety backward pruning scope: cross component 1 final merge
+    component scope: [0, 1, 2]
+    before states: 4504 transitions: 121524
+    explicit Error seeds: 0
+    definite losing states: 0
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 0
+    input environment reused: true
+    after states: 4504 transitions: 121524
+    elapsed: 46 ms
+  staged cross component safety states: 4504 transitions: 121524
+
+[Stepwise Delayed DUCS] Final product inputs: [cross component 1 stages={1,2,3}]
+  safety backward pruning scope: stepwise-delayed-final-mapping
+    before states: 4504 transitions: 121524
+    dead-end seed states: 0
+    backward losing states: 0
+    losing controllable action groups: 0
+    input environment reused: true
+    after backward states: 4504 transitions: 121524
+    after cleanup states: 4504 transitions: 121524
+[Stepwise Delayed DUCS] Product after final mapping safety backward pruning states: 4504 transitions: 121524
+[Stepwise Delayed DUCS] Product before delayed connection states: 4504 transitions: 121524
+[Stepwise Delayed DUCS] OldCon fluent meta states: 1000 transitions: 27000
+[Stepwise Delayed DUCS] hotSwapIn connection mode: legacy
+[Stepwise Delayed DUCS] hotSwapIn connection time: total=125.435 ms, setup=0.247 ms, traversal=124.662 ms
+[Stepwise Delayed DUCS] hotSwapIn connection pairs: visited=1000, enqueued=27001, duplicateSkipped=26001, synchronizedSuccessorPairs=27000
+[Stepwise Delayed DUCS] hotSwapIn connection result: connections=1000, oldStatesWithoutTargets=0, comparisonFluents=18
+[Stepwise Delayed DUCS] hotSwapIn connection unique states: old=1000, mapping=1000, eligibleMappingVisited=1000, eligibleMappingTotal=1000
+[Stepwise Delayed DUCS] hotSwapIn connection cache stats: eligibilityComputations=0, signatureBuilds=0, transitionIndexStateBuilds=0
+[Stepwise Delayed DUCS] hotSwapIn connection legacy stats: transitionComparisons=807500, actionMatches=27000, oldTransitionsScanned=27000, mappingTransitionsScanned=29126
+[Stepwise Delayed DUCS] all old-controller states: 1000
+[Stepwise Delayed DUCS] reachable old-controller states: 1000
+[Stepwise Delayed DUCS] hotSwapIn connections: 1000
+[Stepwise Delayed DUCS] reachable states without connection target: 0
+[Stepwise Delayed DUCS] all states without connection target: 0
+[Stepwise Delayed DUCS] connected environment representation: read-only view
+[Stepwise Delayed DUCS] After delayed hotSwapIn connection states: 5504 transitions: 149524
+  online safety terminalization kept states: 5630 transitions: 145888 terminal states: 378
+  monitor-lifted hotSwapIn transitions: 1000
+[Stepwise Delayed DUCS] After Traditional hotSwapIn monitor semantics states: 5630 transitions: 145888
+[Stepwise Delayed DUCS] After global DontDoTwice states: 5631 transitions: 145888
+  safety backward pruning scope: stepwise-delayed-final
+    before states: 5631 transitions: 145888
+    dead-end seed states: 379
+    backward losing states: 379
+    losing controllable action groups: 2882
+    input environment reused: false
+    after backward states: 5252 transitions: 143006
+    after cleanup states: 5252 transitions: 143006
+[Stepwise Delayed DUCS] After final safety backward pruning states: 5252 transitions: 143006
+
+[Stepwise Delayed DUCS] GR(1)
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [5504] generated successfully.
+[Stepwise Delayed DUCS] GR result: winning
+[Stepwise Delayed DUCS] output controller states: 5504 transitions: 79186
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Stepwise Delayed DUC
+設定 : safetyBackwardPruning=true, incrementalPruning=false, incrementalPruningCleanup=false
+結果 : SUCCESS
+主比較時間（合成開始から生成終了まで-CountTime） : 0分20.16秒
+
+[規模]
+最大状態数時の状態数 : 5631 states
+最大状態数時の遷移数 : 145888 transitions
+最大状態数時の段階 : [Stepwise Delayed DUCS] After global DontDoTwice
+最大遷移数時の状態数 : 5504 states
+最大遷移数時の遷移数 : 149524 transitions
+最大遷移数時の段階 : [Stepwise Delayed DUCS] After delayed hotSwapIn connection
+出力状態数 : 5504 states
+出力遷移数 : 79186 transitions
+
+[GR(1)]
+final GR input 状態数 : 5252 states
+final GR input 遷移数 : 143006 transitions
+GR(1)合成時間 : 0分15.48秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 1.46 GB
+最初の有効sampleからのヒープ増加 : 1.46 GB
+
+[Stepwise Delayed 要求分類]
+旧要求 local 数 : 0 goals
+旧要求 cross 数 : 0 goals
+新要求 local 数 : 3 goals
+新要求 cross 数 : 2 goals
+transition requirement local 数 : 0 goals
+transition requirement cross 数 : 1 goals
+====================================================
+
+Evaluation data CSV written to: out\h6\cc8\run_03\result\CC_HalfCap_N3_L8\stepwise_delayed_SBP\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv
+Tau reduction ON
+Stepwise_UpdCont_T2_hotSwap minimising......
+Minimised States: 1840 in 608ms
+
+[minimized 出力]
+minimized 出力状態数 : 1840 states
+minimized 出力遷移数 : 25425 transitions
+minimize 時間 : 612 ms
+Evaluation data CSV written to: out\h6\cc8\run_03\result\CC_HalfCap_N3_L8\stepwise_delayed_SBP\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv

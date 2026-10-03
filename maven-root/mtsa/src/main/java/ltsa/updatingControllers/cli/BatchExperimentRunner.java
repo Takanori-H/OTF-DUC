@@ -515,15 +515,21 @@ public final class BatchExperimentRunner {
                 "peak_state_space_states_stage_transitions",
                 "peak_state_space_transitions_stage",
                 "peak_state_space_transitions_stage_states",
+                "parse_time",
+                "compile_if_change_total_time",
                 "synthesis_problem_preparation_time",
                 "update_controller_generation_time",
                 "controller_synthesis_related_time",
+                "total_time",
+                "total_time_scope_count_overhead_time",
+                "total_time_time_without_scope_count_overhead",
                 "comparison_primary_controller_synthesis_time",
                 "controller_synthesis_gc_measurement_available",
                 "output_update_controller_states",
                 "output_update_controller_transitions",
                 "minimized_output_update_controller_states",
                 "minimized_output_update_controller_transitions");
+        validatePrimaryTimingMetrics(errors, "", metrics);
         if (normalizedMethod.contains("traditional")) {
             requireMetrics(errors, "", metrics,
                     "traditional_gr1_solving_time",
@@ -1478,6 +1484,133 @@ public final class BatchExperimentRunner {
         }
     }
 
+    private static void validatePrimaryTimingMetrics(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics) {
+        String rawKey = "total_time";
+        String parseKey = "parse_time";
+        String compilationKey = "compile_if_change_total_time";
+        String preparationKey = "synthesis_problem_preparation_time";
+        String generationKey = "update_controller_generation_time";
+        String relatedKey = "controller_synthesis_related_time";
+        String overheadKey = "total_time_scope_count_overhead_time";
+        String adjustedKey = "total_time_time_without_scope_count_overhead";
+        String primaryKey = "comparison_primary_controller_synthesis_time";
+        requireMetrics(
+                errors,
+                prefix,
+                metrics,
+                parseKey,
+                compilationKey,
+                preparationKey,
+                generationKey,
+                relatedKey,
+                rawKey,
+                overheadKey,
+                adjustedKey,
+                primaryKey);
+
+        Long parse = parseLong(metrics.get(parseKey));
+        Long compilation = parseLong(metrics.get(compilationKey));
+        Long preparation = parseLong(metrics.get(preparationKey));
+        Long generation = parseLong(metrics.get(generationKey));
+        Long related = parseLong(metrics.get(relatedKey));
+        Long raw = parseLong(metrics.get(rawKey));
+        Long overhead = parseLong(metrics.get(overheadKey));
+        Long adjusted = parseLong(metrics.get(adjustedKey));
+        Long primary = parseLong(metrics.get(primaryKey));
+        boolean numeric = true;
+        numeric &= requireNumericTimingMetric(errors, prefix, metrics, parseKey, parse);
+        numeric &= requireNumericTimingMetric(
+                errors, prefix, metrics, compilationKey, compilation);
+        numeric &= requireNumericTimingMetric(
+                errors, prefix, metrics, preparationKey, preparation);
+        numeric &= requireNumericTimingMetric(
+                errors, prefix, metrics, generationKey, generation);
+        numeric &= requireNumericTimingMetric(
+                errors, prefix, metrics, relatedKey, related);
+        numeric &= requireNumericTimingMetric(errors, prefix, metrics, rawKey, raw);
+        numeric &= requireNumericTimingMetric(errors, prefix, metrics, overheadKey, overhead);
+        numeric &= requireNumericTimingMetric(errors, prefix, metrics, adjustedKey, adjusted);
+        numeric &= requireNumericTimingMetric(errors, prefix, metrics, primaryKey, primary);
+        if (!numeric) {
+            return;
+        }
+        if (parse.longValue() < 0L || compilation.longValue() < 0L
+                || preparation.longValue() < 0L || generation.longValue() < 0L
+                || related.longValue() < 0L
+                || raw.longValue() < 0L || overhead.longValue() < 0L
+                || adjusted.longValue() < 0L || primary.longValue() < 0L) {
+            errors.add(prefix + "primary timing metric is negative: parse=" + parse
+                    + ", compilation=" + compilation + ", preparation=" + preparation
+                    + ", generation=" + generation + ", related=" + related
+                    + ", raw=" + raw
+                    + ", overhead=" + overhead + ", adjusted=" + adjusted
+                    + ", primary=" + primary);
+            return;
+        }
+        long expectedRelated;
+        try {
+            expectedRelated = Math.addExact(
+                    preparation.longValue(), generation.longValue());
+        } catch (ArithmeticException e) {
+            errors.add(prefix + "controller synthesis related-time sum overflows long: preparation="
+                    + preparation + ", generation=" + generation);
+            return;
+        }
+        if (related.longValue() != expectedRelated) {
+            errors.add(prefix + relatedKey + "=" + related + ", expected="
+                    + preparationKey + "=" + preparation + "+"
+                    + generationKey + "=" + generation + "=" + expectedRelated);
+            return;
+        }
+        long minimumRaw;
+        try {
+            minimumRaw = Math.addExact(compilation.longValue(), generation.longValue());
+        } catch (ArithmeticException e) {
+            errors.add(prefix + "primary timing contained-interval sum overflows long: compilation="
+                    + compilation + ", generation=" + generation);
+            return;
+        }
+        if (raw.longValue() < minimumRaw) {
+            errors.add(prefix + rawKey + "=" + raw + " is shorter than "
+                    + compilationKey + "=" + compilation + "+"
+                    + generationKey + "=" + generation + "=" + minimumRaw);
+            return;
+        }
+        if (overhead.longValue() > raw.longValue()) {
+            errors.add(prefix + overheadKey + "=" + overhead
+                    + " exceeds " + rawKey + "=" + raw);
+            return;
+        }
+        long expected = Math.max(0L, raw.longValue() - overhead.longValue());
+        if (adjusted.longValue() != expected) {
+            errors.add(prefix + adjustedKey + "=" + adjusted
+                    + ", expected=max(0," + raw + "-" + overhead + ")=" + expected);
+        }
+        if (primary.longValue() != expected) {
+            errors.add(prefix + primaryKey + "=" + primary
+                    + ", expected=max(0," + raw + "-" + overhead + ")=" + expected);
+        }
+    }
+
+    private static boolean requireNumericTimingMetric(
+            List<String> errors,
+            String prefix,
+            Map<String, String> metrics,
+            String key,
+            Long parsedValue) {
+        if (parsedValue != null) {
+            return true;
+        }
+        String rawValue = metrics.get(key);
+        if (rawValue != null && !rawValue.trim().isEmpty()) {
+            errors.add(prefix + key + " is not an integer: " + rawValue);
+        }
+        return false;
+    }
+
     private static Long parseLong(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
@@ -2109,7 +2242,7 @@ public final class BatchExperimentRunner {
                 }
                 requireMetric(errors, prefix, metrics, "peak_state_space_states");
                 requireMetric(errors, prefix, metrics, "peak_state_space_transitions");
-                requireMetric(errors, prefix, metrics, "controller_synthesis_related_time");
+                validatePrimaryTimingMetrics(errors, prefix, metrics);
                 if (completed.result.heapSamplingEnabled) {
                     requireMetrics(errors, prefix, metrics,
                             "controller_synthesis_sampled_peak_heap_used",

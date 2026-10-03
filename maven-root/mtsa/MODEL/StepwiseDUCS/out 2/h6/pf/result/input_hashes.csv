@@ -1,0 +1,5 @@
+role,path,sha256,size_bytes
+"config_original","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\configs\hotswap\windows_evaluation_v6_preflight.yaml","455d64c46e06b3bd1d83f017b1b3b9ae6d3a43ac0c0991914e14f0a3da2f376f",2095
+"config_sanitized_snapshot","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\out\h6\pf\result\executed_config.sanitized.yaml","455d64c46e06b3bd1d83f017b1b3b9ae6d3a43ac0c0991914e14f0a3da2f376f",2095
+"lts","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\LTS\EVCharging\EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts","65cdb5bfd4af5750913b2bc96225329340bbd10c8895a0a801dd390c7eec26c2",18990
+"launcher_artifact","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\mtsa-1.0-SNAPSHOT.jar","f683e6e8bab836a37a7c1e3835e6e05b87c29c2af39b8d93dad1849d28533696",353865542

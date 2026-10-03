@@ -169,6 +169,40 @@ public class SafetyBackwardPrunerTest {
     }
 
     @Test
+    public void deferredUncontrollableBoundaryPropagatesAfterRemainingOwnerJoins() {
+        MTS<Long, String> environment = environment(0L);
+        environment.addState(1L);
+        addTransition(environment, 0L, "u", 1L);
+        Map<String, Set<Integer>> owners = owners("u", 0, 1);
+
+        SafetyBackwardPruner.DeferredResult partial = SafetyBackwardPruner.pruneDeferred(
+                environment,
+                set(1L),
+                Collections.<String>emptySet(),
+                owners,
+                stages(0),
+                "partial-owner-scope",
+                null);
+
+        assertFalse(partial.isInitialLosing());
+        assertEquals(1L, partial.getDeferredActionGroups());
+        assertEquals(set(1L), partial.getErrorStates());
+        assertTransition(partial.getEnvironment(), 0L, "u", 1L);
+
+        SafetyBackwardPruner.DeferredResult complete = SafetyBackwardPruner.pruneDeferred(
+                partial.getEnvironment(),
+                partial.getErrorStates(),
+                Collections.<String>emptySet(),
+                owners,
+                stages(0, 1),
+                "complete-owner-scope",
+                null);
+
+        assertTrue("The retained uncontrollable Error boundary must propagate once all owners join.",
+                complete.isInitialLosing());
+    }
+
+    @Test
     public void deferredPruningPropagatesWhenAllUncontrollableOwnersArePresent() {
         MTS<Long, String> environment = environment(0L);
         environment.addState(1L);

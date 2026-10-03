@@ -39,6 +39,15 @@ controllerSpec NEW_REQ = {
 
 ||NewCon = (NEW_ENV).
 
+fluent SeenTick = <tick, stopOldSpec>
+ltl_property T_KEEP_LAST_TICK = [](SeenTick -> tick)
+
+// When raw H_T is one-to-many, both an explicitly selected legacy-stutter run
+// of the unflagged target and the explicit Traditional-monitor target must
+// connect all raw targets before evaluating this transition requirement.  The
+// legacy target name is retained for regression continuity; it no longer
+// denotes history-correlated preconnection monitor pruning.
+
 updatingController Stepwise_OneToMany = {
     oldController = OldCon,
     oldEnvironment = {OLD_ENV},
@@ -51,4 +60,50 @@ updatingController Stepwise_OneToMany = {
     safetyBackwardPruning
 }
 
+updatingController Stepwise_TraditionalMonitor_NoTransition_OneToMany = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Stepwise_LegacyMonitorBoundary_OneToMany = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_KEEP_LAST_TICK,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TraditionalMonitorBoundary_OneToMany = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_KEEP_LAST_TICK,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
 ||STEPWISE_ONE_TO_MANY = Stepwise_OneToMany.
+||STEPWISE_TRADITIONAL_MONITOR_NO_TRANSITION_ONE_TO_MANY =
+        Stepwise_TraditionalMonitor_NoTransition_OneToMany.
+||STEPWISE_LEGACY_MONITOR_BOUNDARY_ONE_TO_MANY =
+        Stepwise_LegacyMonitorBoundary_OneToMany.
+||STEPWISE_TRADITIONAL_MONITOR_BOUNDARY_ONE_TO_MANY =
+        Stepwise_TraditionalMonitorBoundary_OneToMany.

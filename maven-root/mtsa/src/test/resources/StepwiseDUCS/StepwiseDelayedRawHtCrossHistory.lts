@@ -1,0 +1,128 @@
+// Full-pipeline regression for lifting the raw Traditional H_T relation over
+// the monitor states produced after Stepwise's raw delayed connection.
+//
+// The old controller is synthesized by the ordinary DCS declaration and then
+// composed with EXACT_OLD_ENV.  It is therefore the exact reachable closed
+// loop expected by Traditional DUCS, rather than a hand-written quotient.
+
+set EXACT_CONTROLLABLE = {a, z}
+
+// Component A owns a, but not z, on its old side.  Its second relation branch
+// owns a z prefix followed by the uncontrollable action u.
+A_OLD = (a -> A_OLD).
+A_NEW = (a -> A_NEW).
+
+relation R_A_CROSS = {
+    A_OLD@A_OLD = reconfigure -> A_NEW@A_NEW,
+    A_OLD@A_OLD = z -> u -> reconfigure -> A_NEW@A_NEW
+}
+
+// Component B owns z on the old side.  The full old closed loop can therefore
+// execute z, while the same word advances A's mapping shadow into its relation
+// prefix under the current Traditional mapping-product semantics.
+B_OLD = (z -> B_OLD).
+B_NEW = (z -> B_NEW).
+
+relation R_B_CROSS = {
+    B_OLD@B_OLD = reconfigure -> B_NEW@B_NEW
+}
+
+map MAP_A_CROSS = {A_OLD, A_NEW, R_A_CROSS}
+map MAP_B_CROSS = {B_OLD, B_NEW, R_B_CROSS}
+
+||EXACT_OLD_ENV = (A_OLD || B_OLD).
+||EXACT_NEW_ENV = (A_NEW || B_NEW).
+
+controllerSpec EXACT_OLD_REQ = {
+    safety = {}
+    controllable = {EXACT_CONTROLLABLE}
+}
+
+controllerSpec EXACT_NEW_REQ = {
+    safety = {}
+    controllable = {EXACT_CONTROLLABLE}
+}
+
+controller ||ExactSynthOldController = EXACT_OLD_ENV~{EXACT_OLD_REQ}.
+||ExactOldCon = (ExactSynthOldController || EXACT_OLD_ENV).
+
+controller ||ExactSynthNewController = EXACT_NEW_ENV~{EXACT_NEW_REQ}.
+
+// a and z return ExactOldCon to its single raw state.  They nevertheless leave
+// distinct monitor values and distinct mapping-shadow states.  From the old
+// monitor value reached by a, every raw H_T target must still be offered.  The
+// z-prefix target then exposes uncontrollable u and violates this requirement.
+fluent SeenA = <a, z> initially 0
+fluent SeenU = <u, {a, z}> initially 0
+ltl_property T_NO_U_AFTER_A = [](SeenA -> !SeenU)
+
+updatingController Traditional_RawHtCrossHistory = {
+    oldController = ExactOldCon,
+    oldEnvironment = {A_OLD, B_OLD},
+    newEnvironment = {A_NEW, B_NEW},
+    mapRelation = {R_A_CROSS, R_B_CROSS},
+    oldGoal = EXACT_OLD_REQ,
+    newGoal = EXACT_NEW_REQ,
+    transition = T_NO_U_AFTER_A,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_RawHtCrossHistory = {
+    oldController = ExactOldCon,
+    oldEnvironment = {A_OLD, B_OLD},
+    newEnvironment = {A_NEW, B_NEW},
+    mapRelation = {R_A_CROSS, R_B_CROSS},
+    oldGoal = EXACT_OLD_REQ,
+    newGoal = EXACT_NEW_REQ,
+    transition = T_NO_U_AFTER_A,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+// No explicit monitor-semantics flag is needed above: Traditional semantics is
+// the stepwise_delayed default, and preserving raw H_T remains a correctness
+// requirement whenever the connection-shadow fallback is selected.
+
+// One-to-one control.  It uses the same exact synthesized old closed loop but
+// has no pre-hotSwapIn relation prefix.  Raw H_T has one all-old target, so the
+// ordinary staged Stepwise path must remain available and winning.
+relation R_A_ONE = {
+    A_OLD@A_OLD = reconfigure -> A_NEW@A_NEW
+}
+
+relation R_B_ONE = {
+    B_OLD@B_OLD = reconfigure -> B_NEW@B_NEW
+}
+
+map MAP_A_ONE = {A_OLD, A_NEW, R_A_ONE}
+map MAP_B_ONE = {B_OLD, B_NEW, R_B_ONE}
+
+updatingController Traditional_RawHtOneToOne = {
+    oldController = ExactOldCon,
+    oldEnvironment = {A_OLD, B_OLD},
+    newEnvironment = {A_NEW, B_NEW},
+    mapRelation = {R_A_ONE, R_B_ONE},
+    oldGoal = EXACT_OLD_REQ,
+    newGoal = EXACT_NEW_REQ,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_RawHtOneToOne = {
+    oldController = ExactOldCon,
+    oldEnvironment = {A_OLD, B_OLD},
+    newEnvironment = {A_NEW, B_NEW},
+    mapRelation = {R_A_ONE, R_B_ONE},
+    oldGoal = EXACT_OLD_REQ,
+    newGoal = EXACT_NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||TRADITIONAL_RAW_HT_CROSS_HISTORY = Traditional_RawHtCrossHistory.
+||STEPWISE_RAW_HT_CROSS_HISTORY = Stepwise_RawHtCrossHistory.
+||TRADITIONAL_RAW_HT_ONE_TO_ONE = Traditional_RawHtOneToOne.
+||STEPWISE_RAW_HT_ONE_TO_ONE = Stepwise_RawHtOneToOne.

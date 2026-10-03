@@ -1,0 +1,68 @@
+// Characterization of the historical Traditional H_T connection relation.
+//
+// Before synthesis, OldCon and the full mapping shadow are advanced by the
+// same ordinary word.  On z, the B old-side transition synchronizes with the
+// A relation pre-action.  Consequently the mapping shadow reaches A's first
+// INTERMEDIATE state while OldCon reaches B_WAIT.  Traditional DUCS then
+// connects that OldCon state directly to the INTERMEDIATE shadow state.
+
+set ShadowControllable = {z, y, idle, wait}
+
+A_OLD = (idle -> A_OLD).
+A_NEW = (idle -> A_NEW).
+
+relation R_A = {
+    A_OLD@A_OLD = z -> y -> reconfigure -> A_NEW@A_NEW
+}
+
+B_OLD = (z -> B_WAIT),
+B_WAIT = (wait -> B_WAIT).
+
+B_NEW = (wait -> B_NEW).
+
+relation R_B = {
+    B_WAIT@B_OLD = reconfigure -> B_NEW@B_NEW
+}
+
+map MAP_A = {A_OLD, A_NEW, R_A}
+map MAP_B = {B_OLD, B_NEW, R_B}
+
+||MAPPING_SHADOW = (MAP_A || MAP_B).
+||OldCon = (A_OLD || B_OLD).
+
+controllerSpec SHADOW_OLD_REQ = {
+    safety = {}
+    controllable = {ShadowControllable}
+}
+
+controllerSpec SHADOW_NEW_REQ = {
+    safety = {}
+    controllable = {ShadowControllable}
+}
+
+updatingController Traditional_ShadowIntermediateConnection = {
+    oldController = OldCon,
+    oldEnvironment = {A_OLD, B_OLD},
+    newEnvironment = {A_NEW, B_NEW},
+    mapRelation = {R_A, R_B},
+    oldGoal = SHADOW_OLD_REQ,
+    newGoal = SHADOW_NEW_REQ,
+    nonblocking
+}
+
+updatingController Stepwise_ShadowIntermediateConnection = {
+    oldController = OldCon,
+    oldEnvironment = {A_OLD, B_OLD},
+    newEnvironment = {A_NEW, B_NEW},
+    mapRelation = {R_A, R_B},
+    oldGoal = SHADOW_OLD_REQ,
+    newGoal = SHADOW_NEW_REQ,
+    nonblocking,
+    stepwise_delayed
+}
+
+||TRADITIONAL_SHADOW_INTERMEDIATE_CONNECTION =
+    Traditional_ShadowIntermediateConnection.
+
+||STEPWISE_SHADOW_INTERMEDIATE_CONNECTION =
+    Stepwise_ShadowIntermediateConnection.

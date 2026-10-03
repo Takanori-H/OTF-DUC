@@ -1,0 +1,11 @@
+Process:
+	NONDET_FAIL
+States:
+	3
+Transitions:
+	NONDET_FAIL = Q0,
+	Q0	= (idle -> Q0
+		  |hotSwapIn -> Q1),
+	Q1	= (idle -> Q1
+		  |reconfigure -> Q2),
+	Q2	= (left -> Q2).

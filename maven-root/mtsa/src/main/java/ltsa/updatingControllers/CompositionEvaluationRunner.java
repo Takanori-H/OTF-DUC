@@ -46,6 +46,8 @@ public final class CompositionEvaluationRunner {
         private final CompilationStep compilationStep;
         private SuccessfulCompositionCallback successfulCompositionCallback;
         private String openFileName;
+        private boolean hasCompositionStartNanos;
+        private long compositionStartNanos;
 
         public Request(LTSOutput output, CompilationStep compilationStep) {
             if (output == null) {
@@ -66,6 +68,21 @@ public final class CompositionEvaluationRunner {
         public Request withSuccessfulCompositionCallback(SuccessfulCompositionCallback callback) {
             this.successfulCompositionCallback = callback;
             return this;
+        }
+
+        /**
+         * Supplies the monotonic timestamp captured at the composition-operation
+         * entry point (the beginning of {@code HPWindow.doComposition()} in the
+         * GUI, or the equivalent point in a headless runner).
+         */
+        public Request withCompositionStartNanos(long value) {
+            this.compositionStartNanos = value;
+            this.hasCompositionStartNanos = true;
+            return this;
+        }
+
+        private long compositionStartNanosOr(long fallback) {
+            return hasCompositionStartNanos ? compositionStartNanos : fallback;
         }
     }
 
@@ -118,13 +135,15 @@ public final class CompositionEvaluationRunner {
     }
 
     public static Result run(Request request) {
+        long invocationStartNanos = System.nanoTime();
         if (!UpdatingControllerEvaluationRecorder.isEnabled()) {
             return runWithoutEvaluation(request);
         }
 
+        long compositionStartNanos = request.compositionStartNanosOr(invocationStartNanos);
         MemoryMeasurementSession memoryMeasurement = MemoryMeasurementSession.create();
         try {
-            return runWithEvaluation(request, memoryMeasurement);
+            return runWithEvaluation(request, memoryMeasurement, compositionStartNanos);
         } finally {
             memoryMeasurement.finishAndRecord();
         }
@@ -132,11 +151,14 @@ public final class CompositionEvaluationRunner {
 
     private static Result runWithEvaluation(
             Request request,
-            MemoryMeasurementSession memoryMeasurement) {
+            MemoryMeasurementSession memoryMeasurement,
+            long compositionStartNanos) {
 
-        long runStart = System.nanoTime();
         System.gc();
         UpdatingControllerEvaluationRecorder.reset();
+        PrimaryTimingWindow primaryTimingWindow =
+                new PrimaryTimingWindow(compositionStartNanos);
+        primaryTimingWindow.beginCounting();
         UpdatingControllerEvaluationRecorder.recordRunEnvironmentMetadata();
         EvaluationProfiler.resetPeakMemory();
         long baselineMemory = EvaluationProfiler.getCurrentMemoryUsage();
@@ -167,75 +189,82 @@ public final class CompositionEvaluationRunner {
         } catch (OutOfMemoryError e) {
             compileTime = elapsedMillis(compileStart);
             failure = e;
+            primaryTimingWindow.close();
             memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailure(
                     ResultStatus.OUT_OF_MEMORY,
                     failureMessage(e));
             UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+            finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         } catch (RuntimeException e) {
             compileTime = elapsedMillis(compileStart);
             failure = e;
+            primaryTimingWindow.close();
             memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                     ResultStatus.EXCEPTION,
                     failureMessage(e));
             UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+            finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         } catch (Exception e) {
             compileTime = elapsedMillis(compileStart);
             failure = e;
+            primaryTimingWindow.close();
             memoryMeasurement.finishAndRecord();
             UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                     ResultStatus.EXCEPTION,
                     failureMessage(e));
             UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-            finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+            finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
             return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
         }
 
+        if (current == null) {
+            primaryTimingWindow.close();
+        }
         if (current != null) {
             long synthesisStart = System.nanoTime();
             try {
-                TransitionSystemDispatcher.applyComposition(current, request.output);
-                synthesisTime = elapsedMillis(synthesisStart);
+                try {
+                    TransitionSystemDispatcher.applyComposition(current, request.output);
+                } finally {
+                    synthesisTime = elapsedMillis(synthesisStart);
+                    primaryTimingWindow.close();
+                }
             } catch (OutOfMemoryError e) {
-                synthesisTime = elapsedMillis(synthesisStart);
                 failure = e;
                 memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailure(
                         ResultStatus.OUT_OF_MEMORY,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (LTSCompositionException e) {
-                synthesisTime = elapsedMillis(synthesisStart);
                 failure = e;
                 memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (RuntimeException e) {
-                synthesisTime = elapsedMillis(synthesisStart);
                 failure = e;
                 memoryMeasurement.finishAndRecord();
                 UpdatingControllerEvaluationRecorder.recordFailureIfAbsent(
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             }
 
-            // The measured synthesis window is parsing/problem preparation
-            // plus controller composition. CLI artifact generation and GUI
-            // callbacks are covered only by the parent child-lifetime RSS.
+            // The primary wall-time window was frozen immediately after
+            // controller generation. CLI artifact generation and GUI callbacks
+            // are covered only by the parent child-lifetime RSS.
             memoryMeasurement.finishAndRecord();
 
             long postCompositionStart = System.nanoTime();
@@ -245,7 +274,7 @@ public final class CompositionEvaluationRunner {
                             ResultStatus.NOT_CONTROLLABLE,
                             "Composition not controllable.");
                     UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                    finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                    finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                     return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
                 }
 
@@ -260,7 +289,7 @@ public final class CompositionEvaluationRunner {
                         ResultStatus.OUT_OF_MEMORY,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (RuntimeException e) {
                 postCompositionTime = elapsedMillis(postCompositionStart);
@@ -269,7 +298,7 @@ public final class CompositionEvaluationRunner {
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             } catch (Exception e) {
                 postCompositionTime = elapsedMillis(postCompositionStart);
@@ -278,7 +307,7 @@ public final class CompositionEvaluationRunner {
                         ResultStatus.EXCEPTION,
                         failureMessage(e));
                 UpdatingControllerEvaluationRecorder.recordMemorySnapshot("失敗時メモリ");
-                finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+                finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
                 return new Result(current, false, failure, compileTime, synthesisTime, postCompositionTime);
             }
         }
@@ -294,7 +323,7 @@ public final class CompositionEvaluationRunner {
                     "Composition was not generated.");
         }
 
-        finishAndPrint(request.output, runStart, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
+        finishAndPrint(request.output, primaryTimingWindow, compileTime, synthesisTime, postCompositionTime, baselineMemory, current, memoryMeasurement);
         return new Result(current, successful, failure, compileTime, synthesisTime, postCompositionTime);
     }
 
@@ -417,8 +446,13 @@ public final class CompositionEvaluationRunner {
                     compileOnlyRecorded = true;
 
                     continueCompilationStart = System.nanoTime();
-                    CompositeState current = compiler.continueCompilation(targetName);
-                    long continueCompilationTime = elapsedMillis(continueCompilationStart);
+                    CompositeState current;
+                    long continueCompilationTime;
+                    try {
+                        current = compiler.continueCompilation(targetName);
+                    } finally {
+                        continueCompilationTime = elapsedMillis(continueCompilationStart);
+                    }
                     if (UpdatingControllerEvaluationRecorder.isEnabled()) {
                         output.outln("comp.continueCompilation time : " + continueCompilationTime + "ms");
                         UpdatingControllerEvaluationRecorder.recordTime(
@@ -449,7 +483,7 @@ public final class CompositionEvaluationRunner {
 
     private static void finishAndPrint(
             LTSOutput output,
-            long runStart,
+            PrimaryTimingWindow primaryTimingWindow,
             long compileTime,
             long synthesisTime,
             long postCompositionTime,
@@ -457,21 +491,21 @@ public final class CompositionEvaluationRunner {
             CompositeState current,
             MemoryMeasurementSession memoryMeasurement) {
 
-        long runTime = elapsedMillis(runStart);
+        long primaryRawTime = primaryTimingWindow.close();
         memoryMeasurement.finishAndRecord();
-        UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
         long overallPeakMemory = EvaluationProfiler.getPeakMemoryUsage();
         long netPeakMemory = overallPeakMemory - baselineMemory;
         long problemPreparationTime = UpdatingControllerEvaluationRecorder.getRecordedTimeMillis(
                 COMMON_SECTION,
                 "合成問題準備時間");
         long updateControllerGenerationTime = synthesisTime;
-        long controllerSynthesisRelatedTime = problemPreparationTime + updateControllerGenerationTime;
+        long controllerSynthesisRelatedTime =
+                problemPreparationTime + updateControllerGenerationTime;
 
         UpdatingControllerEvaluationRecorder.recordTime(
                 COMMON_SECTION,
                 "合成ボタンを押してから合成完了までの時間",
-                runTime);
+                primaryRawTime);
         UpdatingControllerEvaluationRecorder.recordTime(
                 COMMON_SECTION,
                 "compileIfChange 全体時間（参考）",
@@ -552,6 +586,43 @@ public final class CompositionEvaluationRunner {
 
         UpdatingControllerEvaluationRecorder.recordMemoryCheckpoint("合成終了時");
         UpdatingControllerEvaluationRecorder.printSummary(output);
+    }
+
+    /**
+     * Freezes the primary timing boundary before every post-composition callback
+     * and closes the matching CountTime/observed windows exactly once.
+     */
+    private static final class PrimaryTimingWindow {
+        private final long compositionStartNanos;
+        private boolean countScopeOpen;
+        private boolean closed;
+        private long elapsedMillis;
+
+        private PrimaryTimingWindow(long compositionStartNanos) {
+            this.compositionStartNanos = compositionStartNanos;
+        }
+
+        private void beginCounting() {
+            if (countScopeOpen || closed) {
+                return;
+            }
+            UpdatingControllerEvaluationRecorder.beginPrimaryComparisonCountScope();
+            countScopeOpen = true;
+        }
+
+        private long close() {
+            if (closed) {
+                return elapsedMillis;
+            }
+            elapsedMillis = CompositionEvaluationRunner.elapsedMillis(compositionStartNanos);
+            if (countScopeOpen) {
+                UpdatingControllerEvaluationRecorder.endPrimaryComparisonCountScope();
+                countScopeOpen = false;
+            }
+            UpdatingControllerEvaluationRecorder.closeObservedTimeWindow();
+            closed = true;
+            return elapsedMillis;
+        }
     }
 
     /** Owns the heap sampler and the child-to-parent RSS phase markers. */

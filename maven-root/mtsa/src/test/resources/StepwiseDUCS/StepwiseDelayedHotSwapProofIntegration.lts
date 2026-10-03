@@ -1,0 +1,147 @@
+// Small proof fixture for the Traditional hotSwapIn monitor semantics.
+// The plant is deliberately unchanged by the update: any difference below
+// is caused by requirement-monitor history, not by an environment delta.
+
+set ControllableActions = {a}
+
+OLD_ENV = OLD,
+OLD = (a -> OLD).
+
+NEW_ENV = NEW,
+NEW = (a -> NEW).
+
+relation R_ENV = {
+    OLD@OLD_ENV = reconfigure -> NEW@NEW_ENV
+}
+
+map MAP_ENV = {OLD_ENV, NEW_ENV, R_ENV}
+
+||MAPPING_ENV = (MAP_ENV).
+
+OLD_CLOSED_LOOP = (a -> OLD_CLOSED_LOOP).
+||OldCon = (OLD_CLOSED_LOOP).
+
+controllerSpec EMPTY_OLD_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+controllerSpec EMPTY_NEW_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+// hotSwapIn initiates PendingUpdate.  T_NO_A_WHILE_PENDING is satisfiable:
+// the update controller disables a until stopOldSpec resets the fluent.
+// It is a transition requirement, so it is active throughout the update.
+fluent PendingUpdate = <hotSwapIn, stopOldSpec>
+ltl_property T_NO_A_WHILE_PENDING = [](PendingUpdate -> !a)
+
+updatingController Traditional_TransitionWinning = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = EMPTY_OLD_REQ,
+    newGoal = EMPTY_NEW_REQ,
+    transition = T_NO_A_WHILE_PENDING,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController FullStepwise_TransitionWinning = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = EMPTY_OLD_REQ,
+    newGoal = EMPTY_NEW_REQ,
+    transition = T_NO_A_WHILE_PENDING,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+// SeenA survives hotSwapIn, but the action proposition a is reset by every
+// different event under Traditional semantics.  Thus a,hotSwapIn reaches an
+// old-safety violation before stopOldSpec.  This unflagged target is run with
+// the explicit Java stutter opt-out and is intentionally winning.
+fluent SeenA = <a, stopOldSpec>
+ltl_property O_KEEP_LAST_A = [](SeenA -> a)
+
+controllerSpec OLD_BOUNDARY_REQ = {
+    safety = {O_KEEP_LAST_A}
+    controllable = {ControllableActions}
+}
+
+updatingController Traditional_OldSafetyBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_BOUNDARY_REQ,
+    newGoal = EMPTY_NEW_REQ,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController LegacyStepwise_OldSafetyBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_BOUNDARY_REQ,
+    newGoal = EMPTY_NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController FullStepwise_OldSafetyBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_BOUNDARY_REQ,
+    newGoal = EMPTY_NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+// This new safety is also hotSwapIn-sensitive, but is realizable.  New safety
+// starts at startNewSpec; PendingUpdate requires stopOldSpec to have happened
+// first.  Traditional and full Stepwise should therefore synthesize the same
+// update-order restriction.
+ltl_property N_STOP_OLD_BEFORE_START = [](!PendingUpdate)
+
+controllerSpec NEW_HOTSWAP_REQ = {
+    safety = {N_STOP_OLD_BEFORE_START}
+    controllable = {ControllableActions}
+}
+
+updatingController Traditional_NewSafetyWinning = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = EMPTY_OLD_REQ,
+    newGoal = NEW_HOTSWAP_REQ,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController FullStepwise_NewSafetyWinning = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = EMPTY_OLD_REQ,
+    newGoal = NEW_HOTSWAP_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}

@@ -64,6 +64,7 @@ public final class SingleCompositionRunner {
                     ? new File(".").getAbsolutePath()
                     : parent.getAbsolutePath();
 
+            long compositionStartNanos = System.nanoTime();
             final CompositionEvaluationRunner.CompilationStep compilerStep =
                     CompositionEvaluationRunner.ltsCompilerStep(
                             new LTSInputString(source),
@@ -90,6 +91,7 @@ public final class SingleCompositionRunner {
                                     return compiled;
                                 }
                             })
+                            .withCompositionStartNanos(compositionStartNanos)
                             .withOpenFileName(ltsFile.getAbsolutePath());
 
             CompositionEvaluationRunner.Result result = CompositionEvaluationRunner.run(request);

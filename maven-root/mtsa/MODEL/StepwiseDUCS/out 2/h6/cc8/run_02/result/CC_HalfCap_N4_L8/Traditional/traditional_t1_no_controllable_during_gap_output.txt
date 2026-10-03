@@ -1,0 +1,70 @@
+comp.compile time : 101ms
+Compiled: NODE_OLD(1)
+Compiled: NODE_OLD(2)
+Compiled: NODE_OLD(3)
+Compiled: NODE_OLD(4)
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 10 * 10 * 10 * 10 = 2 ** 16
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 94543K
+-- States: 10000 Transitions: 360000 Memory used: 124604K
+Composed in 330ms
+Composition:OldController = OLD_ENV
+State Space: 10000 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 183913K
+-- States: 10000 Transitions: 360000 Memory used: 198013K
+Composed in 400ms
+Solving the LTS control problem.
+Environment states: 10000
+Game states: 10000
+Game transitions: 30000
+Analysis time: 4269ms.
+Controller [10000] generated successfully.
+Composition:OldController = OldController
+State Space: 10000 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 624877K
+-- States: 10000 Transitions: 360000 Memory used: 675211K
+Composed in 312ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 10 * 10 * 10 * 10 = 2 ** 16
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 241422K
+-- States: 10000 Transitions: 360000 Memory used: 288883K
+Composed in 303ms
+ - Synthesizing Mapping Environment from lists (size=4)...
+INFO: Auto-compiling dependency: NODE_NEW(1)
+Generating Mapping Environment: MAP_NODE_OLD(1)_NODE_NEW(1)
+INFO: Auto-compiling dependency: NODE_NEW(2)
+Generating Mapping Environment: MAP_NODE_OLD(2)_NODE_NEW(2)
+INFO: Auto-compiling dependency: NODE_NEW(3)
+Generating Mapping Environment: MAP_NODE_OLD(3)_NODE_NEW(3)
+INFO: Auto-compiling dependency: NODE_NEW(4)
+Generating Mapping Environment: MAP_NODE_OLD(4)_NODE_NEW(4)
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_NODE_OLD(1)_NODE_NEW(1) || MAP_NODE_OLD(2)_NODE_NEW(2) || MAP_NODE_OLD(3)_NODE_NEW(3) || MAP_NODE_OLD(4)_NODE_NEW(4)
+State Space: 20 * 20 * 20 * 20 = 2 ** 20
+Composing...
+-- States: 10000 Transitions: 360093 Memory used: 357154K
+-- States: 20000 Transitions: 730000 Memory used: 409981K
+-- States: 20000 Transitions: 730000 Memory used: 420897K
+Composed in 515ms
+comp.continueCompilation time : 9247ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_NEW_NODE_POWER_CAP_1_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_2_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_3_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_4_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_1_2_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_2_3_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_3_4_UPD_NEW
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_NODE_1
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_NODE_2
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_NODE_3
+Processing formula for update: T1_NO_CONTROLLABLE_DURING_GAP_NODE_4
+Environment states:697904
+Solving safety goals for the controller synthesis

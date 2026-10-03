@@ -129,6 +129,7 @@ public class SymbolTable {
         addSymbols("incrementalPruning", Symbol.INCREMENTAL_PRUNING);
         addSymbols("incrementalPruningCleanup", Symbol.INCREMENTAL_PRUNING_CLEANUP);
         addSymbols("safetyBackwardPruning", Symbol.SAFETY_BACKWARD_PRUNING);
+        addSymbols("traditionalHotSwapMonitorSemantics", Symbol.TRADITIONAL_HOT_SWAP_MONITOR_SEMANTICS);
     }
 
     private static void addSymbols(String key, Integer elem) {

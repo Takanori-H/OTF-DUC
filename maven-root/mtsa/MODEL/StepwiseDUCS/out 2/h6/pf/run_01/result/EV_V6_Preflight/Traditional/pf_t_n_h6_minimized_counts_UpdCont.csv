@@ -1,0 +1,7 @@
+target,metric_key,metric_label,value,unit
+UpdCont,raw_output_update_controller_states,Raw output update controller states,3869,states
+UpdCont,raw_output_update_controller_transitions,Raw output update controller transitions,31275,transitions
+UpdCont,minimized_output_update_controller_states,Minimized output update controller states,2262,states
+UpdCont,minimized_output_update_controller_transitions,Minimized output update controller transitions,18192,transitions
+UpdCont,minimized_output_update_controller_count_time,Minimized output update controller count time,0,ms
+UpdCont,minimized_output_update_controller_minimize_time,Minimized output update controller minimize time,198,ms

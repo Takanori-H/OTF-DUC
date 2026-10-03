@@ -1,0 +1,48 @@
+set ProbeControllable = {a, z}
+
+C1_OLD = (a -> C1_OLD).
+C1_NEW = (a -> C1_NEW).
+
+relation R1 = {
+    C1_OLD@C1_OLD = reconfigure -> C1_NEW@C1_NEW,
+    C1_OLD@C1_OLD = z -> u -> reconfigure -> C1_NEW@C1_NEW
+}
+
+C2_OLD = (z -> C2_OLD).
+C2_NEW = (z -> C2_NEW).
+
+relation R2 = {
+    C2_OLD@C2_OLD = reconfigure -> C2_NEW@C2_NEW
+}
+
+map MAP1 = {C1_OLD, C1_NEW, R1}
+map MAP2 = {C2_OLD, C2_NEW, R2}
+
+||OLD_ENV = (C1_OLD || C2_OLD).
+||NEW_ENV = (C1_NEW || C2_NEW).
+||MAPPING_ENV = (MAP1 || MAP2).
+||OldCon = (C1_OLD || C2_OLD).
+
+controllerSpec OLD_REQ = {
+    safety = {}
+    controllable = {ProbeControllable}
+}
+
+controllerSpec NEW_REQ = {
+    safety = {}
+    controllable = {ProbeControllable}
+}
+
+updatingController PhaseAwareProbe = {
+    oldController = OldCon,
+    oldEnvironment = {C1_OLD, C2_OLD},
+    newEnvironment = {C1_NEW, C2_NEW},
+    mapRelation = {R1, R2},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||PHASE_A = PhaseAwareProbe.

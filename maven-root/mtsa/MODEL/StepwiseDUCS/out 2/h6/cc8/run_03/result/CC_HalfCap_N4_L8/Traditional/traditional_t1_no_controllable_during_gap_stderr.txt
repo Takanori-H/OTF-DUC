@@ -1,0 +1,2 @@
+Game state size:10000
+Winning state size:10000

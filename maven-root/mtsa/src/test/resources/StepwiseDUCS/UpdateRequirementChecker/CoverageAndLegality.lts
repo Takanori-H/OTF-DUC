@@ -1,0 +1,46 @@
+set ProbeControllable = {a, x, z, reset}
+
+OLD_ENV = OLD0,
+OLD0 = (a -> OLD0 | z -> OLD1),
+OLD1 = (a -> OLD1 | reset -> OLD0 | x -> OLD1).
+
+NEW_ENV = NEW0,
+NEW0 = (a -> NEW0 | z -> NEW1),
+NEW1 = (a -> NEW1 | reset -> NEW0 | x -> NEW1).
+
+relation R_ENV = {
+    OLD0@OLD_ENV = reconfigure -> NEW0@NEW_ENV,
+    OLD1@OLD_ENV = reconfigure -> NEW1@NEW_ENV
+}
+
+map MAP_ENV = {OLD_ENV, NEW_ENV, R_ENV}
+||MAPPING_ENV = (MAP_ENV).
+
+controllerSpec OLD_REQ = {
+    safety = {}
+    controllable = {ProbeControllable}
+}
+
+controllerSpec NEW_REQ = {
+    safety = {}
+    controllable = {ProbeControllable}
+}
+
+OLD_CLOSED_LOOP = OC0,
+OC0 = (a -> OC0 | z -> OC1),
+OC1 = (a -> OC1 | reset -> OC0 | x -> OC1).
+||OldCon = (OLD_CLOSED_LOOP).
+
+updatingController CheckerProbe = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+||PROBE_B = CheckerProbe.
+||PROBE_C = CheckerProbe.

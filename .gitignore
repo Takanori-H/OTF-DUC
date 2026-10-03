@@ -17,6 +17,7 @@ maven-root/mtsa/dependency-reduced-pom.xml
 /docs/
 /maven-root/mtsa/Experiment/
 /maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/
+/maven-root/mtsa/MODEL/StepwiseDUCS/out.zip
 
 # Created by https://www.gitignore.io/api/eclipse,intellij,java,maven
 

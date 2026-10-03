@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -18,7 +17,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import ltsa.control.ControllerGoalDefinition;
-import ltsa.dispatcher.TransitionSystemDispatcher;
 import ltsa.lts.CompactState;
 import ltsa.lts.CompositeState;
 import ltsa.lts.CompositionExpression;
@@ -32,6 +30,7 @@ import ltsa.lts.UpdatingControllersDefinition;
 import ltsa.lts.ltl.AssertDefinition;
 import ltsa.lts.ltl.PredicateDefinition;
 import ltsa.updatingControllers.UpdateConstants;
+import ltsa.updatingControllers.structures.UpdatingControllerCompositeState;
 
 public final class UpdateRequirementChecker {
 
@@ -44,60 +43,68 @@ public final class UpdateRequirementChecker {
     public static Report check(File transitionsFile, File ltsFile, String target) throws IOException {
         TransitionGraph controller = TransitionGraph.fromPrintTransitionsFile(transitionsFile);
         SpecContext spec = SpecContext.load(ltsFile, target);
+        PhaseAwareUpdateEnvironment reference = spec.phaseAwareReference();
+        boolean bulkProtocol = spec.supportsBulkProtocolChecks();
 
         List<RequirementResult> results = new ArrayList<RequirementResult>();
-        results.add(checkHotSwapEnabled(controller));
-        results.add(checkSafetyMonitors("R2", "old_goal_until_stopOldSpec",
-                compileOldSafetyMonitors(spec), controller));
+        results.add(checkHotSwapEnabled(controller, reference));
+        results.add(bulkProtocol
+                ? checkSafetyMonitors("R2", "old_goal_until_stopOldSpec",
+                        compileOldSafetyMonitors(spec), controller)
+                : RequirementResult.unknown("R2", "old_goal_until_stopOldSpec",
+                        "bulk update protocol was not available"));
         results.add(checkSafetyMonitors("R3", "transition_requirement",
                 compileTransitionMonitors(spec), controller));
-        results.add(checkSafetyMonitors("R4", "new_goal_after_startNewSpec",
-                compileNewSafetyMonitors(spec), controller));
-        results.add(checkEventually(controller, "R5", "eventually_stopOldSpec_after_hotSwapIn",
-                UpdateConstants.STOP_OLD_SPEC));
-        results.add(checkEventually(controller, "R6", "eventually_reconfigure_after_hotSwapIn",
-                UpdateConstants.RECONFIGURE));
-        results.add(checkEventually(controller, "R7", "eventually_startNewSpec_after_hotSwapIn",
-                UpdateConstants.START_NEW_SPEC));
+        results.add(bulkProtocol
+                ? checkSafetyMonitors("R4", "new_goal_after_startNewSpec",
+                        compileNewSafetyMonitors(spec), controller)
+                : RequirementResult.unknown("R4", "new_goal_after_startNewSpec",
+                        "bulk update protocol was not available"));
+        results.add(bulkProtocol
+                ? checkEventually(controller, "R5",
+                        "eventually_stopOldSpec_after_hotSwapIn",
+                        UpdateConstants.STOP_OLD_SPEC)
+                : RequirementResult.unknown("R5",
+                        "eventually_stopOldSpec_after_hotSwapIn",
+                        "bulk update protocol was not available"));
+        results.add(bulkProtocol
+                ? checkEventually(controller, "R6",
+                        "eventually_reconfigure_after_hotSwapIn",
+                        UpdateConstants.RECONFIGURE)
+                : RequirementResult.unknown("R6",
+                        "eventually_reconfigure_after_hotSwapIn",
+                        "bulk update protocol was not available"));
+        results.add(bulkProtocol
+                ? checkEventually(controller, "R7",
+                        "eventually_startNewSpec_after_hotSwapIn",
+                        UpdateConstants.START_NEW_SPEC)
+                : RequirementResult.unknown("R7",
+                        "eventually_startNewSpec_after_hotSwapIn",
+                        "bulk update protocol was not available"));
         results.add(checkDeadlockFree(controller));
-        results.add(checkLegality(controller, spec));
+        results.add(checkLegality(controller, spec, reference));
 
         return new Report(results);
     }
 
-    private static RequirementResult checkHotSwapEnabled(TransitionGraph graph) {
-        Set<Integer> preStates = reachableWithoutAction(graph, UpdateConstants.BEGIN_UPDATE);
-        List<String> missing = new ArrayList<String>();
-        for (Integer state : preStates) {
-            if (!graph.hasOutgoingAction(state.intValue(), UpdateConstants.BEGIN_UPDATE)) {
-                missing.add("Q" + state);
-            }
+    static RequirementResult checkHotSwapEnabled(
+            TransitionGraph controller,
+            PhaseAwareUpdateEnvironment reference) {
+        if (reference == null) {
+            return RequirementResult.unknown("R1", "hotSwapIn_enabled_in_all_pre_update_states",
+                    "phase-aware old behavior was not available");
         }
-        if (missing.isEmpty()) {
-            return RequirementResult.pass("R1", "hotSwapIn_enabled_in_all_pre_update_states",
-                    "pre-update states=" + preStates.size());
+        Set<ReferencePairState> coverageRelation = greatestPreCoverageRelation(
+                controller, reference);
+        ReferencePairState initial = new ReferencePairState(0, reference.initialState());
+        if (!coverageRelation.contains(initial)) {
+            return RequirementResult.fail("R1", "hotSwapIn_enabled_in_all_pre_update_states",
+                    "the printed controller does not cover every reachable old behavior "
+                            + "or does not enable hotSwapIn where H_T is defined",
+                    UpdateConstants.BEGIN_UPDATE);
         }
-        return RequirementResult.fail("R1", "hotSwapIn_enabled_in_all_pre_update_states",
-                "missing states=" + join(missing, " "), "");
-    }
-
-    private static Set<Integer> reachableWithoutAction(TransitionGraph graph, String blockedAction) {
-        Set<Integer> reached = new HashSet<Integer>();
-        Queue<Integer> queue = new ArrayDeque<Integer>();
-        reached.add(Integer.valueOf(0));
-        queue.add(Integer.valueOf(0));
-        while (!queue.isEmpty()) {
-            int state = queue.remove().intValue();
-            for (TransitionGraph.Edge edge : graph.getOutgoing(state)) {
-                if (blockedAction.equals(edge.action) || edge.to < 0) {
-                    continue;
-                }
-                if (reached.add(Integer.valueOf(edge.to))) {
-                    queue.add(Integer.valueOf(edge.to));
-                }
-            }
-        }
-        return reached;
+        return RequirementResult.pass("R1", "hotSwapIn_enabled_in_all_pre_update_states",
+                "pre-update coverage relation size=" + coverageRelation.size());
     }
 
     private static RequirementResult checkEventually(
@@ -121,8 +128,14 @@ public final class UpdateRequirementChecker {
         while (!queue.isEmpty()) {
             int state = queue.remove().intValue();
             for (TransitionGraph.Edge edge : graph.getOutgoing(state)) {
-                if (targetAction.equals(edge.action) || edge.to < 0) {
+                if (targetAction.equals(edge.action)) {
                     continue;
+                }
+                if (edge.to < 0) {
+                    return RequirementResult.fail(id, name,
+                            "reachable ERROR before " + targetAction
+                                    + " by " + edge.action + " at Q" + state,
+                            edge.action);
                 }
                 if (avoidReachable.add(Integer.valueOf(edge.to))) {
                     queue.add(Integer.valueOf(edge.to));
@@ -244,6 +257,13 @@ public final class UpdateRequirementChecker {
     private static RequirementResult checkDeadlockFree(TransitionGraph graph) {
         Set<Integer> reachable = graph.reachableStates();
         for (Integer state : reachable) {
+            for (TransitionGraph.Edge edge : graph.getOutgoing(state.intValue())) {
+                if (edge.to < 0) {
+                    return RequirementResult.fail("R8", "deadlock_free",
+                            "reachable ERROR by " + edge.action + " at Q" + state,
+                            edge.action);
+                }
+            }
             if (graph.getOutgoing(state.intValue()).isEmpty()) {
                 return RequirementResult.fail("R8", "deadlock_free",
                         "reachable deadlock at Q" + state, "");
@@ -318,110 +338,267 @@ public final class UpdateRequirementChecker {
         return RequirementResult.pass(id, name, "checked formulas=" + monitors.size());
     }
 
-    private static RequirementResult checkLegality(TransitionGraph controller, SpecContext spec) {
-        if (spec.controllableActions == null || spec.controllableActions.isEmpty()) {
+    private static RequirementResult checkLegality(
+            TransitionGraph controller,
+            SpecContext spec,
+            PhaseAwareUpdateEnvironment reference) {
+        return checkLegalityAgainstReference(
+                controller, reference, spec.controllableActions);
+    }
+
+    static RequirementResult checkLegalityAgainstReference(
+            TransitionGraph controller,
+            PhaseAwareUpdateEnvironment reference,
+            Set<String> controllableActions) {
+        if (controllableActions == null || controllableActions.isEmpty()) {
             return RequirementResult.unknown("R9", "legality",
                     "controllable action set was not available");
         }
-        TransitionGraph environment = spec.compileMappingEnvironment();
-        if (environment == null) {
+        if (reference == null) {
             return RequirementResult.unknown("R9", "legality",
-                    "mapping environment was not available");
+                    "phase-aware update environment was not available");
         }
 
-        Set<String> controllable = new HashSet<String>(spec.controllableActions);
+        Set<String> controllable = new HashSet<String>(controllableActions);
         controllable.remove(UpdateConstants.BEGIN_UPDATE);
-        controllable.remove(UpdateConstants.STOP_OLD_SPEC);
-        controllable.remove(UpdateConstants.START_NEW_SPEC);
-
-        Set<String> relevantEnvironmentActions = new HashSet<String>(environment.getAlphabet());
-        relevantEnvironmentActions.remove(UpdateConstants.BEGIN_UPDATE);
-        relevantEnvironmentActions.remove(UpdateConstants.STOP_OLD_SPEC);
-        relevantEnvironmentActions.remove(UpdateConstants.START_NEW_SPEC);
-
-        Queue<PairState> queue = new ArrayDeque<PairState>();
-        Set<PairState> visited = new HashSet<PairState>();
-        PairState initial = new PairState(0, 0);
-        queue.add(initial);
-        visited.add(initial);
-        while (!queue.isEmpty()) {
-            PairState pair = queue.remove();
-            Set<String> controllerEnabled = enabled(controller, pair.left);
-            Set<String> environmentEnabled = enabled(environment, pair.right);
-
-            for (String action : relevantEnvironmentActions) {
-                boolean controllerHas = controllerEnabled.contains(action);
-                boolean environmentHas = environmentEnabled.contains(action);
-                if (!controllable.contains(action) && environmentHas && !controllerHas) {
-                    return RequirementResult.fail("R9", "legality",
-                            "controller disables uncontrollable action enabled by environment: " + action
-                                    + " at Q" + pair.left + "/E" + pair.right,
-                            action);
-                }
-            }
-
-            Set<String> productActions = new HashSet<String>(controllerEnabled);
-            productActions.addAll(environmentEnabled);
-            for (String action : productActions) {
-                if (UpdateConstants.BEGIN_UPDATE.equals(action)
-                        || UpdateConstants.STOP_OLD_SPEC.equals(action)
-                        || UpdateConstants.START_NEW_SPEC.equals(action)) {
-                    enqueueControllerOnly(controller, queue, visited, pair, action);
-                } else if (environment.getAlphabet().contains(action)) {
-                    enqueueSynchronized(controller, environment, queue, visited, pair, action);
-                } else {
-                    enqueueControllerOnly(controller, queue, visited, pair, action);
-                }
-            }
+        Set<ReferencePairState> simulation = greatestAlternatingSimulation(
+                controller, reference, controllable);
+        ReferencePairState initial = new ReferencePairState(0, reference.initialState());
+        if (!simulation.contains(initial)) {
+            return RequirementResult.fail("R9", "legality",
+                    "the printed controller is not an alternating refinement of the "
+                            + "phase-aware update environment",
+                    "");
         }
         return RequirementResult.pass("R9", "legality",
-                "reachable product states=" + visited.size());
+                "alternating simulation relation size=" + simulation.size());
     }
 
-    private static Set<String> enabled(TransitionGraph graph, int state) {
-        Set<String> result = new HashSet<String>();
-        for (TransitionGraph.Edge edge : graph.getOutgoing(state)) {
-            result.add(edge.action);
+    private static Map<String, List<TransitionGraph.Edge>> controllerByAction(
+            TransitionGraph controller,
+            int state) {
+        Map<String, List<TransitionGraph.Edge>> result =
+                new HashMap<String, List<TransitionGraph.Edge>>();
+        for (TransitionGraph.Edge edge : controller.getOutgoing(state)) {
+            List<TransitionGraph.Edge> edges = result.get(edge.action);
+            if (edges == null) {
+                edges = new ArrayList<TransitionGraph.Edge>();
+                result.put(edge.action, edges);
+            }
+            edges.add(edge);
         }
         return result;
     }
 
-    private static void enqueueControllerOnly(
-            TransitionGraph controller,
-            Queue<PairState> queue,
-            Set<PairState> visited,
-            PairState pair,
-            String action) {
-        for (TransitionGraph.Edge edge : controller.getOutgoing(pair.left)) {
-            if (action.equals(edge.action) && edge.to >= 0) {
-                PairState next = new PairState(edge.to, pair.right);
-                if (visited.add(next)) {
-                    queue.add(next);
-                }
+    private static Map<String, List<PhaseAwareUpdateEnvironment.Transition>> referenceByAction(
+            PhaseAwareUpdateEnvironment reference,
+            PhaseAwareUpdateEnvironment.State state) {
+        Map<String, List<PhaseAwareUpdateEnvironment.Transition>> result =
+                new HashMap<String, List<PhaseAwareUpdateEnvironment.Transition>>();
+        for (PhaseAwareUpdateEnvironment.Transition transition : reference.outgoing(state)) {
+            List<PhaseAwareUpdateEnvironment.Transition> transitions =
+                    result.get(transition.action());
+            if (transitions == null) {
+                transitions = new ArrayList<PhaseAwareUpdateEnvironment.Transition>();
+                result.put(transition.action(), transitions);
             }
+            transitions.add(transition);
         }
+        return result;
     }
 
-    private static void enqueueSynchronized(
+    private static boolean hasNonErrorTarget(List<TransitionGraph.Edge> edges) {
+        if (edges == null) {
+            return false;
+        }
+        for (TransitionGraph.Edge edge : edges) {
+            if (edge.to >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsErrorTarget(List<TransitionGraph.Edge> edges) {
+        if (edges == null) {
+            return false;
+        }
+        for (TransitionGraph.Edge edge : edges) {
+            if (edge.to < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Set<ReferencePairState> greatestPreCoverageRelation(
             TransitionGraph controller,
-            TransitionGraph environment,
-            Queue<PairState> queue,
-            Set<PairState> visited,
-            PairState pair,
-            String action) {
-        for (TransitionGraph.Edge left : controller.getOutgoing(pair.left)) {
-            if (!action.equals(left.action) || left.to < 0) {
+            PhaseAwareUpdateEnvironment reference) {
+        Set<ReferencePairState> relation = candidatePairs(controller, reference, true);
+        boolean changed;
+        do {
+            changed = false;
+            for (ReferencePairState pair
+                    : new HashSet<ReferencePairState>(relation)) {
+                if (!preCoveragePairIsValid(controller, reference, pair, relation)) {
+                    relation.remove(pair);
+                    changed = true;
+                }
+            }
+        } while (changed);
+        return relation;
+    }
+
+    private static boolean preCoveragePairIsValid(
+            TransitionGraph controller,
+            PhaseAwareUpdateEnvironment reference,
+            ReferencePairState pair,
+            Set<ReferencePairState> relation) {
+        Map<String, List<TransitionGraph.Edge>> controllerActions =
+                controllerByAction(controller, pair.controllerState);
+        Map<String, List<PhaseAwareUpdateEnvironment.Transition>> referenceActions =
+                referenceByAction(reference, pair.referenceState);
+        if (!hasNonErrorTarget(controllerActions.get(UpdateConstants.BEGIN_UPDATE))
+                || referenceActions.get(UpdateConstants.BEGIN_UPDATE) == null
+                || referenceActions.get(UpdateConstants.BEGIN_UPDATE).isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<String, List<PhaseAwareUpdateEnvironment.Transition>> entry
+                : referenceActions.entrySet()) {
+            String action = entry.getKey();
+            if (UpdateConstants.BEGIN_UPDATE.equals(action)) {
                 continue;
             }
-            for (TransitionGraph.Edge right : environment.getOutgoing(pair.right)) {
-                if (action.equals(right.action) && right.to >= 0) {
-                    PairState next = new PairState(left.to, right.to);
-                    if (visited.add(next)) {
-                        queue.add(next);
-                    }
+            List<TransitionGraph.Edge> controllerEdges = controllerActions.get(action);
+            if (!hasNonErrorTarget(controllerEdges)) {
+                return false;
+            }
+            for (PhaseAwareUpdateEnvironment.Transition referenceTransition
+                    : entry.getValue()) {
+                if (!hasRelatedControllerTarget(
+                        controllerEdges, referenceTransition.target(), relation)) {
+                    return false;
                 }
             }
         }
+        return true;
+    }
+
+    private static Set<ReferencePairState> greatestAlternatingSimulation(
+            TransitionGraph controller,
+            PhaseAwareUpdateEnvironment reference,
+            Set<String> controllable) {
+        Set<ReferencePairState> relation = candidatePairs(controller, reference, false);
+        boolean changed;
+        do {
+            changed = false;
+            for (ReferencePairState pair
+                    : new HashSet<ReferencePairState>(relation)) {
+                if (!alternatingPairIsValid(
+                        controller, reference, controllable, pair, relation)) {
+                    relation.remove(pair);
+                    changed = true;
+                }
+            }
+        } while (changed);
+        return relation;
+    }
+
+    private static boolean alternatingPairIsValid(
+            TransitionGraph controller,
+            PhaseAwareUpdateEnvironment reference,
+            Set<String> controllable,
+            ReferencePairState pair,
+            Set<ReferencePairState> relation) {
+        Map<String, List<TransitionGraph.Edge>> controllerActions =
+                controllerByAction(controller, pair.controllerState);
+        Map<String, List<PhaseAwareUpdateEnvironment.Transition>> referenceActions =
+                referenceByAction(reference, pair.referenceState);
+
+        Set<String> actions = new HashSet<String>(controllerActions.keySet());
+        actions.addAll(referenceActions.keySet());
+        for (String action : actions) {
+            List<TransitionGraph.Edge> controllerEdges = controllerActions.get(action);
+            List<PhaseAwareUpdateEnvironment.Transition> referenceEdges =
+                    referenceActions.get(action);
+            if (containsErrorTarget(controllerEdges)) {
+                return false;
+            }
+            boolean controllerHas = hasNonErrorTarget(controllerEdges);
+            boolean referenceHas = referenceEdges != null && !referenceEdges.isEmpty();
+            boolean controllerMayDisable = pair.referenceState.isPost()
+                    && controllable.contains(action);
+            if (referenceHas && !controllerHas && !controllerMayDisable) {
+                return false;
+            }
+            if (controllerHas && !referenceHas) {
+                return false;
+            }
+            if (!controllerHas || !referenceHas) {
+                continue;
+            }
+            for (TransitionGraph.Edge controllerEdge : controllerEdges) {
+                if (controllerEdge.to >= 0 && !hasRelatedReferenceTarget(
+                        controllerEdge.to, referenceEdges, relation)) {
+                    return false;
+                }
+            }
+            for (PhaseAwareUpdateEnvironment.Transition referenceEdge : referenceEdges) {
+                if (!hasRelatedControllerTarget(
+                        controllerEdges, referenceEdge.target(), relation)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static Set<ReferencePairState> candidatePairs(
+            TransitionGraph controller,
+            PhaseAwareUpdateEnvironment reference,
+            boolean preOnly) {
+        Set<ReferencePairState> result = new HashSet<ReferencePairState>();
+        for (Integer controllerState : controller.reachableStates()) {
+            for (PhaseAwareUpdateEnvironment.State referenceState : reference.states()) {
+                if (!preOnly || referenceState.isPre()) {
+                    result.add(new ReferencePairState(
+                            controllerState.intValue(), referenceState));
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean hasRelatedControllerTarget(
+            List<TransitionGraph.Edge> controllerEdges,
+            PhaseAwareUpdateEnvironment.State referenceTarget,
+            Set<ReferencePairState> relation) {
+        if (controllerEdges == null) {
+            return false;
+        }
+        for (TransitionGraph.Edge edge : controllerEdges) {
+            if (edge.to >= 0 && relation.contains(new ReferencePairState(
+                    edge.to, referenceTarget))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasRelatedReferenceTarget(
+            int controllerTarget,
+            List<PhaseAwareUpdateEnvironment.Transition> referenceEdges,
+            Set<ReferencePairState> relation) {
+        if (referenceEdges == null) {
+            return false;
+        }
+        for (PhaseAwareUpdateEnvironment.Transition edge : referenceEdges) {
+            if (relation.contains(new ReferencePairState(
+                    controllerTarget, edge.target()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String join(List<?> values, String separator) {
@@ -653,59 +830,50 @@ public final class UpdateRequirementChecker {
         }
     }
 
-    private static final class PairState {
-        final int left;
-        final int right;
+    private static final class ReferencePairState {
+        final int controllerState;
+        final PhaseAwareUpdateEnvironment.State referenceState;
 
-        PairState(int left, int right) {
-            this.left = left;
-            this.right = right;
+        ReferencePairState(
+                int controllerState,
+                PhaseAwareUpdateEnvironment.State referenceState) {
+            this.controllerState = controllerState;
+            this.referenceState = referenceState;
         }
 
         @Override
         public boolean equals(Object other) {
-            if (!(other instanceof PairState)) {
+            if (!(other instanceof ReferencePairState)) {
                 return false;
             }
-            PairState that = (PairState) other;
-            return left == that.left && right == that.right;
+            ReferencePairState that = (ReferencePairState) other;
+            return controllerState == that.controllerState
+                    && referenceState.equals(that.referenceState);
         }
 
         @Override
         public int hashCode() {
-            return 31 * left + right;
+            return 31 * controllerState + referenceState.hashCode();
         }
     }
 
     private static final class SpecContext {
-        final File ltsFile;
-        final String target;
-        final String source;
-        final String currentDirectory;
         final LTSOutput output;
-        final UpdatingControllersDefinition updateDefinition;
+        final UpdatingControllerCompositeState preparedUpdate;
         final List<Symbol> oldSafety;
         final List<Symbol> newSafety;
         final List<Symbol> transitionSafety;
         final Set<String> controllableActions;
 
         SpecContext(
-                File ltsFile,
-                String target,
-                String source,
-                String currentDirectory,
                 LTSOutput output,
-                UpdatingControllersDefinition updateDefinition,
+                UpdatingControllerCompositeState preparedUpdate,
                 List<Symbol> oldSafety,
                 List<Symbol> newSafety,
                 List<Symbol> transitionSafety,
                 Set<String> controllableActions) {
-            this.ltsFile = ltsFile;
-            this.target = target;
-            this.source = source;
-            this.currentDirectory = currentDirectory;
             this.output = output;
-            this.updateDefinition = updateDefinition;
+            this.preparedUpdate = preparedUpdate;
             this.oldSafety = oldSafety;
             this.newSafety = newSafety;
             this.transitionSafety = transitionSafety;
@@ -718,15 +886,11 @@ public final class UpdateRequirementChecker {
             String currentDirectory = parent == null ? new File(".").getAbsolutePath() : parent.getAbsolutePath();
             LTSOutput output = new BufferingOutput();
             LTSCompiler compiler = new LTSCompiler(new LTSInputString(source), output, currentDirectory);
-            Hashtable<String, CompositionExpression> composites = new Hashtable<String, CompositionExpression>();
-            Hashtable processes = new Hashtable();
-            Hashtable explorers = new Hashtable();
-            compiler.parse(composites, processes, explorers);
-
             String updateName = findUpdateControllerName(source, target);
-            CompositionExpression expression = composites.get(updateName);
+            compiler.compile();
+            CompositionExpression expression = LTSCompiler.getComposite(updateName);
             if (!(expression instanceof UpdatingControllersDefinition)) {
-                expression = composites.get(target);
+                expression = LTSCompiler.getComposite(target);
             }
             if (!(expression instanceof UpdatingControllersDefinition)) {
                 throw new IllegalArgumentException("Updating controller definition was not found for target: " + target);
@@ -735,50 +899,42 @@ public final class UpdateRequirementChecker {
             ControllerGoalDefinition oldGoal = ControllerGoalDefinition.getDefinition(definition.getOldGoal());
             ControllerGoalDefinition newGoal = ControllerGoalDefinition.getDefinition(definition.getNewGoal());
             Set<String> controllable = definition.generateUpdatingControllableActions(oldGoal, newGoal);
+            UpdatingControllerCompositeState prepared = null;
+            CompositeState preparedComposite = compiler.continueCompilation(updateName);
+            if (preparedComposite instanceof UpdatingControllerCompositeState) {
+                prepared = (UpdatingControllerCompositeState) preparedComposite;
+            }
             return new SpecContext(
-                    ltsFile,
-                    target,
-                    source,
-                    currentDirectory,
                     output,
-                    definition,
+                    prepared,
                     new ArrayList<Symbol>(oldGoal.getSafetyDefinitions()),
                     new ArrayList<Symbol>(newGoal.getSafetyDefinitions()),
                     new ArrayList<Symbol>(definition.getTransitionGoals()),
                     controllable);
         }
 
-        TransitionGraph compileMappingEnvironment() {
-            List<String> candidates = new ArrayList<String>();
-            candidates.add("MAPPING_ENV");
-            candidates.add("MapEnvironment");
-            candidates.add("MAPPING_ENVIRONMENT");
-            if (updateDefinition.getMapping() != null
-                    && !"unknown".equals(updateDefinition.getMapping().toString())) {
-                candidates.add(updateDefinition.getMapping().toString());
-            }
-            for (String candidate : candidates) {
-                try {
-                    CompactState state = compileComposite(candidate);
-                    if (state != null) {
-                        return TransitionGraph.fromCompactState(state);
-                    }
-                } catch (Throwable ignored) {
-                    // Try the next conventional mapping-environment name.
-                }
-            }
-            return null;
-        }
-
-        private CompactState compileComposite(String name) throws Exception {
-            LTSCompiler compiler = new LTSCompiler(new LTSInputString(source), output, currentDirectory);
-            compiler.compile();
-            CompositeState current = compiler.continueCompilation(name);
-            if (current == null) {
+        PhaseAwareUpdateEnvironment phaseAwareReference() {
+            if (preparedUpdate == null
+                    || preparedUpdate.isOTF()
+                    || preparedUpdate.isFineGrained()
+                    || preparedUpdate.getOldController() == null
+                    || preparedUpdate.getStepwiseStages() == null
+                    || preparedUpdate.getStepwiseStages().isEmpty()) {
                 return null;
             }
-            TransitionSystemDispatcher.applyComposition(current, output);
-            return current.composition;
+            try {
+                return PhaseAwareUpdateEnvironment.build(
+                        preparedUpdate.getOldController(),
+                        preparedUpdate.getStepwiseStages());
+            } catch (RuntimeException failure) {
+                return null;
+            }
+        }
+
+        boolean supportsBulkProtocolChecks() {
+            return preparedUpdate != null
+                    && !preparedUpdate.isOTF()
+                    && !preparedUpdate.isFineGrained();
         }
 
         private static String findUpdateControllerName(String source, String target) {

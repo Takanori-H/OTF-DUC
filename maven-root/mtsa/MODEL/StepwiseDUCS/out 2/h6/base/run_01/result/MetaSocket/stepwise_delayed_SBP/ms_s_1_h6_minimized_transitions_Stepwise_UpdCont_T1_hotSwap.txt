@@ -1,0 +1,37 @@
+Process:
+	Stepwise_UpdCont_T1_hotSwap
+States:
+	17
+Transitions:
+	Stepwise_UpdCont_T1_hotSwap = Q0,
+	Q0	= (input -> Q5
+		  |hotSwapIn -> Q6),
+	Q1	= (input -> Q13),
+	Q2	= (reconfigure -> Q13),
+	Q3	= (startNewSpec -> Q9
+		  |reconfigure -> Q12),
+	Q4	= (reconfigure -> Q11
+		  |input -> Q14
+		  |startNewSpec -> Q15),
+	Q5	= (hotSwapIn -> Q8
+		  |des64 -> Q16),
+	Q6	= (stopOldSpec -> Q4
+		  |input -> Q8),
+	Q7	= (output -> Q1
+		  |des128 -> Q7),
+	Q8	= (stopOldSpec -> Q3),
+	Q9	= (des64 -> Q2
+		  |reconfigure -> Q13),
+	Q10	= (reconfigure -> Q1
+		  |input -> Q2),
+	Q11	= (startNewSpec -> Q1
+		  |input -> Q12),
+	Q12	= (startNewSpec -> Q13),
+	Q13	= (des128 -> Q7),
+	Q14	= (startNewSpec -> Q9),
+	Q15	= (reconfigure -> Q1
+		  |input -> Q2
+		  |des64 -> Q10),
+	Q16	= (output -> Q0
+		  |hotSwapIn -> Q8
+		  |des64 -> Q16).

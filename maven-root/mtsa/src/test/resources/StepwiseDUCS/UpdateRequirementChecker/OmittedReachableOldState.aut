@@ -1,0 +1,12 @@
+Process:
+	PROBE_C
+States:
+	5
+Transitions:
+	PROBE_C = Q0,
+	Q0	= (a -> Q0
+		  |hotSwapIn -> Q1),
+	Q1	= (stopOldSpec -> Q2),
+	Q2	= (reconfigure -> Q3),
+	Q3	= (startNewSpec -> Q4),
+	Q4	= (a -> Q4).

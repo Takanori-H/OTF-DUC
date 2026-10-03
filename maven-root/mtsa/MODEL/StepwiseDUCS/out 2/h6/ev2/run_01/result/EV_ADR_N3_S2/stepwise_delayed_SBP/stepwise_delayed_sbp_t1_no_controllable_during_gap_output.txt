@@ -1,0 +1,350 @@
+comp.compile time : 97ms
+Compiled: EV_CHARGER_OLD(1)
+Compiled: EV_CHARGER_OLD(2)
+Compiled: EV_CHARGER_OLD(3)
+Composition:OLD_ENV = OLD_ENV.EV_CHARGER_OLD(1) || OLD_ENV.EV_CHARGER_OLD(2) || OLD_ENV.EV_CHARGER_OLD(3)
+State Space: 17 * 17 * 17 = 2 ** 15
+Composing...
+-- States: 4913 Transitions: 108375 Memory used: 58596K
+Composed in 132ms
+Formula !P_OLD_CHARGER_RATE_CAP_1 = (true U ABOVE_OLD_CHARGER_RATE_CAP.charger.1)
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_CHARGER_RATE_CAP_1 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |ABOVE_OLD_CHARGER_RATE_CAP.charger.1 -> S1).
+Composition:P_OLD_CHARGER_RATE_CAP_1 = ABOVE_OLD_CHARGER_RATE_CAP.charger.1 || SYNC || P_OLD_CHARGER_RATE_CAP_1
+State Space: 2 * 2 * 2 = 2 ** 3
+Composing...
+-- States: 8 Transitions: 57 Memory used: 33093K
+Composed in 58ms
+After Tau elimination = 4 state
+Tau reduction ON
+P_OLD_CHARGER_RATE_CAP_1 minimising..
+Minimised States: 2 in 0ms
+make DFA(P_OLD_CHARGER_RATE_CAP_1)
+DFA(P_OLD_CHARGER_RATE_CAP_1) has 1 states.
+Tau reduction ON
+P_OLD_CHARGER_RATE_CAP_1 minimising..
+Minimised States: 1 in 0ms
+Formula !P_OLD_CHARGER_RATE_CAP_2 = (true U ABOVE_OLD_CHARGER_RATE_CAP.charger.2)
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_CHARGER_RATE_CAP_2 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |ABOVE_OLD_CHARGER_RATE_CAP.charger.2 -> S1).
+Composition:P_OLD_CHARGER_RATE_CAP_2 = ABOVE_OLD_CHARGER_RATE_CAP.charger.2 || SYNC || P_OLD_CHARGER_RATE_CAP_2
+State Space: 2 * 2 * 2 = 2 ** 3
+Composing...
+-- States: 8 Transitions: 57 Memory used: 32530K
+Composed in 46ms
+After Tau elimination = 4 state
+Tau reduction ON
+P_OLD_CHARGER_RATE_CAP_2 minimising..
+Minimised States: 2 in 0ms
+make DFA(P_OLD_CHARGER_RATE_CAP_2)
+DFA(P_OLD_CHARGER_RATE_CAP_2) has 1 states.
+Tau reduction ON
+P_OLD_CHARGER_RATE_CAP_2 minimising..
+Minimised States: 1 in 0ms
+Formula !P_OLD_CHARGER_RATE_CAP_3 = (true U ABOVE_OLD_CHARGER_RATE_CAP.charger.3)
+GBA 2 states 3 transitions
+Buchi automata:
+P_OLD_CHARGER_RATE_CAP_3 = S0,
+S1@ =(true -> S1),
+S0 =(true -> S0 |ABOVE_OLD_CHARGER_RATE_CAP.charger.3 -> S1).
+Composition:P_OLD_CHARGER_RATE_CAP_3 = ABOVE_OLD_CHARGER_RATE_CAP.charger.3 || SYNC || P_OLD_CHARGER_RATE_CAP_3
+State Space: 2 * 2 * 2 = 2 ** 3
+Composing...
+-- States: 8 Transitions: 57 Memory used: 32405K
+Composed in 45ms
+After Tau elimination = 4 state
+Tau reduction ON
+P_OLD_CHARGER_RATE_CAP_3 minimising..
+Minimised States: 2 in 0ms
+make DFA(P_OLD_CHARGER_RATE_CAP_3)
+DFA(P_OLD_CHARGER_RATE_CAP_3) has 1 states.
+Tau reduction ON
+P_OLD_CHARGER_RATE_CAP_3 minimising..
+Minimised States: 1 in 0ms
+Composition:OldController = OLD_ENV || P_OLD_CHARGER_RATE_CAP_1 || P_OLD_CHARGER_RATE_CAP_2 || P_OLD_CHARGER_RATE_CAP_3
+State Space: 4913 * 1 * 1 * 1 = 2 ** 13
+Composing...
+-- States: 2197 Transitions: 45123 Memory used: 68021K
+Composed in 102ms
+Solving the LTS control problem.
+Environment states: 2198
+Game states: 2198
+Game transitions: 6594
+Analysis time: 728ms.
+Controller [2197] generated successfully.
+Composition:OldController = OldController || P_OLD_CHARGER_RATE_CAP_1 || P_OLD_CHARGER_RATE_CAP_2 || P_OLD_CHARGER_RATE_CAP_3
+State Space: 2197 * 1 * 1 * 1 = 2 ** 12
+Composing...
+-- States: 2197 Transitions: 34983 Memory used: 186421K
+Composed in 161ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.EV_CHARGER_OLD(1) || OLD_ENV.EV_CHARGER_OLD(2) || OLD_ENV.EV_CHARGER_OLD(3)
+State Space: 17 * 17 * 17 = 2 ** 15
+Composing...
+-- States: 4913 Transitions: 108375 Memory used: 75624K
+Composed in 104ms
+ - Synthesizing Mapping Environment from lists (size=3)...
+INFO: Auto-compiling dependency: EV_CHARGER_NEW(1)
+Generating Mapping Environment: MAP_EV_CHARGER_OLD(1)_EV_CHARGER_NEW(1)
+INFO: Auto-compiling dependency: EV_CHARGER_NEW(2)
+Generating Mapping Environment: MAP_EV_CHARGER_OLD(2)_EV_CHARGER_NEW(2)
+INFO: Auto-compiling dependency: EV_CHARGER_NEW(3)
+Generating Mapping Environment: MAP_EV_CHARGER_OLD(3)_EV_CHARGER_NEW(3)
+Mode: Stepwise Delayed Updating Controller Synthesis (baseline) + safety backward pruning + traditional hotSwap monitor semantics
+comp.continueCompilation time : 2251ms
+=========================================
+Mode: Stepwise Delayed DUC (local-only)
+=========================================
+[Stepwise Delayed DUCS]
+oldController is used as global OldCon: OldCon
+
+[Stepwise DUCS] Requirement classification:
+  P_OLD_CHARGER_RATE_CAP_1 (OLD_SAFETY) -> stage 1
+  P_OLD_CHARGER_RATE_CAP_2 (OLD_SAFETY) -> stage 2
+  P_OLD_CHARGER_RATE_CAP_3 (OLD_SAFETY) -> stage 3
+  P_NEW_CHARGER_RATE_CAP_1 (NEW_SAFETY) -> stage 1
+  P_NEW_CHARGER_RATE_CAP_2 (NEW_SAFETY) -> stage 2
+  P_NEW_CHARGER_RATE_CAP_3 (NEW_SAFETY) -> stage 3
+  P_NEW_ADJACENT_FEEDER_BUDGET_1_2 (NEW_SAFETY) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={charger.2.startCharge.1=[1], charger.2.startCharge.2=[1], charger.2.startCharge.3=[1], charger.2.startCharge.4=[1], charger.2.startCharge.5=[1], charger.2.startCharge.6=[1], charger.2.pause=[1], charger.2.release=[1], charger.2.complete=[1], charger.2.disconnect=[1], charger.1.startCharge.3=[0], charger.1.startCharge.2=[0], charger.1.startCharge.5=[0], charger.1.startCharge.4=[0], charger.1.startCharge.1=[0], charger.1.startCharge.6=[0], charger.1.release=[0], charger.1.complete=[0], charger.1.pause=[0], charger.1.disconnect=[0], charger.2.setRate.2=[1], charger.2.setRate.6=[1], charger.2.setRate.5=[1], charger.2.setRate.1=[1], charger.2.setRate.4=[1], charger.2.setRate.3=[1], charger.1.setRate.2=[0], charger.1.setRate.3=[0], charger.1.setRate.4=[0], charger.1.setRate.5=[0], charger.1.setRate.6=[0], charger.1.setRate.1=[0]}
+  P_NEW_ADJACENT_FEEDER_BUDGET_2_3 (NEW_SAFETY) -> cross scope [2, 3] GOAL_SPANS_MULTIPLE_STAGES actions={charger.3.startCharge.4=[2], charger.3.startCharge.5=[2], charger.3.startCharge.6=[2], charger.3.startCharge.1=[2], charger.3.startCharge.2=[2], charger.3.startCharge.3=[2], charger.3.complete=[2], charger.3.pause=[2], charger.3.release=[2], charger.3.disconnect=[2], charger.2.startCharge.1=[1], charger.2.startCharge.2=[1], charger.2.startCharge.3=[1], charger.2.startCharge.4=[1], charger.2.startCharge.5=[1], charger.2.startCharge.6=[1], charger.2.pause=[1], charger.2.release=[1], charger.2.complete=[1], charger.2.disconnect=[1], charger.3.setRate.2=[2], charger.3.setRate.3=[2], charger.3.setRate.1=[2], charger.3.setRate.6=[2], charger.3.setRate.4=[2], charger.3.setRate.5=[2], charger.2.setRate.2=[1], charger.2.setRate.6=[1], charger.2.setRate.5=[1], charger.2.setRate.1=[1], charger.2.setRate.4=[1], charger.2.setRate.3=[1]}
+  T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_1 (TRANSITION) -> stage 1
+  T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_2 (TRANSITION) -> stage 2
+  T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_3 (TRANSITION) -> stage 3
+  post-hotSwapIn Traditional monitor semantics: [T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_1(TRANSITION), T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_2(TRANSITION), T1_NO_CONTROLLABLE_DURING_GAP_CHARGER_3(TRANSITION)]
+[Stepwise Delayed DUCS] Traditional hotSwapIn monitor semantics: 3 hotSwapIn-sensitive goal(s) deferred until after delayed connection.
+[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true incrementalPruning=false incrementalPruningCleanup=false safetyBackwardPruning=true traditionalHotSwapMonitorSemantics=true
+
+[Stepwise Delayed DUCS] Requirement classification summary
+  stages: 3
+  goals: total=11 local=9 cross=2 crossRatio=18.18%
+  local goals by type: oldSafety=3 newSafety=3 transition=3
+  cross goals by type: oldSafety=0 newSafety=2 transition=0
+  cross components: count=1 maxGoalScopeSize=2 maxComponentScopeSize=3 allStageCrossGoals=0 allStageCrossComponents=1
+  requirement fluents: unique=58
+  scope requirement counts:
+    scope {1} total=3 oldSafety=1 newSafety=1 transition=1 requirementFluents=20
+    scope {1,2} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=5
+    scope {2} total=3 oldSafety=1 newSafety=1 transition=1 requirementFluents=20
+    scope {2,3} total=1 oldSafety=0 newSafety=1 transition=0 requirementFluents=5
+    scope {3} total=3 oldSafety=1 newSafety=1 transition=1 requirementFluents=20
+[Stepwise Delayed DUCS] classification statistics CountTime: 14 ms
+[Stepwise Delayed DUCS] cross component build time: 1 ms
+
+[Stepwise Delayed DUCS] Stage 1 old=EV_CHARGER_OLD(1) new=EV_CHARGER_NEW(1) relation=R_CHARGER_1
+  local old safety: [P_OLD_CHARGER_RATE_CAP_1(OLD_SAFETY)]
+  local new safety: [P_NEW_CHARGER_RATE_CAP_1(NEW_SAFETY)]
+  local transition: []
+  mapping before pruning states: 34 transitions: 335
+  mapping meta states: 136 transitions: 6236
+  safety pruning kept states: 136 transitions: 4336
+  deferred safety backward pruning scope: local stage 1
+    component scope: [0]
+    before states: 136 transitions: 4336
+    explicit Error seeds: 40
+    definite losing states: 40
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 160
+    input environment reused: false
+    after states: 96 transitions: 4176
+    elapsed: 14 ms
+  mapping safety states: 96 transitions: 4176
+
+[Stepwise Delayed DUCS] Stage 2 old=EV_CHARGER_OLD(2) new=EV_CHARGER_NEW(2) relation=R_CHARGER_2
+  local old safety: [P_OLD_CHARGER_RATE_CAP_2(OLD_SAFETY)]
+  local new safety: [P_NEW_CHARGER_RATE_CAP_2(NEW_SAFETY)]
+  local transition: []
+  mapping before pruning states: 34 transitions: 335
+  mapping meta states: 136 transitions: 6236
+  safety pruning kept states: 136 transitions: 4336
+  deferred safety backward pruning scope: local stage 2
+    component scope: [1]
+    before states: 136 transitions: 4336
+    explicit Error seeds: 40
+    definite losing states: 40
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 160
+    input environment reused: false
+    after states: 96 transitions: 4176
+    elapsed: 11 ms
+  mapping safety states: 96 transitions: 4176
+
+[Stepwise Delayed DUCS] Stage 3 old=EV_CHARGER_OLD(3) new=EV_CHARGER_NEW(3) relation=R_CHARGER_3
+  local old safety: [P_OLD_CHARGER_RATE_CAP_3(OLD_SAFETY)]
+  local new safety: [P_NEW_CHARGER_RATE_CAP_3(NEW_SAFETY)]
+  local transition: []
+  mapping before pruning states: 34 transitions: 335
+  mapping meta states: 136 transitions: 6236
+  safety pruning kept states: 136 transitions: 4336
+  deferred safety backward pruning scope: local stage 3
+    component scope: [2]
+    before states: 136 transitions: 4336
+    explicit Error seeds: 40
+    definite losing states: 40
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 160
+    input environment reused: false
+    after states: 96 transitions: 4176
+    elapsed: 10 ms
+  mapping safety states: 96 transitions: 4176
+
+[Stepwise Delayed DUCS] Cross components:
+  component 1 stages={1,2,3} goals=[P_NEW_ADJACENT_FEEDER_BUDGET_1_2(NEW_SAFETY), P_NEW_ADJACENT_FEEDER_BUDGET_2_3(NEW_SAFETY)]
+
+[Stepwise Delayed DUCS] Staged cross component 1
+  stages: {1,2,3}
+  goals: [P_NEW_ADJACENT_FEEDER_BUDGET_1_2(NEW_SAFETY), P_NEW_ADJACENT_FEEDER_BUDGET_2_3(NEW_SAFETY)]
+  cross goal scheduler: cost-guided
+  initial fragment stage 1 states: 96 transitions: 4176
+  initial fragment stage 2 states: 96 transitions: 4176
+  initial fragment stage 3 states: 96 transitions: 4176
+  selected cross goal: P_NEW_ADJACENT_FEEDER_BUDGET_1_2 scope={1,2} schedulingCost=9216 candidateBatchGoals=1 estimatedMergedScope={1,2}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_1_MERGE_{1,2}
+
+[Stepwise Delayed DUCS] staged cross step 1
+  product scope: {1,2}
+  added stages: {1,2}
+    batch goals: [P_NEW_ADJACENT_FEEDER_BUDGET_1_2(NEW_SAFETY)]
+  before staged cross pruning states: 1240 transitions: 39004
+  safety pruning kept states: 1240 transitions: 37540
+  deferred safety backward pruning scope: cross component 1 staged step 1 productScope={1,2}
+    component scope: [0, 1]
+    before states: 1240 transitions: 37540
+    explicit Error seeds: 48
+    definite losing states: 48
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 176
+    input environment reused: false
+    after states: 1192 transitions: 37364
+    elapsed: 81 ms
+  after staged cross pruning states: 1192 transitions: 37364
+  selected cross goal: P_NEW_ADJACENT_FEEDER_BUDGET_2_3 scope={2,3} schedulingCost=114432 candidateBatchGoals=1 estimatedMergedScope={1,2,3}
+Owner-aware delayed product: STEPWISE_DELAYED_STAGED_CROSS_COMPONENT_1_STEP_2_MERGE_{1,2,3}
+
+[Stepwise Delayed DUCS] staged cross step 2
+  product scope: {1,2,3}
+  added stages: {3}
+    batch goals: [P_NEW_ADJACENT_FEEDER_BUDGET_2_3(NEW_SAFETY)]
+  before staged cross pruning states: 16704 transitions: 338064
+  safety pruning kept states: 16704 transitions: 334296
+  deferred safety backward pruning scope: cross component 1 staged step 2 productScope={1,2,3}
+    component scope: [0, 1, 2]
+    before states: 16704 transitions: 334296
+    explicit Error seeds: 272
+    definite losing states: 272
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 1008
+    input environment reused: false
+    after states: 16432 transitions: 333288
+    elapsed: 635 ms
+  after staged cross pruning states: 16432 transitions: 333288
+  deferred safety backward pruning scope: cross component 1 final merge
+    component scope: [0, 1, 2]
+    before states: 16432 transitions: 333288
+    explicit Error seeds: 0
+    definite losing states: 0
+    deferred uncontrollable action groups: 0
+    removed controllable action groups: 0
+    input environment reused: true
+    after states: 16432 transitions: 333288
+    elapsed: 93 ms
+  staged cross component safety states: 16432 transitions: 333288
+
+[Stepwise Delayed DUCS] Final product inputs: [cross component 1 stages={1,2,3}]
+  safety backward pruning scope: stepwise-delayed-final-mapping
+    before states: 16432 transitions: 333288
+    dead-end seed states: 0
+    backward losing states: 0
+    losing controllable action groups: 0
+    input environment reused: true
+    after backward states: 16432 transitions: 333288
+    after cleanup states: 16432 transitions: 333288
+[Stepwise Delayed DUCS] Product after final mapping safety backward pruning states: 16432 transitions: 333288
+[Stepwise Delayed DUCS] Product before delayed connection states: 16432 transitions: 333288
+[Stepwise Delayed DUCS] OldCon fluent meta states: 2197 transitions: 34983
+[Stepwise Delayed DUCS] hotSwapIn connection mode: legacy
+[Stepwise Delayed DUCS] hotSwapIn connection time: total=95.882 ms, setup=0.432 ms, traversal=93.992 ms
+[Stepwise Delayed DUCS] hotSwapIn connection pairs: visited=2197, enqueued=34984, duplicateSkipped=32787, synchronizedSuccessorPairs=34983
+[Stepwise Delayed DUCS] hotSwapIn connection result: connections=2197, oldStatesWithoutTargets=0, comparisonFluents=15
+[Stepwise Delayed DUCS] hotSwapIn connection unique states: old=2197, mapping=2197, eligibleMappingVisited=2197, eligibleMappingTotal=2197
+[Stepwise Delayed DUCS] hotSwapIn connection cache stats: eligibilityComputations=0, signatureBuilds=0, transitionIndexStateBuilds=0
+[Stepwise Delayed DUCS] hotSwapIn connection legacy stats: transitionComparisons=673734, actionMatches=34983, oldTransitionsScanned=34983, mappingTransitionsScanned=39930
+[Stepwise Delayed DUCS] all old-controller states: 2197
+[Stepwise Delayed DUCS] reachable old-controller states: 2197
+[Stepwise Delayed DUCS] hotSwapIn connections: 2197
+[Stepwise Delayed DUCS] reachable states without connection target: 0
+[Stepwise Delayed DUCS] all states without connection target: 0
+[Stepwise Delayed DUCS] connected environment representation: read-only view
+[Stepwise Delayed DUCS] After delayed hotSwapIn connection states: 18629 transitions: 370468
+  online safety terminalization kept states: 75982 transitions: 842549 terminal states: 27378
+  monitor-lifted hotSwapIn transitions: 11614
+[Stepwise Delayed DUCS] After Traditional hotSwapIn monitor semantics states: 75982 transitions: 842549
+[Stepwise Delayed DUCS] After global DontDoTwice states: 75983 transitions: 842549
+  safety backward pruning scope: stepwise-delayed-final
+    before states: 75983 transitions: 842549
+    dead-end seed states: 27379
+    backward losing states: 27379
+    losing controllable action groups: 97904
+    input environment reused: false
+    after backward states: 48604 transitions: 744645
+    after cleanup states: 48604 transitions: 744645
+[Stepwise Delayed DUCS] After final safety backward pruning states: 48604 transitions: 744645
+
+[Stepwise Delayed DUCS] GR(1)
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [30575] generated successfully.
+[Stepwise Delayed DUCS] GR result: winning
+[Stepwise Delayed DUCS] output controller states: 30575 transitions: 311041
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Stepwise Delayed DUC
+設定 : safetyBackwardPruning=true, incrementalPruning=false, incrementalPruningCleanup=false
+結果 : SUCCESS
+主比較時間（合成開始から生成終了まで-CountTime） : 20分02.46秒
+
+[規模]
+最大状態数時の状態数 : 75983 states
+最大状態数時の遷移数 : 842549 transitions
+最大状態数時の段階 : [Stepwise Delayed DUCS] After global DontDoTwice
+最大遷移数時の状態数 : 75982 states
+最大遷移数時の遷移数 : 842549 transitions
+最大遷移数時の段階 : [Stepwise Delayed DUCS] After Traditional hotSwapIn monitor semantics
+出力状態数 : 30575 states
+出力遷移数 : 311041 transitions
+
+[GR(1)]
+final GR input 状態数 : 48604 states
+final GR input 遷移数 : 744645 transitions
+GR(1)合成時間 : 19分47.60秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 7.66 GB
+最初の有効sampleからのヒープ増加 : 7.65 GB
+
+[Stepwise Delayed 要求分類]
+旧要求 local 数 : 3 goals
+旧要求 cross 数 : 0 goals
+新要求 local 数 : 3 goals
+新要求 cross 数 : 2 goals
+transition requirement local 数 : 3 goals
+transition requirement cross 数 : 0 goals
+====================================================
+
+Evaluation data CSV written to: out\h6\ev2\run_01\result\EV_ADR_N3_S2\stepwise_delayed_SBP\ev3s2_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv
+Tau reduction ON
+Stepwise_UpdCont_T1_hotSwap minimising.......
+Minimised States: 8181 in 14322ms
+
+[minimized 出力]
+minimized 出力状態数 : 8181 states
+minimized 出力遷移数 : 50456 transitions
+minimize 時間 : 14369 ms
+Evaluation data CSV written to: out\h6\ev2\run_01\result\EV_ADR_N3_S2\stepwise_delayed_SBP\ev3s2_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv

@@ -2457,6 +2457,11 @@ public class LTSCompiler {
                 ucDefinition.setSafetyBackwardPruning();
                 next_symbol();
             }
+            else if(current.kind == Symbol.TRADITIONAL_HOT_SWAP_MONITOR_SEMANTICS)
+            {
+                ucDefinition.setTraditionalHotSwapMonitorSemantics();
+                next_symbol();
+            }
             else if(current.kind == Symbol.NEW_CONTROLLER)
             {
                 ucDefinition.setNewController(this.controllerSubUpdateController());

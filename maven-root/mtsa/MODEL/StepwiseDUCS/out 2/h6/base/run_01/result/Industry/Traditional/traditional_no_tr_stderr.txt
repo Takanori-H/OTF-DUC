@@ -1,0 +1,4 @@
+Game state size:65
+Winning state size:64
+Game state size:6434
+Winning state size:5303

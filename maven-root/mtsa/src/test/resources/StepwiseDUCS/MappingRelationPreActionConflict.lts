@@ -1,0 +1,96 @@
+// A relation pre-action may reuse an old-environment action name at another
+// state. It is rejected only when it creates a second transition with the
+// same label from the relation rule's own old source state.
+
+CONFLICT_OLD = CONFLICT_ROOT,
+CONFLICT_ROOT = (a -> CONFLICT_A),
+CONFLICT_A = (b -> CONFLICT_ROOT).
+
+CONFLICT_NEW = CONFLICT_NEW_ROOT,
+CONFLICT_NEW_ROOT = (a -> CONFLICT_NEW_A),
+CONFLICT_NEW_A = (b -> CONFLICT_NEW_ROOT).
+
+relation R_CONFLICT = {
+    CONFLICT_ROOT@CONFLICT_OLD = a -> y -> reconfigure
+        -> CONFLICT_NEW_ROOT@CONFLICT_NEW
+}
+
+map MAP_CONFLICT = {CONFLICT_OLD, CONFLICT_NEW, R_CONFLICT}
+||CONFLICTING_MAPPING = (MAP_CONFLICT).
+
+ACCEPTED_OLD = ACCEPTED_ROOT,
+ACCEPTED_ROOT = (a -> ACCEPTED_A),
+ACCEPTED_A = (b -> ACCEPTED_ROOT).
+
+ACCEPTED_NEW = ACCEPTED_NEW_ROOT,
+ACCEPTED_NEW_ROOT = (a -> ACCEPTED_NEW_A),
+ACCEPTED_NEW_A = (b -> ACCEPTED_NEW_ROOT).
+
+relation R_ACCEPTED = {
+    ACCEPTED_ROOT@ACCEPTED_OLD = x -> y -> reconfigure
+        -> ACCEPTED_NEW_ROOT@ACCEPTED_NEW,
+    ACCEPTED_A@ACCEPTED_OLD = a -> y -> reconfigure
+        -> ACCEPTED_NEW_A@ACCEPTED_NEW
+}
+
+map MAP_ACCEPTED = {ACCEPTED_OLD, ACCEPTED_NEW, R_ACCEPTED}
+||NONCONFLICTING_MAPPING = (MAP_ACCEPTED).
+
+POST_OLD = POST_ROOT,
+POST_ROOT = (a -> POST_ROOT).
+
+POST_NEW = POST_NEW_ROOT,
+POST_NEW_ROOT = (a -> POST_NEW_ROOT).
+
+relation R_POST = {
+    POST_ROOT@POST_OLD = x -> reconfigure -> a -> postDone
+        -> POST_NEW_ROOT@POST_NEW
+}
+
+map MAP_POST = {POST_OLD, POST_NEW, R_POST}
+||POSTACTION_MAPPING = (MAP_POST).
+
+// A rule with no pre-action starts with the protocol action itself.  The
+// state-local check must not reinterpret reconfigure as a conflicting
+// pre-action.
+DIRECT_OLD = DIRECT_ROOT,
+DIRECT_ROOT = (a -> DIRECT_ROOT).
+
+DIRECT_NEW = DIRECT_NEW_ROOT,
+DIRECT_NEW_ROOT = (a -> DIRECT_NEW_ROOT).
+
+relation R_DIRECT = {
+    DIRECT_ROOT@DIRECT_OLD = reconfigure
+        -> DIRECT_NEW_ROOT@DIRECT_NEW
+}
+
+map MAP_DIRECT = {DIRECT_OLD, DIRECT_NEW, R_DIRECT}
+||DIRECT_RECONFIGURE_MAPPING = (MAP_DIRECT).
+
+// The conflict occurs only in the second concrete forall expansion.  This
+// catches validation performed before expansion, or validation of only the
+// first expanded source/action pair.
+range FORALL_INDEX = 0..1
+
+FORALL_OLD = FORALL_ROOT[0],
+FORALL_ROOT[i:FORALL_INDEX] = (
+      when (i == 0) safe -> FORALL_ROOT[1]
+    | when (i == 1) collide[i] -> FORALL_ROOT[0]
+).
+
+FORALL_NEW = FORALL_NEW_ROOT[0],
+FORALL_NEW_ROOT[i:FORALL_INDEX] = (
+      when (i == 0) safe -> FORALL_NEW_ROOT[1]
+    | when (i == 1) collide[i] -> FORALL_NEW_ROOT[0]
+).
+
+relation R_FORALL_CONFLICT = {
+    forall [i:FORALL_INDEX]
+        FORALL_ROOT[i]@FORALL_OLD = collide[i] -> reconfigure
+            -> FORALL_NEW_ROOT[i]@FORALL_NEW
+}
+
+map MAP_FORALL_CONFLICT = {
+    FORALL_OLD, FORALL_NEW, R_FORALL_CONFLICT
+}
+||FORALL_CONFLICTING_MAPPING = (MAP_FORALL_CONFLICT).

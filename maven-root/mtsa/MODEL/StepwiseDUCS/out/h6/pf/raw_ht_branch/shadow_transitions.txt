@@ -1,0 +1,34 @@
+Process:
+	Stepwise_ShadowIntermediateConnection
+States:
+	18
+Transitions:
+	Stepwise_ShadowIntermediateConnection = Q0,
+	Q0	= (idle -> Q0
+		  |z -> Q6
+		  |hotSwapIn -> Q10),
+	Q1	= ({idle, wait} -> Q11),
+	Q2	= (reconfigure -> Q11),
+	Q3	= (stopOldSpec -> Q12),
+	Q4	= (idle -> Q5
+		  |z -> Q14),
+	Q5	= (z -> Q14),
+	Q6	= (hotSwapIn -> Q3
+		  |{idle, wait} -> Q6),
+	Q7	= (startNewSpec -> Q15),
+	Q8	= (y -> Q2
+		  |wait -> Q14),
+	Q9	= (startNewSpec -> Q4
+		  |idle -> Q16
+		  |z -> Q17),
+	Q10	= (stopOldSpec -> Q9),
+	Q11	= ({idle, wait} -> Q13),
+	Q12	= (y -> Q7
+		  |startNewSpec -> Q8
+		  |wait -> Q17),
+	Q13	= ({idle, wait} -> Q1),
+	Q14	= (y -> Q2),
+	Q15	= (wait -> Q2
+		  |reconfigure -> Q11),
+	Q16	= (startNewSpec -> Q4),
+	Q17	= (startNewSpec -> Q8).

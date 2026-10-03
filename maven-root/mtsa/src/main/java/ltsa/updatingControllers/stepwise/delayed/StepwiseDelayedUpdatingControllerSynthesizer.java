@@ -2,6 +2,8 @@ package ltsa.updatingControllers.stepwise.delayed;
 
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.ar.dc.uba.model.condition.Formula;
+import MTSSynthesis.ar.dc.uba.model.condition.PropositionalVariable;
+import MTSSynthesis.ar.dc.uba.model.condition.Valuation;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.controller.util.FluentStateValuation;
 import MTSTools.ac.ic.doc.commons.relations.BinaryRelation;
@@ -39,6 +41,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -244,6 +247,19 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             UpdatingControllerCompositeState uccs,
             LTSOutput output,
             boolean phaseMemoryDiagnostics) {
+        return applyPostConnectionMonitor(
+                preparePostConnectionMonitorInputs(
+                        uccs,
+                        output,
+                        phaseMemoryDiagnostics),
+                output,
+                phaseMemoryDiagnostics);
+    }
+
+    private static PostConnectionMonitorInputs preparePostConnectionMonitorInputs(
+            UpdatingControllerCompositeState uccs,
+            LTSOutput output,
+            boolean phaseMemoryDiagnostics) {
         ConnectedEnvironmentInputs inputs = prepareConnectedEnvironmentInputs(
                 uccs,
                 output,
@@ -285,6 +301,33 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         StepwiseGoalClassifier classifier = new StepwiseGoalClassifier(stages, actionOwnership, output);
         StepwiseGoalClassifier.Classification classification =
                 classifier.classify(oldGoal, newGoal, uccs.getStepwiseTransitionGoals());
+        // Keep the complete classification before hotSwap-sensitive
+        // deferral mutates it.  The Traditional connection-shadow fallback must
+        // connect raw H_T first and replay every requirement monitor afterwards;
+        // otherwise a raw old state reached with two monitor valuations can lose
+        // one of its uncontrollable cross-history hotSwapIn outcomes.
+        List<StepwiseClassifiedGoal> allClassifiedGoals =
+                allActiveClassifiedGoals(classification, stages.size());
+        List<StepwiseClassifiedGoal> classifiedCrossGoals = classification.getCrossGoals();
+        List<StepwiseClassifiedGoal> deferredHotSwapMonitorGoals =
+                Collections.emptyList();
+        if (uccs.isTraditionalHotSwapMonitorSemantics()) {
+            // Snapshot in Traditional monitor mode: deferral mutates the
+            // effective staged classification, while reporting must retain
+            // the original input classification.
+            classifiedCrossGoals =
+                    new ArrayList<StepwiseClassifiedGoal>(classification.getCrossGoals());
+            deferredHotSwapMonitorGoals = deferHotSwapSensitiveGoals(
+                    classification,
+                    stages.size());
+            outputGoalNames(
+                    output,
+                    "post-hotSwapIn Traditional monitor semantics",
+                    deferredHotSwapMonitorGoals);
+            output.outln("[Stepwise Delayed DUCS] Traditional hotSwapIn monitor semantics: "
+                    + deferredHotSwapMonitorGoals.size()
+                    + " hotSwapIn-sensitive goal(s) deferred until after delayed connection.");
+        }
         List<StepwiseClassifiedGoal> crossGoals = classification.getCrossGoals();
         long crossComponentBuildStart = System.currentTimeMillis();
         List<CrossComponent> crossComponents = buildCrossComponents(crossGoals);
@@ -321,10 +364,32 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     "stepwise.mapping_components.ready");
         }
 
+        boolean preserveTraditionalConnectionShadow =
+                requiresTraditionalConnectionShadowPreservation(oldController, bases);
+        List<StepwiseClassifiedGoal> postConnectionMonitorGoals =
+                deferredHotSwapMonitorGoals;
+        if (preserveTraditionalConnectionShadow) {
+            // Traditional constructs raw E_u (and every H_T edge) before the
+            // requirement-monitor product.  Replaying all monitors after the
+            // delayed raw connection is the only safe lift when one raw old
+            // state represents several histories/valuations.
+            postConnectionMonitorGoals =
+                    new ArrayList<StepwiseClassifiedGoal>(allClassifiedGoals);
+            outputGoalNames(
+                    output,
+                    "post-connection raw H_T monitor semantics",
+                    postConnectionMonitorGoals);
+            output.outln("[Stepwise Delayed DUCS] Raw H_T preservation: "
+                    + postConnectionMonitorGoals.size()
+                    + " goal(s) evaluated after delayed raw connection.");
+        }
+
         output.outln("[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true"
                 + " incrementalPruning=" + uccs.isIncrementalPruning()
                 + " incrementalPruningCleanup=" + uccs.isIncrementalPruningCleanup()
-                + " safetyBackwardPruning=" + uccs.isSafetyBackwardPruning());
+                + " safetyBackwardPruning=" + uccs.isSafetyBackwardPruning()
+                + " traditionalHotSwapMonitorSemantics="
+                + uccs.isTraditionalHotSwapMonitorSemantics());
         UpdatingControllerEvaluationRecorder.recordCount(
                 "Stepwise Delayed DUC 設定",
                 "incrementalPruning 有効",
@@ -340,6 +405,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 "safetyBackwardPruning 有効",
                 uccs.isSafetyBackwardPruning() ? 1 : 0,
                 "boolean");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC 設定",
+                "Traditional hotSwapIn monitor semantics 有効",
+                uccs.isTraditionalHotSwapMonitorSemantics() ? 1 : 0,
+                "boolean");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn monitor goal 数",
+                postConnectionMonitorGoals.size(),
+                "goals");
         UpdatingControllerEvaluationRecorder.recordCount(
                 "Stepwise Delayed DUC 設定",
                 "costGuidedCrossScheduling 有効",
@@ -364,8 +439,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 output,
                 stages.size(),
                 classification,
-                crossGoals,
-                crossComponents);
+                classifiedCrossGoals,
+                crossComponents,
+                deferredHotSwapMonitorGoals);
         long classificationStatsCountTime = System.currentTimeMillis() - classificationStatsStart;
         UpdatingControllerEvaluationRecorder.recordEvaluationCountTime(
                 StepwiseDelayedEvaluationMetrics.CLASSIFICATION_SECTION,
@@ -378,7 +454,15 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 + crossComponentBuildTime + " ms");
 
         DelayedEnv mappingProduct;
-        if (uccs.isIncrementalPruning()) {
+        if (preserveTraditionalConnectionShadow) {
+            output.outln("[Stepwise Delayed DUCS] Traditional connection-shadow preservation required; "
+                    + "connecting raw H_T before requirement monitoring and mapping SBP.");
+            mappingProduct = buildTraditionalConnectionShadowPreservingProduct(
+                    bases,
+                    stages,
+                    globalActions,
+                    output);
+        } else if (uccs.isIncrementalPruning()) {
             IncrementalPruningCounter counter = new IncrementalPruningCounter();
             List<DelayedEnv> localSafetyEnvironments = buildIncrementalLocalEnvironments(
                     bases,
@@ -539,7 +623,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
                     "stepwise.mapping.final_product_ready");
         }
-        if (uccs.isSafetyBackwardPruning() && !uccs.isIncrementalPruning()) {
+        if (uccs.isSafetyBackwardPruning()
+                && !uccs.isIncrementalPruning()
+                && !preserveTraditionalConnectionShadow) {
             SafetyBackwardPruner.Result finalMappingPruning = SafetyBackwardPruner.prune(
                     mappingProduct.env,
                     uccs.getUpdateGRGoal().getControllableActions(),
@@ -625,10 +711,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 oldMeta.env,
                 mappingProduct.env,
                 connectionPlan.connections,
-                uccs.getUpdateGRGoal().getControllableActions());
+                uccs.getUpdateGRGoal().getControllableActions(),
+                postConnectionMonitorGoals);
     }
 
-    private static MTS<Long, String> connectPreparedEnvironment(
+    private static PostConnectionMonitorInputs connectPreparedEnvironment(
             ConnectedEnvironmentInputs inputs,
             LTSOutput output,
             boolean phaseMemoryDiagnostics) {
@@ -669,15 +756,280 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
                     "stepwise.hot_swap_in.connected_environment_ready");
         }
-        return connected;
+        // End this frame before constructing the monitor product.  The
+        // connected view has already indexed the hotSwapIn relation, so the
+        // potentially large raw Connection list can now become unreachable.
+        return new PostConnectionMonitorInputs(
+                connected,
+                inputs.postConnectionMonitorGoals);
+    }
+
+    private static MTS<Long, String> applyPostConnectionMonitor(
+            PostConnectionMonitorInputs inputs,
+            LTSOutput output,
+            boolean phaseMemoryDiagnostics) {
+        if (inputs.postConnectionMonitorGoals.isEmpty()) {
+            return inputs.takeConnectedEnvironment();
+        }
+
+        long monitorProductStart = System.currentTimeMillis();
+        MTS<Long, String> monitored = buildPostConnectionMonitorProductAndReleaseSource(
+                inputs,
+                "post-hotSwapIn Traditional monitor semantics",
+                output);
+        UpdatingControllerEvaluationRecorder.recordTime(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn Traditional monitor product 構築・枝刈り時間",
+                System.currentTimeMillis() - monitorProductStart);
+        outputStateSpace(
+                output,
+                "[Stepwise Delayed DUCS] After Traditional hotSwapIn monitor semantics",
+                monitored);
+        if (phaseMemoryDiagnostics) {
+            UpdatingControllerEvaluationRecorder.recordPhaseMemoryCheckpoint(
+                    "stepwise.hot_swap_in.traditional_monitor_ready");
+        }
+        return monitored;
+    }
+
+    /**
+     * Builds the one-use post-connection product in a nested frame.  Taking the
+     * connected source out of the hand-off object makes that source, its old
+     * controller, and its mapping environment eligible for collection as soon
+     * as this method returns; the caller then retains only the product MTS.
+     */
+    private static MTS<Long, String> buildPostConnectionMonitorProductAndReleaseSource(
+            PostConnectionMonitorInputs inputs,
+            String scope,
+            LTSOutput output) {
+        MTS<Long, String> connected = inputs.takeConnectedEnvironment();
+        Set<Fluent> monitorFluents =
+                StepwiseUpdatingControllerSafetySynthesizer.collectFluentsForEnvironment(
+                        inputs.postConnectionMonitorGoals,
+                        normalizedMonitorActions(connected.getActions()));
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn monitor fluent 数",
+                monitorFluents.size(),
+                "fluents");
+
+        // The product is intentionally built only after the real delayed
+        // hotSwapIn edges exist. Replaying the connected graph applies every
+        // deferred monitor's actual transition on hotSwapIn.
+        return buildPostConnectionMonitorProduct(
+                connected,
+                monitorFluents,
+                inputs.postConnectionMonitorGoals,
+                scope,
+                output);
+    }
+
+    /**
+     * Constructs the reachable post-connection monitor product with an
+     * immutable bit-vector valuation. A violating state and every incoming
+     * transition to it are retained, but the state is never expanded. This is
+     * the online equivalent of constructing the full product, deleting every
+     * violating state's outgoing transitions, and removing states that then
+     * become unreachable.
+     *
+     * <p>The returned graph deliberately remains an ordinary {@link MTSImpl}.
+     * This optimisation changes neither the downstream representation nor the
+     * DontDoTwice/SBP/GR(1) pipeline.</p>
+     */
+    static MTS<Long, String> buildPostConnectionMonitorProduct(
+            MTS<Long, String> base,
+            Set<Fluent> fluents,
+            Collection<StepwiseClassifiedGoal> goals,
+            String scope,
+            LTSOutput output) {
+        MTS<Long, String> result = new MTSImpl<Long, String>(0L);
+        result.addActions(base.getActions());
+
+        MonitorEncoding encoding = new MonitorEncoding(fluents);
+        BitVectorValuation valuation = new BitVectorValuation(encoding.bitByFluentName);
+        Map<BitVectorProductKey, Long> keyToState =
+                new HashMap<BitVectorProductKey, Long>();
+        Queue<BitVectorProductKey> pending = new ArrayDeque<BitVectorProductKey>();
+
+        BitVectorProductKey initial = new BitVectorProductKey(
+                base.getInitialState(),
+                encoding.initialMask);
+        if (violates(initial.monitorMask, valuation, goals)) {
+            Diagnostics.fatal("stepwise_delayed safety pruning found initial state violating in "
+                    + scope + ".");
+        }
+        keyToState.put(initial, 0L);
+        pending.add(initial);
+
+        long nextStateId = 1L;
+        long terminalStates = 0L;
+        long expandedStates = 0L;
+        long emittedTransitions = 0L;
+        long liftedHotSwapInTransitions = 0L;
+        while (!pending.isEmpty()) {
+            BitVectorProductKey current = pending.remove();
+            Long fromState = keyToState.get(current);
+            expandedStates++;
+            for (Pair<String, Long> transition : base.getTransitions(
+                    current.baseState,
+                    MTS.TransitionType.REQUIRED)) {
+                BigInteger targetMask = encoding.next(
+                        current.monitorMask,
+                        transition.getFirst());
+                BitVectorProductKey targetKey = new BitVectorProductKey(
+                        transition.getSecond(),
+                        targetMask);
+                Long targetState = keyToState.get(targetKey);
+                if (targetState == null) {
+                    targetState = nextStateId++;
+                    keyToState.put(targetKey, targetState);
+                    result.addState(targetState);
+                    if (violates(targetMask, valuation, goals)) {
+                        terminalStates++;
+                    } else {
+                        pending.add(targetKey);
+                    }
+                }
+                result.addAction(transition.getFirst());
+                if (result.addRequired(fromState, transition.getFirst(), targetState)) {
+                    emittedTransitions++;
+                    if (UpdateConstants.BEGIN_UPDATE.equals(transition.getFirst())) {
+                        liftedHotSwapInTransitions++;
+                    }
+                }
+            }
+        }
+
+        if (output != null) {
+            output.outln("  online safety terminalization kept states: "
+                    + result.getStates().size()
+                    + " transitions: " + emittedTransitions
+                    + " terminal states: " + terminalStates);
+            output.outln("  monitor-lifted hotSwapIn transitions: "
+                    + liftedHotSwapInTransitions);
+        }
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn online terminal state 数",
+                terminalStates,
+                "states");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn expanded monitor-product state 数",
+                expandedStates,
+                "states");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn emitted monitor-product transition 数",
+                emittedTransitions,
+                "transitions");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                "Stepwise Delayed DUC",
+                "post-hotSwapIn monitor-lifted hotSwapIn transition 数",
+                liftedHotSwapInTransitions,
+                "transitions");
+        return result;
+    }
+
+    private static boolean violates(
+            BigInteger monitorMask,
+            BitVectorValuation valuation,
+            Collection<StepwiseClassifiedGoal> goals) {
+        valuation.setMonitorMask(monitorMask);
+        for (StepwiseClassifiedGoal goal : goals) {
+            Formula formula = goal.getFormula();
+            if (formula.evaluate(valuation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Removes goals whose monitor state can change on hotSwapIn from the
+     * staged PAS pipeline.  They are evaluated once, over the connected graph,
+     * so the actual hotSwapIn edge participates in the monitor transition.
+     */
+    private static List<StepwiseClassifiedGoal> deferHotSwapSensitiveGoals(
+            StepwiseGoalClassifier.Classification classification,
+            int stageCount) {
+        Set<StepwiseClassifiedGoal> deferred =
+                new LinkedHashSet<StepwiseClassifiedGoal>();
+        for (int stageIndex = 0; stageIndex < stageCount; stageIndex++) {
+            removeHotSwapSensitiveGoals(classification.getOldSafety(stageIndex), deferred);
+            removeHotSwapSensitiveGoals(classification.getNewSafety(stageIndex), deferred);
+            removeHotSwapSensitiveGoals(classification.getTransitions(stageIndex), deferred);
+        }
+        removeHotSwapSensitiveGoals(classification.getCrossGoals(), deferred);
+        return new ArrayList<StepwiseClassifiedGoal>(deferred);
+    }
+
+    private static void removeHotSwapSensitiveGoals(
+            List<StepwiseClassifiedGoal> goals,
+            Set<StepwiseClassifiedGoal> deferred) {
+        Iterator<StepwiseClassifiedGoal> iterator = goals.iterator();
+        while (iterator.hasNext()) {
+            StepwiseClassifiedGoal goal = iterator.next();
+            if (monitorChangesOnHotSwapIn(goal)) {
+                deferred.add(goal);
+                iterator.remove();
+            }
+        }
+    }
+
+    private static boolean monitorChangesOnHotSwapIn(StepwiseClassifiedGoal goal) {
+        // LTSA action propositions are one-step fluents.  Since hotSwapIn is a
+        // different event, Traditional DUCS adds it to every such fluent's
+        // terminating set.
+        if (!goal.getActionFluentsForUpdate().isEmpty()) {
+            return true;
+        }
+
+        SingleSymbol hotSwapIn = new SingleSymbol(UpdateConstants.BEGIN_UPDATE);
+        for (Fluent fluent : goal.getFluents()) {
+            if (isPhaseFluentKnownFalseAtHotSwapIn(fluent)) {
+                continue;
+            }
+            if (fluent.getInitiatingActions().contains(hotSwapIn)
+                    || fluent.getTerminatingActions().contains(hotSwapIn)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPhaseFluentKnownFalseAtHotSwapIn(Fluent fluent) {
+        // Delayed connections only target phase-initial mapping states.  These
+        // three internal phase fluents are therefore false on both sides of
+        // hotSwapIn, even though their definitions list hotSwapIn as a reset.
+        return UpdatingControllersUtils.stopFluent.equals(fluent)
+                || UpdatingControllersUtils.reconFluent.equals(fluent)
+                || UpdatingControllersUtils.startFluent.equals(fluent);
+    }
+
+    private static Set<String> normalizedMonitorActions(Set<String> actions) {
+        Set<String> result = new HashSet<String>(actions);
+        for (String action : actions) {
+            if (UpdatingControllersUtils.isOld(action)) {
+                result.add(UpdatingControllersUtils.withoutOld(action));
+            }
+        }
+        return result;
+    }
+
+    private static String normalizedMonitorAction(String action) {
+        return UpdatingControllersUtils.isOld(action)
+                ? UpdatingControllersUtils.withoutOld(action)
+                : action;
     }
 
     private static void outputClassificationStatistics(
             LTSOutput output,
             int stageCount,
             StepwiseGoalClassifier.Classification classification,
-            List<StepwiseClassifiedGoal> crossGoals,
-            List<CrossComponent> crossComponents) {
+            List<StepwiseClassifiedGoal> classifiedCrossGoals,
+            List<CrossComponent> effectiveCrossComponents,
+            List<StepwiseClassifiedGoal> deferredHotSwapMonitorGoals) {
         int localOldSafetyGoals = 0;
         int localNewSafetyGoals = 0;
         int localTransitionGoals = 0;
@@ -686,19 +1038,48 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             localNewSafetyGoals += classification.getNewSafety(stageIndex).size();
             localTransitionGoals += classification.getTransitions(stageIndex).size();
         }
+        for (StepwiseClassifiedGoal goal : deferredHotSwapMonitorGoals) {
+            if (goal.getStageIndex() < 0) {
+                continue;
+            }
+            if (StepwiseRequirementKind.OLD_SAFETY.equals(goal.getKind())) {
+                localOldSafetyGoals++;
+            } else if (StepwiseRequirementKind.NEW_SAFETY.equals(goal.getKind())) {
+                localNewSafetyGoals++;
+            } else {
+                localTransitionGoals++;
+            }
+        }
         int localGoals = localOldSafetyGoals + localNewSafetyGoals + localTransitionGoals;
-        int crossOldSafetyGoals = countGoalsByKind(crossGoals, StepwiseRequirementKind.OLD_SAFETY);
-        int crossNewSafetyGoals = countGoalsByKind(crossGoals, StepwiseRequirementKind.NEW_SAFETY);
-        int crossTransitionGoals = countGoalsByKind(crossGoals, StepwiseRequirementKind.TRANSITION);
-        int crossGoalCount = crossGoals.size();
+        int crossOldSafetyGoals = countGoalsByKind(
+                classifiedCrossGoals,
+                StepwiseRequirementKind.OLD_SAFETY);
+        int crossNewSafetyGoals = countGoalsByKind(
+                classifiedCrossGoals,
+                StepwiseRequirementKind.NEW_SAFETY);
+        int crossTransitionGoals = countGoalsByKind(
+                classifiedCrossGoals,
+                StepwiseRequirementKind.TRANSITION);
+        int crossGoalCount = classifiedCrossGoals.size();
         int totalGoals = localGoals + crossGoalCount;
         double crossGoalRatio = totalGoals == 0 ? 0.0 : ((double) crossGoalCount) / totalGoals;
         long crossGoalRatioPermille = Math.round(crossGoalRatio * 1000.0);
-        int maxGoalScopeSize = maxGoalScopeSize(crossGoals);
-        int allStageCrossGoalCount = countAllStageCrossGoals(crossGoals, stageCount);
-        int maxComponentScopeSize = maxComponentScopeSize(crossComponents);
-        int allStageCrossComponentCount = countAllStageCrossComponents(crossComponents, stageCount);
-        int requirementFluentCount = uniqueRequirementFluents(stageCount, classification, crossGoals).size();
+        int maxGoalScopeSize = maxGoalScopeSize(classifiedCrossGoals);
+        int allStageCrossGoalCount = countAllStageCrossGoals(classifiedCrossGoals, stageCount);
+        List<CrossComponent> classifiedCrossComponents = effectiveCrossComponents;
+        if (classifiedCrossGoals.size() != totalEffectiveCrossGoals(classification)) {
+            classifiedCrossComponents = buildCrossComponents(classifiedCrossGoals);
+            sortCrossComponentsByStageSet(classifiedCrossComponents);
+        }
+        int maxComponentScopeSize = maxComponentScopeSize(classifiedCrossComponents);
+        int allStageCrossComponentCount = countAllStageCrossComponents(
+                classifiedCrossComponents,
+                stageCount);
+        int requirementFluentCount = uniqueRequirementFluents(
+                stageCount,
+                classification,
+                classifiedCrossGoals,
+                deferredHotSwapMonitorGoals).size();
 
         output.outln("");
         output.outln("[Stepwise Delayed DUCS] Requirement classification summary");
@@ -713,7 +1094,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         output.outln("  cross goals by type: oldSafety=" + crossOldSafetyGoals
                 + " newSafety=" + crossNewSafetyGoals
                 + " transition=" + crossTransitionGoals);
-        output.outln("  cross components: count=" + crossComponents.size()
+        output.outln("  cross components: count=" + classifiedCrossComponents.size()
                 + " maxGoalScopeSize=" + maxGoalScopeSize
                 + " maxComponentScopeSize=" + maxComponentScopeSize
                 + " allStageCrossGoals=" + allStageCrossGoalCount
@@ -732,7 +1113,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         UpdatingControllerEvaluationRecorder.recordCount(section, "cross old safety goal 数", crossOldSafetyGoals, "goals");
         UpdatingControllerEvaluationRecorder.recordCount(section, "cross new safety goal 数", crossNewSafetyGoals, "goals");
         UpdatingControllerEvaluationRecorder.recordCount(section, "cross transition goal 数", crossTransitionGoals, "goals");
-        UpdatingControllerEvaluationRecorder.recordCount(section, "cross component 数", crossComponents.size(), "components");
+        UpdatingControllerEvaluationRecorder.recordCount(
+                section,
+                "cross component 数",
+                classifiedCrossComponents.size(),
+                "components");
         UpdatingControllerEvaluationRecorder.recordCount(section, "cross goal 最大 scope size", maxGoalScopeSize, "stages");
         UpdatingControllerEvaluationRecorder.recordCount(section, "cross component 最大 scope size", maxComponentScopeSize, "stages");
         UpdatingControllerEvaluationRecorder.recordCount(section, "all-stage cross goal 数", allStageCrossGoalCount, "goals");
@@ -743,20 +1128,32 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 "requirement fluent 数（重複排除後）",
                 requirementFluentCount,
                 "fluents");
-        recordScopeRequirementCounts(output, stageCount, classification, crossGoals);
+        recordScopeRequirementCounts(
+                output,
+                stageCount,
+                classification,
+                classifiedCrossGoals,
+                deferredHotSwapMonitorGoals);
+    }
+
+    private static int totalEffectiveCrossGoals(
+            StepwiseGoalClassifier.Classification classification) {
+        return classification.getCrossGoals().size();
     }
 
     private static Set<Fluent> uniqueRequirementFluents(
             int stageCount,
             StepwiseGoalClassifier.Classification classification,
-            List<StepwiseClassifiedGoal> crossGoals) {
+            List<StepwiseClassifiedGoal> classifiedCrossGoals,
+            List<StepwiseClassifiedGoal> deferredHotSwapMonitorGoals) {
         Set<Fluent> fluents = new LinkedHashSet<Fluent>();
         for (int stageIndex = 0; stageIndex < stageCount; stageIndex++) {
             addRequirementFluents(fluents, classification.getOldSafety(stageIndex));
             addRequirementFluents(fluents, classification.getNewSafety(stageIndex));
             addRequirementFluents(fluents, classification.getTransitions(stageIndex));
         }
-        addRequirementFluents(fluents, crossGoals);
+        addRequirementFluents(fluents, classifiedCrossGoals);
+        addRequirementFluents(fluents, deferredHotSwapMonitorGoals);
         return fluents;
     }
 
@@ -772,7 +1169,8 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             LTSOutput output,
             int stageCount,
             StepwiseGoalClassifier.Classification classification,
-            List<StepwiseClassifiedGoal> crossGoals) {
+            List<StepwiseClassifiedGoal> classifiedCrossGoals,
+            List<StepwiseClassifiedGoal> deferredHotSwapMonitorGoals) {
         List<ScopeRequirementCounts> counts = new ArrayList<ScopeRequirementCounts>();
         for (int stageIndex = 0; stageIndex < stageCount; stageIndex++) {
             Set<Integer> scope = new java.util.TreeSet<Integer>();
@@ -782,7 +1180,15 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             addGoalCounts(localCounts, classification.getNewSafety(stageIndex));
             addGoalCounts(localCounts, classification.getTransitions(stageIndex));
         }
-        for (StepwiseClassifiedGoal goal : crossGoals) {
+        for (StepwiseClassifiedGoal goal : deferredHotSwapMonitorGoals) {
+            if (goal.getStageIndex() >= 0) {
+                ScopeRequirementCounts localCounts = countsForScope(
+                        counts,
+                        goal.getStageScope());
+                localCounts.add(goal);
+            }
+        }
+        for (StepwiseClassifiedGoal goal : classifiedCrossGoals) {
             ScopeRequirementCounts crossCounts = countsForScope(counts, goal.getStageScope());
             crossCounts.add(goal);
         }
@@ -897,6 +1303,332 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
     private static String formatPercent(double ratio) {
         return String.format(Locale.ROOT, "%.2f%%", ratio * 100.0);
+    }
+
+    /**
+     * Detects the case in which the historical Traditional connection shadow
+     * can enter a relation prefix before hotSwapIn.  A relation entry action
+     * leaves an OLD_SIDE state for an INTERMEDIATE state.  If that label also
+     * belongs to the old controlled behaviour, Traditional's same-word BFS can
+     * synchronize the two and must retain the resulting state as a hotSwapIn
+     * target.
+     */
+    private static boolean requiresTraditionalConnectionShadowPreservation(
+            MTS<Long, String> oldController,
+            List<StageBase> bases) {
+        return hasTraditionalConnectionShadowOverlap(oldController, bases)
+                || hasOneToManyTraditionalConnectionShadow(oldController, bases);
+    }
+
+    private static boolean hasTraditionalConnectionShadowOverlap(
+            MTS<Long, String> oldController,
+            List<StageBase> bases) {
+        Set<String> oldActions = oldController.getActions();
+        for (StageBase base : bases) {
+            for (Long source : base.mapping.getStates()) {
+                MappingEnvironmentGenerator.MappingStateMetadata sourceMetadata =
+                        stageMetadata(base, source);
+                if (sourceMetadata == null
+                        || !MappingEnvironmentGenerator.MappingStateSide.OLD_SIDE.equals(
+                                sourceMetadata.getSide())) {
+                    continue;
+                }
+                for (Pair<String, Long> transition : base.mapping.getTransitions(
+                        source,
+                        MTS.TransitionType.REQUIRED)) {
+                    MappingEnvironmentGenerator.MappingStateMetadata targetMetadata =
+                            stageMetadata(base, transition.getSecond());
+                    if (targetMetadata != null
+                            && MappingEnvironmentGenerator.MappingStateSide.INTERMEDIATE.equals(
+                                    targetMetadata.getSide())
+                            && oldActions.contains(transition.getFirst())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Detects the other case in which coverage-by-existence is insufficient:
+     * one reachable old-controller state is correlated by Traditional H_T
+     * with more than one raw mapping tuple.  Preconnection SBP may correctly
+     * classify one tuple as losing for the post-hotSwap game, yet deleting it
+     * would hide an uncontrollable hotSwapIn outcome while another tuple lets
+     * the old-state coverage check pass.
+     *
+     * <p>The traversal is the historical Traditional same-word BFS evaluated
+     * directly over the mapping components.  Visible actions use static
+     * alphabet ownership and all same-label targets; tau interleaves inside
+     * the full mapping product and is then synchronized with an old-controller
+     * tau, matching the materialized Traditional construction.</p>
+     */
+    private static boolean hasOneToManyTraditionalConnectionShadow(
+            MTS<Long, String> oldController,
+            List<StageBase> bases) {
+        List<Long> initialTuple = new ArrayList<Long>(bases.size());
+        for (StageBase base : bases) {
+            initialTuple.add(base.mapping.getInitialState());
+        }
+
+        Queue<Pair<Long, List<Long>>> pending =
+                new ArrayDeque<Pair<Long, List<Long>>>();
+        Set<Pair<Long, List<Long>>> scheduled =
+                new HashSet<Pair<Long, List<Long>>>();
+        Map<Long, Set<List<Long>>> targetsByOldState =
+                new HashMap<Long, Set<List<Long>>>();
+        Pair<Long, List<Long>> initialCorrelation =
+                new Pair<Long, List<Long>>(
+                        oldController.getInitialState(), initialTuple);
+        pending.add(initialCorrelation);
+        scheduled.add(initialCorrelation);
+        Set<List<Long>> initialTargets = new HashSet<List<Long>>();
+        initialTargets.add(initialTuple);
+        targetsByOldState.put(oldController.getInitialState(), initialTargets);
+
+        while (!pending.isEmpty()) {
+            Pair<Long, List<Long>> correlation = pending.remove();
+            for (Pair<String, Long> oldTransition : oldController.getTransitions(
+                    correlation.getFirst(), MTS.TransitionType.REQUIRED)) {
+                if (UpdateConstants.BEGIN_UPDATE.equals(oldTransition.getFirst())) {
+                    continue;
+                }
+                if (scheduleTraditionalShadowTargets(
+                        bases,
+                        correlation.getSecond(),
+                        oldTransition.getFirst(),
+                        oldTransition.getSecond(),
+                        pending,
+                        scheduled,
+                        targetsByOldState)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Streams Traditional shadow successors and stops as soon as a second
+     * tuple is found for the same old-controller state.  In particular, this
+     * avoids materialising a potentially exponential Cartesian successor
+     * list merely to decide that the preservation fallback is required.
+     */
+    private static boolean scheduleTraditionalShadowTargets(
+            List<StageBase> bases,
+            List<Long> tuple,
+            String action,
+            Long oldTarget,
+            Queue<Pair<Long, List<Long>>> pending,
+            Set<Pair<Long, List<Long>>> scheduled,
+            Map<Long, Set<List<Long>>> targetsByOldState) {
+        if (MTSConstants.TAU.equals(action)) {
+            for (int i = 0; i < bases.size(); i++) {
+                for (Long target : requiredTargets(
+                        bases.get(i).mapping, tuple.get(i), action)) {
+                    List<Long> successor = new ArrayList<Long>(tuple);
+                    successor.set(i, target);
+                    if (scheduleTraditionalShadowCorrelation(
+                            oldTarget,
+                            successor,
+                            pending,
+                            scheduled,
+                            targetsByOldState)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        boolean hasOwner = false;
+        List<List<Long>> choices = new ArrayList<List<Long>>(bases.size());
+        for (int i = 0; i < bases.size(); i++) {
+            MTS<Long, String> component = bases.get(i).mapping;
+            if (!component.getActions().contains(action)) {
+                choices.add(Collections.singletonList(tuple.get(i)));
+                continue;
+            }
+            hasOwner = true;
+            List<Long> enabledTargets = requiredTargets(component, tuple.get(i), action);
+            if (enabledTargets.isEmpty()) {
+                return false;
+            }
+            choices.add(enabledTargets);
+        }
+        if (!hasOwner) {
+            return false;
+        }
+
+        return scheduleTraditionalShadowCartesianTargets(
+                choices,
+                0,
+                new ArrayList<Long>(choices.size()),
+                oldTarget,
+                pending,
+                scheduled,
+                targetsByOldState);
+    }
+
+    private static List<Long> requiredTargets(
+            MTS<Long, String> environment,
+            Long state,
+            String action) {
+        List<Long> result = new ArrayList<Long>();
+        for (Pair<String, Long> transition : environment.getTransitions(
+                state, MTS.TransitionType.REQUIRED)) {
+            if (action.equals(transition.getFirst())
+                    && !result.contains(transition.getSecond())) {
+                result.add(transition.getSecond());
+            }
+        }
+        return result;
+    }
+
+    private static boolean scheduleTraditionalShadowCartesianTargets(
+            List<List<Long>> choices,
+            int index,
+            List<Long> current,
+            Long oldTarget,
+            Queue<Pair<Long, List<Long>>> pending,
+            Set<Pair<Long, List<Long>>> scheduled,
+            Map<Long, Set<List<Long>>> targetsByOldState) {
+        if (index == choices.size()) {
+            return scheduleTraditionalShadowCorrelation(
+                    oldTarget,
+                    new ArrayList<Long>(current),
+                    pending,
+                    scheduled,
+                    targetsByOldState);
+        }
+        for (Long target : choices.get(index)) {
+            current.add(target);
+            boolean foundMultiple = scheduleTraditionalShadowCartesianTargets(
+                    choices,
+                    index + 1,
+                    current,
+                    oldTarget,
+                    pending,
+                    scheduled,
+                    targetsByOldState);
+            current.remove(current.size() - 1);
+            if (foundMultiple) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean scheduleTraditionalShadowCorrelation(
+            Long oldState,
+            List<Long> mappingTuple,
+            Queue<Pair<Long, List<Long>>> pending,
+            Set<Pair<Long, List<Long>>> scheduled,
+            Map<Long, Set<List<Long>>> targetsByOldState) {
+        Set<List<Long>> targets = targetsByOldState.get(oldState);
+        if (targets == null) {
+            targets = new HashSet<List<Long>>();
+            targetsByOldState.put(oldState, targets);
+        }
+        targets.add(mappingTuple);
+        if (targets.size() > 1) {
+            return true;
+        }
+
+        Pair<Long, List<Long>> correlation =
+                new Pair<Long, List<Long>>(oldState, mappingTuple);
+        if (scheduled.add(correlation)) {
+            pending.add(correlation);
+        }
+        return false;
+    }
+
+    private static MappingEnvironmentGenerator.MappingStateMetadata stageMetadata(
+            StageBase base,
+            Long state) {
+        Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata> byStage =
+                base.stageMetadata.get(state);
+        return byStage == null ? null : byStage.get(base.stage.getIndex());
+    }
+
+    /**
+     * Correctness fallback for a Traditional connection-shadow overlap.  The
+     * staged path may otherwise prune a relation-prefix state while it is
+     * still needed as an uncontrollable hotSwapIn outcome.  This path composes
+     * only the raw mapping stages and phase metadata.  Every requirement
+     * monitor is deliberately applied after the raw H_T edges have been
+     * connected, matching Traditional's connection-before-monitor order.
+     * The ordinary staged path remains in use when no overlap exists.
+     */
+    private static DelayedEnv buildTraditionalConnectionShadowPreservingProduct(
+            List<StageBase> bases,
+            List<StepwiseStage> stages,
+            Set<String> globalActions,
+            LTSOutput output) {
+        Set<Fluent> phaseFluents = new LinkedHashSet<Fluent>();
+        addPhaseComparisonFluents(phaseFluents);
+        List<DelayedEnv> rawStageInputs = new ArrayList<DelayedEnv>();
+        for (StageBase base : bases) {
+            addPassiveSelfLoopsForMissingActions(base.mapping, globalActions);
+            Set<Integer> stageScope = singletonStageScope(base.stage.getIndex());
+            DelayedEnv phaseMeta = timedBuildFluentProduct(
+                    base.mapping,
+                    base.stageMetadata,
+                    Collections.<Long, Long>emptyMap(),
+                    phaseFluents,
+                    stageScope,
+                    "connection-shadow stage " + base.stage.getDisplayIndex()
+                            + " phase metaEnv 構築時間");
+            String phaseMetaLabel =
+                    "[Stepwise Delayed DUCS] Connection-shadow stage "
+                            + base.stage.getDisplayIndex()
+                            + " phase meta";
+            StateSpaceStats phaseMetaStats = outputStateSpace(
+                    output,
+                    phaseMetaLabel,
+                    phaseMeta.env);
+            recordScopedStateSpace(
+                    "connection-shadow stage " + base.stage.getDisplayIndex()
+                            + " phase metaEnv",
+                    stageScope,
+                    phaseMetaStats);
+            rawStageInputs.add(new DelayedEnv(
+                    phaseMeta.env,
+                    phaseMeta.trackedFluents,
+                    phaseMeta.valuation,
+                    phaseMeta.stageMetadata,
+                    phaseMeta.oldControllerOrigin,
+                    base.realActions,
+                    phaseMeta.errorStates));
+        }
+
+        Set<Integer> fullScope = allStageScope(stages.size());
+        DelayedEnv rawProduct = timedComposeProduct(
+                rawStageInputs,
+                "STEPWISE_DELAYED_TRADITIONAL_CONNECTION_SHADOW_PRODUCT",
+                fullScope,
+                "Traditional connection-shadow full mapping product 並列合成時間",
+                output);
+        outputStateSpace(
+                output,
+                "[Stepwise Delayed DUCS] Raw connection-shadow product before delayed connection",
+                rawProduct.env);
+        return rawProduct;
+    }
+
+    private static List<StepwiseClassifiedGoal> allActiveClassifiedGoals(
+            StepwiseGoalClassifier.Classification classification,
+            int stageCount) {
+        Set<StepwiseClassifiedGoal> result =
+                new LinkedHashSet<StepwiseClassifiedGoal>();
+        for (int stageIndex = 0; stageIndex < stageCount; stageIndex++) {
+            result.addAll(classification.getOldSafety(stageIndex));
+            result.addAll(classification.getNewSafety(stageIndex));
+            result.addAll(classification.getTransitions(stageIndex));
+        }
+        result.addAll(classification.getCrossGoals());
+        return new ArrayList<StepwiseClassifiedGoal>(result);
     }
 
     private static List<DelayedEnv> buildIncrementalLocalEnvironments(
@@ -2189,16 +2921,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         MTS<Long, String> result = new MTSImpl<Long, String>(0L);
         result.addActions(base.getActions());
         Map<ProductStateKey, Long> keyToState = new HashMap<ProductStateKey, Long>();
-        Map<Long, Set<Fluent>> trueFluentsByState = new HashMap<Long, Set<Fluent>>();
         Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> resultMetadata =
                 new HashMap<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>>();
         Map<Long, Long> resultOldOrigins = new HashMap<Long, Long>();
         Set<Long> resultErrorStates = new LinkedHashSet<Long>();
-        Queue<ProductStateKey> pending = new LinkedList<ProductStateKey>();
+        Queue<ProductStateKey> pending = new ArrayDeque<ProductStateKey>();
 
         ProductStateKey initial = new ProductStateKey(base.getInitialState(), initialTrueFluents(fluents));
         keyToState.put(initial, 0L);
-        trueFluentsByState.put(0L, initial.trueFluents);
         copyMetadata(initial.baseState, 0L, stageMetadata, oldOrigins, resultMetadata, resultOldOrigins);
         if (baseErrorStates.contains(initial.baseState)) {
             resultErrorStates.add(0L);
@@ -2221,7 +2951,6 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                     targetState = nextStateId++;
                     keyToState.put(targetKey, targetState);
                     result.addState(targetState);
-                    trueFluentsByState.put(targetState, targetKey.trueFluents);
                     copyMetadata(targetKey.baseState, targetState, stageMetadata, oldOrigins,
                             resultMetadata, resultOldOrigins);
                     if (baseErrorStates.contains(targetKey.baseState)) {
@@ -2236,9 +2965,9 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
 
         FluentStateValuation<Long> valuation = new FluentStateValuation<Long>(result.getStates());
-        for (Map.Entry<Long, Set<Fluent>> entry : trueFluentsByState.entrySet()) {
-            for (Fluent fluent : entry.getValue()) {
-                valuation.addHoldingFluent(entry.getKey(), fluent);
+        for (Map.Entry<ProductStateKey, Long> entry : keyToState.entrySet()) {
+            for (Fluent fluent : entry.getKey().trueFluents) {
+                valuation.addHoldingFluent(entry.getValue(), fluent);
             }
         }
         DelayedEnv fluentProduct = new DelayedEnv(
@@ -2247,7 +2976,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 valuation,
                 resultMetadata,
                 resultOldOrigins,
-                new HashSet<String>(base.getActions()),
+                base.getActions(),
                 resultErrorStates);
         if (DEBUG_HOT_SWAP_LINEAGE) {
             debugPropagateLocalStateVectorsThroughFluentProduct(base, result, keyToState);
@@ -2272,20 +3001,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         MTS<Long, String> result = new MTSImpl<Long, String>(0L);
         result.addActions(current.env.getActions());
         Map<ProductStateKey, Long> keyToState = new HashMap<ProductStateKey, Long>();
-        Map<Long, Long> resultToBaseState = new HashMap<Long, Long>();
-        Map<Long, Set<Fluent>> newTrueFluentsByState = new HashMap<Long, Set<Fluent>>();
         Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> resultMetadata =
                 new HashMap<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>>();
         Map<Long, Long> resultOldOrigins = new HashMap<Long, Long>();
         Set<Long> resultErrorStates = new LinkedHashSet<Long>();
-        Queue<ProductStateKey> pending = new LinkedList<ProductStateKey>();
+        Queue<ProductStateKey> pending = new ArrayDeque<ProductStateKey>();
 
         ProductStateKey initial = new ProductStateKey(
                 current.env.getInitialState(),
                 initialTrueFluents(newFluents));
         keyToState.put(initial, 0L);
-        resultToBaseState.put(0L, initial.baseState);
-        newTrueFluentsByState.put(0L, initial.trueFluents);
         copyMetadata(
                 initial.baseState,
                 0L,
@@ -2318,8 +3043,6 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 if (targetState == null) {
                     targetState = nextStateId++;
                     keyToState.put(targetKey, targetState);
-                    resultToBaseState.put(targetState, targetKey.baseState);
-                    newTrueFluentsByState.put(targetState, targetKey.trueFluents);
                     result.addState(targetState);
                     copyMetadata(
                             targetKey.baseState,
@@ -2341,17 +3064,14 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         Set<Fluent> trackedFluents = new LinkedHashSet<Fluent>(current.trackedFluents);
         trackedFluents.addAll(newFluents);
         FluentStateValuation<Long> valuation = new FluentStateValuation<Long>(result.getStates());
-        for (Map.Entry<Long, Long> entry : resultToBaseState.entrySet()) {
-            Long resultState = entry.getKey();
-            Long baseState = entry.getValue();
+        for (Map.Entry<ProductStateKey, Long> entry : keyToState.entrySet()) {
+            Long resultState = entry.getValue();
+            Long baseState = entry.getKey().baseState;
             for (Fluent fluent : current.valuation.getFluentsFromState(baseState)) {
                 valuation.addHoldingFluent(resultState, fluent);
             }
-            Set<Fluent> newTrueFluents = newTrueFluentsByState.get(resultState);
-            if (newTrueFluents != null) {
-                for (Fluent fluent : newTrueFluents) {
-                    valuation.addHoldingFluent(resultState, fluent);
-                }
+            for (Fluent fluent : entry.getKey().trueFluents) {
+                valuation.addHoldingFluent(resultState, fluent);
             }
         }
 
@@ -2684,6 +3404,22 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
             TupleTransitionIndex transitionIndex = indexTupleTransitions(inputs, tuple);
             for (String action : transitionIndex.enabledActions) {
+                if (MTSConstants.TAU.equals(action)) {
+                    nextStateId = addInterleavedTauTransitions(
+                            tuple,
+                            inputs,
+                            transitionIndex,
+                            tupleToState,
+                            debugStateToTuple,
+                            productErrorStates,
+                            pending,
+                            product,
+                            valuation,
+                            metadata,
+                            fromState,
+                            nextStateId);
+                    continue;
+                }
                 List<List<Long>> targetChoices = targetChoices(
                         action,
                         tuple,
@@ -2782,7 +3518,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         Set<Long> visitedMappingStates = new HashSet<Long>();
         Set<Long> visitedEligibleMappingStates = new HashSet<Long>();
         Set<Pair<Long, Long>> discovered = new HashSet<Pair<Long, Long>>();
-        Queue<Pair<Long, Long>> pending = new LinkedList<Pair<Long, Long>>();
+        Queue<Pair<Long, Long>> pending = new ArrayDeque<Pair<Long, Long>>();
         Pair<Long, Long> initial = new Pair<Long, Long>(
                 oldMeta.env.getInitialState(),
                 mappingProduct.env.getInitialState());
@@ -2845,8 +3581,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             ConnectionBuildStats stats) {
         Boolean cached = eligibleMappingStates.get(state);
         if (cached == null) {
-            cached = Boolean.valueOf(isMappingOldSide(mappingProduct, state)
-                    && phaseInitial(mappingProduct, state));
+            cached = Boolean.valueOf(isConnectionShadowState(mappingProduct, state));
             eligibleMappingStates.put(state, cached);
             stats.eligibilityComputations++;
         }
@@ -2885,7 +3620,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         stats.comparisonFluents = orderedConnectionComparisonFluents(comparisonFluents).size();
         stats.setupNanos = System.nanoTime() - setupStart;
         Set<Pair<Long, Long>> discovered = new HashSet<Pair<Long, Long>>();
-        Queue<Pair<Long, Long>> pending = new LinkedList<Pair<Long, Long>>();
+        Queue<Pair<Long, Long>> pending = new ArrayDeque<Pair<Long, Long>>();
         Pair<Long, Long> initial = new Pair<Long, Long>(
                 oldMeta.env.getInitialState(),
                 mappingProduct.env.getInitialState());
@@ -2908,8 +3643,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             visitedOldStates.add(oldState);
             visitedMappingStates.add(mappingState);
             stats.eligibilityChecks++;
-            if (isMappingOldSide(mappingProduct, mappingState)
-                    && phaseInitial(mappingProduct, mappingState)) {
+            if (isConnectionShadowState(mappingProduct, mappingState)) {
                 visitedEligibleMappingStates.add(mappingState);
                 stats.valuationChecks++;
                 if (valuationsMatch(oldMeta, oldState, mappingProduct, mappingState, comparisonFluents)) {
@@ -3246,7 +3980,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         if (initial.equals(target)) {
             return Collections.emptyList();
         }
-        Queue<Long> pending = new LinkedList<Long>();
+        Queue<Long> pending = new ArrayDeque<Long>();
         Set<Long> discovered = new HashSet<Long>();
         Map<Long, Long> predecessor = new HashMap<Long, Long>();
         Map<Long, String> predecessorAction = new HashMap<Long, String>();
@@ -3796,8 +4530,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     private static Set<Long> buildEligibleMappingStates(DelayedEnv mappingProduct) {
         Set<Long> result = new HashSet<Long>();
         for (Long state : mappingProduct.env.getStates()) {
-            if (isMappingOldSide(mappingProduct, state)
-                    && phaseInitial(mappingProduct, state)) {
+            if (isConnectionShadowState(mappingProduct, state)) {
                 result.add(state);
             }
         }
@@ -3807,8 +4540,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
     private static long countEligibleMappingStates(DelayedEnv mappingProduct) {
         long count = 0;
         for (Long state : mappingProduct.env.getStates()) {
-            if (isMappingOldSide(mappingProduct, state)
-                    && phaseInitial(mappingProduct, state)) {
+            if (isConnectionShadowState(mappingProduct, state)) {
                 count++;
             }
         }
@@ -3840,17 +4572,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 && !env.valuation.isTrue(state, UpdatingControllersUtils.startFluent);
     }
 
-    private static boolean isMappingOldSide(DelayedEnv env, Long state) {
-        Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata> metadata = env.stageMetadata.get(state);
-        if (metadata == null || metadata.isEmpty()) {
-            return false;
-        }
-        for (MappingEnvironmentGenerator.MappingStateMetadata stateMetadata : metadata.values()) {
-            if (!MappingEnvironmentGenerator.MappingStateSide.OLD_SIDE.equals(stateMetadata.getSide())) {
-                return false;
-            }
-        }
-        return true;
+    /**
+     * A delayed-connection target is any mapping-shadow state reached by the
+     * same pre-update word while the update phase is still initial.  The
+     * historical Traditional construction does not require every mapping
+     * component to remain on OLD_SIDE: a normal action of one component may
+     * synchronize with another component's relation pre-action and therefore
+     * move that component to an INTERMEDIATE state before hotSwapIn.
+     */
+    private static boolean isConnectionShadowState(DelayedEnv env, Long state) {
+        return phaseInitial(env, state);
     }
 
     static MTS<Long, String> connectOldAndMapping(
@@ -3860,6 +4591,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             Set<String> controllableActions) {
         long mappingOffset = nextFreshState(oldEnv);
         MTS<Long, String> result = new MTSImpl<Long, String>(oldEnv.getInitialState());
+        for (String action : oldEnv.getActions()) {
+            if (!MTSConstants.TAU.equals(action)) {
+                result.addAction(oldConnectedAction(action, controllableActions));
+            }
+        }
+        for (String action : mappingEnv.getActions()) {
+            if (!MTSConstants.TAU.equals(action)) {
+                result.addAction(action);
+            }
+        }
         for (Long state : oldEnv.getStates()) {
             result.addState(state);
         }
@@ -3868,10 +4609,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
         for (Long state : oldEnv.getStates()) {
             for (Pair<String, Long> transition : oldEnv.getTransitions(state, MTS.TransitionType.REQUIRED)) {
-                String action = transition.getFirst();
-                if (controllableActions.contains(action) && UpdatingControllersUtils.isNotUpdateAction(action)) {
-                    action = action + UpdateConstants.OLD_LABEL;
-                }
+                String action = oldConnectedAction(transition.getFirst(), controllableActions);
                 result.addAction(action);
                 result.addRequired(state, action, transition.getSecond());
             }
@@ -3888,6 +4626,16 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         }
         result.removeUnreachableStates();
         return result;
+    }
+
+    private static String oldConnectedAction(
+            String action,
+            Set<String> controllableActions) {
+        if (controllableActions.contains(action)
+                && UpdatingControllersUtils.isNotUpdateAction(action)) {
+            return action + UpdateConstants.OLD_LABEL;
+        }
+        return action;
     }
 
     static MTS<Long, String> connectOldAndMappingView(
@@ -4268,10 +5016,57 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
                 choices.add(targets);
             }
         }
-        if (!updateAction && !hasOwner && MTSConstants.TAU.equals(baseAction)) {
-            return null;
-        }
         return choices;
+    }
+
+    /**
+     * Tau is local to one input of a parallel composition.  It therefore
+     * interleaves with the other inputs instead of synchronising with their
+     * tau transitions (or being blocked merely because their alphabets
+     * reserve the tau label).
+     */
+    private static long addInterleavedTauTransitions(
+            List<Long> tuple,
+            List<DelayedEnv> inputs,
+            TupleTransitionIndex transitionIndex,
+            Map<List<Long>, Long> tupleToState,
+            Map<Long, List<Long>> debugStateToTuple,
+            Set<Long> productErrorStates,
+            Queue<List<Long>> pending,
+            MTS<Long, String> product,
+            FluentStateValuation<Long> valuation,
+            Map<Long, Map<Integer, MappingEnvironmentGenerator.MappingStateMetadata>> metadata,
+            Long fromState,
+            long nextStateId) {
+        for (int movingInput = 0; movingInput < inputs.size(); movingInput++) {
+            List<Long> tauTargets = transitionIndex.targets(
+                    movingInput, MTSConstants.TAU);
+            if (tauTargets.isEmpty()) {
+                continue;
+            }
+            List<List<Long>> choices = new ArrayList<List<Long>>(inputs.size());
+            for (int i = 0; i < inputs.size(); i++) {
+                choices.add(i == movingInput
+                        ? tauTargets
+                        : Collections.singletonList(tuple.get(i)));
+            }
+            nextStateId = addCartesianProductTransitions(
+                    choices,
+                    0,
+                    new ArrayList<Long>(choices.size()),
+                    inputs,
+                    tupleToState,
+                    debugStateToTuple,
+                    productErrorStates,
+                    pending,
+                    product,
+                    valuation,
+                    metadata,
+                    fromState,
+                    MTSConstants.TAU,
+                    nextStateId);
+        }
+        return nextStateId;
     }
 
     private static long addCartesianProductTransitions(
@@ -4760,7 +5555,10 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
         private ProductStateKey(Long baseState, Set<Fluent> trueFluents) {
             this.baseState = baseState;
-            this.trueFluents = new LinkedHashSet<Fluent>(trueFluents);
+            // All callers hand over a freshly-created set. Product keys own
+            // that set for the remainder of the traversal and never mutate it,
+            // avoiding a second full set allocation on every explored edge.
+            this.trueFluents = trueFluents;
         }
 
         public boolean equals(Object other) {
@@ -4773,6 +5571,145 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
 
         public int hashCode() {
             return 31 * baseState.hashCode() + trueFluents.hashCode();
+        }
+    }
+
+    /**
+     * Compact immutable state used only by the post-hotSwap monitor product.
+     * BigInteger supplies an immutable, unbounded bit vector, so the same path
+     * works above and below 64 tracked fluents without mutable map keys.
+     */
+    private static final class BitVectorProductKey {
+        private final Long baseState;
+        private final BigInteger monitorMask;
+
+        private BitVectorProductKey(Long baseState, BigInteger monitorMask) {
+            this.baseState = baseState;
+            this.monitorMask = monitorMask;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof BitVectorProductKey)) {
+                return false;
+            }
+            BitVectorProductKey that = (BitVectorProductKey) other;
+            return baseState.equals(that.baseState)
+                    && monitorMask.equals(that.monitorMask);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * baseState.hashCode() + monitorMask.hashCode();
+        }
+    }
+
+    private static final class MonitorDelta {
+        private final BigInteger initiatingMask;
+        private final BigInteger terminatingMask;
+
+        private MonitorDelta(
+                BigInteger initiatingMask,
+                BigInteger terminatingMask) {
+            this.initiatingMask = initiatingMask;
+            this.terminatingMask = terminatingMask;
+        }
+
+        private boolean isIdentity() {
+            return initiatingMask.signum() == 0 && terminatingMask.signum() == 0;
+        }
+    }
+
+    /**
+     * Fixed fluent index and lazily cached action effects for the one-use fused
+     * product. Only actions on an expanded transition allocate a delta; emitted
+     * .old labels are normalised only for monitor lookup, while the graph
+     * continues to retain the original emitted label.
+     */
+    private static final class MonitorEncoding {
+        private final List<Fluent> orderedFluents;
+        private final Map<String, Integer> bitByFluentName;
+        private final Map<String, MonitorDelta> deltaByNormalizedAction;
+        private final BigInteger initialMask;
+
+        private MonitorEncoding(Set<Fluent> fluents) {
+            this.orderedFluents = new ArrayList<Fluent>(fluents);
+            Collections.sort(this.orderedFluents, new Comparator<Fluent>() {
+                @Override
+                public int compare(Fluent left, Fluent right) {
+                    return left.getName().compareTo(right.getName());
+                }
+            });
+            this.bitByFluentName = new HashMap<String, Integer>();
+            BigInteger initial = BigInteger.ZERO;
+            for (int index = 0; index < orderedFluents.size(); index++) {
+                Fluent fluent = orderedFluents.get(index);
+                Integer previous = bitByFluentName.put(
+                        fluent.getName(),
+                        Integer.valueOf(index));
+                if (previous != null) {
+                    Diagnostics.fatal("duplicate fluent name in post-hotSwap monitor product: "
+                            + fluent.getName() + ".");
+                }
+                if (fluent.getInitialValue()) {
+                    initial = initial.setBit(index);
+                }
+            }
+            this.initialMask = initial;
+            this.deltaByNormalizedAction = new HashMap<String, MonitorDelta>();
+        }
+
+        private BigInteger next(BigInteger current, String emittedAction) {
+            MonitorDelta delta = deltaFor(normalizedMonitorAction(emittedAction));
+            if (delta.isIdentity()) {
+                return current;
+            }
+            BigInteger next = current.andNot(delta.terminatingMask)
+                    .or(delta.initiatingMask);
+            return next.equals(current) ? current : next;
+        }
+
+        private MonitorDelta deltaFor(String normalizedAction) {
+            MonitorDelta known = deltaByNormalizedAction.get(normalizedAction);
+            if (known != null) {
+                return known;
+            }
+
+            SingleSymbol symbol = new SingleSymbol(normalizedAction);
+            BigInteger initiating = BigInteger.ZERO;
+            BigInteger terminating = BigInteger.ZERO;
+            for (int index = 0; index < orderedFluents.size(); index++) {
+                Fluent fluent = orderedFluents.get(index);
+                if (fluent.getTerminatingActions().contains(symbol)) {
+                    terminating = terminating.setBit(index);
+                }
+                if (fluent.getInitiatingActions().contains(symbol)) {
+                    initiating = initiating.setBit(index);
+                }
+            }
+            MonitorDelta created = new MonitorDelta(initiating, terminating);
+            deltaByNormalizedAction.put(normalizedAction, created);
+            return created;
+        }
+    }
+
+    /** Formula adapter that reuses one object while product masks stay immutable. */
+    private static final class BitVectorValuation implements Valuation {
+        private final Map<String, Integer> bitByFluentName;
+        private BigInteger monitorMask = BigInteger.ZERO;
+
+        private BitVectorValuation(Map<String, Integer> bitByFluentName) {
+            this.bitByFluentName = bitByFluentName;
+        }
+
+        private void setMonitorMask(BigInteger monitorMask) {
+            this.monitorMask = monitorMask;
+        }
+
+        @Override
+        public boolean getValuation(PropositionalVariable variable) {
+            Integer bit = bitByFluentName.get(variable.getName());
+            return bit != null && monitorMask.testBit(bit.intValue());
         }
     }
 
@@ -4816,14 +5753,24 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             long mappingOffset = nextFreshState(oldEnv);
 
             // Match the insertion and alphabet construction performed by the
-            // legacy connector. In particular, alphabet-only input actions are
-            // not copied, while labels from unreachable REQUIRED transitions
-            // remain after reachability pruning.
+            // materialized connector. Visible alphabet-only actions must remain in the
+            // connected interface so later products cannot treat them as local
+            // actions and introduce transitions that the source graph disabled.
             Set<Long> allStates = new HashSet<Long>();
             allStates.add(initialState);
             Map<Long, BinaryRelation<String, Long>> transitions =
                     new HashMap<Long, BinaryRelation<String, Long>>();
             Set<String> connectedActions = new HashSet<String>();
+            for (String action : oldEnv.getActions()) {
+                if (!MTSConstants.TAU.equals(action)) {
+                    connectedActions.add(oldConnectedAction(action, controllableActions));
+                }
+            }
+            for (String action : mappingEnv.getActions()) {
+                if (!MTSConstants.TAU.equals(action)) {
+                    connectedActions.add(action);
+                }
+            }
 
             for (Long state : oldEnv.getStates()) {
                 allStates.add(state);
@@ -4893,16 +5840,6 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
             }
             this.requiredTransitions = Collections.unmodifiableMap(readOnlyRequired);
             this.maybeTransitions = Collections.unmodifiableMap(emptyMaybes);
-        }
-
-        private static String oldConnectedAction(
-                String action,
-                Set<String> controllableActions) {
-            if (controllableActions.contains(action)
-                    && UpdatingControllersUtils.isNotUpdateAction(action)) {
-                return action + UpdateConstants.OLD_LABEL;
-            }
-            return action;
         }
 
         private static Set<Long> reachableStates(
@@ -5201,16 +6138,43 @@ public class StepwiseDelayedUpdatingControllerSynthesizer {
         private final MTS<Long, String> mappingEnvironment;
         private final List<Connection> connections;
         private final Set<String> controllableActions;
+        private final List<StepwiseClassifiedGoal> postConnectionMonitorGoals;
 
         private ConnectedEnvironmentInputs(
                 MTS<Long, String> oldEnvironment,
                 MTS<Long, String> mappingEnvironment,
                 List<Connection> connections,
-                Set<String> controllableActions) {
+                Set<String> controllableActions,
+                List<StepwiseClassifiedGoal> postConnectionMonitorGoals) {
             this.oldEnvironment = oldEnvironment;
             this.mappingEnvironment = mappingEnvironment;
+            // These inputs are handed off once and treated as immutable.  Keep
+            // the existing zero-copy lifetime boundary: the connection list
+            // can be large, so copying it here would raise the connection peak.
             this.connections = connections;
             this.controllableActions = controllableActions;
+            this.postConnectionMonitorGoals = postConnectionMonitorGoals;
+        }
+    }
+
+    private static final class PostConnectionMonitorInputs {
+        private MTS<Long, String> connectedEnvironment;
+        private final List<StepwiseClassifiedGoal> postConnectionMonitorGoals;
+
+        private PostConnectionMonitorInputs(
+                MTS<Long, String> connectedEnvironment,
+                List<StepwiseClassifiedGoal> postConnectionMonitorGoals) {
+            this.connectedEnvironment = connectedEnvironment;
+            this.postConnectionMonitorGoals = postConnectionMonitorGoals;
+        }
+
+        private MTS<Long, String> takeConnectedEnvironment() {
+            if (connectedEnvironment == null) {
+                throw new IllegalStateException("connected environment was already consumed");
+            }
+            MTS<Long, String> result = connectedEnvironment;
+            connectedEnvironment = null;
+            return result;
         }
     }
 

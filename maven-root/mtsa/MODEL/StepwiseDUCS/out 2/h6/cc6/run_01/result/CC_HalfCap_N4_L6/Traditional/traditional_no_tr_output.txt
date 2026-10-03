@@ -1,0 +1,103 @@
+comp.compile time : 95ms
+Compiled: NODE_OLD(1)
+Compiled: NODE_OLD(2)
+Compiled: NODE_OLD(3)
+Compiled: NODE_OLD(4)
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 8 * 8 * 8 * 8 = 2 ** 12
+Composing...
+-- States: 4096 Transitions: 114688 Memory used: 35310K
+Composed in 155ms
+Composition:OldController = OLD_ENV
+State Space: 4096 = 2 ** 12
+Composing...
+-- States: 4096 Transitions: 114688 Memory used: 59128K
+Composed in 114ms
+Solving the LTS control problem.
+Environment states: 4096
+Game states: 4096
+Game transitions: 12288
+Analysis time: 1586ms.
+Controller [4096] generated successfully.
+Composition:OldController = OldController
+State Space: 4096 = 2 ** 12
+Composing...
+-- States: 4096 Transitions: 114688 Memory used: 223875K
+Composed in 112ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 8 * 8 * 8 * 8 = 2 ** 12
+Composing...
+-- States: 4096 Transitions: 114688 Memory used: 113648K
+Composed in 141ms
+ - Synthesizing Mapping Environment from lists (size=4)...
+INFO: Auto-compiling dependency: NODE_NEW(1)
+Generating Mapping Environment: MAP_NODE_OLD(1)_NODE_NEW(1)
+INFO: Auto-compiling dependency: NODE_NEW(2)
+Generating Mapping Environment: MAP_NODE_OLD(2)_NODE_NEW(2)
+INFO: Auto-compiling dependency: NODE_NEW(3)
+Generating Mapping Environment: MAP_NODE_OLD(3)_NODE_NEW(3)
+INFO: Auto-compiling dependency: NODE_NEW(4)
+Generating Mapping Environment: MAP_NODE_OLD(4)_NODE_NEW(4)
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_NODE_OLD(1)_NODE_NEW(1) || MAP_NODE_OLD(2)_NODE_NEW(2) || MAP_NODE_OLD(3)_NODE_NEW(3) || MAP_NODE_OLD(4)_NODE_NEW(4)
+State Space: 16 * 16 * 16 * 16 = 2 ** 16
+Composing...
+-- States: 8192 Transitions: 233472 Memory used: 152277K
+Composed in 230ms
+comp.continueCompilation time : 3515ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_NEW_NODE_POWER_CAP_1_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_2_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_3_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_4_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_1_2_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_2_3_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_3_4_UPD_NEW
+Environment states:20480
+Solving safety goals for the controller synthesis
+Environment states after safety: 36865
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [22080] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+主比較時間（合成開始から生成終了まで-CountTime） : 4分57.47秒
+
+[規模]
+最大状態数時の状態数 : 36865 states
+最大状態数時の遷移数 : 651520 transitions
+最大状態数時の段階 : [4. Final]
+最大遷移数時の状態数 : 36865 states
+最大遷移数時の遷移数 : 651520 transitions
+最大遷移数時の段階 : [4. Final]
+出力状態数 : 22080 states
+出力遷移数 : 340188 transitions
+
+[GR(1)]
+final GR input 状態数 : 36865 states
+final GR input 遷移数 : 651520 transitions
+GR(1)合成時間 : 4分23.71秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 8.70 GB
+最初の有効sampleからのヒープ増加 : 8.70 GB
+====================================================
+
+Evaluation data CSV written to: out\h6\cc6\run_01\result\CC_HalfCap_N4_L6\Traditional\cc4l6_t_n_h6_evaluation_UpdCont.csv
+Tau reduction ON
+UpdCont minimising......
+Minimised States: 7439 in 8520ms
+
+[minimized 出力]
+minimized 出力状態数 : 7439 states
+minimized 出力遷移数 : 107215 transitions
+minimize 時間 : 8537 ms
+Evaluation data CSV written to: out\h6\cc6\run_01\result\CC_HalfCap_N4_L6\Traditional\cc4l6_t_n_h6_evaluation_UpdCont.csv

@@ -2,6 +2,9 @@ package ltsa.updatingControllers.stepwise.delayed;
 
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.ar.dc.uba.model.condition.FluentImpl;
+import MTSSynthesis.ar.dc.uba.model.condition.FluentPropositionalVariable;
+import MTSSynthesis.ar.dc.uba.model.condition.Formula;
+import MTSSynthesis.ar.dc.uba.model.condition.OrFormula;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.ar.dc.uba.model.language.Symbol;
 import MTSSynthesis.controller.util.FluentStateValuation;
@@ -17,10 +20,13 @@ import ltsa.lts.LTSOutput;
 import ltsa.updatingControllers.UpdateConstants;
 import ltsa.updatingControllers.synthesis.SafetyBackwardPruner;
 import ltsa.updatingControllers.synthesis.UpdatingControllerSafetySynthesizer;
+import ltsa.updatingControllers.stepwise.StepwiseClassifiedGoal;
+import ltsa.updatingControllers.stepwise.StepwiseRequirementKind;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,6 +74,77 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
     }
 
     @Test
+    public void ownerAwareProductInterleavesRequiredTauTransitions() {
+        MTS<Long, String> first = new MTSImpl<Long, String>(0L);
+        first.addState(1L);
+        first.addActions(set(MTSConstants.TAU, "firstReady"));
+        first.addRequired(0L, MTSConstants.TAU, 1L);
+        first.addRequired(1L, "firstReady", 1L);
+
+        MTS<Long, String> second = new MTSImpl<Long, String>(0L);
+        second.addState(1L);
+        second.addActions(set(MTSConstants.TAU, "secondReady"));
+        second.addRequired(0L, MTSConstants.TAU, 1L);
+        second.addRequired(1L, "secondReady", 1L);
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.composeProduct(
+                        Arrays.asList(
+                                emptyValuedFragment(first, Collections.singleton("firstReady")),
+                                emptyValuedFragment(second, Collections.singleton("secondReady"))),
+                        "TAU_INTERLEAVING_TEST",
+                        NO_OUTPUT);
+
+        long initial = product.getEnvironment().getInitialState();
+        Set<Long> tauTargets = targets(
+                product.getEnvironment(), initial, MTSConstants.TAU);
+        assertEquals("Each component tau must interleave instead of synchronizing.",
+                2,
+                tauTargets.size());
+
+        int firstOnly = 0;
+        int secondOnly = 0;
+        for (Long target : tauTargets) {
+            boolean firstEnabled = hasTransition(
+                    product.getEnvironment(), target, "firstReady");
+            boolean secondEnabled = hasTransition(
+                    product.getEnvironment(), target, "secondReady");
+            if (firstEnabled && !secondEnabled) {
+                firstOnly++;
+            } else if (!firstEnabled && secondEnabled) {
+                secondOnly++;
+            }
+        }
+        assertEquals(1, firstOnly);
+        assertEquals(1, secondOnly);
+    }
+
+    @Test
+    public void reservedTauAlphabetDoesNotBlockAnotherComponentsTau() {
+        MTS<Long, String> moving = new MTSImpl<Long, String>(0L);
+        moving.addState(1L);
+        moving.addAction(MTSConstants.TAU);
+        moving.addRequired(0L, MTSConstants.TAU, 1L);
+
+        MTS<Long, String> observing = new MTSImpl<Long, String>(0L);
+        observing.addAction(MTSConstants.TAU);
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.composeProduct(
+                        Arrays.asList(
+                                emptyValuedFragment(moving, Collections.<String>emptySet()),
+                                emptyValuedFragment(observing, Collections.<String>emptySet())),
+                        "TAU_RESERVED_ALPHABET_TEST",
+                        NO_OUTPUT);
+
+        assertEquals(1,
+                targets(
+                        product.getEnvironment(),
+                        product.getEnvironment().getInitialState(),
+                        MTSConstants.TAU).size());
+    }
+
+    @Test
     public void initialLocalProductMakesPassiveActionUpdateActionFluent() {
         MTS<Long, String> mapping = oneStateEnvironment("activate", "later");
         Fluent active = fluent("active", false, set("activate"), set("later"));
@@ -88,6 +165,381 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
         assertNotEquals("A passive mapping self-loop may change the fluent-product state.",
                 activeState,
                 inactiveState);
+    }
+
+    @Test
+    public void fluentProductTracksAFluentBeyondTheFirstSixtyFourBits() {
+        MTS<Long, String> environment = oneStateEnvironment("setHigh", "clearHigh");
+        Set<Fluent> fluents = new LinkedHashSet<Fluent>();
+        for (int index = 0; index < 64; index++) {
+            fluents.add(fluent(
+                    "inert" + index,
+                    false,
+                    Collections.<String>emptySet(),
+                    Collections.<String>emptySet()));
+        }
+        Fluent highBit = fluent(
+                "highBit",
+                false,
+                Collections.singleton("setHigh"),
+                Collections.singleton("clearHigh"));
+        fluents.add(highBit);
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.buildFluentProduct(
+                        environment,
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        fluents);
+
+        long initial = product.getEnvironment().getInitialState();
+        long high = onlyTarget(product.getEnvironment(), initial, "setHigh");
+        assertNotEquals("The 65th fluent must distinguish product states.", initial, high);
+        assertFalse(product.getValuation().isTrue(initial, highBit));
+        assertTrue(product.getValuation().isTrue(high, highBit));
+        assertEquals(initial, onlyTarget(product.getEnvironment(), high, "clearHigh"));
+        assertEquals(high, onlyTarget(product.getEnvironment(), high, "setHigh"));
+    }
+
+    @Test
+    public void fluentProductNormalizesOldActionLabelsBeforeUpdatingFluents() {
+        MTS<Long, String> environment = oneStateEnvironment(
+                "activate" + UpdateConstants.OLD_LABEL,
+                "reset" + UpdateConstants.OLD_LABEL);
+        Fluent active = fluent(
+                "active",
+                false,
+                Collections.singleton("activate"),
+                Collections.singleton("reset"));
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv product =
+                StepwiseDelayedUpdatingControllerSynthesizer.buildFluentProduct(
+                        environment,
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.singleton(active));
+
+        long initial = product.getEnvironment().getInitialState();
+        long activeState = onlyTarget(
+                product.getEnvironment(),
+                initial,
+                "activate" + UpdateConstants.OLD_LABEL);
+        assertTrue(product.getValuation().isTrue(activeState, active));
+        assertEquals(initial, onlyTarget(
+                product.getEnvironment(),
+                activeState,
+                "reset" + UpdateConstants.OLD_LABEL));
+    }
+
+    @Test
+    public void onlinePostConnectionTerminalizationMatchesBuildThenPruneReference() {
+        MTS<Long, String> connected = new MTSImpl<Long, String>(0L);
+        connected.addState(1L);
+        connected.addState(2L);
+        connected.addState(3L);
+        connected.addState(4L);
+        connected.addActions(set("arm", "unsafe", "escape", "bypass"));
+        connected.addRequired(0L, "arm", 1L);
+        connected.addRequired(1L, "unsafe", 2L);
+        connected.addRequired(2L, "escape", 4L);
+        connected.addRequired(1L, "bypass", 3L);
+
+        Fluent unsafe = fluent(
+                "unsafe",
+                false,
+                Collections.singleton("unsafe"),
+                Collections.<String>emptySet());
+        Set<Fluent> fluents = Collections.singleton(unsafe);
+        List<StepwiseClassifiedGoal> goals = Collections.singletonList(
+                classifiedGoal(
+                        "T_UNSAFE",
+                        new FluentPropositionalVariable(unsafe),
+                        fluents));
+
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv fullProduct =
+                StepwiseDelayedUpdatingControllerSynthesizer.buildFluentProduct(
+                        connected,
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        fluents);
+        MTS<Long, String> reference = terminalizeReference(fullProduct, goals);
+        MTS<Long, String> online =
+                StepwiseDelayedUpdatingControllerSynthesizer
+                        .buildPostConnectionMonitorProduct(
+                                connected,
+                                fluents,
+                                goals,
+                                "ONLINE_TERMINALIZATION_EQUIVALENCE_TEST",
+                                NO_OUTPUT);
+
+        assertEquals(canonicalMtsSnapshot(reference), canonicalMtsSnapshot(online));
+        long armed = onlyTarget(online, online.getInitialState(), "arm");
+        long violation = onlyTarget(online, armed, "unsafe");
+        assertEquals("A violating state is retained as a terminal target.",
+                0,
+                online.getTransitions(violation, MTS.TransitionType.REQUIRED).size());
+        assertEquals("A state with a safe alternate path must remain reachable.",
+                1,
+                targets(online, armed, "bypass").size());
+        assertEquals("Only the state reachable exclusively beyond the violation is omitted.",
+                4,
+                online.getStates().size());
+    }
+
+    @Test
+    public void onlinePostConnectionProductSupportsMoreThanSixtyFourFluents() {
+        MTS<Long, String> connected = new MTSImpl<Long, String>(0L);
+        Set<Fluent> fluents = new LinkedHashSet<Fluent>();
+        Formula anySet = Formula.FALSE_FORMULA;
+        for (int index = 0; index < 65; index++) {
+            String action = "set" + index;
+            connected.addAction(action);
+            connected.addRequired(0L, action, 0L);
+            Fluent fluent = fluent(
+                    "bit" + index,
+                    false,
+                    Collections.singleton(action),
+                    Collections.<String>emptySet());
+            fluents.add(fluent);
+            anySet = new OrFormula(anySet, new FluentPropositionalVariable(fluent));
+        }
+        List<StepwiseClassifiedGoal> goals = Collections.singletonList(
+                classifiedGoal("T_ANY_BIT", anySet, fluents));
+
+        MTS<Long, String> online =
+                StepwiseDelayedUpdatingControllerSynthesizer
+                        .buildPostConnectionMonitorProduct(
+                                connected,
+                                fluents,
+                                goals,
+                                "ONLINE_MORE_THAN_64_FLUENTS_TEST",
+                                NO_OUTPUT);
+
+        long initial = online.getInitialState();
+        Set<Long> terminalTargets = new HashSet<Long>();
+        for (int index = 0; index < 65; index++) {
+            long target = onlyTarget(online, initial, "set" + index);
+            terminalTargets.add(target);
+            assertEquals("Every one-bit valuation is violating and terminal.",
+                    0,
+                    online.getTransitions(target, MTS.TransitionType.REQUIRED).size());
+        }
+        assertEquals("Every fluent bit, including bits above 63, must remain distinct.",
+                65,
+                terminalTargets.size());
+        assertEquals(66, online.getStates().size());
+        assertEquals(65, totalTransitionCount(online));
+    }
+
+    @Test
+    public void onlinePostConnectionProductNormalizesOldLabelsBeforeViolationCheck() {
+        MTS<Long, String> connected = new MTSImpl<Long, String>(0L);
+        connected.addState(1L);
+        connected.addState(2L);
+        connected.addActions(set(
+                "activate" + UpdateConstants.OLD_LABEL,
+                "after"));
+        connected.addRequired(
+                0L,
+                "activate" + UpdateConstants.OLD_LABEL,
+                1L);
+        connected.addRequired(1L, "after", 2L);
+        Fluent active = fluent(
+                "active",
+                false,
+                Collections.singleton("activate"),
+                Collections.<String>emptySet());
+        Set<Fluent> fluents = Collections.singleton(active);
+
+        MTS<Long, String> online =
+                StepwiseDelayedUpdatingControllerSynthesizer
+                        .buildPostConnectionMonitorProduct(
+                                connected,
+                                fluents,
+                                Collections.singletonList(classifiedGoal(
+                                        "T_ACTIVE",
+                                        new FluentPropositionalVariable(active),
+                                        fluents)),
+                                "ONLINE_OLD_LABEL_NORMALIZATION_TEST",
+                                NO_OUTPUT);
+
+        long violation = onlyTarget(
+                online,
+                online.getInitialState(),
+                "activate" + UpdateConstants.OLD_LABEL);
+        assertEquals(0, online.getTransitions(
+                violation, MTS.TransitionType.REQUIRED).size());
+        assertEquals("The successor after the normalized-action violation is unreachable.",
+                2,
+                online.getStates().size());
+    }
+
+    @Test
+    public void onlinePostConnectionProductAppliesInitiationAfterTermination() {
+        MTS<Long, String> connected = oneStateEnvironment(
+                "toggle" + UpdateConstants.OLD_LABEL);
+        Fluent active = fluent(
+                "active",
+                false,
+                Collections.singleton("toggle"),
+                Collections.singleton("toggle"));
+        Set<Fluent> fluents = Collections.singleton(active);
+
+        MTS<Long, String> online =
+                StepwiseDelayedUpdatingControllerSynthesizer
+                        .buildPostConnectionMonitorProduct(
+                                connected,
+                                fluents,
+                                Collections.singletonList(classifiedGoal(
+                                        "T_INITIATION_WINS",
+                                        new FluentPropositionalVariable(active),
+                                        fluents)),
+                                "ONLINE_INITIATION_AFTER_TERMINATION_TEST",
+                                NO_OUTPUT);
+
+        long violation = onlyTarget(
+                online,
+                online.getInitialState(),
+                "toggle" + UpdateConstants.OLD_LABEL);
+        assertEquals("A fluent initiated and terminated by the same action must end true.",
+                0,
+                online.getTransitions(violation, MTS.TransitionType.REQUIRED).size());
+    }
+
+    @Test
+    public void onlinePostConnectionProductRejectsAnInitiallyViolatingMonitor() {
+        MTS<Long, String> connected = oneStateEnvironment("work");
+        Fluent initiallyUnsafe = fluent(
+                "initiallyUnsafe",
+                true,
+                Collections.<String>emptySet(),
+                Collections.<String>emptySet());
+        Set<Fluent> fluents = Collections.singleton(initiallyUnsafe);
+
+        try {
+            StepwiseDelayedUpdatingControllerSynthesizer
+                    .buildPostConnectionMonitorProduct(
+                            connected,
+                            fluents,
+                            Collections.singletonList(classifiedGoal(
+                                    "T_INITIAL",
+                                    new FluentPropositionalVariable(initiallyUnsafe),
+                                    fluents)),
+                            "ONLINE_INITIAL_VIOLATION_TEST",
+                            NO_OUTPUT);
+            fail("An initially violating post-connection monitor must be rejected.");
+        } catch (LTSException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains(
+                    "initial state violating"));
+        }
+    }
+
+    @Test
+    public void onlinePostConnectionProductTerminalizesEveryOneToManyTarget() {
+        MTS<Long, String> connected = new MTSImpl<Long, String>(0L);
+        connected.addState(1L);
+        connected.addState(2L);
+        connected.addState(3L);
+        connected.addState(4L);
+        connected.addActions(set(
+                UpdateConstants.BEGIN_UPDATE,
+                "leftAfter",
+                "rightAfter"));
+        connected.addRequired(0L, UpdateConstants.BEGIN_UPDATE, 1L);
+        connected.addRequired(0L, UpdateConstants.BEGIN_UPDATE, 2L);
+        connected.addRequired(1L, "leftAfter", 3L);
+        connected.addRequired(2L, "rightAfter", 4L);
+        Fluent hotSwapSeen = fluent(
+                "hotSwapSeen",
+                false,
+                Collections.singleton(UpdateConstants.BEGIN_UPDATE),
+                Collections.<String>emptySet());
+        Set<Fluent> fluents = Collections.singleton(hotSwapSeen);
+
+        MTS<Long, String> online =
+                StepwiseDelayedUpdatingControllerSynthesizer
+                        .buildPostConnectionMonitorProduct(
+                                connected,
+                                fluents,
+                                Collections.singletonList(classifiedGoal(
+                                        "T_HOT_SWAP",
+                                        new FluentPropositionalVariable(hotSwapSeen),
+                                        fluents)),
+                                "ONLINE_ONE_TO_MANY_TEST",
+                                NO_OUTPUT);
+
+        Set<Long> targets = targets(
+                online,
+                online.getInitialState(),
+                UpdateConstants.BEGIN_UPDATE);
+        assertEquals("Both one-to-many connection targets must be retained.", 2, targets.size());
+        for (Long target : targets) {
+            assertEquals("Every violating connection target must be terminal.",
+                    0,
+                    online.getTransitions(target, MTS.TransitionType.REQUIRED).size());
+        }
+        assertEquals("Neither branch beyond a violating connection may be generated.",
+                3,
+                online.getStates().size());
+    }
+
+    @Test
+    public void postHotSwapProductUpdatesEveryOneToManyTargetValuation() {
+        MTS<Long, String> oldEnvironment = new MTSImpl<Long, String>(0L);
+        oldEnvironment.addAction("a");
+        oldEnvironment.addRequired(0L, "a", 0L);
+
+        MTS<Long, String> mappingEnvironment = new MTSImpl<Long, String>(0L);
+        mappingEnvironment.addState(1L);
+        List<StepwiseDelayedUpdatingControllerSynthesizer.Connection> connections =
+                Arrays.asList(
+                        new StepwiseDelayedUpdatingControllerSynthesizer.Connection(0L, 0L),
+                        new StepwiseDelayedUpdatingControllerSynthesizer.Connection(0L, 1L));
+        MTS<Long, String> connected =
+                StepwiseDelayedUpdatingControllerSynthesizer.connectOldAndMappingView(
+                        oldEnvironment,
+                        mappingEnvironment,
+                        connections,
+                        Collections.singleton("a"));
+
+        Fluent seenA = fluent(
+                "SeenA",
+                false,
+                Collections.singleton("a"),
+                Collections.singleton(UpdateConstants.STOP_OLD_SPEC));
+        Fluent resetOnHotSwap = fluent(
+                "ResetOnHotSwap",
+                false,
+                Collections.singleton("a"),
+                Collections.singleton(UpdateConstants.BEGIN_UPDATE));
+        Set<Fluent> monitorFluents = set(seenA, resetOnHotSwap);
+        StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv monitored =
+                StepwiseDelayedUpdatingControllerSynthesizer.buildFluentProduct(
+                        connected,
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        monitorFluents);
+
+        Long afterA = onlyTarget(
+                monitored.getEnvironment(),
+                monitored.getEnvironment().getInitialState(),
+                "a" + UpdateConstants.OLD_LABEL);
+        Set<Long> postHotSwapTargets = new HashSet<Long>();
+        for (Pair<String, Long> transition : monitored.getEnvironment().getTransitions(
+                afterA,
+                MTS.TransitionType.REQUIRED)) {
+            if (UpdateConstants.BEGIN_UPDATE.equals(transition.getFirst())) {
+                postHotSwapTargets.add(transition.getSecond());
+            }
+        }
+
+        assertEquals("Both one-to-many mapping targets must survive the monitor product.",
+                2,
+                postHotSwapTargets.size());
+        for (Long target : postHotSwapTargets) {
+            assertTrue(monitored.getValuation().isTrue(target, seenA));
+            assertFalse(monitored.getValuation().isTrue(target, resetOnHotSwap));
+        }
     }
 
     @Test
@@ -609,7 +1061,8 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                 UpdateConstants.STOP_OLD_SPEC,
                 "oldMaybeOnly",
                 "oldAlphabetOnly",
-                "unreachableOld"));
+                "unreachableOld",
+                MTSConstants.TAU));
         oldEnvironment.addRequired(5L, "control", 9L);
         oldEnvironment.addRequired(5L, "observe", 5L);
         oldEnvironment.addRequired(9L, UpdateConstants.STOP_OLD_SPEC, 9L);
@@ -625,9 +1078,11 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                 "passive",
                 "branch",
                 UpdateConstants.RECONFIGURE,
+                UpdateConstants.START_NEW_SPEC,
                 "mappingMaybeOnly",
                 "mappingAlphabetOnly",
-                "unreachableMapping"));
+                "unreachableMapping",
+                MTSConstants.TAU));
         mappingEnvironment.addRequired(3L, "control", 11L);
         mappingEnvironment.addRequired(3L, "passive", 7L);
         mappingEnvironment.addRequired(3L, "branch", 7L);
@@ -643,6 +1098,7 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                         new StepwiseDelayedUpdatingControllerSynthesizer.Connection(5L, 7L));
         Set<String> controllableActions = set(
                 "control",
+                "oldAlphabetOnly",
                 UpdateConstants.STOP_OLD_SPEC,
                 UpdateConstants.RECONFIGURE);
 
@@ -665,13 +1121,18 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
         assertEquals(set(5L, 9L, 104L, 108L, 112L), materialized.getStates());
         assertEquals(set(
                         "control" + UpdateConstants.OLD_LABEL,
+                        "oldAlphabetOnly" + UpdateConstants.OLD_LABEL,
                         "observe",
                         UpdateConstants.STOP_OLD_SPEC,
+                        "oldMaybeOnly",
                         "unreachableOld",
                         "control",
                         "passive",
                         "branch",
                         UpdateConstants.RECONFIGURE,
+                        UpdateConstants.START_NEW_SPEC,
+                        "mappingMaybeOnly",
+                        "mappingAlphabetOnly",
                         "unreachableMapping",
                         UpdateConstants.BEGIN_UPDATE),
                 materialized.getActions());
@@ -699,10 +1160,19 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
                 5L,
                 UpdateConstants.BEGIN_UPDATE));
         assertEquals(set(108L, 112L), targets(materialized, 104L, "branch"));
-        assertFalse(materialized.getActions().contains("oldMaybeOnly"));
-        assertFalse(materialized.getActions().contains("mappingMaybeOnly"));
+        assertTrue(materialized.getActions().contains("oldMaybeOnly"));
+        assertTrue(materialized.getActions().contains("mappingMaybeOnly"));
+        assertTrue(materialized.getActions().contains(
+                "oldAlphabetOnly" + UpdateConstants.OLD_LABEL));
         assertFalse(materialized.getActions().contains("oldAlphabetOnly"));
-        assertFalse(materialized.getActions().contains("mappingAlphabetOnly"));
+        assertTrue(materialized.getActions().contains("mappingAlphabetOnly"));
+        assertTrue(materialized.getActions().contains(UpdateConstants.START_NEW_SPEC));
+        for (Long state : materialized.getStates()) {
+            assertFalse("An alphabet-only startNewSpec must not gain an edge during connection.",
+                    hasTransition(materialized, state, UpdateConstants.START_NEW_SPEC));
+        }
+        assertFalse("Reserved alphabet-only tau must remain excluded.",
+                materialized.getActions().contains(MTSConstants.TAU));
 
         assertEquals(
                 "The read-only view must expose exactly the materialized connected MTS, "
@@ -783,6 +1253,42 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
         assertEquals(
                 canonicalMtsSnapshot(throughMts),
                 canonicalMtsSnapshot(throughCompact));
+    }
+
+    @Test
+    public void dontDoTwiceDoesNotIntroduceTransitionsMissingFromTheBase() {
+        MTS<Long, String> environment = new MTSImpl<Long, String>(0L);
+        environment.addState(1L);
+        environment.addActions(set(
+                "arm",
+                UpdateConstants.STOP_OLD_SPEC,
+                UpdateConstants.START_NEW_SPEC));
+        environment.addRequired(0L, "arm", 1L);
+        environment.addRequired(1L, UpdateConstants.STOP_OLD_SPEC, 1L);
+
+        CompactState compactEnvironment = MTSToAutomataConverter.getInstance().convert(
+                environment,
+                "DONT_DO_TWICE_PROJECTION_INPUT",
+                false,
+                false);
+        MTS<Long, String> decorated =
+                UpdatingControllerSafetySynthesizer.getDontDoTwiceGoals(
+                        compactEnvironment,
+                        new HashSet<String>(environment.getActions()));
+
+        long initial = decorated.getInitialState();
+        assertFalse("stopOldSpec is disabled in the base initial state.",
+                hasTransition(decorated, initial, UpdateConstants.STOP_OLD_SPEC));
+        assertFalse("An alphabet-only startNewSpec must not become a transition.",
+                hasTransition(decorated, initial, UpdateConstants.START_NEW_SPEC));
+
+        long armed = onlyTarget(decorated, initial, "arm");
+        assertTrue("A base stopOldSpec transition must remain available.",
+                hasTransition(decorated, armed, UpdateConstants.STOP_OLD_SPEC));
+        for (Long state : decorated.getStates()) {
+            assertFalse("The safety decoration must not introduce startNewSpec.",
+                    hasTransition(decorated, state, UpdateConstants.START_NEW_SPEC));
+        }
     }
 
     private static MTS<Long, String> oneStateEnvironment(String... actions) {
@@ -933,6 +1439,53 @@ public class StepwiseDelayedUpdatingControllerSynthesizerTest {
             }
         }
         return result;
+    }
+
+    private static MTS<Long, String> terminalizeReference(
+            StepwiseDelayedUpdatingControllerSynthesizer.DelayedEnv monitored,
+            Collection<StepwiseClassifiedGoal> goals) {
+        Set<Long> violating = new HashSet<Long>();
+        for (StepwiseClassifiedGoal goal : goals) {
+            for (Long state : monitored.getEnvironment().getStates()) {
+                monitored.getValuation().setActualState(state);
+                if (goal.getFormula().evaluate(monitored.getValuation())) {
+                    violating.add(state);
+                }
+            }
+        }
+
+        MTS<Long, String> result = new MTSImpl<Long, String>(
+                monitored.getEnvironment().getInitialState());
+        result.addActions(monitored.getEnvironment().getActions());
+        for (Long state : monitored.getEnvironment().getStates()) {
+            result.addState(state);
+        }
+        for (Long state : monitored.getEnvironment().getStates()) {
+            if (violating.contains(state)) {
+                continue;
+            }
+            for (Pair<String, Long> transition : monitored.getEnvironment().getTransitions(
+                    state, MTS.TransitionType.REQUIRED)) {
+                result.addRequired(state, transition.getFirst(), transition.getSecond());
+            }
+        }
+        result.removeUnreachableStates();
+        return result;
+    }
+
+    private static StepwiseClassifiedGoal classifiedGoal(
+            String name,
+            Formula formula,
+            Set<Fluent> fluents) {
+        return new StepwiseClassifiedGoal(
+                new ltsa.lts.Symbol(ltsa.lts.Symbol.UPPERIDENT, name),
+                StepwiseRequirementKind.TRANSITION,
+                0,
+                Collections.singleton(0),
+                "test",
+                formula,
+                fluents,
+                Collections.<Fluent>emptySet());
     }
 
     private static Fluent fluent(

@@ -21,6 +21,9 @@ import ltsa.updatingControllers.stepwise.StepwiseStage;
 import java.util.*;
 
 public class UpdatingControllersDefinition extends CompositionExpression {
+    public static final String HOT_SWAP_MONITOR_SEMANTICS_PROPERTY =
+            "stepwise.delayed.hotSwapMonitorSemantics";
+
     private Symbol oldController;
     private Symbol mapping;
     private Symbol oldGoal;
@@ -37,6 +40,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
     private boolean incrementalPruning;
     private boolean incrementalPruningCleanup;
     private boolean safetyBackwardPruning;
+    private boolean traditionalHotSwapMonitorSemantics;
     private Symbol newController;
     // ▼▼▼ 追加: 新しい構文用のリストフィールド ▼▼▼
     private List<Symbol> oldEnvironmentList;
@@ -62,6 +66,7 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         incrementalPruning = false;
         incrementalPruningCleanup = false;
         safetyBackwardPruning = false;
+        traditionalHotSwapMonitorSemantics = false;
         this.output = output;
 
         // ▼▼▼ 追加: 初期化 ▼▼▼
@@ -157,6 +162,11 @@ public class UpdatingControllersDefinition extends CompositionExpression {
         if (safetyBackwardPruning && (isOTF || fineGrained || selectiveFineGrained || stepwise)) {
             Diagnostics.fatal("safetyBackwardPruning can only be used with traditional DUCS or stepwise_delayed.");
         }
+        if (traditionalHotSwapMonitorSemantics && !stepwiseDelayed) {
+            Diagnostics.fatal("traditionalHotSwapMonitorSemantics can only be used with stepwise_delayed.");
+        }
+        boolean useTraditionalHotSwapMonitorSemantics = stepwiseDelayed
+                && (traditionalHotSwapMonitorSemantics || traditionalHotSwapMonitorSemanticsFromSystemProperty());
         boolean fineGrainedMode = fineGrained || selectiveFineGrained;
 
         // 全体のControllable Action (OTF探索用)
@@ -364,7 +374,10 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     + (incrementalPruning
                     ? (incrementalPruningCleanup ? " (incremental pruning + cleanup)" : " (incremental pruning)")
                     : " (baseline)")
-                    + (safetyBackwardPruning ? " + safety backward pruning" : ""));
+                    + (safetyBackwardPruning ? " + safety backward pruning" : "")
+                    + (useTraditionalHotSwapMonitorSemantics
+                    ? " + traditional hotSwap monitor semantics"
+                    : ""));
             if (stepwiseStages.isEmpty()) {
                 Diagnostics.fatal("stepwise_delayed mode requires at least one oldEnvironment/newEnvironment/mapRelation stage.");
             }
@@ -860,6 +873,8 @@ public class UpdatingControllersDefinition extends CompositionExpression {
                     name.getName(), fineGrainedMode, updateProtocolSpec);
         }
         ucce.setSafetyBackwardPruning(safetyBackwardPruning);
+        ucce.setTraditionalHotSwapMonitorSemantics(useTraditionalHotSwapMonitorSemantics);
+        ucce.setReferenceStepwiseStages(stepwiseStages);
 
         //評価実験用：UpdatingControllersDefinition.compose測定終了
         UpdatingControllerEvaluationRecorder.endCountScope(
@@ -1367,6 +1382,33 @@ public class UpdatingControllersDefinition extends CompositionExpression {
 
     public void setSafetyBackwardPruning() {
         this.safetyBackwardPruning = true;
+    }
+
+    public void setTraditionalHotSwapMonitorSemantics() {
+        this.traditionalHotSwapMonitorSemantics = true;
+    }
+
+    public boolean isTraditionalHotSwapMonitorSemantics() {
+        return traditionalHotSwapMonitorSemantics;
+    }
+
+    static boolean traditionalHotSwapMonitorSemanticsFromSystemProperty() {
+        String value = System.getProperty(HOT_SWAP_MONITOR_SEMANTICS_PROPERTY);
+        // This resolver contributes only to the stepwise_delayed effective
+        // mode.  Unspecified therefore selects the paper/Traditional
+        // hotSwapIn monitor semantics; "stutter" is the explicit legacy opt-out.
+        if (value == null || value.trim().isEmpty()) {
+            return true;
+        }
+        if ("traditional".equalsIgnoreCase(value.trim())) {
+            return true;
+        }
+        if ("stutter".equalsIgnoreCase(value.trim())) {
+            return false;
+        }
+        Diagnostics.fatal("Invalid -D" + HOT_SWAP_MONITOR_SEMANTICS_PROPERTY + "=" + value
+                + "; expected 'stutter' or 'traditional'.");
+        return false;
     }
 
     public boolean isFineGrained() {

@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "2026-08-04-campaign-v1",
+  "status": "COMPLETE",
+  "startedAt": "2026-08-17T23:18:41.050675+09:00",
+  "endedAt": "2026-08-17T23:19:09.554138+09:00",
+  "configFile": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/Experiment/configs/hotswap/windows_evaluation_v6_preflight.yaml",
+  "configSha256": "455d64c46e06b3bd1d83f017b1b3b9ae6d3a43ac0c0991914e14f0a3da2f376f",
+  "sanitizedConfigSnapshot": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/result/executed_config.sanitized.yaml",
+  "sanitizedConfigSnapshotSha256": "455d64c46e06b3bd1d83f017b1b3b9ae6d3a43ac0c0991914e14f0a3da2f376f",
+  "inputHashes": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/result/input_hashes.csv",
+  "environment": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/result/campaign_environment.json",
+  "effectiveJvmFlags": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/result/effective_jvm_flags.txt",
+  "launcherArtifact": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/target/mtsa-1.0-SNAPSHOT.jar",
+  "launcherArtifactSha256": "22339d2cafa6c4fc6d3ca8b29ed85e29b2a27e6731bcad79dddcc48139a1f194",
+  "gitRepository": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa",
+  "gitCommit": "f0d18729093da7f093b085d6f342d8e235c889ec",
+  "gitDirty": true,
+  "outputDir": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/result",
+  "requireFreshOutputDir": true,
+  "alternateMethodOrderByRun": true,
+  "validateMemoryQuality": true,
+  "validateMethodTarget": true,
+  "memoryQualityPolicy": "2026-08-06-rss-primary-v1",
+  "maxMemorySamplingGapMillis": null,
+  "maxRssSamplingGapMillis": 1000,
+  "maxHeapSamplingGapMillis": null,
+  "effectiveMaxRssSamplingGapMillis": 1000,
+  "effectiveMaxHeapSamplingGapMillis": null,
+  "heapSamplingGapWarningReferenceMillis": 1000,
+  "runCount": 1,
+  "caseCountPerRun": 2,
+  "expectedCaseCount": 2,
+  "completedCaseCount": 2,
+  "failureCount": 0,
+  "validationPassed": true,
+  "validationErrors": [],
+  "runnerError": null,
+  "cases": [{
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "pf_s_n_h6",
+    "example": "EV_V6_Preflight",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 310030
+    },
+    "meta": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8159
+    },
+    "executionMetadata": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 1058383
+    },
+    "minimizedTransitions": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 529067
+    },
+    "minimizedCounts": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 786
+    },
+    "stdout": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 76
+    },
+    "stderr": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 88
+    },
+    "effectiveChildCommand": ["/Library/Java/JavaVirtualMachines/adoptopenjdk-16.jdk/Contents/Home/bin/java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=pf_s_n_h6", "-Dmtsa.evaluation.example=EV_V6_Preflight", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment/LTS/EVCharging/EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=Experiment/configs/hotswap/windows_evaluation_v6_preflight.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=1", "-Dmtsa.evaluation.runLabel=run_01", "-cp", "../../target/mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment/LTS/EVCharging/EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out/h6/pf/run_01/result/EV_V6_Preflight/stepwise_delayed_SBP/pf_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "pf_t_n_h6",
+    "example": "EV_V6_Preflight",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 128779
+    },
+    "meta": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7732
+    },
+    "executionMetadata": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 1058673
+    },
+    "minimizedTransitions": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 529158
+    },
+    "minimizedCounts": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 684
+    },
+    "stdout": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 76
+    },
+    "stderr": {
+      "path": "/Users/takanori/Waseda University/research/git/as_of_20251210_mtsa/mtsa/maven-root/mtsa/MODEL/StepwiseDUCS/out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 88
+    },
+    "effectiveChildCommand": ["/Library/Java/JavaVirtualMachines/adoptopenjdk-16.jdk/Contents/Home/bin/java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=pf_t_n_h6", "-Dmtsa.evaluation.example=EV_V6_Preflight", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment/LTS/EVCharging/EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=Experiment/configs/hotswap/windows_evaluation_v6_preflight.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=1", "-Dmtsa.evaluation.runLabel=run_01", "-cp", "../../target/mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment/LTS/EVCharging/EVCharging_3Chargers_MaxSOC1_AdjacentDemandResponsePolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_execution_UpdCont.json", "--output", "out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/traditional_no_tr_output.txt", "--transitions", "out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out/h6/pf/run_01/result/EV_V6_Preflight/Traditional/pf_t_n_h6_minimized_counts_UpdCont.csv"]
+  }]
+}

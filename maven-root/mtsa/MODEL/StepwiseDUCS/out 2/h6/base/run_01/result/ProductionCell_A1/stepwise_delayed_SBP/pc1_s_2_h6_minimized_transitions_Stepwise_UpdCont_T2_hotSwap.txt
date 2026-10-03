@@ -1,0 +1,154 @@
+Process:
+	Stepwise_UpdCont_T2_hotSwap
+States:
+	74
+Transitions:
+	Stepwise_UpdCont_T2_hotSwap = Q0,
+	Q0	= (in[1] -> Q22
+		  |hotSwapIn -> Q56),
+	Q1	= (stopOldSpec -> Q54),
+	Q2	= (reset[1] -> Q34),
+	Q3	= (reconfigure -> Q8
+		  |polish[1] -> Q16
+		  |drill[1] -> Q21
+		  |clean[1] -> Q35
+		  |stamp[1] -> Q36
+		  |out[1] -> Q38),
+	Q4	= (startNewSpec -> Q7
+		  |clean[1] -> Q11
+		  |out[1] -> Q14
+		  |drill[1] -> Q40
+		  |paint[1] -> Q43
+		  |stamp[1] -> Q48),
+	Q5	= (reconfigure -> Q8),
+	Q6	= (cleanNOk[1] -> Q7
+		  |cleanOk[1] -> Q15),
+	Q7	= (clean[1] -> Q6),
+	Q8	= (startNewSpec -> Q7),
+	Q9	= (stampOk[1] -> Q7),
+	Q10	= (drill[1] -> Q33),
+	Q11	= (startNewSpec -> Q6
+		  |cleanNOk[1] -> Q8
+		  |cleanOk[1] -> Q25),
+	Q12	= (out[1] -> Q14),
+	Q13	= (paintNOk[1] -> Q15
+		  |paintOk[1] -> Q44),
+	Q14	= (startNewSpec -> Q2
+		  |reset[1] -> Q42),
+	Q15	= (paint[1] -> Q13),
+	Q16	= ({polishNOk, polishOk}[1] -> Q5
+		  |reconfigure -> Q8),
+	Q17	= (clean[1] -> Q30),
+	Q18	= (stampOk[1] -> Q31
+		  |startNewSpec -> Q32),
+	Q19	= (drillOk[1] -> Q5
+		  |drillNOk[1] -> Q41
+		  |reconfigure -> Q71),
+	Q20	= (startNewSpec -> Q30
+		  |cleanNOk[1] -> Q31
+		  |cleanOk[1] -> Q72),
+	Q21	= ({drillNOk, drillOk}[1] -> Q5
+		  |reconfigure -> Q40),
+	Q22	= (drill[1] -> Q51
+		  |hotSwapIn -> Q69),
+	Q23	= (hotSwapIn -> Q1
+		  |out[1] -> Q52),
+	Q24	= (clean[1] -> Q53
+		  |hotSwapIn -> Q59),
+	Q25	= (startNewSpec -> Q15),
+	Q26	= (polish[1] -> Q50
+		  |hotSwapIn -> Q59),
+	Q27	= (stampOk[1] -> Q15),
+	Q28	= ({cleanNOk, cleanOk}[1] -> Q37
+		  |reconfigure -> Q70),
+	Q29	= (stampOk[1] -> Q37
+		  |reconfigure -> Q66),
+	Q30	= (cleanNOk[1] -> Q17
+		  |cleanOk[1] -> Q57),
+	Q31	= (startNewSpec -> Q17),
+	Q32	= (stampOk[1] -> Q17),
+	Q33	= (drillNOk[1] -> Q10
+		  |drillOk[1] -> Q44),
+	Q34	= (in[1] -> Q17),
+	Q35	= (cleanNOk[1] -> Q5
+		  |reconfigure -> Q11
+		  |cleanOk[1] -> Q37),
+	Q36	= (stampOk[1] -> Q5
+		  |reconfigure -> Q48),
+	Q37	= (reconfigure -> Q25),
+	Q38	= (reconfigure -> Q14
+		  |reset[1] -> Q49),
+	Q39	= (drill[1] -> Q19
+		  |reconfigure -> Q31
+		  |out[1] -> Q38
+		  |clean[1] -> Q46
+		  |stamp[1] -> Q47
+		  |polish[1] -> Q60),
+	Q40	= ({drillNOk, drillOk}[1] -> Q8),
+	Q41	= (reconfigure -> Q31),
+	Q42	= (in[1] -> Q31
+		  |startNewSpec -> Q34),
+	Q43	= (paintNOk[1] -> Q8
+		  |paintOk[1] -> Q12),
+	Q44	= (out[1] -> Q2),
+	Q45	= (reconfigure -> Q72),
+	Q46	= (reconfigure -> Q20
+		  |cleanNOk[1] -> Q41
+		  |cleanOk[1] -> Q45),
+	Q47	= (reconfigure -> Q18
+		  |stampOk[1] -> Q41),
+	Q48	= (stampOk[1] -> Q8
+		  |startNewSpec -> Q9),
+	Q49	= (in[1] -> Q41
+		  |reconfigure -> Q42),
+	Q50	= (polishOk[1] -> Q24
+		  |polishNOk[1] -> Q26
+		  |hotSwapIn -> Q61),
+	Q51	= (drillNOk[1] -> Q22
+		  |drillOk[1] -> Q26
+		  |hotSwapIn -> Q62),
+	Q52	= (reset[1] -> Q0
+		  |hotSwapIn -> Q63),
+	Q53	= (cleanOk[1] -> Q23
+		  |cleanNOk[1] -> Q24
+		  |hotSwapIn -> Q65),
+	Q54	= (reconfigure -> Q25
+		  |clean[1] -> Q28
+		  |stamp[1] -> Q29
+		  |out[1] -> Q38
+		  |drill[1] -> Q55
+		  |polish[1] -> Q67),
+	Q55	= ({drillNOk, drillOk}[1] -> Q37
+		  |reconfigure -> Q68),
+	Q56	= (stopOldSpec -> Q49
+		  |in[1] -> Q69),
+	Q57	= (paint[1] -> Q58),
+	Q58	= (paintOk[1] -> Q10
+		  |paintNOk[1] -> Q57),
+	Q59	= (stopOldSpec -> Q3),
+	Q60	= (reconfigure -> Q31
+		  |{polishNOk, polishOk}[1] -> Q41),
+	Q61	= (stopOldSpec -> Q16
+		  |{polishNOk, polishOk}[1] -> Q59
+		  |reconfigure -> Q73),
+	Q62	= (stopOldSpec -> Q19
+		  |drillOk[1] -> Q59
+		  |drillNOk[1] -> Q69),
+	Q63	= (stopOldSpec -> Q38
+		  |reset[1] -> Q56),
+	Q64	= ({cleanNOk, cleanOk}[1] -> Q15),
+	Q65	= (cleanOk[1] -> Q1
+		  |stopOldSpec -> Q35
+		  |cleanNOk[1] -> Q59),
+	Q66	= (stampOk[1] -> Q25
+		  |startNewSpec -> Q27),
+	Q67	= (reconfigure -> Q25
+		  |{polishNOk, polishOk}[1] -> Q37),
+	Q68	= ({drillNOk, drillOk}[1] -> Q25),
+	Q69	= (stopOldSpec -> Q39),
+	Q70	= ({cleanNOk, cleanOk}[1] -> Q25
+		  |startNewSpec -> Q64),
+	Q71	= (drillOk[1] -> Q8
+		  |drillNOk[1] -> Q31),
+	Q72	= (startNewSpec -> Q57),
+	Q73	= (stopOldSpec -> Q4).

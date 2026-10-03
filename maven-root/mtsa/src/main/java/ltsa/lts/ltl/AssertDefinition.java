@@ -249,6 +249,8 @@ public class AssertDefinition {
 	public Vector getParams() { return params; }
 
 	public FormulaSyntax getLTLFormula() { return ltl_formula; }
+
+	public LabelSet getAlphaExtension() { return alphaExtension; }
 	public Formula getFormula(boolean original) {
 		if (this.fac != null) {
 			if (original) {

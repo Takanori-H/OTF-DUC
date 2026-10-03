@@ -1,0 +1,121 @@
+// Proof-obligation fixtures for delayed hotSwapIn connection construction.
+//
+// CORRELATED_* merges two monitor histories at the same raw OldCon state.
+// Raw Traditional H_T correlates that state with both alternating mapping
+// targets before the monitor is composed.  The post-connection monitor product
+// must therefore expose both raw targets from each reachable monitor history.
+
+set CorrelatedControllableActions = {mark, clear}
+
+CORRELATED_OLD_ENV = CORRELATED_OLD_A,
+CORRELATED_OLD_A = (mark -> CORRELATED_OLD_B),
+CORRELATED_OLD_B = (clear -> CORRELATED_OLD_A).
+
+CORRELATED_NEW_ENV = CORRELATED_NEW_A,
+CORRELATED_NEW_A = (mark -> CORRELATED_NEW_B),
+CORRELATED_NEW_B = (clear -> CORRELATED_NEW_A).
+
+relation R_CORRELATED = {
+    CORRELATED_OLD_A@CORRELATED_OLD_ENV = reconfigure
+        -> CORRELATED_NEW_A@CORRELATED_NEW_ENV,
+    CORRELATED_OLD_B@CORRELATED_OLD_ENV = reconfigure
+        -> CORRELATED_NEW_B@CORRELATED_NEW_ENV
+}
+
+map MAP_CORRELATED = {
+    CORRELATED_OLD_ENV,
+    CORRELATED_NEW_ENV,
+    R_CORRELATED
+}
+
+controllerSpec CORRELATED_OLD_REQ = {
+    safety = {}
+    controllable = {CorrelatedControllableActions}
+}
+
+// The environment gates mark/clear.  This legal one-state controller has one
+// raw state that the post-connection monitor represents with two valuations.
+CORRELATED_OLD_CLOSED_LOOP = (
+      mark -> CORRELATED_OLD_CLOSED_LOOP
+    | clear -> CORRELATED_OLD_CLOSED_LOOP
+).
+||CorrelatedOldCon = (CORRELATED_OLD_CLOSED_LOOP).
+
+controllerSpec CORRELATED_NEW_REQ = {
+    safety = {}
+    controllable = {CorrelatedControllableActions}
+}
+
+fluent SeenMark = <mark, clear> initially 0
+fluent InMarkedPhase = <mark, clear> initially 0
+ltl_property T_CORRELATED_HISTORY = [](SeenMark -> InMarkedPhase)
+
+updatingController Stepwise_CorrelatedHistory = {
+    oldController = CorrelatedOldCon,
+    oldEnvironment = {CORRELATED_OLD_ENV},
+    newEnvironment = {CORRELATED_NEW_ENV},
+    mapRelation = {R_CORRELATED},
+    oldGoal = CORRELATED_OLD_REQ,
+    newGoal = CORRELATED_NEW_REQ,
+    transition = T_CORRELATED_HISTORY,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_CORRELATED_HISTORY = Stepwise_CorrelatedHistory.
+
+// MISSING_* deliberately violates the old-controller/environment consistency
+// assumption.  OrphanOldCon can take orphan before the real owner enables it,
+// so one reachable old analysis state has no synchronously reachable mapping
+// target.  The synthesizer must reject this input instead of silently using a
+// partial delayed connection relation.
+
+set MissingControllableActions = {unlock, orphan}
+
+MISSING_OLD_ENV = MISSING_OLD_A,
+MISSING_OLD_A = (unlock -> MISSING_OLD_B),
+MISSING_OLD_B = (orphan -> MISSING_OLD_B).
+
+MISSING_NEW_ENV = MISSING_NEW_A,
+MISSING_NEW_A = (unlock -> MISSING_NEW_B),
+MISSING_NEW_B = (orphan -> MISSING_NEW_B).
+
+relation R_MISSING = {
+    MISSING_OLD_A@MISSING_OLD_ENV = reconfigure
+        -> MISSING_NEW_A@MISSING_NEW_ENV,
+    MISSING_OLD_B@MISSING_OLD_ENV = reconfigure
+        -> MISSING_NEW_B@MISSING_NEW_ENV
+}
+
+map MAP_MISSING = {MISSING_OLD_ENV, MISSING_NEW_ENV, R_MISSING}
+
+controllerSpec MISSING_OLD_REQ = {
+    safety = {}
+    controllable = {MissingControllableActions}
+}
+
+ORPHAN_OLD_CLOSED_LOOP = (
+    orphan -> ORPHAN_OLD_STATE
+),
+ORPHAN_OLD_STATE = (orphan -> ORPHAN_OLD_STATE).
+||OrphanOldCon = (ORPHAN_OLD_CLOSED_LOOP).
+
+controllerSpec MISSING_NEW_REQ = {
+    safety = {}
+    controllable = {MissingControllableActions}
+}
+
+updatingController Stepwise_MissingConnectionTarget = {
+    oldController = OrphanOldCon,
+    oldEnvironment = {MISSING_OLD_ENV},
+    newEnvironment = {MISSING_NEW_ENV},
+    mapRelation = {R_MISSING},
+    oldGoal = MISSING_OLD_REQ,
+    newGoal = MISSING_NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+||STEPWISE_MISSING_CONNECTION_TARGET = Stepwise_MissingConnectionTarget.

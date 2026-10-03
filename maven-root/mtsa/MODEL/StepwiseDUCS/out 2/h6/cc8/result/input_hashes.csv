@@ -1,0 +1,6 @@
+role,path,sha256,size_bytes
+"config_original","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\configs\hotswap\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml","a2ffc714cf219ab97056592434feee75205bf0ed6108e86d87d85d7ae88c1e43",4989
+"config_sanitized_snapshot","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\out\h6\cc8\result\executed_config.sanitized.yaml","4a401d13c826efe8bcc6f07bbdd542084a795d68148aa02f47b96f8c120eafaf",4878
+"lts","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\LTS\ComputeCluster\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts","5a10daf15a20c63e5a168e16bc8cd64f9eaa20386123b4fd1367c1a3927aec73",15894
+"lts","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\Experiment\LTS\ComputeCluster\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts","95ae53632f430f6a4af47608626bf1684dbc9d0aab68f40b78165a4027b5ac96",18323
+"launcher_artifact","C:\Users\admin\Desktop\202607-Hirano-StepwiseDUCS\mtsa-1.0-SNAPSHOT.jar","990f559b78e0fb88ec28c48dcbc6e5d0317ae4c82cdbf1eb573ed9ddf0ff2a35",353882055

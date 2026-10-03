@@ -1,0 +1,231 @@
+// Soundness boundary for the historical Traditional H_T shadow relation.
+//
+// C1 has no ordinary z transition, but both R1 prefixes start with z.  C2 and
+// OldCon can execute z, so the full mapping shadow reaches both relation
+// intermediates on the same pre-update word.  The uncontrollable u branch is
+// unsafe.  Because hotSwapIn is uncontrollable, neither Traditional nor
+// Stepwise may hide that shadow target and return a controller.
+
+set ShadowSafetyControllable = {a, z, s}
+
+C1_OLD = (a -> C1_OLD).
+C1_NEW = (a -> C1_NEW).
+
+relation R1 = {
+    C1_OLD@C1_OLD = reconfigure -> C1_NEW@C1_NEW,
+    C1_OLD@C1_OLD = z -> s -> reconfigure -> C1_NEW@C1_NEW,
+    C1_OLD@C1_OLD = z -> u -> reconfigure -> C1_NEW@C1_NEW
+}
+
+C2_OLD = (z -> C2_OLD).
+C2_NEW = (z -> C2_NEW).
+
+relation R2 = {
+    C2_OLD@C2_OLD = reconfigure -> C2_NEW@C2_NEW
+}
+
+map MAP1 = {C1_OLD, C1_NEW, R1}
+map MAP2 = {C2_OLD, C2_NEW, R2}
+
+controllerSpec SHADOW_SAFETY_OLD_REQ = {
+    safety = {}
+    controllable = {ShadowSafetyControllable}
+}
+
+controllerSpec SHADOW_SAFETY_NEW_REQ = {
+    safety = {}
+    controllable = {ShadowSafetyControllable}
+}
+
+||ShadowSafetyOldCon = (C1_OLD || C2_OLD).
+
+fluent SeenU = <u, a> initially 0
+ltl_property T_NO_U = [](!SeenU)
+
+updatingController Traditional_ShadowSafety = {
+    oldController = ShadowSafetyOldCon,
+    oldEnvironment = {C1_OLD, C2_OLD},
+    newEnvironment = {C1_NEW, C2_NEW},
+    mapRelation = {R1, R2},
+    oldGoal = SHADOW_SAFETY_OLD_REQ,
+    newGoal = SHADOW_SAFETY_NEW_REQ,
+    transition = T_NO_U,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_ShadowSafety = {
+    oldController = ShadowSafetyOldCon,
+    oldEnvironment = {C1_OLD, C2_OLD},
+    newEnvironment = {C1_NEW, C2_NEW},
+    mapRelation = {R1, R2},
+    oldGoal = SHADOW_SAFETY_OLD_REQ,
+    newGoal = SHADOW_SAFETY_NEW_REQ,
+    transition = T_NO_U,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+||TRADITIONAL_SHADOW_SAFETY = Traditional_ShadowSafety.
+||STEPWISE_SHADOW_SAFETY = Stepwise_ShadowSafety.
+
+// A second boundary has no relation-prefix/OldCon label overlap.  The sole
+// OldCon state is correlated with both all-OLD states.  Only HIDDEN_UNSAFE has
+// the uncontrollable relation-only fail action.  Existence-only coverage must
+// not allow preconnection SBP to hide that second H_T target.
+
+set HiddenControllable = {tick}
+
+HIDDEN_OLD = HIDDEN_SAFE,
+HIDDEN_SAFE = (tick -> HIDDEN_UNSAFE),
+HIDDEN_UNSAFE = (tick -> HIDDEN_SAFE).
+
+HIDDEN_NEW = HIDDEN_NEW_SAFE,
+HIDDEN_NEW_SAFE = (tick -> HIDDEN_NEW_UNSAFE),
+HIDDEN_NEW_UNSAFE = (tick -> HIDDEN_NEW_SAFE).
+
+relation R_HIDDEN = {
+    HIDDEN_SAFE@HIDDEN_OLD = reconfigure
+        -> HIDDEN_NEW_SAFE@HIDDEN_NEW,
+    HIDDEN_UNSAFE@HIDDEN_OLD = fail -> reconfigure
+        -> HIDDEN_NEW_UNSAFE@HIDDEN_NEW
+}
+
+map MAP_HIDDEN = {HIDDEN_OLD, HIDDEN_NEW, R_HIDDEN}
+
+controllerSpec HIDDEN_OLD_REQ = {
+    safety = {}
+    controllable = {HiddenControllable}
+}
+
+controllerSpec HIDDEN_NEW_REQ = {
+    safety = {}
+    controllable = {HiddenControllable}
+}
+
+HIDDEN_OLD_QUOTIENT = (tick -> HIDDEN_OLD_QUOTIENT).
+||HiddenOldCon = (HIDDEN_OLD_QUOTIENT).
+
+fluent SeenFail = <fail, tick> initially 0
+ltl_property T_NO_FAIL = [](!SeenFail)
+
+updatingController Traditional_HiddenAllOldShadow = {
+    oldController = HiddenOldCon,
+    oldEnvironment = {HIDDEN_OLD},
+    newEnvironment = {HIDDEN_NEW},
+    mapRelation = {R_HIDDEN},
+    oldGoal = HIDDEN_OLD_REQ,
+    newGoal = HIDDEN_NEW_REQ,
+    transition = T_NO_FAIL,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_HiddenAllOldShadow = {
+    oldController = HiddenOldCon,
+    oldEnvironment = {HIDDEN_OLD},
+    newEnvironment = {HIDDEN_NEW},
+    mapRelation = {R_HIDDEN},
+    oldGoal = HIDDEN_OLD_REQ,
+    newGoal = HIDDEN_NEW_REQ,
+    transition = T_NO_FAIL,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+||TRADITIONAL_HIDDEN_ALL_OLD_SHADOW = Traditional_HiddenAllOldShadow.
+||STEPWISE_HIDDEN_ALL_OLD_SHADOW = Stepwise_HiddenAllOldShadow.
+
+// A third boundary characterises tau in the full Traditional mapping product.
+// OldCon reaches the same raw state through visible a and tau.  In MAP_TAU1,
+// a reaches a safe all-OLD state while tau reaches an all-OLD state whose
+// relation-only tauFail action is uncontrollable and unsafe.  MAP_TAU2 has no
+// tau transition, so the unsafe target exists only when tau interleaves in the
+// full mapping product instead of synchronising with every component.
+
+set TauShadowControllable = {a, hold, park}
+
+TAU1_OLD = (a -> TAU1_SAFE | tauStep -> TAU1_UNSAFE),
+TAU1_SAFE = (hold -> TAU1_SAFE),
+TAU1_UNSAFE = (hold -> TAU1_UNSAFE)\{tauStep}.
+
+TAU1_NEW = (a -> TAU1_NEW_SAFE | tauStep -> TAU1_NEW_UNSAFE),
+TAU1_NEW_SAFE = (hold -> TAU1_NEW_SAFE),
+TAU1_NEW_UNSAFE = (hold -> TAU1_NEW_UNSAFE)\{tauStep}.
+
+relation R_TAU1 = {
+    TAU1_OLD@TAU1_OLD = reconfigure
+        -> TAU1_NEW@TAU1_NEW,
+    TAU1_SAFE@TAU1_OLD = reconfigure
+        -> TAU1_NEW_SAFE@TAU1_NEW,
+    TAU1_UNSAFE@TAU1_OLD = tauFail -> reconfigure
+        -> TAU1_NEW_UNSAFE@TAU1_NEW
+}
+
+TAU2_OLD = (park -> TAU2_OLD).
+TAU2_NEW = (park -> TAU2_NEW).
+
+relation R_TAU2 = {
+    TAU2_OLD@TAU2_OLD = reconfigure -> TAU2_NEW@TAU2_NEW
+}
+
+map MAP_TAU1 = {TAU1_OLD, TAU1_NEW, R_TAU1}
+map MAP_TAU2 = {TAU2_OLD, TAU2_NEW, R_TAU2}
+
+TAU_SHADOW_OLD_CON = (
+      a -> TAU_SHADOW_Q
+    | shadowTauStep -> TAU_SHADOW_Q
+    | park -> TAU_SHADOW_OLD_CON
+),
+TAU_SHADOW_Q = (
+      hold -> TAU_SHADOW_Q
+    | park -> TAU_SHADOW_Q
+ )\{shadowTauStep}.
+
+||TauShadowOldCon = (TAU_SHADOW_OLD_CON).
+
+controllerSpec TAU_SHADOW_OLD_REQ = {
+    safety = {}
+    controllable = {TauShadowControllable}
+}
+
+controllerSpec TAU_SHADOW_NEW_REQ = {
+    safety = {}
+    controllable = {TauShadowControllable}
+}
+
+fluent SeenTauFail = <tauFail, hold> initially 0
+ltl_property T_NO_TAU_FAIL = [](!SeenTauFail)
+
+updatingController Traditional_TauShadowSafety = {
+    oldController = TauShadowOldCon,
+    oldEnvironment = {TAU1_OLD, TAU2_OLD},
+    newEnvironment = {TAU1_NEW, TAU2_NEW},
+    mapRelation = {R_TAU1, R_TAU2},
+    oldGoal = TAU_SHADOW_OLD_REQ,
+    newGoal = TAU_SHADOW_NEW_REQ,
+    transition = T_NO_TAU_FAIL,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TauShadowSafety = {
+    oldController = TauShadowOldCon,
+    oldEnvironment = {TAU1_OLD, TAU2_OLD},
+    newEnvironment = {TAU1_NEW, TAU2_NEW},
+    mapRelation = {R_TAU1, R_TAU2},
+    oldGoal = TAU_SHADOW_OLD_REQ,
+    newGoal = TAU_SHADOW_NEW_REQ,
+    transition = T_NO_TAU_FAIL,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+||TRADITIONAL_TAU_SHADOW_SAFETY = Traditional_TauShadowSafety.
+||STEPWISE_TAU_SHADOW_SAFETY = Stepwise_TauShadowSafety.

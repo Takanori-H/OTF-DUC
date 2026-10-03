@@ -1,0 +1,186 @@
+// Full-pipeline proof fixture for a mixed one-to-many hotSwapIn relation.
+//
+// The valid one-state OldCon quotient is synchronously related to both old-side
+// mapping states.  MIXED_SAFE has no bad action, whereas MIXED_UNSAFE has an
+// uncontrollable bad self-loop.  After hotSwapIn, the transition requirement
+// can be completed safely from the former target, but the latter target admits
+// an uncontrollable bad event before stopOldSpec.  Since hotSwapIn
+// is uncontrollable, both Traditional DUC and Stepwise Delayed DUC must reject
+// the mixed relation rather than keeping only the safe branch.
+
+set MixedControllableActions = {tick}
+
+MIXED_OLD_ENV = MIXED_SAFE,
+MIXED_SAFE = (tick -> MIXED_UNSAFE),
+MIXED_UNSAFE = (
+      tick -> MIXED_SAFE
+    | bad -> MIXED_UNSAFE
+).
+
+MIXED_NEW_ENV = MIXED_NEW_SAFE,
+MIXED_NEW_SAFE = (tick -> MIXED_NEW_UNSAFE),
+MIXED_NEW_UNSAFE = (
+      tick -> MIXED_NEW_SAFE
+    | bad -> MIXED_NEW_UNSAFE
+).
+
+relation R_MIXED = {
+    MIXED_SAFE@MIXED_OLD_ENV = reconfigure
+        -> MIXED_NEW_SAFE@MIXED_NEW_ENV,
+    MIXED_UNSAFE@MIXED_OLD_ENV = reconfigure
+        -> MIXED_NEW_UNSAFE@MIXED_NEW_ENV
+}
+
+map MAP_MIXED = {MIXED_OLD_ENV, MIXED_NEW_ENV, R_MIXED}
+
+controllerSpec MIXED_OLD_REQ = {
+    safety = {}
+    controllable = {MixedControllableActions}
+}
+
+// The plant gates bad at MIXED_SAFE.  This controller is therefore a legal,
+// deadlock-free one-state quotient of the two old-environment states.
+MIXED_OLD_CLOSED_LOOP = (
+      tick -> MIXED_OLD_CLOSED_LOOP
+    | bad -> MIXED_OLD_CLOSED_LOOP
+).
+||MixedOldCon = (MIXED_OLD_CLOSED_LOOP).
+
+controllerSpec MIXED_NEW_REQ = {
+    safety = {}
+    controllable = {MixedControllableActions}
+}
+
+fluent UpdatePending = <hotSwapIn, stopOldSpec> initially 0
+fluent BadAfterSwap = <bad, {tick, hotSwapIn}> initially 0
+ltl_property T_NO_BAD_WHILE_PENDING = [](!(UpdatePending && BadAfterSwap))
+
+// Single-target controls establish that the two suffixes used by the mixed
+// fixture really lie on opposite sides of the synthesis boundary.
+
+SAFE_ONLY_OLD_ENV = (tick -> SAFE_ONLY_OLD_ENV) + {bad}.
+SAFE_ONLY_NEW_ENV = (tick -> SAFE_ONLY_NEW_ENV) + {bad}.
+
+relation R_SAFE_ONLY = {
+    SAFE_ONLY_OLD_ENV@SAFE_ONLY_OLD_ENV = reconfigure
+        -> SAFE_ONLY_NEW_ENV@SAFE_ONLY_NEW_ENV
+}
+
+map MAP_SAFE_ONLY = {SAFE_ONLY_OLD_ENV, SAFE_ONLY_NEW_ENV, R_SAFE_ONLY}
+
+SAFE_ONLY_OLD_CLOSED_LOOP = (
+      tick -> SAFE_ONLY_OLD_CLOSED_LOOP
+    | bad -> SAFE_ONLY_OLD_CLOSED_LOOP
+).
+||SafeOnlyOldCon = (SAFE_ONLY_OLD_CLOSED_LOOP).
+
+UNSAFE_ONLY_OLD_ENV = (
+      tick -> UNSAFE_ONLY_OLD_ENV
+    | bad -> UNSAFE_ONLY_OLD_ENV
+).
+UNSAFE_ONLY_NEW_ENV = (
+      tick -> UNSAFE_ONLY_NEW_ENV
+    | bad -> UNSAFE_ONLY_NEW_ENV
+).
+
+relation R_UNSAFE_ONLY = {
+    UNSAFE_ONLY_OLD_ENV@UNSAFE_ONLY_OLD_ENV = reconfigure
+        -> UNSAFE_ONLY_NEW_ENV@UNSAFE_ONLY_NEW_ENV
+}
+
+map MAP_UNSAFE_ONLY = {
+    UNSAFE_ONLY_OLD_ENV,
+    UNSAFE_ONLY_NEW_ENV,
+    R_UNSAFE_ONLY
+}
+
+UNSAFE_ONLY_OLD_CLOSED_LOOP = (
+      tick -> UNSAFE_ONLY_OLD_CLOSED_LOOP
+    | bad -> UNSAFE_ONLY_OLD_CLOSED_LOOP
+).
+||UnsafeOnlyOldCon = (UNSAFE_ONLY_OLD_CLOSED_LOOP).
+
+updatingController Traditional_SafeConnectionTarget = {
+    oldController = SafeOnlyOldCon,
+    oldEnvironment = {SAFE_ONLY_OLD_ENV},
+    newEnvironment = {SAFE_ONLY_NEW_ENV},
+    mapRelation = {R_SAFE_ONLY},
+    oldGoal = MIXED_OLD_REQ,
+    newGoal = MIXED_NEW_REQ,
+    transition = T_NO_BAD_WHILE_PENDING,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_SafeConnectionTarget = {
+    oldController = SafeOnlyOldCon,
+    oldEnvironment = {SAFE_ONLY_OLD_ENV},
+    newEnvironment = {SAFE_ONLY_NEW_ENV},
+    mapRelation = {R_SAFE_ONLY},
+    oldGoal = MIXED_OLD_REQ,
+    newGoal = MIXED_NEW_REQ,
+    transition = T_NO_BAD_WHILE_PENDING,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Traditional_UnsafeConnectionTarget = {
+    oldController = UnsafeOnlyOldCon,
+    oldEnvironment = {UNSAFE_ONLY_OLD_ENV},
+    newEnvironment = {UNSAFE_ONLY_NEW_ENV},
+    mapRelation = {R_UNSAFE_ONLY},
+    oldGoal = MIXED_OLD_REQ,
+    newGoal = MIXED_NEW_REQ,
+    transition = T_NO_BAD_WHILE_PENDING,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_UnsafeConnectionTarget = {
+    oldController = UnsafeOnlyOldCon,
+    oldEnvironment = {UNSAFE_ONLY_OLD_ENV},
+    newEnvironment = {UNSAFE_ONLY_NEW_ENV},
+    mapRelation = {R_UNSAFE_ONLY},
+    oldGoal = MIXED_OLD_REQ,
+    newGoal = MIXED_NEW_REQ,
+    transition = T_NO_BAD_WHILE_PENDING,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Traditional_MixedConnectionTargets = {
+    oldController = MixedOldCon,
+    oldEnvironment = {MIXED_OLD_ENV},
+    newEnvironment = {MIXED_NEW_ENV},
+    mapRelation = {R_MIXED},
+    oldGoal = MIXED_OLD_REQ,
+    newGoal = MIXED_NEW_REQ,
+    transition = T_NO_BAD_WHILE_PENDING,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_MixedConnectionTargets = {
+    oldController = MixedOldCon,
+    oldEnvironment = {MIXED_OLD_ENV},
+    newEnvironment = {MIXED_NEW_ENV},
+    mapRelation = {R_MIXED},
+    oldGoal = MIXED_OLD_REQ,
+    newGoal = MIXED_NEW_REQ,
+    transition = T_NO_BAD_WHILE_PENDING,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+||TRADITIONAL_MIXED_CONNECTION_TARGETS = Traditional_MixedConnectionTargets.
+||STEPWISE_MIXED_CONNECTION_TARGETS = Stepwise_MixedConnectionTargets.
+||TRADITIONAL_SAFE_CONNECTION_TARGET = Traditional_SafeConnectionTarget.
+||STEPWISE_SAFE_CONNECTION_TARGET = Stepwise_SafeConnectionTarget.
+||TRADITIONAL_UNSAFE_CONNECTION_TARGET = Traditional_UnsafeConnectionTarget.
+||STEPWISE_UNSAFE_CONNECTION_TARGET = Stepwise_UnsafeConnectionTarget.

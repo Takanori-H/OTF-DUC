@@ -1,0 +1,123 @@
+// Full-pipeline regression for alphabet preservation after delayed connection.
+// Each transition requirement is individually realizable. Together they form
+// a cyclic precedence constraint, so neither stopOldSpec nor startNewSpec can
+// occur first and synthesis must report losing.
+
+set ControllableActions = {tick}
+
+OLD_ENV = (tick -> OLD_ENV).
+NEW_ENV = (tick -> NEW_ENV).
+
+relation R = {
+    OLD_ENV@OLD_ENV = reconfigure -> NEW_ENV@NEW_ENV
+}
+
+map MAP = {OLD_ENV, NEW_ENV, R}
+
+controllerSpec OLD_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+OLD_CL = (tick -> OLD_CL).
+||OldCon = (OLD_CL).
+
+controllerSpec NEW_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+fluent StopSeen = <stopOldSpec, tick> initially 0
+fluent StartSeen = <startNewSpec, tick> initially 0
+
+// stopOldSpec is permitted only after startNewSpec.
+ltl_property T_STOP_AFTER_START = [](!(StopSeen && !StartSeen))
+// startNewSpec is permitted only after stopOldSpec.
+ltl_property T_START_AFTER_STOP = [](!(StartSeen && !StopSeen))
+
+updatingController Traditional_StopAfterStart = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_STOP_AFTER_START,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_StopAfterStart = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_STOP_AFTER_START,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Traditional_StartAfterStop = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_START_AFTER_STOP,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_StartAfterStop = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_START_AFTER_STOP,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Traditional_CyclicOrdering = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_STOP_AFTER_START,
+    transition = T_START_AFTER_STOP,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_CyclicOrdering = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_STOP_AFTER_START,
+    transition = T_START_AFTER_STOP,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+||TRADITIONAL_STOP_AFTER_START = Traditional_StopAfterStart.
+||STEPWISE_STOP_AFTER_START = Stepwise_StopAfterStart.
+||TRADITIONAL_START_AFTER_STOP = Traditional_StartAfterStop.
+||STEPWISE_START_AFTER_STOP = Stepwise_StartAfterStop.
+||TRADITIONAL_CYCLIC_ORDERING = Traditional_CyclicOrdering.
+||STEPWISE_CYCLIC_ORDERING = Stepwise_CyclicOrdering.

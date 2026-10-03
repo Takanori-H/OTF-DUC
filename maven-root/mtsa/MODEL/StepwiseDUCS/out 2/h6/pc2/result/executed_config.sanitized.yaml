@@ -1,0 +1,80 @@
+# hotSwap-complete campaign: Stepwise cases use LTS targets with
+# traditionalHotSwapMonitorSemantics; Traditional cases remain baselines.
+# Final paper-evaluation rerun for ProductionCell with two robot arms.
+#
+# Run from the StepwiseDUCS distribution root with the final evaluation jar.
+# Existing matching artifacts may be overwritten on an intentional rerun.
+# Diagnostic JFR/phase-memory recording and the Windows lifetime high-water
+# probe are disabled; the common synthesis-window memory measurements remain
+# enabled. G1GC uses the same young-generation cap as the other final configs.
+outputDir: "out/h6/pc2/result"
+runs: 3
+timeoutHours: 12
+requireFreshOutputDir: false
+alternateMethodOrderByRun: true
+validateMethodTarget: true
+validateMemoryQuality: true
+# RSS gap is hard-fail; heap gap remains diagnostic without maxHeapSamplingGapMillis.
+maxRssSamplingGapMillis: 1000
+requirementsCheck: false
+traceCheck: false
+notifyOn: always
+slackWebhookUrl: "<redacted>"
+notifyTimeoutSeconds: 30
+
+javaOptions:
+  - -Djava.awt.headless=true
+  - -Dmtsa.evaluation.enabled=true
+  - -Dupdating.controller.evaluation.profile=paper
+  - -Dmtsa.evaluation.memorySampling.enabled=true
+  - -Dmtsa.evaluation.memorySampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.enabled=true
+  - -Dmtsa.evaluation.rssSampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000
+  - -Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000
+  - -Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false
+  - -Dmtsa.evaluation.phaseMemoryDiagnostics=false
+  - -Dstepwise.delayed.connectedEnvironmentView=true
+  - -XX:+UseG1GC
+  - -XX:+UnlockExperimentalVMOptions
+  - -XX:G1MaxNewSizePercent=20
+  - -Xmx220g
+
+cases:
+  - id: pc2_s_n_h6
+    example: ProductionCell_A2
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/ProductionCell_Arms=2.lts"
+    target: Stepwise_UpdCont_hotSwap
+  - id: pc2_s_1_h6
+    example: ProductionCell_A2
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/ProductionCell_Arms=2.lts"
+    target: Stepwise_UpdCont_T1_hotSwap
+  - id: pc2_s_2_h6
+    example: ProductionCell_A2
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/ProductionCell_Arms=2.lts"
+    target: Stepwise_UpdCont_T2_hotSwap
+
+  - id: pc2_t_n_h6
+    example: ProductionCell_A2
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/ProductionCell_Arms=2.lts"
+    target: UpdCont
+  - id: pc2_t_1_h6
+    example: ProductionCell_A2
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/ProductionCell_Arms=2.lts"
+    target: UpdCont_T1
+  - id: pc2_t_2_h6
+    example: ProductionCell_A2
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/ProductionCell_Arms=2.lts"
+    target: UpdCont_T2

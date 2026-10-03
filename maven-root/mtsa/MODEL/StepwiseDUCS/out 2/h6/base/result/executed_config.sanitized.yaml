@@ -1,0 +1,237 @@
+# hotSwap-complete campaign: Stepwise cases use LTS targets with
+# traditionalHotSwapMonitorSemantics; Traditional cases remain baselines.
+# Final paper-evaluation rerun for the existing Traditional DUCS examples.
+#
+# Run this configuration from the StepwiseDUCS distribution root (the
+# directory that directly contains Experiment/) with the exact evaluation jar
+# prepared for the final campaign. Existing run directories may be reused and
+# matching artifacts overwritten when the experiment is intentionally rerun.
+# JFR, phase-memory diagnostics, diagnostic GC logging, and the Windows-native
+# lifetime high-water probe are disabled. The cross-platform 50 ms sampled
+# heap/process-memory synthesis-window measurements remain enabled as paper
+# metrics.
+outputDir: "out/h6/base/result"
+runs: 3
+timeoutHours: 12
+requireFreshOutputDir: false
+# Keep no_tr -> T1 -> T2 fixed. Within each variant, the five examples retain
+# their YAML order, while the two methods swap order on even-numbered runs.
+alternateMethodOrderByRun: true
+validateMethodTarget: true
+validateMemoryQuality: true
+# RSS gap is hard-fail; heap gap remains diagnostic without maxHeapSamplingGapMillis.
+maxRssSamplingGapMillis: 1000
+requirementsCheck: false
+traceCheck: false
+notifyOn: always
+slackWebhookUrl: "<redacted>"
+notifyTimeoutSeconds: 30
+
+javaOptions:
+  - -Djava.awt.headless=true
+  - -Dmtsa.evaluation.enabled=true
+  - -Dupdating.controller.evaluation.profile=paper
+  - -Dmtsa.evaluation.memorySampling.enabled=true
+  - -Dmtsa.evaluation.memorySampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.enabled=true
+  - -Dmtsa.evaluation.rssSampling.intervalMillis=50
+  - -Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000
+  - -Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000
+  - -Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false
+  - -Dmtsa.evaluation.phaseMemoryDiagnostics=false
+  - -Dstepwise.delayed.connectedEnvironmentView=true
+  - -XX:+UseG1GC
+  - -XX:+UnlockExperimentalVMOptions
+  - -XX:G1MaxNewSizePercent=20
+  - -Xmx220g
+
+cases:
+  - id: ind_s_n_h6
+    example: Industry
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/Industry.lts"
+    target: Stepwise_UpdCont_hotSwap
+  - id: ind_s_1_h6
+    example: Industry
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/Industry.lts"
+    target: Stepwise_UpdCont_T1_hotSwap
+  - id: ind_s_2_h6
+    example: Industry
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/Industry.lts"
+    target: Stepwise_UpdCont_T2_hotSwap
+
+  - id: ind_t_n_h6
+    example: Industry
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/Industry.lts"
+    target: UpdCont
+  - id: ind_t_1_h6
+    example: Industry
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/Industry.lts"
+    target: UpdCont_T1
+  - id: ind_t_2_h6
+    example: Industry
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/Industry.lts"
+    target: UpdCont_T2
+
+  - id: ms_s_n_h6
+    example: MetaSocket
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/MetaSocket.lts"
+    target: Stepwise_UpdCont_hotSwap
+  - id: ms_s_1_h6
+    example: MetaSocket
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/MetaSocket.lts"
+    target: Stepwise_UpdCont_T1_hotSwap
+  - id: ms_s_2_h6
+    example: MetaSocket
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/MetaSocket.lts"
+    target: Stepwise_UpdCont_T2_hotSwap
+
+  - id: ms_t_n_h6
+    example: MetaSocket
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/MetaSocket.lts"
+    target: UpdCont
+  - id: ms_t_1_h6
+    example: MetaSocket
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/MetaSocket.lts"
+    target: UpdCont_T1
+  - id: ms_t_2_h6
+    example: MetaSocket
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/MetaSocket.lts"
+    target: UpdCont_T2
+
+  - id: pp_s_n_h6
+    example: PowerPlant
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/PowerPlant.lts"
+    target: Stepwise_UpdCont_hotSwap
+  - id: pp_s_1_h6
+    example: PowerPlant
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/PowerPlant.lts"
+    target: Stepwise_UpdCont_T1_hotSwap
+  - id: pp_s_2_h6
+    example: PowerPlant
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/PowerPlant.lts"
+    target: Stepwise_UpdCont_T2_hotSwap
+
+  - id: pp_t_n_h6
+    example: PowerPlant
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/PowerPlant.lts"
+    target: UpdCont
+  - id: pp_t_1_h6
+    example: PowerPlant
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/PowerPlant.lts"
+    target: UpdCont_T1
+  - id: pp_t_2_h6
+    example: PowerPlant
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/PowerPlant.lts"
+    target: UpdCont_T2
+
+  - id: pc1_s_n_h6
+    example: ProductionCell_A1
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/ProductionCell_Arms=1.lts"
+    target: Stepwise_UpdCont_hotSwap
+  - id: pc1_s_1_h6
+    example: ProductionCell_A1
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/ProductionCell_Arms=1.lts"
+    target: Stepwise_UpdCont_T1_hotSwap
+  - id: pc1_s_2_h6
+    example: ProductionCell_A1
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/ProductionCell_Arms=1.lts"
+    target: Stepwise_UpdCont_T2_hotSwap
+
+  - id: pc1_t_n_h6
+    example: ProductionCell_A1
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/ProductionCell_Arms=1.lts"
+    target: UpdCont
+  - id: pc1_t_1_h6
+    example: ProductionCell_A1
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/ProductionCell_Arms=1.lts"
+    target: UpdCont_T1
+  - id: pc1_t_2_h6
+    example: ProductionCell_A1
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/ProductionCell_Arms=1.lts"
+    target: UpdCont_T2
+
+  - id: surv_s_n_h6
+    example: Surveillance
+    method: stepwise_delayed+SBP
+    variant: no_tr
+    lts: "Experiment/LTS/Surveillance.lts"
+    target: Stepwise_UpdCont_hotSwap
+  - id: surv_s_1_h6
+    example: Surveillance
+    method: stepwise_delayed+SBP
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/Surveillance.lts"
+    target: Stepwise_UpdCont_T1_hotSwap
+  - id: surv_s_2_h6
+    example: Surveillance
+    method: stepwise_delayed+SBP
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/Surveillance.lts"
+    target: Stepwise_UpdCont_T2_hotSwap
+
+  - id: surv_t_n_h6
+    example: Surveillance
+    method: Traditional
+    variant: no_tr
+    lts: "Experiment/LTS/Surveillance.lts"
+    target: UpdCont
+  - id: surv_t_1_h6
+    example: Surveillance
+    method: Traditional
+    variant: t1_no_controllable_during_gap
+    lts: "Experiment/LTS/Surveillance.lts"
+    target: UpdCont_T1
+  - id: surv_t_2_h6
+    example: Surveillance
+    method: Traditional
+    variant: t2_start_after_stop_and_reconfigure
+    lts: "Experiment/LTS/Surveillance.lts"
+    target: UpdCont_T2

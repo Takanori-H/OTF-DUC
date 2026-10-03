@@ -1,0 +1,61 @@
+INFO: Registered Map Environment: MAP_A
+INFO: Registered Map Environment: MAP_B
+Compiled: A_OLD
+Compiled: B_OLD
+ - Synthesizing Mapping Environment from lists (size=2)...
+INFO: Auto-compiling dependency: A_NEW
+Generating Mapping Environment: MAP_A_OLD_A_NEW
+INFO: Auto-compiling dependency: B_NEW
+Generating Mapping Environment: MAP_B_OLD_B_NEW
+Mode: Stepwise Delayed Updating Controller Synthesis (baseline)
+=========================================
+Mode: Stepwise Delayed DUC (local-only)
+=========================================
+[Stepwise Delayed DUCS]
+oldController is used as global OldCon: OldCon
+
+[Stepwise DUCS] Requirement classification:
+  post-connection raw H_T monitor semantics: []
+[Stepwise Delayed DUCS] Raw H_T preservation: 0 goal(s) evaluated after delayed raw connection.
+[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true incrementalPruning=false incrementalPruningCleanup=false safetyBackwardPruning=false traditionalHotSwapMonitorSemantics=false
+
+[Stepwise Delayed DUCS] Requirement classification summary
+  stages: 2
+  goals: total=0 local=0 cross=0 crossRatio=0.00%
+  local goals by type: oldSafety=0 newSafety=0 transition=0
+  cross goals by type: oldSafety=0 newSafety=0 transition=0
+  cross components: count=0 maxGoalScopeSize=0 maxComponentScopeSize=0 allStageCrossGoals=0 allStageCrossComponents=0
+  requirement fluents: unique=0
+  scope requirement counts:
+    scope {1} total=0 oldSafety=0 newSafety=0 transition=0 requirementFluents=0
+    scope {2} total=0 oldSafety=0 newSafety=0 transition=0 requirementFluents=0
+[Stepwise Delayed DUCS] classification statistics CountTime: 52 ms
+[Stepwise Delayed DUCS] cross component build time: 1 ms
+[Stepwise Delayed DUCS] Traditional connection-shadow preservation required; connecting raw H_T before requirement monitoring and mapping SBP.
+Owner-aware delayed product: STEPWISE_DELAYED_TRADITIONAL_CONNECTION_SHADOW_PRODUCT
+[Stepwise Delayed DUCS] Raw connection-shadow product before delayed connection states: 16 transitions: 64
+[Stepwise Delayed DUCS] Product before delayed connection states: 16 transitions: 64
+[Stepwise Delayed DUCS] OldCon fluent meta states: 2 transitions: 4
+[Stepwise Delayed DUCS] hotSwapIn connection mode: legacy
+[Stepwise Delayed DUCS] hotSwapIn connection time: total=2.285 ms, setup=0.198 ms, traversal=1.717 ms
+[Stepwise Delayed DUCS] hotSwapIn connection pairs: visited=2, enqueued=4, duplicateSkipped=2, synchronizedSuccessorPairs=3
+[Stepwise Delayed DUCS] hotSwapIn connection result: connections=2, oldStatesWithoutTargets=0, comparisonFluents=3
+[Stepwise Delayed DUCS] hotSwapIn connection unique states: old=2, mapping=2, eligibleMappingVisited=2, eligibleMappingTotal=0
+[Stepwise Delayed DUCS] hotSwapIn connection cache stats: eligibilityComputations=0, signatureBuilds=0, transitionIndexStateBuilds=0
+[Stepwise Delayed DUCS] hotSwapIn connection legacy stats: transitionComparisons=16, actionMatches=3, oldTransitionsScanned=4, mappingTransitionsScanned=8
+[Stepwise Delayed DUCS] all old-controller states: 2
+[Stepwise Delayed DUCS] reachable old-controller states: 2
+[Stepwise Delayed DUCS] hotSwapIn connections: 2
+[Stepwise Delayed DUCS] reachable states without connection target: 0
+[Stepwise Delayed DUCS] all states without connection target: 0
+[Stepwise Delayed DUCS] connected environment representation: read-only view
+[Stepwise Delayed DUCS] After delayed hotSwapIn connection states: 18 transitions: 70
+[Stepwise Delayed DUCS] After global DontDoTwice states: 19 transitions: 70
+
+[Stepwise Delayed DUCS] GR(1)
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [18] generated successfully.
+[Stepwise Delayed DUCS] GR result: winning
+[Stepwise Delayed DUCS] output controller states: 18 transitions: 32

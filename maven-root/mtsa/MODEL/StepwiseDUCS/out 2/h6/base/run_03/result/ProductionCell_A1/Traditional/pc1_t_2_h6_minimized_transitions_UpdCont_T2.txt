@@ -1,0 +1,154 @@
+Process:
+	UpdCont_T2
+States:
+	74
+Transitions:
+	UpdCont_T2 = Q0,
+	Q0	= (in[1] -> Q3
+		  |hotSwapIn -> Q57),
+	Q1	= (hotSwapIn -> Q20
+		  |polish[1] -> Q44),
+	Q2	= (clean[1] -> Q16),
+	Q3	= (drill[1] -> Q45
+		  |hotSwapIn -> Q67),
+	Q4	= ({drillNOk, drillOk}[1] -> Q14
+		  |reconfigure -> Q51),
+	Q5	= (stampOk[1] -> Q14
+		  |reconfigure -> Q17),
+	Q6	= (hotSwapIn -> Q24
+		  |out[1] -> Q46),
+	Q7	= (reconfigure -> Q42
+		  |reset[1] -> Q43),
+	Q8	= (hotSwapIn -> Q20
+		  |clean[1] -> Q47),
+	Q9	= (reconfigure -> Q34),
+	Q10	= (cleanOk[1] -> Q9
+		  |cleanNOk[1] -> Q14
+		  |reconfigure -> Q23),
+	Q11	= (startNewSpec -> Q2),
+	Q12	= (drill[1] -> Q4
+		  |stamp[1] -> Q5
+		  |out[1] -> Q7
+		  |clean[1] -> Q10
+		  |reconfigure -> Q11
+		  |polish[1] -> Q50),
+	Q13	= (stopOldSpec -> Q15),
+	Q14	= (reconfigure -> Q11),
+	Q15	= (startNewSpec -> Q2
+		  |stamp[1] -> Q17
+		  |clean[1] -> Q23
+		  |out[1] -> Q42
+		  |drill[1] -> Q51
+		  |paint[1] -> Q55),
+	Q16	= (cleanNOk[1] -> Q2
+		  |cleanOk[1] -> Q18),
+	Q17	= (stampOk[1] -> Q11
+		  |startNewSpec -> Q49),
+	Q18	= (paint[1] -> Q32),
+	Q19	= (cleanNOk[1] -> Q21
+		  |cleanOk[1] -> Q29),
+	Q20	= (stopOldSpec -> Q12),
+	Q21	= (clean[1] -> Q19),
+	Q22	= (drill[1] -> Q30),
+	Q23	= (cleanNOk[1] -> Q11
+		  |startNewSpec -> Q16
+		  |cleanOk[1] -> Q34),
+	Q24	= (stopOldSpec -> Q35),
+	Q25	= (in[1] -> Q52
+		  |startNewSpec -> Q54),
+	Q26	= (out[1] -> Q7
+		  |clean[1] -> Q37
+		  |stamp[1] -> Q38
+		  |reconfigure -> Q52
+		  |polish[1] -> Q53
+		  |drill[1] -> Q66),
+	Q27	= (reconfigure -> Q52),
+	Q28	= (out[1] -> Q42),
+	Q29	= (paint[1] -> Q56),
+	Q30	= (drillNOk[1] -> Q22
+		  |drillOk[1] -> Q65),
+	Q31	= ({cleanNOk, cleanOk}[1] -> Q18),
+	Q32	= (paintNOk[1] -> Q18
+		  |paintOk[1] -> Q65),
+	Q33	= (startNewSpec -> Q29),
+	Q34	= (startNewSpec -> Q18),
+	Q35	= (out[1] -> Q7
+		  |reconfigure -> Q34
+		  |clean[1] -> Q39
+		  |drill[1] -> Q40
+		  |stamp[1] -> Q41
+		  |polish[1] -> Q60),
+	Q36	= (reconfigure -> Q33),
+	Q37	= (cleanNOk[1] -> Q27
+		  |cleanOk[1] -> Q36
+		  |reconfigure -> Q71),
+	Q38	= (stampOk[1] -> Q27
+		  |reconfigure -> Q69),
+	Q39	= ({cleanNOk, cleanOk}[1] -> Q9
+		  |reconfigure -> Q73),
+	Q40	= ({drillNOk, drillOk}[1] -> Q9
+		  |reconfigure -> Q70),
+	Q41	= (stampOk[1] -> Q9
+		  |reconfigure -> Q72),
+	Q42	= (reset[1] -> Q25
+		  |startNewSpec -> Q48),
+	Q43	= (reconfigure -> Q25
+		  |in[1] -> Q27),
+	Q44	= (polishNOk[1] -> Q1
+		  |polishOk[1] -> Q8
+		  |hotSwapIn -> Q62),
+	Q45	= (drillOk[1] -> Q1
+		  |drillNOk[1] -> Q3
+		  |hotSwapIn -> Q63),
+	Q46	= (reset[1] -> Q0
+		  |hotSwapIn -> Q64),
+	Q47	= (cleanOk[1] -> Q6
+		  |cleanNOk[1] -> Q8
+		  |hotSwapIn -> Q61),
+	Q48	= (reset[1] -> Q54),
+	Q49	= (stampOk[1] -> Q2),
+	Q50	= (reconfigure -> Q11
+		  |{polishNOk, polishOk}[1] -> Q14),
+	Q51	= ({drillNOk, drillOk}[1] -> Q11),
+	Q52	= (startNewSpec -> Q21),
+	Q53	= ({polishNOk, polishOk}[1] -> Q27
+		  |reconfigure -> Q52),
+	Q54	= (in[1] -> Q21),
+	Q55	= (paintNOk[1] -> Q11
+		  |paintOk[1] -> Q28),
+	Q56	= (paintOk[1] -> Q22
+		  |paintNOk[1] -> Q29),
+	Q57	= (stopOldSpec -> Q43
+		  |in[1] -> Q67),
+	Q58	= (drillOk[1] -> Q11
+		  |drillNOk[1] -> Q52),
+	Q59	= (stampOk[1] -> Q18),
+	Q60	= ({polishNOk, polishOk}[1] -> Q9
+		  |reconfigure -> Q34),
+	Q61	= (stopOldSpec -> Q10
+		  |cleanNOk[1] -> Q20
+		  |cleanOk[1] -> Q24),
+	Q62	= (reconfigure -> Q13
+		  |{polishNOk, polishOk}[1] -> Q20
+		  |stopOldSpec -> Q50),
+	Q63	= (drillOk[1] -> Q20
+		  |stopOldSpec -> Q66
+		  |drillNOk[1] -> Q67),
+	Q64	= (stopOldSpec -> Q7
+		  |reset[1] -> Q57),
+	Q65	= (out[1] -> Q48),
+	Q66	= (drillOk[1] -> Q14
+		  |drillNOk[1] -> Q27
+		  |reconfigure -> Q58),
+	Q67	= (stopOldSpec -> Q26),
+	Q68	= (stampOk[1] -> Q21),
+	Q69	= (stampOk[1] -> Q52
+		  |startNewSpec -> Q68),
+	Q70	= ({drillNOk, drillOk}[1] -> Q34),
+	Q71	= (startNewSpec -> Q19
+		  |cleanOk[1] -> Q33
+		  |cleanNOk[1] -> Q52),
+	Q72	= (stampOk[1] -> Q34
+		  |startNewSpec -> Q59),
+	Q73	= (startNewSpec -> Q31
+		  |{cleanNOk, cleanOk}[1] -> Q34).

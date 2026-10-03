@@ -34,6 +34,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 	private boolean incrementalPruning;
 	private boolean incrementalPruningCleanup;
 	private boolean safetyBackwardPruning;
+	private boolean traditionalHotSwapMonitorSemantics;
 	private UpdateProtocolSpec updateProtocolSpec;
 	// ★追加: Mappingを構成するLTSのリスト (OTF探索で利用)
     private Vector<CompactState> mappingComponents;
@@ -94,6 +95,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 			this.incrementalPruning = false;
 			this.incrementalPruningCleanup = false;
 			this.safetyBackwardPruning = false;
+			this.traditionalHotSwapMonitorSemantics = false;
 			this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = null;
 	}
@@ -156,6 +158,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 			this.incrementalPruning = incrementalPruning;
 			this.incrementalPruningCleanup = incrementalPruningCleanup;
 			this.safetyBackwardPruning = false;
+			this.traditionalHotSwapMonitorSemantics = stepwiseDelayed;
 			this.updateProtocolSpec = null;
 		this.mappingComponents = new Vector<CompactState>();
 		this.newEnvironmentComponents = new Vector<CompactState>();
@@ -241,6 +244,7 @@ public class UpdatingControllerCompositeState extends CompositeState {
 			this.incrementalPruning = false;
 			this.incrementalPruningCleanup = false;
 			this.safetyBackwardPruning = false;
+			this.traditionalHotSwapMonitorSemantics = false;
 			this.updateProtocolSpec = updateProtocolSpec;
 		this.mappingComponents = mappingComponents;
 		this.newEnvironmentComponents = newEnvironmentComponents;
@@ -367,6 +371,16 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		this.safetyBackwardPruning = safetyBackwardPruning;
 	}
 
+	public boolean isTraditionalHotSwapMonitorSemantics()
+	{
+		return traditionalHotSwapMonitorSemantics;
+	}
+
+	public void setTraditionalHotSwapMonitorSemantics(boolean traditionalHotSwapMonitorSemantics)
+	{
+		this.traditionalHotSwapMonitorSemantics = traditionalHotSwapMonitorSemantics;
+	}
+
 	public boolean isFineGrained()
 	{
 		return fineGrained;
@@ -411,6 +425,12 @@ public class UpdatingControllerCompositeState extends CompositeState {
 		return stepwiseStages;
 	}
 
+	public void setReferenceStepwiseStages(List<StepwiseStage> stages) {
+		this.stepwiseStages = stages == null
+				? null
+				: new java.util.ArrayList<StepwiseStage>(stages);
+	}
+
 	public ControllerGoalDefinition getStepwiseOldGoalDefinition() {
 		return stepwiseOldGoalDefinition;
 	}
@@ -441,15 +461,17 @@ public class UpdatingControllerCompositeState extends CompositeState {
 														controllableActions,
 														isOTF, fineGrained, name);
 			} else if (this.stepwise || this.stepwiseDelayed) {
-				clone = new UpdatingControllerCompositeState(oldController, oldControllerName, stepwiseStages,
+			clone = new UpdatingControllerCompositeState(oldController, oldControllerName, stepwiseStages,
 						stepwiseOldGoalDefinition, stepwiseNewGoalDefinition, stepwiseTransitionGoals,
 						updateGRGoal, controllableActions, name, stepwiseDelayed,
 						incrementalPruning, incrementalPruningCleanup);
 			} else {
 				clone = new UpdatingControllerCompositeState(oldController, mapping, updateSafetyGoals,
 							updateGRGoal, name, fineGrained, updateProtocolSpec);
-			}
-			clone.setSafetyBackwardPruning(safetyBackwardPruning);
+		}
+		clone.setReferenceStepwiseStages(stepwiseStages);
+		clone.setSafetyBackwardPruning(safetyBackwardPruning);
+			clone.setTraditionalHotSwapMonitorSemantics(traditionalHotSwapMonitorSemantics);
 			clone.setCompositionType(getCompositionType());
 		clone.makeAbstract = makeAbstract;
 		clone.makeClousure = makeClousure;

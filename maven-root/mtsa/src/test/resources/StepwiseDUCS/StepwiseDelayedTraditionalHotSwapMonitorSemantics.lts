@@ -1,0 +1,236 @@
+// Full-pipeline characterization of the default Traditional hotSwapIn
+// requirement-monitor semantics and the explicit Java stutter opt-out.  The
+// Legacy-named unflagged targets are retained for fixture-name compatibility
+// and are legacy only when the test selects stutter explicitly.
+
+set ControllableActions = {a}
+
+OLD_ENV = OLD,
+OLD = (a -> OLD).
+
+NEW_ENV = NEW,
+NEW = (a -> NEW).
+
+relation R_ENV = {
+    OLD@OLD_ENV = reconfigure -> NEW@NEW_ENV
+}
+
+map MAP_ENV = {OLD_ENV, NEW_ENV, R_ENV}
+
+||MAPPING_ENV = (MAP_ENV).
+
+controllerSpec OLD_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+OLD_CLOSED_LOOP = (a -> OLD_CLOSED_LOOP).
+||OldCon = (OLD_CLOSED_LOOP).
+
+controllerSpec NEW_REQ = {
+    safety = {}
+    controllable = {ControllableActions}
+}
+
+||NewCon = (NEW_ENV).
+
+// SeenA remains true until stopOldSpec.  In Traditional DUCS the action
+// proposition a is reset by hotSwapIn, so the state reached immediately after
+// a,hotSwapIn violates this transition requirement.  Explicit stutter mode
+// leaves the monitor unchanged; the default mode must reproduce Traditional.
+fluent SeenA = <a, stopOldSpec>
+ltl_property T_KEEP_LAST_A = [](SeenA -> a)
+
+// Explicit fluent boundaries exercise both directions of delta(q,hotSwapIn)
+// without using an action proposition in the requirement.
+fluent ResetOnHotSwap = <a, hotSwapIn>
+ltl_property T_EXPLICIT_HOTSWAP_RESET = [](SeenA -> ResetOnHotSwap)
+fluent HotSwapSeen = <hotSwapIn, stopOldSpec>
+ltl_property T_EXPLICIT_HOTSWAP_INITIATE = [](!HotSwapSeen)
+
+// A normal transition requirement whose explicit fluent monitors already
+// stutter at hotSwapIn on every reachable connection source.  The ordinary
+// action a resets both monitors together; no O-DUCS-only event is involved.
+fluent StopSeen = <stopOldSpec, a>
+fluent StartSeen = <startNewSpec, a>
+ltl_property T_START_BEFORE_STOP = [](StartSeen -> StopSeen)
+
+updatingController Traditional_HotSwapMonitorBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_KEEP_LAST_A,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_LegacyHotSwapMonitorBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_KEEP_LAST_A,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TraditionalHotSwapMonitorBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_KEEP_LAST_A,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Traditional_ExplicitResetBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_EXPLICIT_HOTSWAP_RESET,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Traditional_ExplicitInitiateBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_EXPLICIT_HOTSWAP_INITIATE,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_LegacyExplicitResetBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_EXPLICIT_HOTSWAP_RESET,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TraditionalExplicitResetBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_EXPLICIT_HOTSWAP_RESET,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Stepwise_LegacyExplicitInitiateBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_EXPLICIT_HOTSWAP_INITIATE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TraditionalExplicitInitiateBoundary = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_EXPLICIT_HOTSWAP_INITIATE,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+// No-transition controls.  With no requirement monitor to change at
+// hotSwapIn, Traditional and explicit stutter modes must produce the same
+// result and must not create a second mapping suffix.
+updatingController Stepwise_LegacyNoTransitionControl = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TraditionalNoTransitionControl = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+updatingController Stepwise_LegacyStutterControl = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_START_BEFORE_STOP,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning
+}
+
+updatingController Stepwise_TraditionalStutterControl = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    transition = T_START_BEFORE_STOP,
+    nonblocking,
+    stepwise_delayed,
+    safetyBackwardPruning,
+    traditionalHotSwapMonitorSemantics
+}
+
+||TRADITIONAL_HOTSWAP_MONITOR_BOUNDARY = Traditional_HotSwapMonitorBoundary.
+||STEPWISE_LEGACY_HOTSWAP_MONITOR_BOUNDARY = Stepwise_LegacyHotSwapMonitorBoundary.
+||STEPWISE_TRADITIONAL_HOTSWAP_MONITOR_BOUNDARY = Stepwise_TraditionalHotSwapMonitorBoundary.
+||STEPWISE_LEGACY_NO_TRANSITION_CONTROL = Stepwise_LegacyNoTransitionControl.
+||STEPWISE_TRADITIONAL_NO_TRANSITION_CONTROL = Stepwise_TraditionalNoTransitionControl.
+||STEPWISE_LEGACY_STUTTER_CONTROL = Stepwise_LegacyStutterControl.
+||STEPWISE_TRADITIONAL_STUTTER_CONTROL = Stepwise_TraditionalStutterControl.

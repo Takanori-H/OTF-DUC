@@ -1,0 +1,44 @@
+set ProbeControllable = {dummy}
+
+OLD_ENV = OLD0,
+OLD0 = (idle -> OLD0).
+
+NEW_ENV = NEW0,
+NEW0 = (left -> NEW_L | right -> NEW_R),
+NEW_L = (left -> NEW_L),
+NEW_R = (right -> NEW_R).
+
+relation R_ENV = {
+    OLD0@OLD_ENV = reconfigure -> NEW_L@NEW_ENV,
+    OLD0@OLD_ENV = reconfigure -> NEW_R@NEW_ENV
+}
+
+map MAP_ENV = {OLD_ENV, NEW_ENV, R_ENV}
+||MAPPING_ENV = (MAP_ENV).
+
+controllerSpec OLD_REQ = {
+    safety = {}
+    controllable = {ProbeControllable}
+}
+
+controllerSpec NEW_REQ = {
+    safety = {}
+    controllable = {ProbeControllable}
+}
+
+OLD_CLOSED_LOOP = (idle -> OLD_CLOSED_LOOP).
+||OldCon = (OLD_CLOSED_LOOP).
+
+updatingController CheckerNondeterministicTargets = {
+    oldController = OldCon,
+    oldEnvironment = {OLD_ENV},
+    newEnvironment = {NEW_ENV},
+    mapRelation = {R_ENV},
+    oldGoal = OLD_REQ,
+    newGoal = NEW_REQ,
+    nonblocking,
+    safetyBackwardPruning
+}
+
+||NONDET_PASS = CheckerNondeterministicTargets.
+||NONDET_FAIL = CheckerNondeterministicTargets.

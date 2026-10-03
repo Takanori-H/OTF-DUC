@@ -1,0 +1,975 @@
+{
+  "schemaVersion": "2026-08-04-campaign-v1",
+  "status": "COMPLETE",
+  "startedAt": "2026-08-30T15:13:28.9838179+09:00",
+  "endedAt": "2026-09-04T10:07:58.7874555+09:00",
+  "configFile": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml",
+  "configSha256": "a115fc6fefec1e9e3b21c85da7a73533c209a77b36f1896f100d26d0fefbdd6d",
+  "sanitizedConfigSnapshot": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\result\\executed_config.sanitized.yaml",
+  "sanitizedConfigSnapshotSha256": "dc870e0f9a1fd9bd1f61efcf117a5e8bb0a3870fdf1e160b888829778cfee625",
+  "inputHashes": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\result\\input_hashes.csv",
+  "environment": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\result\\campaign_environment.json",
+  "effectiveJvmFlags": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\result\\effective_jvm_flags.txt",
+  "launcherArtifact": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\mtsa-1.0-SNAPSHOT.jar",
+  "launcherArtifactSha256": "990f559b78e0fb88ec28c48dcbc6e5d0317ae4c82cdbf1eb573ed9ddf0ff2a35",
+  "gitRepository": null,
+  "gitCommit": null,
+  "gitDirty": null,
+  "outputDir": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\result",
+  "requireFreshOutputDir": false,
+  "alternateMethodOrderByRun": true,
+  "validateMemoryQuality": true,
+  "validateMethodTarget": true,
+  "memoryQualityPolicy": "2026-08-06-rss-primary-v1",
+  "maxMemorySamplingGapMillis": null,
+  "maxRssSamplingGapMillis": 1000,
+  "maxHeapSamplingGapMillis": null,
+  "effectiveMaxRssSamplingGapMillis": 1000,
+  "effectiveMaxHeapSamplingGapMillis": null,
+  "heapSamplingGapWarningReferenceMillis": 1000,
+  "runCount": 3,
+  "caseCountPerRun": 6,
+  "expectedCaseCount": 18,
+  "completedCaseCount": 18,
+  "failureCount": 0,
+  "validationPassed": true,
+  "validationErrors": [],
+  "runnerError": null,
+  "cases": [{
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "dr322_s_n_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 241532
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8473
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 22940520
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 9693867
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 794
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_n_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "dr322_t_n_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 132360
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8043
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 22937746
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 9693747
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 692
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=dr322_t_n_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "dr322_s_1_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 241567
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8702
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 22229585
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 8284900
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 812
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_1_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "dr322_t_1_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 132409
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8272
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 22228818
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 8284653
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 710
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=dr322_t_1_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "dr322_s_2_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 243141
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8747
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 20509559
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 7619230
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 812
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_2_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "dr322_t_2_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 132393
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8322
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 20510590
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 7618951
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 710
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=dr322_t_2_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\dr322\\run_01\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "dr322_t_n_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 132352
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8043
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 22937746
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 9693747
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 692
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=dr322_t_n_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "dr322_s_n_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 241540
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8471
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 22940520
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 9693867
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 794
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_n_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "dr322_t_1_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 132407
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8273
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 22228818
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 8284653
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 710
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=dr322_t_1_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "dr322_s_1_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 241563
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8701
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 22229585
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 8284900
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 812
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_1_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "dr322_t_2_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 132405
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8321
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 20510590
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 7618951
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 710
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=dr322_t_2_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "dr322_s_2_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 243127
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8746
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 20509559
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 7619230
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 812
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_2_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_02\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "dr322_s_n_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 241532
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8470
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 22940520
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 9693867
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 794
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_n_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "dr322_t_n_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 132357
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8042
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 22937746
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 9693747
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 692
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=dr322_t_n_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "dr322_s_1_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 241575
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8702
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 22229585
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 8284900
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 812
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_1_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "dr322_t_1_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 132403
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8273
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 22228818
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 8284653
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 710
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=dr322_t_1_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "dr322_s_2_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 243142
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8749
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 20509559
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 7619230
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 812
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=dr322_s_2_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\stepwise_delayed_SBP\\dr322_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "dr322_t_2_h6",
+    "example": "Drone_ArriveGeo_D2_G322",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 132391
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8322
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 20510590
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 7618951
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 710
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 99
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=dr322_t_2_h6", "-Dmtsa.evaluation.example=Drone_ArriveGeo_D2_G322", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\drone_rebuilt_2drones_3x2x2_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\DroneRebuilt\\Drone_2Drones_3x2x2_TemporaryGeofencePolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\dr322\\run_03\\result\\Drone_ArriveGeo_D2_G322\\Traditional\\dr322_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }]
+}

@@ -1,0 +1,109 @@
+comp.compile time : 96ms
+Compiled: NODE_OLD(1)
+Compiled: NODE_OLD(2)
+Compiled: NODE_OLD(3)
+Compiled: NODE_OLD(4)
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 10 * 10 * 10 * 10 = 2 ** 16
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 94220K
+-- States: 10000 Transitions: 360000 Memory used: 125317K
+Composed in 346ms
+Composition:OldController = OLD_ENV
+State Space: 10000 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 183898K
+-- States: 10000 Transitions: 360000 Memory used: 198159K
+Composed in 304ms
+Solving the LTS control problem.
+Environment states: 10000
+Game states: 10000
+Game transitions: 30000
+Analysis time: 4458ms.
+Controller [10000] generated successfully.
+Composition:OldController = OldController
+State Space: 10000 = 2 ** 14
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 624627K
+-- States: 10000 Transitions: 360000 Memory used: 674960K
+Composed in 307ms
+Compiled: OldController
+Composition:OLD_ENV = OLD_ENV.NODE_OLD(1) || OLD_ENV.NODE_OLD(2) || OLD_ENV.NODE_OLD(3) || OLD_ENV.NODE_OLD(4)
+State Space: 10 * 10 * 10 * 10 = 2 ** 16
+Composing...
+-- States: 10000 Transitions: 360000 Memory used: 248336K
+-- States: 10000 Transitions: 360000 Memory used: 295697K
+Composed in 293ms
+ - Synthesizing Mapping Environment from lists (size=4)...
+INFO: Auto-compiling dependency: NODE_NEW(1)
+Generating Mapping Environment: MAP_NODE_OLD(1)_NODE_NEW(1)
+INFO: Auto-compiling dependency: NODE_NEW(2)
+Generating Mapping Environment: MAP_NODE_OLD(2)_NODE_NEW(2)
+INFO: Auto-compiling dependency: NODE_NEW(3)
+Generating Mapping Environment: MAP_NODE_OLD(3)_NODE_NEW(3)
+INFO: Auto-compiling dependency: NODE_NEW(4)
+Generating Mapping Environment: MAP_NODE_OLD(4)_NODE_NEW(4)
+Mode: Traditional Updating Controller Synthesis
+Composition:MAPPING_ENV = MAP_NODE_OLD(1)_NODE_NEW(1) || MAP_NODE_OLD(2)_NODE_NEW(2) || MAP_NODE_OLD(3)_NODE_NEW(3) || MAP_NODE_OLD(4)_NODE_NEW(4)
+State Space: 20 * 20 * 20 * 20 = 2 ** 20
+Composing...
+-- States: 10000 Transitions: 360093 Memory used: 355080K
+-- States: 20000 Transitions: 730000 Memory used: 431118K
+-- States: 20000 Transitions: 730000 Memory used: 464058K
+Composed in 569ms
+comp.continueCompilation time : 9480ms
+=========================================
+Mode: Traditional DUC (legacy update events)
+=========================================
+Processing formula for update: P_NEW_NODE_POWER_CAP_1_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_2_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_3_UPD_NEW
+Processing formula for update: P_NEW_NODE_POWER_CAP_4_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_1_2_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_2_3_UPD_NEW
+Processing formula for update: P_NEW_ADJACENT_POWER_BUDGET_3_4_UPD_NEW
+Environment states:50000
+Solving safety goals for the controller synthesis
+Environment states after safety: 90001
+Synthezising GR
+Environment after safety is deterministic
+Solving a deterministic controller synthesis
+Controller [52955] generated successfully.
+================ EVALUATION SUMMARY ================
+
+[結果]
+手法 : Traditional DUC
+設定 : safetyBackwardPruning=false
+結果 : SUCCESS
+主比較時間（合成開始から生成終了まで-CountTime） : 43分20.65秒
+
+[規模]
+最大状態数時の状態数 : 90001 states
+最大状態数時の遷移数 : 1987910 transitions
+最大状態数時の段階 : [4. Final]
+最大遷移数時の状態数 : 90001 states
+最大遷移数時の遷移数 : 1987910 transitions
+最大遷移数時の段階 : [4. Final]
+出力状態数 : 52955 states
+出力遷移数 : 994887 transitions
+
+[GR(1)]
+final GR input 状態数 : 90001 states
+final GR input 遷移数 : 1987910 transitions
+GR(1)合成時間 : 38分33.58秒
+
+[メモリ]
+合成区間の同時点ヒープ最大値 : 25.93 GB
+最初の有効sampleからのヒープ増加 : 25.92 GB
+====================================================
+
+Evaluation data CSV written to: out\h6\cc8\run_03\result\CC_HalfCap_N4_L8\Traditional\cc4l8_t_n_h6_evaluation_UpdCont.csv
+Tau reduction ON
+UpdCont minimising......
+Minimised States: 13777 in 69779ms
+
+[minimized 出力]
+minimized 出力状態数 : 13777 states
+minimized 出力遷移数 : 240553 transitions
+minimize 時間 : 69811 ms
+Evaluation data CSV written to: out\h6\cc8\run_03\result\CC_HalfCap_N4_L8\Traditional\cc4l8_t_n_h6_evaluation_UpdCont.csv

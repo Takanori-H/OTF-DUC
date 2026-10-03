@@ -1,0 +1,97 @@
+INFO: Registered Map Environment: MAP_A_CROSS
+INFO: Registered Map Environment: MAP_B_CROSS
+INFO: Registered Map Environment: MAP_A_ONE
+INFO: Registered Map Environment: MAP_B_ONE
+Compiled: A_OLD
+Compiled: B_OLD
+Composition:EXACT_OLD_ENV = EXACT_OLD_ENV.A_OLD || EXACT_OLD_ENV.B_OLD
+State Space: 1 * 1 = 2 ** 0
+Composing...
+-- States: 1 Transitions: 2 Memory used: 10638K
+Composed in 30ms
+Composition:ExactSynthOldController = EXACT_OLD_ENV
+State Space: 1 = 2 ** 0
+Composing...
+-- States: 1 Transitions: 2 Memory used: 10948K
+Composed in 8ms
+Solving the LTS control problem.
+Environment states: 1
+Game states: 1
+Game transitions: 3
+Analysis time: 141ms.
+Controller [1] generated successfully.
+Composition:ExactSynthOldController = ExactSynthOldController
+State Space: 1 = 2 ** 0
+Composing...
+-- States: 1 Transitions: 2 Memory used: 12232K
+Composed in 10ms
+Compiled: ExactSynthOldController
+Composition:EXACT_OLD_ENV = EXACT_OLD_ENV.A_OLD || EXACT_OLD_ENV.B_OLD
+State Space: 1 * 1 = 2 ** 0
+Composing...
+-- States: 1 Transitions: 2 Memory used: 11823K
+Composed in 8ms
+ - Synthesizing Mapping Environment from lists (size=2)...
+INFO: Auto-compiling dependency: A_NEW
+Generating Mapping Environment: MAP_A_OLD_A_NEW
+INFO: Auto-compiling dependency: B_NEW
+Generating Mapping Environment: MAP_B_OLD_B_NEW
+Mode: Stepwise Delayed Updating Controller Synthesis (baseline) + safety backward pruning
+=========================================
+Mode: Stepwise Delayed DUC (local-only)
+=========================================
+[Stepwise Delayed DUCS]
+oldController is used as global OldCon: ExactOldCon
+
+[Stepwise DUCS] Requirement classification:
+  T_NO_U_AFTER_A (TRANSITION) -> cross scope [1, 2] GOAL_SPANS_MULTIPLE_STAGES actions={a=[0], z=[0, 1], u=[0]}
+  post-connection raw H_T monitor semantics: [T_NO_U_AFTER_A(TRANSITION)]
+[Stepwise Delayed DUCS] Raw H_T preservation: 1 goal(s) evaluated after delayed raw connection.
+[Stepwise Delayed DUCS] mode flags: stepwise_delayed=true incrementalPruning=false incrementalPruningCleanup=false safetyBackwardPruning=true traditionalHotSwapMonitorSemantics=false
+
+[Stepwise Delayed DUCS] Requirement classification summary
+  stages: 2
+  goals: total=1 local=0 cross=1 crossRatio=100.00%
+  local goals by type: oldSafety=0 newSafety=0 transition=0
+  cross goals by type: oldSafety=0 newSafety=0 transition=1
+  cross components: count=1 maxGoalScopeSize=2 maxComponentScopeSize=2 allStageCrossGoals=1 allStageCrossComponents=1
+  requirement fluents: unique=2
+  scope requirement counts:
+    scope {1} total=0 oldSafety=0 newSafety=0 transition=0 requirementFluents=0
+    scope {1,2} total=1 oldSafety=0 newSafety=0 transition=1 requirementFluents=2
+    scope {2} total=0 oldSafety=0 newSafety=0 transition=0 requirementFluents=0
+[Stepwise Delayed DUCS] classification statistics CountTime: 33 ms
+[Stepwise Delayed DUCS] cross component build time: 1 ms
+[Stepwise Delayed DUCS] Traditional connection-shadow preservation required; connecting raw H_T before requirement monitoring and mapping SBP.
+Owner-aware delayed product: STEPWISE_DELAYED_TRADITIONAL_CONNECTION_SHADOW_PRODUCT
+[Stepwise Delayed DUCS] Raw connection-shadow product before delayed connection states: 16 transitions: 56
+[Stepwise Delayed DUCS] Product before delayed connection states: 16 transitions: 56
+[Stepwise Delayed DUCS] OldCon fluent meta states: 1 transitions: 2
+[Stepwise Delayed DUCS] hotSwapIn connection mode: legacy
+[Stepwise Delayed DUCS] hotSwapIn connection time: total=1.620 ms, setup=0.188 ms, traversal=1.042 ms
+[Stepwise Delayed DUCS] hotSwapIn connection pairs: visited=2, enqueued=3, duplicateSkipped=1, synchronizedSuccessorPairs=2
+[Stepwise Delayed DUCS] hotSwapIn connection result: connections=2, oldStatesWithoutTargets=0, comparisonFluents=3
+[Stepwise Delayed DUCS] hotSwapIn connection unique states: old=1, mapping=2, eligibleMappingVisited=2, eligibleMappingTotal=0
+[Stepwise Delayed DUCS] hotSwapIn connection cache stats: eligibilityComputations=0, signatureBuilds=0, transitionIndexStateBuilds=0
+[Stepwise Delayed DUCS] hotSwapIn connection legacy stats: transitionComparisons=16, actionMatches=2, oldTransitionsScanned=4, mappingTransitionsScanned=8
+[Stepwise Delayed DUCS] all old-controller states: 1
+[Stepwise Delayed DUCS] reachable old-controller states: 1
+[Stepwise Delayed DUCS] hotSwapIn connections: 2
+[Stepwise Delayed DUCS] reachable states without connection target: 0
+[Stepwise Delayed DUCS] all states without connection target: 0
+[Stepwise Delayed DUCS] connected environment representation: read-only view
+[Stepwise Delayed DUCS] After delayed hotSwapIn connection states: 17 transitions: 60
+  online safety terminalization kept states: 38 transitions: 120 terminal states: 4
+  monitor-lifted hotSwapIn transitions: 4
+[Stepwise Delayed DUCS] After Traditional hotSwapIn monitor semantics states: 38 transitions: 120
+[Stepwise Delayed DUCS] After global DontDoTwice states: 39 transitions: 120
+  safety backward pruning scope: stepwise-delayed-final
+    before states: 39 transitions: 120
+    dead-end seed states: 5
+    backward losing states: 11
+    losing controllable action groups: 28
+    input environment reused: false
+    after backward states: 1 transitions: 0
+    after cleanup states: 1 transitions: 0
+    initial state is losing: there is no controller.
+Composition failed: stepwise_delayed safety backward pruning found initial state losing in stepwise-delayed-final.

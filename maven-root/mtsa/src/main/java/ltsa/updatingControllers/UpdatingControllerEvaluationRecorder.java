@@ -57,7 +57,11 @@ public final class UpdatingControllerEvaluationRecorder {
             + "metric_schema_version,metric_description_id,"
             + "section_readable_ja,metric_readable_ja,metric_category,artifact,phase,action,event,stat";
     private static final int DATA_CSV_COLUMN_COUNT = 19;
-    private static final String METRIC_SCHEMA_VERSION = "2026-08-04-evaluation-v4";
+    private static final String METRIC_SCHEMA_VERSION = "2026-08-11-evaluation-v6";
+    private static final String PRIMARY_COMPARISON_COUNT_SCOPE_SECTION =
+            "共通 / HPWindow";
+    private static final String PRIMARY_COMPARISON_COUNT_SCOPE_LABEL =
+            "合成ボタンを押してから合成完了までの時間";
 
     public enum ResultStatus {
         NOT_RECORDED,
@@ -452,6 +456,27 @@ public final class UpdatingControllerEvaluationRecorder {
                 return;
             }
         }
+    }
+
+    /** Opens the CountTime scope from composition-operation entry to controller generation. */
+    public static void beginPrimaryComparisonCountScope() {
+        beginCountScope(
+                PRIMARY_COMPARISON_COUNT_SCOPE_SECTION,
+                PRIMARY_COMPARISON_COUNT_SCOPE_LABEL);
+    }
+
+    /** Closes the primary CountTime scope immediately after controller generation. */
+    public static void endPrimaryComparisonCountScope() {
+        endCountScope(
+                PRIMARY_COMPARISON_COUNT_SCOPE_SECTION,
+                PRIMARY_COMPARISON_COUNT_SCOPE_LABEL);
+    }
+
+    private static long primaryComparisonCountOverheadMillis() {
+        CountScope scope = countScopes.get(timerKey(
+                PRIMARY_COMPARISON_COUNT_SCOPE_SECTION,
+                PRIMARY_COMPARISON_COUNT_SCOPE_LABEL));
+        return scope == null ? 0L : Math.max(0L, scope.countTimeMillis);
     }
 
     private static void addStateSpaceCountOverhead(long countTimeMillis) {
@@ -2182,7 +2207,7 @@ public final class UpdatingControllerEvaluationRecorder {
             notes.add("大枠比較用時間: 実測総時間から構文解析、評価用カウント、評価出力、GUI描画を除いた時間。");
             notes.add("厳密比較用時間: 大枠比較用時間からさらに共通前処理時間を除いた時間。");
             notes.add("手法固有時間: 各 DUC 手法に固有の準備・中核・後処理を合計した時間。");
-            notes.add("手法別中核内訳は区間が非対称: Traditional DUC は更新用環境構築+最終合成、Stepwise Delayed DUC は最終GR(1)のみ。手法間の主比較には controller_synthesis_related_time を使う。");
+            notes.add("手法別中核内訳は区間が非対称: Traditional DUC は更新用環境構築+最終合成、Stepwise Delayed DUC は最終GR(1)のみ。手法間の主比較には、合成操作入口から update controller 生成終了までの total_time から同一区間内の CountTime を除いた comparison_primary_controller_synthesis_time を使う。");
         } else if ("OTF-DUC 方針1 時間・メモリ内訳".equals(section)) {
             notes.add("通常OTF探索+簡単マージ時間: on-the-fly探索開始から、belief repair 直前の簡単マージ完了までの時間。");
             notes.add("通常OTF探索+簡単マージ中増加メモリ: 同区間のピークメモリ - 同区間直前メモリ。");
@@ -2621,10 +2646,10 @@ public final class UpdatingControllerEvaluationRecorder {
         Long controllerSynthesisTime = hasRecordedTime("共通 / HPWindow", "コントローラ合成時間")
                 ? optionalTime("共通 / HPWindow", "コントローラ合成時間")
                 : null;
+        long primaryComparisonCountOverhead = primaryComparisonCountOverheadMillis();
         long broadObservedTime = totalTime == null
                 ? -1
-                : Math.max(0, totalTime - parseTime - stateSpaceCountOverheadObservedMillis
-                        - drawTime);
+                : Math.max(0, totalTime - parseTime - stateSpaceCountOverheadObservedMillis);
         long strictObservedTime = totalTime == null
                 ? -1
                 : Math.max(0, broadObservedTime - commonPreprocessTime);
@@ -2679,8 +2704,8 @@ public final class UpdatingControllerEvaluationRecorder {
             addMetric(comparisonSection,
                     "大枠比較用時間（構文解析・カウント・描画除外）",
                     broadObservedTime,
-                    "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - GUI描画時間。"
-                            + "評価結果出力は実測総時間の確定後なので差し引かない。共通前処理は差し引かない。");
+                    "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間。"
+                            + "GUI描画と評価結果出力は実測総時間の確定後なので差し引かない。共通前処理は差し引かない。");
             addMetric(comparisonSection,
                     "厳密比較用時間（構文解析・共通前処理・カウント・描画除外）",
                     strictObservedTime,
@@ -2695,12 +2720,18 @@ public final class UpdatingControllerEvaluationRecorder {
                 "手法固有として個別計測できた時間",
                 methodSpecificTime,
                 methodSpecificFormula());
-        if (hasControllerSynthesisTime) {
+        if (totalTime != null) {
+            long primaryControllerSynthesisTime = Math.max(
+                    0L,
+                    totalTime - primaryComparisonCountOverhead);
             addMetric(comparisonSection,
                     "主比較用コントローラ合成時間",
-                    controllerSynthesisTime,
-                    "共通 / HPWindow のコントローラ合成時間と同値。"
-                            + "Traditional DUC と Stepwise Delayed DUC の主時間比較にはこの対称な区間を使う。");
+                    primaryControllerSynthesisTime,
+                    "max(0, total_time - total_time_scope_count_overhead_time)。"
+                            + "構文解析を含む合成操作入口から update controller 生成終了までの区間から、"
+                            + "同区間内の評価用カウント時間だけを除いた値を主比較に使う。");
+        }
+        if (hasControllerSynthesisTime) {
             long controllerSynthesisWithoutCommon = controllerSynthesisTime - commonPreprocessTime;
             long unclassifiedNonCommonTime = controllerSynthesisWithoutCommon - methodSpecificTime;
             addMetric(comparisonSection,
@@ -2870,10 +2901,9 @@ public final class UpdatingControllerEvaluationRecorder {
         Long totalTime = firstRecordedTime(
                 timeKey("共通 / HPWindow", "合成ボタンを押してから合成完了までの時間"),
                 timeKey("一時 runner", "合成全体実行時間"));
-        long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         Long comparisonTime = totalTime == null
                 ? null
-                : Math.max(0, totalTime - stateSpaceCountOverheadObservedMillis - drawTime);
+                : Math.max(0, totalTime - stateSpaceCountOverheadObservedMillis);
         recordPeakStateSpaceSummaryMetrics();
 
         output.outln("================ EVALUATION SUMMARY ================");
@@ -2887,8 +2917,8 @@ public final class UpdatingControllerEvaluationRecorder {
         if (isFailureStatus(resultStatus) && !failureMessage.isEmpty()) {
             printSummaryValueCompact(output, "失敗理由", failureMessage);
         }
-        printSummaryMillisCompact(output, "比較用時間（合成全体-CountTime-描画）", comparisonTime,
-                "合成の全体時間 - 実測時間内のカウントによるオーバーヘッド - コントローラ描画時間。");
+        printSummaryMillisCompact(output, "主比較時間（合成開始から生成終了まで-CountTime）", comparisonTime,
+                "合成操作入口から update controller 生成終了までの時間 - 同区間内のカウントによるオーバーヘッド。");
 
         printSummarySectionHeader(output, "規模");
         printSummaryDataMetricCompact(output, "最大状態数時の状態数", "peak_state_space_states",
@@ -4188,10 +4218,9 @@ public final class UpdatingControllerEvaluationRecorder {
                 timeKey("UpdatingControllersDefinition", "Goal 定義と controllable action 集合生成時間"),
                 timeKey("UpdatingControllersDefinition", "Mapping Environment Component 合成時間"));
         long parseTime = optionalTime("共通 / HPWindow", "構文解析時間");
-        long drawTime = optionalTime("共通 / HPWindow", "コントローラ描画時間");
         long methodSpecificTime = methodSpecificTime();
         long observedWithoutParseCountAndDraw = Math.max(0, totalTime - parseTime
-                - stateSpaceCountOverheadObservedMillis - drawTime);
+                - stateSpaceCountOverheadObservedMillis);
         long strictObservedTime = Math.max(0, observedWithoutParseCountAndDraw - commonPreprocessTime);
         long strictUnclassifiedTime = Math.max(0, strictObservedTime - methodSpecificTime);
 
@@ -4201,8 +4230,8 @@ public final class UpdatingControllerEvaluationRecorder {
                 "大枠比較用時間（構文解析・カウント・描画除外）",
                 Long.toString(observedWithoutParseCountAndDraw),
                 "ms",
-                "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間 - GUI描画時間。"
-                        + "評価出力は実測総時間の確定後なので差し引かない。共通前処理は差し引かない。"));
+                "実測総時間 - 構文解析時間 - 実測総時間内の評価用カウント時間。"
+                        + "GUI描画と評価出力は実測総時間の確定後なので差し引かない。共通前処理は差し引かない。"));
         outputDataRow(output, new DataMetric(
                 "comparison_strict_observed_time_without_parse_common_preprocess_count_and_draw",
                 "比較用時間集計",

@@ -1,0 +1,1911 @@
+{
+  "schemaVersion": "2026-08-04-campaign-v1",
+  "status": "FAILED",
+  "startedAt": "2026-08-20T07:01:37.87007+09:00",
+  "endedAt": "2026-08-24T01:06:12.257132+09:00",
+  "configFile": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml",
+  "configSha256": "a2ffc714cf219ab97056592434feee75205bf0ed6108e86d87d85d7ae88c1e43",
+  "sanitizedConfigSnapshot": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\result\\executed_config.sanitized.yaml",
+  "sanitizedConfigSnapshotSha256": "4a401d13c826efe8bcc6f07bbdd542084a795d68148aa02f47b96f8c120eafaf",
+  "inputHashes": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\result\\input_hashes.csv",
+  "environment": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\result\\campaign_environment.json",
+  "effectiveJvmFlags": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\result\\effective_jvm_flags.txt",
+  "launcherArtifact": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\mtsa-1.0-SNAPSHOT.jar",
+  "launcherArtifactSha256": "990f559b78e0fb88ec28c48dcbc6e5d0317ae4c82cdbf1eb573ed9ddf0ff2a35",
+  "gitRepository": null,
+  "gitCommit": null,
+  "gitDirty": null,
+  "outputDir": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\result",
+  "requireFreshOutputDir": false,
+  "alternateMethodOrderByRun": true,
+  "validateMemoryQuality": true,
+  "validateMethodTarget": true,
+  "memoryQualityPolicy": "2026-08-06-rss-primary-v1",
+  "maxMemorySamplingGapMillis": null,
+  "maxRssSamplingGapMillis": 1000,
+  "maxHeapSamplingGapMillis": null,
+  "effectiveMaxRssSamplingGapMillis": 1000,
+  "effectiveMaxHeapSamplingGapMillis": null,
+  "heapSamplingGapWarningReferenceMillis": 1000,
+  "runCount": 3,
+  "caseCountPerRun": 12,
+  "expectedCaseCount": 36,
+  "completedCaseCount": 36,
+  "failureCount": 6,
+  "validationPassed": true,
+  "validationErrors": [],
+  "runnerError": null,
+  "cases": [{
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc3l8_s_n_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 310886
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8378
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 2198868
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 588816
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 786
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc3l8_t_n_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 129085
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7940
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 2198929
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 588936
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 684
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc4l8_s_n_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 363206
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8401
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 28235650
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 5113950
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 792
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc4l8_t_n_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 132290
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7976
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 28233155
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 5113497
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 690
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc3l8_s_1_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 315243
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8618
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 6415194
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 411873
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 807
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 96
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc3l8_t_1_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 129260
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8195
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 6415564
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 411681
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 705
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 96
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc4l8_s_1_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "TIMEOUT",
+    "timeoutPhase": "SYNTHESIS_OR_PROBLEM_PREPARATION",
+    "exitCode": null,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 28976
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8195
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 40
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 100
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc4l8_t_1_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "TIMEOUT",
+    "timeoutPhase": "SYNTHESIS_OR_PROBLEM_PREPARATION",
+    "exitCode": null,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 28490
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 7768
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 40
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 49
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc3l8_s_2_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 316689
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8647
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 2200109
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 532813
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 804
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc3l8_t_2_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 129159
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8220
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 2200140
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 532731
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 702
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc4l8_s_2_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 369053
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8681
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 28368017
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 4793934
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 810
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 1,
+    "runLabel": "run_01",
+    "id": "cc4l8_t_2_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 132348
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8260
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 28368567
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 4794257
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 708
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=1", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_01", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\cc8\\run_01\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc3l8_t_n_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 129097
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7941
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 2198929
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 588936
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 684
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc3l8_s_n_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 310874
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8368
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 2198868
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 588816
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 786
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc4l8_t_n_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 132289
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7974
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 28233155
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 5113497
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 690
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc4l8_s_n_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 363227
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8402
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 28235650
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 5113950
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 792
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc3l8_t_1_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 129269
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8192
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 6415564
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 411681
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 705
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 96
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc3l8_s_1_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 315246
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8621
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 6415194
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 411873
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 807
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 96
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc4l8_t_1_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "TIMEOUT",
+    "timeoutPhase": "SYNTHESIS_OR_PROBLEM_PREPARATION",
+    "exitCode": null,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 28489
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 7768
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 40
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 49
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc4l8_s_1_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "TIMEOUT",
+    "timeoutPhase": "SYNTHESIS_OR_PROBLEM_PREPARATION",
+    "exitCode": null,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 28975
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8195
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 40
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 100
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc3l8_t_2_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 129153
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8218
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 2200140
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 532731
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 702
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc3l8_s_2_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 316686
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8646
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 2200109
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 532813
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 804
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc4l8_t_2_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 132353
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8255
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 28368567
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 4794257
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 708
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 2,
+    "runLabel": "run_02",
+    "id": "cc4l8_s_2_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 369075
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8683
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 28368017
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 4793934
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 810
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=2", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_02", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_02\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc3l8_s_n_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 310872
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8368
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 2198868
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 588816
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 786
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc3l8_t_n_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 129092
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7947
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 2198929
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 588936
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 684
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc4l8_s_n_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "no_tr",
+    "target": "Stepwise_UpdCont_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 363208
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 8402
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 410
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 28235650
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 5113950
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 792
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_evaluation_Stepwise_UpdCont_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=Stepwise_UpdCont_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_execution_Stepwise_UpdCont_hotSwap.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_no_tr_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_transitions_Stepwise_UpdCont_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_n_h6_minimized_counts_Stepwise_UpdCont_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc4l8_t_n_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "no_tr",
+    "target": "UpdCont",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_evaluation_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 132287
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_meta.json",
+      "exists": true,
+      "sizeBytes": 7977
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_execution_UpdCont.json",
+      "exists": true,
+      "sizeBytes": 364
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 28233155
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_transitions_UpdCont.txt",
+      "exists": true,
+      "sizeBytes": 5113497
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_counts_UpdCont.csv",
+      "exists": true,
+      "sizeBytes": 690
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_evaluation_UpdCont.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_n_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=no_tr", "-Dmtsa.evaluation.target=UpdCont", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_execution_UpdCont.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_no_tr_transitions_UpdCont.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_transitions_UpdCont.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_n_h6_minimized_counts_UpdCont.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc3l8_s_1_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 315238
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8619
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 6415194
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 411873
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 807
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 96
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc3l8_t_1_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 129260
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8192
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 6415564
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": true,
+      "sizeBytes": 411681
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 705
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 96
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc4l8_s_1_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "Stepwise_UpdCont_T1_hotSwap",
+    "status": "TIMEOUT",
+    "timeoutPhase": "SYNTHESIS_OR_PROBLEM_PREPARATION",
+    "exitCode": null,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 28975
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 8195
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 40
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 100
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_evaluation_Stepwise_UpdCont_T1_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T1_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T1_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_execution_Stepwise_UpdCont_T1_hotSwap.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t1_no_controllable_during_gap_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_transitions_Stepwise_UpdCont_T1_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_1_h6_minimized_counts_Stepwise_UpdCont_T1_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc4l8_t_1_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "t1_no_controllable_during_gap",
+    "target": "UpdCont_T1",
+    "status": "TIMEOUT",
+    "timeoutPhase": "SYNTHESIS_OR_PROBLEM_PREPARATION",
+    "exitCode": null,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_evaluation_UpdCont_T1.csv",
+      "exists": true,
+      "sizeBytes": 28489
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_meta.json",
+      "exists": true,
+      "sizeBytes": 7768
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_execution_UpdCont_T1.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_transitions_UpdCont_T1.txt",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_counts_UpdCont_T1.csv",
+      "exists": false,
+      "sizeBytes": 0
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stdout.txt",
+      "exists": true,
+      "sizeBytes": 40
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_stderr.txt",
+      "exists": true,
+      "sizeBytes": 49
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_evaluation_UpdCont_T1.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_1_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t1_no_controllable_during_gap", "-Dmtsa.evaluation.target=UpdCont_T1", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T1", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_execution_UpdCont_T1.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t1_no_controllable_during_gap_transitions_UpdCont_T1.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_transitions_UpdCont_T1.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_1_h6_minimized_counts_UpdCont_T1.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc3l8_s_2_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 316699
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8653
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 2200109
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 532813
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 804
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc3l8_s_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\stepwise_delayed_SBP\\cc3l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc3l8_t_2_h6",
+    "example": "CC_HalfCap_N3_L8",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 129164
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8226
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 2200140
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 532731
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 702
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 94
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=cc3l8_t_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N3_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_3Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N3_L8\\Traditional\\cc3l8_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc4l8_s_2_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "stepwise_delayed+SBP",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "Stepwise_UpdCont_T2_hotSwap",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 369061
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8681
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json",
+      "exists": true,
+      "sizeBytes": 416
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 28368017
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt",
+      "exists": true,
+      "sizeBytes": 4793934
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv",
+      "exists": true,
+      "sizeBytes": 810
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_evaluation_Stepwise_UpdCont_T2_hotSwap.csv", "-Dmtsa.evaluation.caseId=cc4l8_s_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=stepwise_delayed+SBP", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=Stepwise_UpdCont_T2_hotSwap", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "Stepwise_UpdCont_T2_hotSwap", "--expected-method", "stepwise_delayed+SBP", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_execution_Stepwise_UpdCont_T2_hotSwap.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\stepwise_delayed_sbp_t2_start_after_stop_and_reconfigure_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_transitions_Stepwise_UpdCont_T2_hotSwap.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\stepwise_delayed_SBP\\cc4l8_s_2_h6_minimized_counts_Stepwise_UpdCont_T2_hotSwap.csv"]
+  }, {
+    "runIndex": 3,
+    "runLabel": "run_03",
+    "id": "cc4l8_t_2_h6",
+    "example": "CC_HalfCap_N4_L8",
+    "method": "Traditional",
+    "variant": "t2_start_after_stop_and_reconfigure",
+    "target": "UpdCont_T2",
+    "status": "SUCCESS",
+    "timeoutPhase": null,
+    "exitCode": 0,
+    "evaluationCsv": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 132363
+    },
+    "meta": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_meta.json",
+      "exists": true,
+      "sizeBytes": 8260
+    },
+    "executionMetadata": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_execution_UpdCont_T2.json",
+      "exists": true,
+      "sizeBytes": 370
+    },
+    "transitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 28368567
+    },
+    "minimizedTransitions": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_transitions_UpdCont_T2.txt",
+      "exists": true,
+      "sizeBytes": 4794257
+    },
+    "minimizedCounts": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_counts_UpdCont_T2.csv",
+      "exists": true,
+      "sizeBytes": 708
+    },
+    "stdout": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stdout.txt",
+      "exists": true,
+      "sizeBytes": 78
+    },
+    "stderr": {
+      "path": "C:\\Users\\admin\\Desktop\\202607-Hirano-StepwiseDUCS\\out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_stderr.txt",
+      "exists": true,
+      "sizeBytes": 98
+    },
+    "effectiveChildCommand": ["C:\\Program Files\\Java\\jdk-18.0.1.1\\bin\\java", "-Djava.awt.headless=true", "-Dmtsa.evaluation.enabled=true", "-Dupdating.controller.evaluation.profile=paper", "-Dmtsa.evaluation.memorySampling.enabled=true", "-Dmtsa.evaluation.memorySampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.enabled=true", "-Dmtsa.evaluation.rssSampling.intervalMillis=50", "-Dmtsa.evaluation.rssSampling.providerTimeoutMillis=5000", "-Dmtsa.evaluation.memoryProtocol.ackTimeoutMillis=30000", "-Dmtsa.evaluation.windowsPeakWorkingSet.enabled=false", "-Dmtsa.evaluation.phaseMemoryDiagnostics=false", "-Dstepwise.delayed.connectedEnvironmentView=true", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1MaxNewSizePercent=20", "-Xmx220g", "-Dmtsa.evaluation.memoryProtocol.enabled=true", "-Dmtsa.evaluation.parentFinalizationRequired=true", "-Dmtsa.evaluation.csvFile=out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_evaluation_UpdCont_T2.csv", "-Dmtsa.evaluation.caseId=cc4l8_t_2_h6", "-Dmtsa.evaluation.example=CC_HalfCap_N4_L8", "-Dmtsa.evaluation.method=Traditional", "-Dmtsa.evaluation.variant=t2_start_after_stop_and_reconfigure", "-Dmtsa.evaluation.target=UpdCont_T2", "-Dmtsa.evaluation.ltsFile=Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "-Dmtsa.evaluation.configFile=.\\Experiment\\configs\\hotswap\\compute_cluster_n3_n4_maxlevel8_half_cap_final_evaluation_windows.yaml", "-Dmtsa.evaluation.runIndex=3", "-Dmtsa.evaluation.runCount=3", "-Dmtsa.evaluation.runLabel=run_03", "-cp", ".\\mtsa-1.0-SNAPSHOT.jar", "ltsa.updatingControllers.cli.SingleCompositionRunner", "--lts", "Experiment\\LTS\\ComputeCluster\\ComputeCluster_4Nodes_MaxLevel8_HalfCapAdjacentPowerBudgetPolicyRollout_Update.lts", "--target", "UpdCont_T2", "--expected-method", "Traditional", "--execution-metadata", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_execution_UpdCont_T2.json", "--output", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_output.txt", "--transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\traditional_t2_start_after_stop_and_reconfigure_transitions_UpdCont_T2.txt", "--minimized-transitions", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_transitions_UpdCont_T2.txt", "--minimized-counts", "out\\h6\\cc8\\run_03\\result\\CC_HalfCap_N4_L8\\Traditional\\cc4l8_t_2_h6_minimized_counts_UpdCont_T2.csv"]
+  }]
+}
