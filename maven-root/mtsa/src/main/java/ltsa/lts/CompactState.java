@@ -332,7 +332,9 @@ public class CompactState implements Automata {
             Hashtable<String, Integer> newLabelMap = new Hashtable<>();
             for (Map.Entry<String, Integer> entry : stateLabelMap.entrySet()) {
                 int oldId = entry.getValue();
-                if (otn.containsKey(oldId)) {
+                if (oldId == Declaration.ERROR) {
+                    newLabelMap.put(entry.getKey(), Declaration.ERROR);
+                } else if (otn.containsKey(oldId)) {
                     int newId = otn.get(oldId);
                     newLabelMap.put(entry.getKey(), newId);
                 }

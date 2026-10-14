@@ -153,6 +153,12 @@ final class ExperimentConfig {
             experimentCase.example = keyValue.value;
         } else if ("method".equals(keyValue.key)) {
             experimentCase.method = keyValue.value;
+        } else if ("mode".equals(keyValue.key)) {
+            experimentCase.mode = keyValue.value;
+        } else if ("scenario".equals(keyValue.key)) {
+            experimentCase.scenario = new File(keyValue.value);
+        } else if ("measurementScope".equals(keyValue.key)) {
+            experimentCase.measurementScope = keyValue.value;
         } else if ("variant".equals(keyValue.key)
                 || "transitionRequirement".equals(keyValue.key)) {
             experimentCase.variant = keyValue.value;
@@ -194,11 +200,38 @@ final class ExperimentConfig {
 
         for (int i = 0; i < cases.size(); i++) {
             ExperimentCase experimentCase = cases.get(i);
+            if (!isBlank(experimentCase.mode)
+                    && !experimentCase.isDifferentialSynthesis()) {
+                throw new IllegalArgumentException("Unknown experiment mode: " + experimentCase.mode);
+            }
             if (isBlank(experimentCase.example)) {
                 throw new IllegalArgumentException("cases[" + i + "].example is required.");
             }
             if (isBlank(experimentCase.method)) {
                 throw new IllegalArgumentException("cases[" + i + "].method is required.");
+            }
+            if (experimentCase.isDifferentialSynthesis()) {
+                experimentCase.method = experimentCase.method.toUpperCase(Locale.ROOT);
+                if (!"FULL".equals(experimentCase.method)
+                        && !"DIFFERENTIAL".equals(experimentCase.method)
+                        && !"FROM_SCRATCH".equals(experimentCase.method)) {
+                    throw new IllegalArgumentException(
+                            "Differential synthesis method must be FULL, DIFFERENTIAL, or FROM_SCRATCH.");
+                }
+                if (!"generation".equals(experimentCase.effectiveMeasurementScope())
+                        && !"update".equals(experimentCase.effectiveMeasurementScope())) {
+                    throw new IllegalArgumentException("measurementScope must be generation or update.");
+                }
+                if (experimentCase.scenario == null || !experimentCase.scenario.isFile()) {
+                    throw new IllegalArgumentException(
+                            "Differential synthesis requires an existing scenario file.");
+                }
+            } else if (experimentCase.scenario != null) {
+                throw new IllegalArgumentException(
+                        "scenario requires mode: differential-synthesis.");
+            } else if (experimentCase.measurementScope != null) {
+                throw new IllegalArgumentException(
+                        "measurementScope requires mode: differential-synthesis.");
             }
             if (experimentCase.lts == null) {
                 throw new IllegalArgumentException("cases[" + i + "].lts is required.");
@@ -215,6 +248,22 @@ final class ExperimentConfig {
                         + sanitize(experimentCase.method)
                         + "_"
                         + sanitize(experimentCase.variant);
+                if (experimentCase.isDifferentialSynthesis()
+                        && "update".equals(experimentCase.effectiveMeasurementScope())) {
+                    experimentCase.id += "_update";
+                }
+            }
+        }
+        validateModeOptions();
+    }
+
+    /** Also called after command-line overrides have been applied. */
+    void validateModeOptions() {
+        for (ExperimentCase experimentCase : cases) {
+            if ((experimentCase.isDifferentialSynthesis() || experimentCase.isNativeDifferentialSynthesis())
+                    && (experimentCase.requirementsCheckOrDefault(requirementsCheck) || traceCheck)) {
+                throw new IllegalArgumentException(
+                        "Differential synthesis does not support requirementsCheck or traceCheck.");
             }
         }
     }
@@ -375,11 +424,26 @@ final class ExperimentConfig {
         String id;
         String example;
         String method;
+        String mode;
+        File scenario;
+        String measurementScope;
         String variant;
         File lts;
         String target;
         Long timeoutMillis;
         Boolean requirementsCheck;
+
+        boolean isDifferentialSynthesis() {
+            return "differential-synthesis".equals(mode);
+        }
+
+        boolean isNativeDifferentialSynthesis() {
+            return ltsa.differential.nativeintegration.NativeDifferentialResult.isMethodName(method);
+        }
+
+        String effectiveMeasurementScope() {
+            return measurementScope == null ? "generation" : measurementScope;
+        }
 
         long timeoutMillisOrDefault(long defaultValue) {
             return timeoutMillis == null ? defaultValue : timeoutMillis.longValue();
@@ -416,6 +480,9 @@ final class ExperimentConfig {
         }
 
         String filePrefix() {
+            if (isDifferentialSynthesis()) {
+                return sanitize(id);
+            }
             return methodFilePrefix() + "_" + sanitize(variant);
         }
 

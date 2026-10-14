@@ -3,6 +3,7 @@ package ltsa.control.util;
 import MTSSynthesis.ar.dc.uba.model.condition.Fluent;
 import MTSSynthesis.ar.dc.uba.model.language.Symbol;
 import MTSSynthesis.controller.model.ControllerGoal;
+import MTSSynthesis.controller.differential.nativeintegration.NativeMemoryDiagnostics;
 import MTSTools.ac.ic.doc.commons.collections.PowerSet;
 import MTSTools.ac.ic.doc.commons.relations.BinaryRelation;
 import MTSTools.ac.ic.doc.commons.relations.BinaryRelationUtils;
@@ -14,6 +15,7 @@ import com.google.common.collect.Sets;
 import ltsa.ac.ic.doc.mtstools.util.fsp.AutomataToMTSConverter;
 import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
 import ltsa.lts.CompactState;
+import ltsa.lts.Analyser;
 import ltsa.lts.CompositeState;
 import ltsa.lts.LTSOutput;
 import ltsa.ui.StandardOutput;
@@ -27,10 +29,22 @@ import static MTSTools.ac.ic.doc.mtstools.model.MTS.TransitionType.*;
 public class ControllerUtils {
 
 	public static MTS<Long, String> removeTopStates(MTS<Long, String> mts, Collection<Fluent> fluents) {
+        return removeTopStates(mts, fluents, null, null);
+    }
+
+    private static MTS<Long, String> removeTopStates(MTS<Long, String> mts, Collection<Fluent> fluents,
+                                                     Map<Long, Long> plantToProductStates, NativeMemoryDiagnostics diagnostics) {
 
 		MTSToAutomataConverter instance = MTSToAutomataConverter.getInstance();
 		Vector<CompactState> machinesToCompose = new Vector<CompactState>();
-		machinesToCompose.add(instance.convert(mts, " ", true));
+        Map<Long, Long> productToInput = plantToProductStates == null ? null : new HashMap<>();
+        NativeMemoryDiagnostics.Token toCompact = diagnostics == null ? null : diagnostics.begin(
+                "fluent_to_compact", NativeMemoryDiagnostics.counts("mts_states", mts.getStates().size(),
+                        "mts_actions", mts.getActions().size(), "fluents", fluents.size()));
+        machinesToCompose.add(instance.convert(mts, " ", false, true, productToInput));
+        if (diagnostics != null) diagnostics.end(toCompact, NativeMemoryDiagnostics.counts(
+                "compact_states", machinesToCompose.firstElement().maxStates,
+                "product_to_input_entries", productToInput == null ? 0 : productToInput.size()));
 		Set<String> mtsActions = mts.getActions();
 
 		List<MTS<Long, String>> toCompose = new ArrayList<MTS<Long, String>>();
@@ -54,8 +68,46 @@ public class ControllerUtils {
 		}
 
 		CompositeState c = new CompositeState(machinesToCompose);
-		c.compose(new StandardOutput());
-		return AutomataToMTSConverter.getInstance().convert(c.composition);
+        NativeMemoryDiagnostics.Token recompose = diagnostics == null ? null : diagnostics.begin(
+                "fluent_recompose", NativeMemoryDiagnostics.counts("components", machinesToCompose.size(),
+                        "input_compact_states", machinesToCompose.firstElement().maxStates));
+        if (plantToProductStates == null) {
+            c.compose(new StandardOutput());
+        } else {
+            Analyser analyser = new Analyser(c, new StandardOutput(), null, false,
+                    diagnostics, "fluent_product");
+            c.composition = analyser.composeNoHide();
+            c.applyLTSOperations(new StandardOutput());
+            if (diagnostics != null) diagnostics.end(recompose, NativeMemoryDiagnostics.counts(
+                    "compact_states", c.composition.maxStates));
+            NativeMemoryDiagnostics.Token correspondence = diagnostics == null ? null : diagnostics.begin(
+                    "fluent_correspondence", NativeMemoryDiagnostics.counts(
+                            "product_to_input_entries", productToInput.size()));
+            Map<Long, Long> inputToProduct = new HashMap<>();
+            for (Map.Entry<Long, Long> entry : productToInput.entrySet()) {
+                inputToProduct.put(entry.getValue(), entry.getKey());
+            }
+            plantToProductStates.clear();
+            for (Map.Entry<Integer, int[]> entry : analyser.getCompositionStateToComponentStates().entrySet()) {
+                Long productState = inputToProduct.get((long) entry.getValue()[0]);
+                if (productState == null) throw new IllegalStateException("Missing embedded-product correspondence");
+                plantToProductStates.put((long) entry.getKey(), productState);
+            }
+            if (diagnostics != null) diagnostics.end(correspondence, NativeMemoryDiagnostics.counts(
+                    "input_to_product_entries", inputToProduct.size(),
+                    "plant_to_product_entries", plantToProductStates.size()));
+        }
+        if (diagnostics != null && plantToProductStates == null) diagnostics.end(recompose,
+                NativeMemoryDiagnostics.counts("compact_states", c.composition.maxStates));
+        NativeMemoryDiagnostics.Token toMts = diagnostics == null ? null : diagnostics.begin(
+                "fluent_to_mts", NativeMemoryDiagnostics.counts("compact_states", c.composition.maxStates));
+        MTS<Long, String> result = AutomataToMTSConverter.getInstance().convert(c.composition);
+        if (diagnostics != null) diagnostics.end(toMts, NativeMemoryDiagnostics.counts(
+                "mts_states", result.getStates().size(), "mts_actions", result.getActions().size()));
+        if (plantToProductStates != null && result.getStates().contains(-1L)) {
+            plantToProductStates.put(-1L, -1L);
+        }
+        return result;
 
 //		CompositionRuleApplier compositionRuleApplier = new CompositionRuleApplier();
 //		MTS<Long, String> result = new MTSMultipleComposer<Long, String>(compositionRuleApplier).compose(toCompose);
@@ -104,8 +156,18 @@ public class ControllerUtils {
 	 */
 	//TODO make this method work for MTS as well. 
 	public static MTS<Long, String> embedFluents(MTS<Long, String> mts, ControllerGoal<String> goal, LTSOutput output) {
+        return embedFluents(mts, goal, output, null);
+    }
+
+    public static MTS<Long, String> embedFluents(MTS<Long, String> mts, ControllerGoal<String> goal,
+            LTSOutput output, Map<Long, Long> plantToProductStates) {
+        return embedFluents(mts, goal, output, plantToProductStates, null);
+    }
+
+    public static MTS<Long, String> embedFluents(MTS<Long, String> mts, ControllerGoal<String> goal,
+            LTSOutput output, Map<Long, Long> plantToProductStates, NativeMemoryDiagnostics diagnostics) {
 		output.outln("Environment states: " + mts.getStates().size());
-		MTS<Long, String> result = ControllerUtils.removeTopStates(mts, goal.getFluents());
+		MTS<Long, String> result = ControllerUtils.removeTopStates(mts, goal.getFluents(), plantToProductStates, diagnostics);
 		output.outln("Game states: " + result.getStates().size());
 		output.outln("Game transitions: " + result.getNumberOfTransitions());
 		return result;

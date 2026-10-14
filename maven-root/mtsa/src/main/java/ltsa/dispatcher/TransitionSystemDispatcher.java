@@ -8,6 +8,9 @@ import MTSSynthesis.ar.dc.uba.model.condition.*;
 import MTSSynthesis.ar.dc.uba.model.language.SingleSymbol;
 import MTSSynthesis.ar.dc.uba.util.FormulaToMarkedLTS;
 import MTSSynthesis.controller.*;
+import MTSSynthesis.controller.differential.nativeintegration.NativeSynthesisCapture;
+import MTSSynthesis.controller.differential.nativeintegration.NativeGenerationTiming;
+import MTSSynthesis.controller.differential.nativeintegration.NativeMemoryDiagnostics;
 import MTSSynthesis.controller.gr.StrategyState;
 import MTSSynthesis.controller.model.Assumptions;
 import MTSSynthesis.controller.model.Guarantees;
@@ -204,12 +207,23 @@ public class TransitionSystemDispatcher {
      * @param ltsOutput used for process output
      */
     public static void applyComposition(CompositeState toCompose, LTSOutput ltsOutput, Statistics ...stats) {
+        if (toCompose.differentialOptions != null) {
+            ltsa.differential.nativeintegration.NativeDifferentialSynthesis.execute(toCompose, ltsOutput);
+            return;
+        }
+        NativeSynthesisCapture<Long, String> capture = toCompose.differentialCapture;
+        long compositionStart = capture == null ? 0L : System.nanoTime();
         // 1. 合成の実行
         // Dynamic Updateの場合、この中で applyUpdatingController が呼ばれます
         compose(toCompose, ltsOutput);
+        if (capture != null) {
+            capture.setProduct(toCompose.composition);
+            capture.addNanos(NativeSynthesisCapture.GAME_UPDATE, System.nanoTime() - compositionStart);
+        }
         try {
             // 2. 追加オペレーション（最小化、決定化など）の適用
             toCompose.applyOperations(ltsOutput, stats);
+            if (capture != null) capture.setFinalController(toCompose.composition);
         } catch (Exception e) {
             throw new LTSCompositionException("Error composing");
         }
@@ -2056,11 +2070,21 @@ public class TransitionSystemDispatcher {
     }
 
     public static void synthesise(CompositeState compositeState, LTSOutput output) {
+        NativeSynthesisCapture<Long, String> capture = compositeState.differentialCapture;
+        NativeMemoryDiagnostics diagnostics = capture == null ? null : capture.getMemoryDiagnostics();
+        NativeMemoryDiagnostics.Token componentConversion = diagnostics == null ? null : diagnostics.begin(
+                "component_to_mts", NativeMemoryDiagnostics.counts("components", compositeState.getMachines().size()));
+        long componentConversionStart = capture == null ? 0L : System.nanoTime();
         List<LTS<Long, String>> ltss = new ArrayList<>();
         for (CompactState automata : compositeState.getMachines()) {
             LTS<Long, String> lts = new LTSAdapter<>(
                     AutomataToMTSConverter.getInstance().convert(automata), TransitionType.REQUIRED);
             ltss.add(lts);
+        }
+        if (diagnostics != null) diagnostics.end(componentConversion,
+                NativeMemoryDiagnostics.counts("components", ltss.size()));
+        if (capture != null) {
+            capture.addNanos(NativeSynthesisCapture.GAME_UPDATE, System.nanoTime() - componentConversionStart);
         }
 
         CompactState composition = compositeState.getComposition();
@@ -2068,10 +2092,24 @@ public class TransitionSystemDispatcher {
             if (compositeState.goal != null) {
                 CompactState synthesiseController = synthesise(compositeState, compositeState.goal, output);
                 if (synthesiseController != null) {
+                    long postprocessingStart = capture == null ? 0L : System.nanoTime();
+                    NativeGenerationTiming.Stamp postcomposeStart = capture == null ? null
+                            : capture.getGenerationTiming().start();
+                    NativeMemoryDiagnostics.Token postcompose = diagnostics == null ? null : diagnostics.begin(
+                            "controller_postcompose", NativeMemoryDiagnostics.counts(
+                                    "controller_compact_states", synthesiseController.maxStates));
                     synthesiseController = applyLatencyHeuristic(compositeState, synthesiseController);
                     //compositeState.setComposition(synthesiseController);
                     compositeState.machines.set(0,synthesiseController); //replace environment with controller
                     compositeState.compose(output);
+                    if (diagnostics != null) diagnostics.end(postcompose, NativeMemoryDiagnostics.counts(
+                            "controller_compact_states", compositeState.composition.maxStates));
+                    if (capture != null) {
+                        capture.setFinalController(compositeState.composition);
+                        capture.getGenerationTiming().finishGenerationSegment("controller_postcompose", postcomposeStart);
+                        capture.addNanos(NativeSynthesisCapture.CONTROLLER_GENERATION,
+                                System.nanoTime() - postprocessingStart);
+                    }
 
                 } else if (!composition.name.contains(ControlConstants.NO_CONTROLLER)) {
                     // Issue #71
@@ -2127,6 +2165,12 @@ public class TransitionSystemDispatcher {
 
     public static CompactState synthesise(CompositeState compositeState, ControllerGoal<String> goal,
                                           LTSOutput output) {
+        return synthesise(compositeState, goal, output, compositeState.differentialCapture);
+    }
+
+    public static CompactState synthesise(CompositeState compositeState, ControllerGoal<String> goal,
+                                          LTSOutput output, NativeSynthesisCapture<Long, String> capture) {
+        NativeMemoryDiagnostics diagnostics = capture == null ? null : capture.getMemoryDiagnostics();
 
         // ToDani: MTS env =
         // AutomataToMTS.getInstance().convert(compositeState.composition);
@@ -2139,6 +2183,10 @@ public class TransitionSystemDispatcher {
         long initialTime = System.currentTimeMillis();
 
         boolean isMTS = MTSUtils.isMTSRepresentation(c);
+        if (capture != null && (isMTS || c.isNonDeterministic() || c.hasTau()
+                || !goal.getBuchi().isEmpty())) {
+            throw new IllegalArgumentException("Native capture requires deterministic, tau-free GR LTS synthesis");
+        }
 
         if (!isMTS && (c.isNonDeterministic() || c.hasTau())) {
             MTS<Long, String> env = AutomataToMTSConverter.getInstance().convert(c);
@@ -2211,8 +2259,24 @@ public class TransitionSystemDispatcher {
 
 
             MTS<StrategyState<Long, Integer>, String> synthesised = null;
+            long gamePreparationStart = capture == null ? 0L : System.nanoTime();
+            NativeMemoryDiagnostics.Token toMts = diagnostics == null ? null : diagnostics.begin(
+                    "product_to_mts", NativeMemoryDiagnostics.counts("compact_states", c.maxStates));
             MTS<Long, String> env = AutomataToMTSConverter.getInstance().convert(c);
-            MTS<Long, String> plant = ControllerUtils.embedFluents(env, goal, output);
+            if (diagnostics != null) diagnostics.end(toMts, NativeMemoryDiagnostics.counts(
+                    "mts_states", env.getStates().size(), "mts_actions", env.getActions().size()));
+            Map<Long, Long> plantToProduct = capture == null ? null : new HashMap<>();
+            MTS<Long, String> plant = ControllerUtils.embedFluents(env, goal, output, plantToProduct, diagnostics);
+            if (capture != null) {
+                NativeMemoryDiagnostics.Token plantCapture = diagnostics == null ? null : diagnostics.begin(
+                        "plant_capture", NativeMemoryDiagnostics.counts("plant_to_product_entries", plantToProduct.size()));
+                capture.setProduct(c);
+                capture.setPlant(plant);
+                capture.setPlantToProductStates(plantToProduct);
+                if (diagnostics != null) diagnostics.end(plantCapture, NativeMemoryDiagnostics.counts(
+                        "captured_plant_to_product_entries", capture.getPlantToProductStates().size()));
+                capture.addNanos(NativeSynthesisCapture.GAME_UPDATE, System.nanoTime() - gamePreparationStart);
+            }
 
             // If we are solving BGR
             if (goal.getBuchi().size() > 0) {
@@ -2241,7 +2305,7 @@ public class TransitionSystemDispatcher {
                 }
             } else {
                 ControllerSynthesisFacade<Long, String, Integer> facade = new ControllerSynthesisFacade<>();
-                synthesised = facade.synthesiseControllerWithPlantInformation(plant, goal, c);
+                synthesised = facade.synthesiseControllerWithPlantInformation(plant, goal, c, capture);
                 // TODO move the feature calculation here and remove method synthesiseControllerWithPlantInformation
 
                 if (synthesised == null) {
@@ -2249,6 +2313,12 @@ public class TransitionSystemDispatcher {
                     output.outln("Analysis time: " + (System.currentTimeMillis() - initialTime) + "ms.");
                     return null;
                 } else {
+                    long conversionStart = capture == null ? 0L : System.nanoTime();
+                    NativeGenerationTiming.Stamp conversionStamp = capture == null ? null
+                            : capture.getGenerationTiming().start();
+                    NativeMemoryDiagnostics.Token controllerConversion = diagnostics == null ? null : diagnostics.begin(
+                            "controller_conversion", NativeMemoryDiagnostics.counts(
+                                    "strategy_controller_states", synthesised.getStates().size()));
                     GenericMTSToLongStringMTSConverter<StrategyState<Long, Integer>, String> transformer = new GenericMTSToLongStringMTSConverter<StrategyState<Long, Integer>, String>();
                     MTS<Long, String> plainController = transformer.transform(synthesised);
 
@@ -2268,9 +2338,29 @@ public class TransitionSystemDispatcher {
 
                     output.outln("Analysis time: " + (System.currentTimeMillis() - initialTime) + "ms.");
                     output.outln("Controller [" + plainController.getStates().size() + "] generated successfully.");
+                    Map<Long, Long> plainToCompact = capture == null ? null : new HashMap<>();
                     CompactState controller = MTSToAutomataConverter.getInstance().convert(plainController,
-                            compositeState.getName(), isMTS, true);
+                            compositeState.getName(), isMTS, true, plainToCompact);
                     controller.setMtsControlProblemAnswer("ALL");
+                    if (capture != null) {
+                        NativeMemoryDiagnostics.Token controllerCapture = diagnostics == null ? null : diagnostics.begin(
+                                "controller_capture", NativeMemoryDiagnostics.counts(
+                                        "strategy_to_plain_entries", transformer.getStateMapping().size(),
+                                        "plain_to_compact_entries", plainToCompact.size()));
+                        capture.setPlainController(plainController);
+                        capture.setStrategyToPlainStates(transformer.getStateMapping());
+                        capture.setPlainToCompactStates(plainToCompact);
+                        capture.setController(controller);
+                        if (diagnostics != null) diagnostics.end(controllerCapture, NativeMemoryDiagnostics.counts(
+                                "captured_strategy_to_plain_entries", capture.getStrategyToPlainStates().size(),
+                                "captured_plain_to_compact_entries", capture.getPlainToCompactStates().size()));
+                        capture.getGenerationTiming().finishGenerationSegment("controller_conversion", conversionStamp);
+                        capture.addNanos(NativeSynthesisCapture.CONTROLLER_GENERATION,
+                                System.nanoTime() - conversionStart);
+                    }
+                    if (diagnostics != null) diagnostics.end(controllerConversion, NativeMemoryDiagnostics.counts(
+                            "plain_controller_states", plainController.getStates().size(),
+                            "compact_controller_states", controller.maxStates));
                     return controller;
                 }
             }

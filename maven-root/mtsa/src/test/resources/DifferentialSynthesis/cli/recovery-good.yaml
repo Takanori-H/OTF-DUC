@@ -1,0 +1,9 @@
+controllableActions: [idle, start]
+states:
+  initial: {trace: []}
+  working: {trace: [start]}
+  recovery: {new: true}
+transitions:
+  - {from: working, action: divert, to: recovery}
+  - {from: recovery, action: resume, to: working}
+  - {from: recovery, action: wait, to: recovery}

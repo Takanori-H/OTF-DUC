@@ -57,11 +57,21 @@ public class MTSToAutomataConverter {
 	}
 	
 	public CompactState convert(MTS<Long, String> mts, String name, boolean includeMaybes, boolean transferRolesInfo) {
+        return convert(mts, name, includeMaybes, transferRolesInfo, null);
+    }
+
+    /** Optionally returns the exact MTS-state to CompactState-state renumbering. */
+    public CompactState convert(MTS<Long, String> mts, String name, boolean includeMaybes,
+                                boolean transferRolesInfo, Map<Long, Long> stateMapping) {
 		Set<Long> states = mts.getStates();
 		int size = (states.contains(-1L))? states.size()-1 : states.size();
 		int endState = -9999;
 
 		Map<Long, Long> indexToState = buildIndexToState(mts.getStates(), mts.getInitialState());
+        if (stateMapping != null) {
+            stateMapping.clear();
+            stateMapping.putAll(indexToState);
+        }
 		MyHashStack statemap = this.buildStateMap(states, size, indexToState);
 		Map<String, Integer> indexToAction = new HashMap<String, Integer>();
 

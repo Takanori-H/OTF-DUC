@@ -91,6 +91,7 @@ public final class BatchExperimentRunner {
             config = ExperimentConfig.load(configFile);
             applyBooleanOverride(options, "requirements-check", config, "requirementsCheck");
             applyBooleanOverride(options, "trace-check", config, "traceCheck");
+            config.validateModeOptions();
 
             boolean useRunDirectories = config.runsSpecified;
             List<File> plannedRunOutputDirectories = new ArrayList<File>();
@@ -484,6 +485,12 @@ public final class BatchExperimentRunner {
     private static List<String> validateCaseArtifactsBeforeFinalize(
             ExperimentCase experimentCase,
             CasePaths paths) {
+        if (experimentCase.isDifferentialSynthesis()) {
+            return validateDifferentialCaseArtifacts(experimentCase, paths);
+        }
+        if (experimentCase.isNativeDifferentialSynthesis()) {
+            return validateNativeDifferentialCaseArtifacts(experimentCase, paths);
+        }
         List<String> errors = new ArrayList<String>();
         requireNonEmptyFile(errors, "", paths.outputFile);
         requireNonEmptyFile(errors, "", paths.transitionsFile);
@@ -593,8 +600,149 @@ public final class BatchExperimentRunner {
         return errors;
     }
 
+    private static List<String> validateNativeDifferentialCaseArtifacts(
+            ExperimentCase experimentCase, CasePaths paths) {
+        List<String> errors = new ArrayList<String>();
+        requireNonEmptyFile(errors, "", paths.outputFile);
+        requireNonEmptyFile(errors, "", paths.transitionsFile);
+        requireNonEmptyFile(errors, "", paths.minimizedTransitionsFile);
+        requireNonEmptyFile(errors, "", paths.minimizedCountsFile);
+        requireNonEmptyFile(errors, "", paths.evaluationCsvFile);
+        requireNonEmptyFile(errors, "", paths.executionMetadataFile);
+        Map<String, String> metrics = readEvaluationCsvValues(paths.evaluationCsvFile);
+        requireMetricValue(errors, "", metrics, "native_ds_schema_version", "1");
+        requireMetricValue(errors, "", metrics, "native_ds_backend", "mtsa_native");
+        requireMetricValue(errors, "", metrics, "native_ds_method", safeLower(experimentCase.method));
+        requireMetrics(errors, "", metrics, "native_ds_game_update_ns",
+                "native_ds_requirements_analysis_ns", "native_ds_controller_generation_ns");
+        if (metrics.containsKey("native_ds_generation_timing_version")) {
+            requireMetricValue(errors, "", metrics, "native_ds_generation_timing_version", "1");
+            requireMetrics(errors, "", metrics, "native_ds_controller_build_ns",
+                    "native_ds_controller_conversion_ns", "native_ds_controller_postcompose_ns");
+            if ("native_differential_differential".equalsIgnoreCase(experimentCase.method)) {
+                requireMetrics(errors, "", metrics, "native_ds_controller_copy_ns", "native_ds_controller_patch_ns");
+            }
+        }
+        if ("native_differential_prepare".equalsIgnoreCase(experimentCase.method)) {
+            requireMetrics(errors, "", metrics, "native_ds_initial_total_ns", "native_ds_snapshot_save_ns");
+        } else {
+            requireMetrics(errors, "", metrics, "native_ds_snapshot_restore_ns",
+                    "native_ds_compatibility_ns", "native_ds_update_total_ns");
+        }
+        for (Map.Entry<String, String> metric : metrics.entrySet()) {
+            if (metric.getKey().startsWith("native_ds_")
+                    && (metric.getKey().endsWith("_ns") || metric.getKey().endsWith("_bytes")
+                    || metric.getKey().endsWith("_gc_collection_ms") || metric.getKey().endsWith("_gc_collection_count"))) {
+                try {
+                    if (Long.parseLong(metric.getValue()) < 0) throw new NumberFormatException();
+                } catch (NumberFormatException ex) {
+                    errors.add("Invalid native measurement " + metric.getKey() + "=" + metric.getValue());
+                }
+            }
+        }
+        validatePrimaryTimingMetrics(errors, "", metrics);
+        validateEvaluationCsvSchemaAndKeys(errors, "", paths.evaluationCsvFile);
+        if (!fileContains(paths.executionMetadataFile, "\"matches\": true")) {
+            errors.add("native method/target execution validation did not pass");
+        }
+        return errors;
+    }
+
+    private static List<String> validateDifferentialCaseArtifacts(
+            ExperimentCase experimentCase, CasePaths paths) {
+        List<String> errors = new ArrayList<String>();
+        requireNonEmptyFile(errors, "", paths.outputFile);
+        requireNonEmptyFile(errors, "", paths.transitionsFile);
+        requireNonEmptyFile(errors, "", paths.evaluationCsvFile);
+        requireNonEmptyFile(errors, "", paths.executionMetadataFile);
+        Map<String, String> metrics = readEvaluationCsvValues(paths.evaluationCsvFile);
+        requireMetricValue(errors, "", metrics, "mode", "Differential synthesis");
+        requireMetricValue(errors, "", metrics, "ds_schema_version", "2");
+        requireMetricValue(errors, "", metrics, "ds_measurement_scope",
+                experimentCase.effectiveMeasurementScope());
+        requireKey(errors, "", metrics, "result");
+        requireKey(errors, "", metrics, "failure_reason");
+        String status = metrics.get("ds_status");
+        if (!isDifferentialStatus(status)) {
+            errors.add("Unknown or missing differential synthesis status: " + status);
+        }
+        for (String key : new String[] {"ds_prepared_input_sha256", "ds_controller_output_sha256"}) {
+            String hash = metrics.get(key);
+            if (hash == null || !hash.matches("[0-9a-fA-F]{64}")) {
+                errors.add("Invalid or missing differential synthesis SHA-256: " + key);
+            }
+        }
+        for (String key : new String[] {"ds_game_update_ns", "ds_analysis_ns", "ds_compatibility_ns",
+                "ds_generation_ns", "ds_export_ns", "ds_update_pipeline_ns"}) {
+            requireKey(errors, "", metrics, key);
+            String value = metrics.get(key);
+            if (value != null && !value.isEmpty()) {
+                Long nanos = parseLong(value);
+                if (nanos == null || nanos.longValue() < 0L) {
+                    errors.add("Invalid differential synthesis duration: " + key + "=" + value);
+                }
+            }
+        }
+        requireMetrics(errors, "", metrics, "ds_game_update_ns", "ds_analysis_ns");
+        if (STATUS_SUCCESS.equals(status)) {
+            requireMetrics(errors, "", metrics, "ds_game_update_ns", "ds_analysis_ns", "ds_compatibility_ns",
+                    "ds_generation_ns", "ds_export_ns");
+        } else if (metrics.get("ds_generation_ns") != null
+                && !metrics.get("ds_generation_ns").isEmpty()) {
+            errors.add("Generation duration must be empty when generation did not run.");
+        }
+        boolean updateScope = "update".equals(experimentCase.effectiveMeasurementScope());
+        if (updateScope) {
+            requireMetrics(errors, "", metrics, "ds_update_pipeline_ns", "ds_game_update_ns", "ds_analysis_ns");
+        } else if (metrics.get("ds_update_pipeline_ns") != null
+                && !metrics.get("ds_update_pipeline_ns").isEmpty()) {
+            errors.add("Update pipeline duration must be empty for generation measurement scope.");
+        }
+        requireMetricValue(errors, "", metrics, "ds_memory_scope", updateScope
+                ? "update_with_old_inputs"
+                : (STATUS_SUCCESS.equals(status) ? "generation_with_prepared_inputs" : "not_run"));
+        requireMetric(errors, "", metrics, "heap_memory_sampling_available");
+        String heapAvailable = metrics.get("heap_memory_sampling_available");
+        if (!"true".equals(heapAvailable) && !"false".equals(heapAvailable)) {
+            errors.add("heap_memory_sampling_available must be true or false.");
+        }
+        if (!updateScope && !STATUS_SUCCESS.equals(status) && !"false".equals(heapAvailable)) {
+            errors.add("Heap generation sampling must be unavailable when generation did not run.");
+        }
+        validateEvaluationCsvSchemaAndKeys(errors, "", paths.evaluationCsvFile);
+        if (!fileContains(paths.executionMetadataFile, "\"matches\": true")) {
+            errors.add("method/target execution validation did not pass");
+        }
+        return errors;
+    }
+
+    private static boolean isDifferentialStatus(String status) {
+        return STATUS_SUCCESS.equals(status)
+                || "BASE_UNREALIZABLE".equals(status)
+                || "UNREALIZABLE".equals(status)
+                || "SIMULATION_INCOMPATIBLE".equals(status);
+    }
+
+    private static boolean skipsDifferentialMeasurement(
+            ExperimentCase experimentCase, Map<String, String> metrics) {
+        String status = metrics.get("ds_status");
+        return experimentCase.isDifferentialSynthesis()
+                && "generation".equals(experimentCase.effectiveMeasurementScope())
+                && isDifferentialStatus(status) && !STATUS_SUCCESS.equals(status);
+    }
+
     private static String determineTimeoutPhase(CasePaths paths, CaseResult result) {
         MemoryWindowHandshakeCoordinator.Result protocol = result.memoryProtocolResult;
+        if (paths.differentialSynthesis) {
+            if (protocol != null && protocol.getEndMarkerCount() > 0) {
+                return "DIFFERENTIAL_POST_MEASUREMENT_EXPORT";
+            }
+            if (protocol != null && protocol.getStartMarkerCount() > 0) {
+                return "update".equals(paths.measurementScope)
+                        ? "DIFFERENTIAL_UPDATE_PIPELINE" : "DIFFERENTIAL_CONTROLLER_GENERATION";
+            }
+            return "DIFFERENTIAL_JVM_STARTUP_OR_INPUT_ANALYSIS_OR_COMPATIBILITY";
+        }
         if (protocol != null && protocol.getEndMarkerCount() > 0) {
             return "POST_SYNTHESIS_EVALUATION_OR_ARTIFACT_GENERATION";
         }
@@ -698,7 +846,8 @@ public final class BatchExperimentRunner {
                 || completeSynthesisRssWindow;
         boolean requiredMemoryDataComplete =
                 heapMeasurementComplete && rssMeasurementComplete;
-        if (STATUS_SUCCESS.equals(result.status) && !requiredMemoryDataComplete) {
+        boolean measurementSkipped = skipsDifferentialMeasurement(experimentCase, existingMetrics);
+        if (STATUS_SUCCESS.equals(result.status) && !measurementSkipped && !requiredMemoryDataComplete) {
             result.status = STATUS_MEASUREMENT_FAILED;
             result.errorMessage = appendError(
                     result.errorMessage,
@@ -706,7 +855,7 @@ public final class BatchExperimentRunner {
                             + " (heap=" + heapMeasurementComplete
                             + ", rss=" + rssMeasurementComplete + ")");
         }
-        List<String> memoryQualityErrors = memoryQualityErrors(
+        List<String> memoryQualityErrors = measurementSkipped ? new ArrayList<String>() : memoryQualityErrors(
                 config,
                 result,
                 existingMetrics,
@@ -783,6 +932,12 @@ public final class BatchExperimentRunner {
                         "batch memory quality validation enabled",
                         Boolean.toString(config.validateMemoryQuality),
                         "boolean"));
+        if (experimentCase.isDifferentialSynthesis()) {
+            addExternalMetricIfAbsent(metrics, existingMetrics,
+                    externalMetric("batch_memory_quality_validation_applicable", section,
+                            "requested measurement window available for validation",
+                            Boolean.toString(!measurementSkipped), "boolean"));
+        }
         addExternalMetricIfAbsent(metrics, existingMetrics,
                 externalMetric(
                         "batch_memory_quality_validation_passed",
@@ -1321,7 +1476,8 @@ public final class BatchExperimentRunner {
             result.memoryMetricsWriteAttempted = true;
             UpdatingControllerEvaluationRecorder.appendExternalDataMetrics(
                     paths.evaluationCsvFile,
-                    evaluationMode(experimentCase.method),
+                    experimentCase.isDifferentialSynthesis()
+                            ? "Differential synthesis" : evaluationMode(experimentCase.method),
                     result.status,
                     finalFailureReason,
                     metrics);
@@ -1736,12 +1892,21 @@ public final class BatchExperimentRunner {
         }
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
-        command.add(SingleCompositionRunner.class.getName());
+        command.add(experimentCase.isDifferentialSynthesis()
+                ? "ltsa.differential.DifferentialSynthesisRunner"
+                : SingleCompositionRunner.class.getName());
         command.add("--lts");
         command.add(experimentCase.lts.getPath());
         command.add("--target");
         command.add(experimentCase.target);
-        if (config.validateMethodTarget) {
+        if (experimentCase.isDifferentialSynthesis()) {
+            command.add("--scenario");
+            command.add(experimentCase.scenario.getPath());
+            command.add("--method");
+            command.add(experimentCase.method);
+            command.add("--measurement-scope");
+            command.add(experimentCase.effectiveMeasurementScope());
+        } else if (config.validateMethodTarget || experimentCase.isNativeDifferentialSynthesis()) {
             command.add("--expected-method");
             command.add(experimentCase.method);
         }
@@ -1751,10 +1916,12 @@ public final class BatchExperimentRunner {
         command.add(paths.outputFile.getPath());
         command.add("--transitions");
         command.add(paths.transitionsFile.getPath());
-        command.add("--minimized-transitions");
-        command.add(paths.minimizedTransitionsFile.getPath());
-        command.add("--minimized-counts");
-        command.add(paths.minimizedCountsFile.getPath());
+        if (!experimentCase.isDifferentialSynthesis()) {
+            command.add("--minimized-transitions");
+            command.add(paths.minimizedTransitionsFile.getPath());
+            command.add("--minimized-counts");
+            command.add(paths.minimizedCountsFile.getPath());
+        }
         if (paths.requirementsCheckEnabled) {
             command.add("--requirements-check");
             command.add(paths.requirementsCheckFile.getPath());
@@ -1870,8 +2037,8 @@ public final class BatchExperimentRunner {
     private static String statusFromExitCode(int exitCode, CasePaths paths) {
         if (exitCode == SingleCompositionRunner.EXIT_SUCCESS) {
             if (paths.transitionsFile.exists()
-                    && paths.minimizedTransitionsFile.exists()
-                    && paths.minimizedCountsFile.exists()
+                    && (paths.differentialSynthesis || paths.minimizedTransitionsFile.exists())
+                    && (paths.differentialSynthesis || paths.minimizedCountsFile.exists())
                     && paths.executionMetadataFile.exists()
                     && (!paths.requirementsCheckEnabled || paths.requirementsCheckFile.exists())) {
                 return STATUS_SUCCESS;
@@ -1926,6 +2093,13 @@ public final class BatchExperimentRunner {
         values.put("variant", experimentCase.variant);
         values.put("target", experimentCase.target);
         values.put("lts", experimentCase.lts.getPath());
+        if (experimentCase.isDifferentialSynthesis()) {
+            values.put("executionMode", experimentCase.mode);
+            values.put("measurementScope", experimentCase.effectiveMeasurementScope());
+            values.put("ltsSha256", ExperimentCampaignProvenance.sha256(experimentCase.lts));
+            values.put("scenario", experimentCase.scenario.getPath());
+            values.put("scenarioSha256", ExperimentCampaignProvenance.sha256(experimentCase.scenario));
+        }
         values.put("runIndex", Integer.valueOf(paths.runIndex));
         values.put("runCount", Integer.valueOf(paths.runCount));
         if (paths.runLabel != null) {
@@ -1933,8 +2107,8 @@ public final class BatchExperimentRunner {
         }
         values.put("output", paths.outputFile.getPath());
         values.put("transitions", paths.transitionsFile.getPath());
-        values.put("minimizedTransitions", paths.minimizedTransitionsFile.getPath());
-        values.put("minimizedCounts", paths.minimizedCountsFile.getPath());
+        values.put("minimizedTransitions", paths.differentialSynthesis ? null : paths.minimizedTransitionsFile.getPath());
+        values.put("minimizedCounts", paths.differentialSynthesis ? null : paths.minimizedCountsFile.getPath());
         values.put("requirementsCheckEnabled", Boolean.valueOf(paths.requirementsCheckEnabled));
         values.put("traceCheckEnabled", Boolean.valueOf(config.traceCheck));
         values.put("requirementsCheck",
@@ -1949,6 +2123,10 @@ public final class BatchExperimentRunner {
                 Boolean.valueOf(result.memoryMetricsWriteSucceeded));
         values.put("heapSamplingEnabled", Boolean.valueOf(result.heapSamplingEnabled));
         Map<String, String> evaluationMetrics = readEvaluationCsvValues(paths.evaluationCsvFile);
+        if (experimentCase.isDifferentialSynthesis()) {
+            values.put("differentialSynthesisStatus", evaluationMetrics.get("ds_status"));
+            values.put("differentialMemoryScope", evaluationMetrics.get("ds_memory_scope"));
+        }
         putMetricIfPresent(values, evaluationMetrics,
                 "controller_synthesis_sampled_base_heap_used",
                 "controllerSynthesisSampledBaseHeapUsedBytes");
@@ -2232,85 +2410,101 @@ public final class BatchExperimentRunner {
                     completed.paths.evaluationCsvFile);
 
             if (STATUS_SUCCESS.equals(completed.result.status)) {
-                requireNonEmptyFile(errors, prefix, completed.paths.outputFile);
-                requireNonEmptyFile(errors, prefix, completed.paths.transitionsFile);
-                requireNonEmptyFile(errors, prefix, completed.paths.minimizedTransitionsFile);
-                requireNonEmptyFile(errors, prefix, completed.paths.minimizedCountsFile);
-                requireNonEmptyFile(errors, prefix, completed.paths.executionMetadataFile);
-                if (completed.paths.requirementsCheckEnabled) {
-                    requireNonEmptyFile(errors, prefix, completed.paths.requirementsCheckFile);
-                }
-                requireMetric(errors, prefix, metrics, "peak_state_space_states");
-                requireMetric(errors, prefix, metrics, "peak_state_space_transitions");
-                validatePrimaryTimingMetrics(errors, prefix, metrics);
-                if (completed.result.heapSamplingEnabled) {
-                    requireMetrics(errors, prefix, metrics,
-                            "controller_synthesis_sampled_peak_heap_used",
-                            "heap_memory_sampling_available",
-                            "heap_memory_sampling_sample_count",
-                            "heap_memory_sampling_failure_count",
-                            "heap_memory_sampling_max_gap_ms");
-                }
-                if (completed.result.rssSamplingEnabled) {
-                    requireMetrics(errors, prefix, metrics,
-                            "controller_synthesis_sampled_base_process_rss",
-                            "controller_synthesis_sampled_peak_process_rss",
-                            "controller_synthesis_sampled_process_rss_increase",
-                            "memory_protocol_handshake_complete",
-                            "memory_protocol_boundary_samples_complete",
-                            "process_rss_synthesis_window_complete_and_valid",
-                            "process_rss_synthesis_window_sample_count",
-                            "process_rss_synthesis_window_failure_count",
-                            "process_rss_synthesis_window_provider_failure_count",
-                            "process_rss_synthesis_window_provider_timeout_count",
-                            "process_rss_synthesis_window_provider_circuit_open",
-                            "process_rss_synthesis_window_max_gap_ms");
-                }
-                if (config.validateMemoryQuality
-                        && !"true".equalsIgnoreCase(metrics.get(
-                                "batch_memory_quality_validation_passed"))) {
-                    errors.add(prefix + "memory quality validation did not pass");
-                }
-                if (config.validateMemoryQuality) {
-                    requireMetricValue(
-                            errors,
-                            prefix,
-                            metrics,
-                            "batch_memory_quality_policy",
-                            MEMORY_QUALITY_POLICY);
-                    Long rssGapLimit = config.effectiveMaxRssSamplingGapMillis();
-                    if (rssGapLimit != null) {
-                        requireMetricValue(
-                                errors,
-                                prefix,
-                                metrics,
-                                "batch_rss_sampling_max_gap_limit_ms",
-                                Long.toString(rssGapLimit.longValue()));
+                if (completed.experimentCase.isDifferentialSynthesis()) {
+                    for (String error : validateDifferentialCaseArtifacts(
+                            completed.experimentCase, completed.paths)) {
+                        errors.add(prefix + error);
                     }
-                    Long heapGapLimit = config.effectiveMaxHeapSamplingGapMillis();
-                    if (heapGapLimit != null) {
-                        requireMetricValue(
-                                errors,
-                                prefix,
-                                metrics,
-                                "batch_heap_sampling_max_gap_limit_ms",
-                                Long.toString(heapGapLimit.longValue()));
+                } else if (completed.experimentCase.isNativeDifferentialSynthesis()) {
+                    for (String error : validateNativeDifferentialCaseArtifacts(
+                            completed.experimentCase, completed.paths)) {
+                        errors.add(prefix + error);
                     }
-                    Long heapWarningReference =
-                            config.heapSamplingGapWarningReferenceMillis();
-                    if (completed.result.heapSamplingEnabled
-                            && heapWarningReference != null) {
+                } else {
+                    requireNonEmptyFile(errors, prefix, completed.paths.outputFile);
+                    requireNonEmptyFile(errors, prefix, completed.paths.transitionsFile);
+                    requireNonEmptyFile(errors, prefix, completed.paths.minimizedTransitionsFile);
+                    requireNonEmptyFile(errors, prefix, completed.paths.minimizedCountsFile);
+                    requireNonEmptyFile(errors, prefix, completed.paths.executionMetadataFile);
+                    if (completed.paths.requirementsCheckEnabled) {
+                        requireNonEmptyFile(errors, prefix, completed.paths.requirementsCheckFile);
+                    }
+                    requireMetric(errors, prefix, metrics, "peak_state_space_states");
+                    requireMetric(errors, prefix, metrics, "peak_state_space_transitions");
+                    validatePrimaryTimingMetrics(errors, prefix, metrics);
+                }
+                boolean measurementSkipped = skipsDifferentialMeasurement(
+                        completed.experimentCase, metrics);
+                if (!measurementSkipped) {
+                    if (completed.result.heapSamplingEnabled) {
+                        requireMetrics(errors, prefix, metrics,
+                                "controller_synthesis_sampled_peak_heap_used",
+                                "heap_memory_sampling_available",
+                                "heap_memory_sampling_sample_count",
+                                "heap_memory_sampling_failure_count",
+                                "heap_memory_sampling_max_gap_ms");
+                    }
+                    if (completed.result.rssSamplingEnabled) {
+                        requireMetrics(errors, prefix, metrics,
+                                "controller_synthesis_sampled_base_process_rss",
+                                "controller_synthesis_sampled_peak_process_rss",
+                                "controller_synthesis_sampled_process_rss_increase",
+                                "memory_protocol_handshake_complete",
+                                "memory_protocol_boundary_samples_complete",
+                                "process_rss_synthesis_window_complete_and_valid",
+                                "process_rss_synthesis_window_sample_count",
+                                "process_rss_synthesis_window_failure_count",
+                                "process_rss_synthesis_window_provider_failure_count",
+                                "process_rss_synthesis_window_provider_timeout_count",
+                                "process_rss_synthesis_window_provider_circuit_open",
+                                "process_rss_synthesis_window_max_gap_ms");
+                    }
+                    if (config.validateMemoryQuality
+                            && !"true".equalsIgnoreCase(metrics.get(
+                                    "batch_memory_quality_validation_passed"))) {
+                        errors.add(prefix + "memory quality validation did not pass");
+                    }
+                    if (config.validateMemoryQuality) {
                         requireMetricValue(
                                 errors,
                                 prefix,
                                 metrics,
-                                "batch_heap_sampling_gap_warning_reference_ms",
-                                Long.toString(heapWarningReference.longValue()));
-                        requireMetric(
-                                errors,
-                                prefix,
-                                metrics,
-                                "batch_heap_sampling_gap_warning");
+                                "batch_memory_quality_policy",
+                                MEMORY_QUALITY_POLICY);
+                        Long rssGapLimit = config.effectiveMaxRssSamplingGapMillis();
+                        if (rssGapLimit != null) {
+                            requireMetricValue(
+                                    errors,
+                                    prefix,
+                                    metrics,
+                                    "batch_rss_sampling_max_gap_limit_ms",
+                                    Long.toString(rssGapLimit.longValue()));
+                        }
+                        Long heapGapLimit = config.effectiveMaxHeapSamplingGapMillis();
+                        if (heapGapLimit != null) {
+                            requireMetricValue(
+                                    errors,
+                                    prefix,
+                                    metrics,
+                                    "batch_heap_sampling_max_gap_limit_ms",
+                                    Long.toString(heapGapLimit.longValue()));
+                        }
+                        Long heapWarningReference =
+                                config.heapSamplingGapWarningReferenceMillis();
+                        if (completed.result.heapSamplingEnabled
+                                && heapWarningReference != null) {
+                            requireMetricValue(
+                                    errors,
+                                    prefix,
+                                    metrics,
+                                    "batch_heap_sampling_gap_warning_reference_ms",
+                                    Long.toString(heapWarningReference.longValue()));
+                            requireMetric(
+                                    errors,
+                                    prefix,
+                                    metrics,
+                                    "batch_heap_sampling_gap_warning");
+                        }
                     }
                 }
                 if (!fileContains(
@@ -2325,7 +2519,56 @@ public final class BatchExperimentRunner {
                 errors.add(prefix + "meta status does not match final case status");
             }
         }
+        validateDifferentialPairs(errors, completedCases);
         return errors;
+    }
+
+    /** Compare normally completed distinct methods with the same inputs and measurement scope. */
+    private static void validateDifferentialPairs(
+            List<String> errors, List<CompletedCase> completedCases) {
+        Map<List<String>, List<CompletedCase>> groups = new LinkedHashMap<>();
+        for (CompletedCase completed : completedCases) {
+            if (!completed.experimentCase.isDifferentialSynthesis()
+                    || !STATUS_SUCCESS.equals(completed.result.status)) {
+                continue;
+            }
+            ExperimentCase experimentCase = completed.experimentCase;
+            try {
+                List<String> key = java.util.Arrays.asList(
+                        Integer.toString(completed.paths.runIndex),
+                        experimentCase.lts.getCanonicalPath(), experimentCase.target,
+                        experimentCase.scenario.getCanonicalPath(), experimentCase.effectiveMeasurementScope());
+                groups.computeIfAbsent(key, ignored -> new ArrayList<>()).add(completed);
+            } catch (IOException e) {
+                errors.add("Differential pair input path could not be resolved: " + e);
+            }
+        }
+        for (List<CompletedCase> group : groups.values()) {
+            for (int i = 0; i < group.size(); i++) {
+                CompletedCase left = group.get(i);
+                Map<String, String> leftMetrics = readEvaluationCsvValues(left.paths.evaluationCsvFile);
+                for (int j = i + 1; j < group.size(); j++) {
+                    CompletedCase right = group.get(j);
+                    if (left.experimentCase.method.equals(right.experimentCase.method)) {
+                        continue;
+                    }
+                    Map<String, String> rightMetrics = readEvaluationCsvValues(right.paths.evaluationCsvFile);
+                    for (String key : new String[] {"ds_prepared_input_sha256", "ds_status",
+                            "ds_controller_output_sha256"}) {
+                        String expected = leftMetrics.get(key);
+                        String actual = rightMetrics.get(key);
+                        if (expected == null || !expected.equals(actual)) {
+                            errors.add("run=" + left.paths.runIndex + ", " + left.experimentCase.method
+                                    + "=" + left.experimentCase.id + ", " + right.experimentCase.method
+                                    + "=" + right.experimentCase.id
+                                    + ": paired differential metric differs: " + key
+                                    + " (" + left.experimentCase.method + "=" + expected + ", "
+                                    + right.experimentCase.method + "=" + actual + ")");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private static void validateEvaluationCsvSchemaAndKeys(
@@ -2555,6 +2798,14 @@ public final class BatchExperimentRunner {
             item.put("id", completed.experimentCase.id);
             item.put("example", completed.experimentCase.example);
             item.put("method", completed.experimentCase.method);
+            if (completed.experimentCase.isDifferentialSynthesis()) {
+                item.put("executionMode", completed.experimentCase.mode);
+                item.put("measurementScope", completed.experimentCase.effectiveMeasurementScope());
+                item.put("lts", artifactSummary(completed.experimentCase.lts));
+                item.put("ltsSha256", ExperimentCampaignProvenance.sha256(completed.experimentCase.lts));
+                item.put("scenario", artifactSummary(completed.experimentCase.scenario));
+                item.put("scenarioSha256", ExperimentCampaignProvenance.sha256(completed.experimentCase.scenario));
+            }
             item.put("variant", completed.experimentCase.variant);
             item.put("target", completed.experimentCase.target);
             item.put("status", completed.result.status);
@@ -2566,8 +2817,10 @@ public final class BatchExperimentRunner {
                     artifactSummary(completed.paths.executionMetadataFile));
             item.put("transitions", artifactSummary(completed.paths.transitionsFile));
             item.put("minimizedTransitions",
-                    artifactSummary(completed.paths.minimizedTransitionsFile));
-            item.put("minimizedCounts", artifactSummary(completed.paths.minimizedCountsFile));
+                    completed.paths.differentialSynthesis ? null
+                            : artifactSummary(completed.paths.minimizedTransitionsFile));
+            item.put("minimizedCounts", completed.paths.differentialSynthesis ? null
+                    : artifactSummary(completed.paths.minimizedCountsFile));
             item.put("stdout", artifactSummary(completed.paths.stdoutFile));
             item.put("stderr", artifactSummary(completed.paths.stderrFile));
             item.put("effectiveChildCommand", completed.result.command);
@@ -3214,6 +3467,16 @@ public final class BatchExperimentRunner {
         out.println("      lts: Experiment/lts/Workflow/workflow_no_tr.lts");
         out.println("      target: UpdCont");
         out.println("      requirementsCheck: false  # optional per-case override");
+        out.println("    # Dedicated differential synthesis case (requirementsCheck/traceCheck disabled):");
+        out.println("    - id: differential_case_full");
+        out.println("      example: SafetyExample");
+        out.println("      mode: differential-synthesis");
+        out.println("      method: FULL  # or DIFFERENTIAL / FROM_SCRATCH; each case runs in a separate JVM");
+        out.println("      measurementScope: generation  # default generation; update includes game update/analysis/gate/generation");
+        out.println("      lts: Experiment/lts/safety.lts");
+        out.println("      target: GAME");
+        out.println("      scenario: Experiment/scenarios/safety_update.yaml");
+        out.println("      requirementsCheck: false");
         out.println("");
         out.println("CLI top-level defaults:");
         out.println("  --requirements-check true|false");
@@ -3283,6 +3546,8 @@ public final class BatchExperimentRunner {
         final int runIndex;
         final int runCount;
         final String runLabel;
+        final boolean differentialSynthesis;
+        final String measurementScope;
 
         private CasePaths(
                 File caseDirectory,
@@ -3299,7 +3564,9 @@ public final class BatchExperimentRunner {
                 File metaFile,
                 int runIndex,
                 int runCount,
-                String runLabel) {
+                String runLabel,
+                boolean differentialSynthesis,
+                String measurementScope) {
             this.caseDirectory = caseDirectory;
             this.outputFile = outputFile;
             this.transitionsFile = transitionsFile;
@@ -3315,6 +3582,8 @@ public final class BatchExperimentRunner {
             this.runIndex = runIndex;
             this.runCount = runCount;
             this.runLabel = runLabel;
+            this.differentialSynthesis = differentialSynthesis;
+            this.measurementScope = measurementScope;
         }
 
         static CasePaths create(
@@ -3349,15 +3618,19 @@ public final class BatchExperimentRunner {
                     new File(caseDirectory, prefix + "_meta.json"),
                     runIndex,
                     runCount,
-                    runLabel);
+                    runLabel,
+                    experimentCase.isDifferentialSynthesis(),
+                    experimentCase.effectiveMeasurementScope());
         }
 
         List<File> artifactFiles() {
             List<File> files = new ArrayList<File>();
             files.add(outputFile);
             files.add(transitionsFile);
-            files.add(minimizedTransitionsFile);
-            files.add(minimizedCountsFile);
+            if (!differentialSynthesis) {
+                files.add(minimizedTransitionsFile);
+                files.add(minimizedCountsFile);
+            }
             if (requirementsCheckFile != null) {
                 files.add(requirementsCheckFile);
             }

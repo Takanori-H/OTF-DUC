@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import ltsa.lts.CompactState;
+import ltsa.differential.nativeintegration.NativeDifferentialResult;
 import ltsa.lts.CompositeState;
 import ltsa.lts.LTSInputString;
 import ltsa.lts.PrintTransitions;
@@ -92,7 +93,13 @@ public final class SingleCompositionRunner {
                                 }
                             })
                             .withCompositionStartNanos(compositionStartNanos)
-                            .withOpenFileName(ltsFile.getAbsolutePath());
+                            .withOpenFileName(ltsFile.getAbsolutePath())
+                            .withSuccessfulCompositionCallback(
+                                    new CompositionEvaluationRunner.SuccessfulCompositionCallback() {
+                                        @Override public void afterSuccessfulComposition(CompositeState current) {
+                                            recordNativeDifferentialMetrics(current);
+                                        }
+                                    });
 
             CompositionEvaluationRunner.Result result = CompositionEvaluationRunner.run(request);
             Throwable failure = result.getFailure();
@@ -189,6 +196,50 @@ public final class SingleCompositionRunner {
                     // best effort
                 }
             }
+        }
+    }
+
+    static void recordNativeDifferentialMetrics(CompositeState current) {
+        if (current.differentialOptions == null) return;
+        NativeDifferentialResult result = current.differentialResult;
+        if (result == null || result.getMode() != current.differentialOptions.getMode()) {
+            throw new IllegalStateException("Native differential synthesis completed without matching measurements");
+        }
+        String section = "Native differential synthesis";
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "native_ds_schema_version", section, "Measurement schema", "1", "text", "");
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "native_ds_backend", section, "Synthesis backend", "mtsa_native", "text", "");
+        UpdatingControllerEvaluationRecorder.recordStableMetric(
+                "native_ds_method", section, "Executed method",
+                NativeDifferentialResult.methodName(result.getMode()), "text", "");
+        if (result.getPhaseNanos().containsKey("controller_build")) {
+            UpdatingControllerEvaluationRecorder.recordStableMetric(
+                    "native_ds_generation_timing_version", section, "Generation timing schema", "1", "text", "");
+        }
+        for (Map.Entry<String, Long> phase : result.getPhaseNanos().entrySet()) {
+            UpdatingControllerEvaluationRecorder.recordStableMetric(
+                    "native_ds_" + phase.getKey() + "_ns", section, phase.getKey(),
+                    Long.toString(phase.getValue()), "ns",
+                    "Elapsed time includes GC; generation contains build/conversion/postcompose, build contains copy/patch; do not sum nested phases; absent means not executed");
+        }
+        for (Map.Entry<String, Long> memory : result.getMemoryBytes().entrySet()) {
+            UpdatingControllerEvaluationRecorder.recordStableMetric(
+                    "native_ds_" + memory.getKey() + "_bytes", section, memory.getKey(),
+                    Long.toString(memory.getValue()), "bytes",
+                    "Request-local sampled heap (100 ms), including retained data; no forced GC; not process RSS");
+        }
+        for (Map.Entry<String, Long> gc : result.getGcCollectionMillis().entrySet()) {
+            UpdatingControllerEvaluationRecorder.recordStableMetric(
+                    "native_ds_" + gc.getKey() + "_gc_collection_ms", section, gc.getKey() + " GC collection time",
+                    Long.toString(gc.getValue()), "ms",
+                    "JVM-wide GC MXBean interval delta; coarse collection time, not exact pause; absent if unsupported");
+        }
+        for (Map.Entry<String, Long> gc : result.getGcCollectionCounts().entrySet()) {
+            UpdatingControllerEvaluationRecorder.recordStableMetric(
+                    "native_ds_" + gc.getKey() + "_gc_collection_count", section, gc.getKey() + " GC collection count",
+                    Long.toString(gc.getValue()), "count",
+                    "JVM-wide GC MXBean interval delta; absent if unsupported; nested intervals must not be summed");
         }
     }
 
@@ -361,7 +412,7 @@ public final class SingleCompositionRunner {
                 + "[--minimized-transitions minimized_transitions.txt] "
                 + "[--minimized-counts minimized_counts.csv] "
                 + "[--requirements-check requirements_check.csv] "
-                + "[--expected-method Traditional|stepwise_delayed+SBP|OTF] "
+                + "[--expected-method Traditional|stepwise_delayed+SBP|OTF|native_differential_<mode>] "
                 + "[--execution-metadata execution.json]");
     }
 
@@ -426,7 +477,9 @@ public final class SingleCompositionRunner {
             String expected = normalizeMethod(expectedMethod);
             String actual = "non_updating_controller";
             boolean actualSbp = false;
-            if (current instanceof UpdatingControllerCompositeState) {
+            if (current != null && current.differentialOptions != null) {
+                actual = NativeDifferentialResult.methodName(current.differentialOptions.getMode());
+            } else if (current instanceof UpdatingControllerCompositeState) {
                 UpdatingControllerCompositeState update =
                         (UpdatingControllerCompositeState) current;
                 actualSbp = update.isSafetyBackwardPruning();
@@ -476,6 +529,9 @@ public final class SingleCompositionRunner {
             String normalized = method == null
                     ? ""
                     : method.toLowerCase(java.util.Locale.ROOT);
+            if (normalized.startsWith("native_differential_")) {
+                return NativeDifferentialResult.isMethodName(normalized) ? normalized : "unknown";
+            }
             if (normalized.contains("traditional")) {
                 return "traditional";
             }

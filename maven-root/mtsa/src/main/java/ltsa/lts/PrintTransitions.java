@@ -4,8 +4,7 @@ import static ltsa.lts.CompactStateUtils.isProbabilisticMachine;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.TreeSet;
 import java.util.Set;
 
 public class PrintTransitions {
@@ -36,15 +35,22 @@ public class PrintTransitions {
 
 
 
-  private String prettyPrintAlphabet(Set<String> alphabet) {
-    if (alphabet.size() == 0) return "";
-    String retval = "+{";
-    Iterator<String> I = alphabet.iterator();
-    while (I.hasNext()) {
-      retval = retval + I.next();
-      if (I.hasNext()) retval = retval + ", ";
+  private void appendAlphabetExtension(StringBuilder fsp) {
+    Set<String> unusedLabels = new TreeSet<>();
+    Arrays.stream(sm.getAlphabet())
+        .filter(label -> !sm.usesLabel(label))
+        .forEach(unusedLabels::add);
+    if (unusedLabels.isEmpty()) return;
+    fsp.append("+{");
+    boolean first = true;
+    for (String label : unusedLabels) {
+      if (!first) fsp.append(", ");
+      // Format one label at a time: numeric components require FSP brackets,
+      // while a multi-label Alphabet may already contain its own set braces.
+      fsp.append(new Alphabet(new String[] {label}).toString());
+      first = false;
     }
-    return retval + "}";
+    fsp.append("}");
   }
 
   public String getFSP(int k) {
@@ -69,7 +75,10 @@ public class PrintTransitions {
         if (i == sm.endseq) fsp.append("END");
         else fsp.append("STOP");
         if (i < sm.maxStates - 1) fsp.append(",\n");
-        else fsp.append(".\n");
+        else {
+          appendAlphabetExtension(fsp);
+          fsp.append(".\n");
+        }
         fsp.append("\n");
       } else {
         fsp.append("(");
@@ -124,21 +133,7 @@ public class PrintTransitions {
             if (i < sm.maxStates - 1) fsp.append("),\n");
             else {
               fsp.append(")");
-              Set<String> remainingLabelsSet = new HashSet<>();
-              Arrays.stream(sm.getAlphabet())
-                      .filter(label -> !sm.usesLabel(label))
-                      .forEach(remainingLabelsSet::add);
-              if (remainingLabelsSet.size() != 0) {
-                fsp.append("+{");
-                Iterator<String> I = remainingLabelsSet.iterator();
-                String[] alphabetArray = new String[remainingLabelsSet.size()];
-                int pos = 0;
-                while (I.hasNext()) {
-                  alphabetArray[pos++] = I.next();
-                }
-                Alphabet remaining = new Alphabet(alphabetArray);
-                fsp.append(remaining.toString());
-              }
+              appendAlphabetExtension(fsp);
               fsp.append(".");
             }
           } else {

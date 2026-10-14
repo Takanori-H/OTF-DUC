@@ -1,6 +1,7 @@
 package ltsa.lts;
 
 import ltsa.lts.ltl.FluentTrace;
+import MTSSynthesis.controller.differential.nativeintegration.NativeMemoryDiagnostics;
 import ltsa.lts.util.LTSUtils;
 
 import java.util.*;
@@ -8,6 +9,8 @@ import java.util.*;
 public class Analyser implements Animator, Automata {
 
     private ModelExplorerContext explorerContext;
+    private final NativeMemoryDiagnostics memoryDiagnostics;
+    private final String memoryPhase;
 
     private CompositeState cs; // the composite being operated on
 
@@ -69,6 +72,19 @@ public class Analyser implements Animator, Automata {
 
     public Analyser(CompositeState cs, LTSOutput output, EventManager eman,
                     boolean ia) {
+        this(cs, output, eman, ia,
+                cs.differentialCapture == null ? null : cs.differentialCapture.getMemoryDiagnostics(),
+                cs.differentialCapture != null && cs.differentialCapture.getProduct() == null
+                        ? "initial_product" : "controller_product");
+    }
+
+    /** Explicit request-local diagnostics for internal compositions that must not capture a new product. */
+    public Analyser(CompositeState cs, LTSOutput output, EventManager eman, boolean ia,
+                    NativeMemoryDiagnostics diagnostics, String phase) {
+        memoryDiagnostics = diagnostics;
+        memoryPhase = phase;
+        NativeMemoryDiagnostics.Token setup = diagnostics == null ? null : diagnostics.begin(
+                phase + "_analyser_setup", NativeMemoryDiagnostics.counts("components", cs.machines.size()));
         explorerContext = new ModelExplorerContext();
         this.cs = cs;
         this.output = output;
@@ -86,8 +102,11 @@ public class Analyser implements Animator, Automata {
         violated = new boolean[cs.machines.size()];
         explorerContext.violated = violated;
         Enumeration e = cs.machines.elements();
+        NativeMemoryDiagnostics.Token clone = diagnostics == null ? null : diagnostics.begin(
+                phase + "_machine_clone", NativeMemoryDiagnostics.counts("components", sm.length));
         for (int i = 0; e.hasMoreElements(); i++)
             sm[i] = ((CompactState) e.nextElement()).myclone();
+        if (diagnostics != null) diagnostics.end(clone, NativeMemoryDiagnostics.counts("components", sm.length));
         Nmach = sm.length;
 
         explorerContext.Nmach = Nmach;
@@ -232,13 +251,23 @@ public class Analyser implements Animator, Automata {
                     visible.set(i);
             }
         }
-
+        if (diagnostics != null) diagnostics.end(setup, NativeMemoryDiagnostics.counts(
+                "components", sm.length, "actions", actionName.length));
     }
 
     private MyList compTrans; // list of transitions
 
     public CompactState compose() {
         return private_compose(true);
+    }
+
+    /** Exact composition-state to component-state mapping, including deadlocks. */
+    public Map<Integer, int[]> getCompositionStateToComponentStates() {
+        Map<Integer, int[]> result = new HashMap<>();
+        for (Map.Entry<Integer, int[]> entry : explorerContext.stateToComponentStates.entrySet()) {
+            result.put(entry.getKey(), entry.getValue().clone());
+        }
+        return result;
     }
 
     public CompactState composeNoHide() {
@@ -248,8 +277,13 @@ public class Analyser implements Animator, Automata {
     private CompactState private_compose(boolean dohiding) {
         output.outln("Composing...");
         long start = System.currentTimeMillis();
+        NativeMemoryDiagnostics.Token product = memoryDiagnostics == null ? null : memoryDiagnostics.begin(
+                memoryPhase, NativeMemoryDiagnostics.counts("components", Nmach));
+        NativeMemoryDiagnostics.Token exploration = memoryDiagnostics == null ? null : memoryDiagnostics.begin(
+                memoryPhase + "_exploration", NativeMemoryDiagnostics.counts("components", Nmach));
         //TODO (for epavese) why this is not being used?
         int ret = newState_compose();
+        if (memoryDiagnostics != null) memoryDiagnostics.end(exploration, compositionCounts());
 
         // information for ROLES feature for ML  # TODO refactor
         HashMap<AbstractMap.SimpleEntry<Integer, String>, int[]> statePlusActionToComponentStates = null;
@@ -268,9 +302,20 @@ public class Analyser implements Animator, Automata {
             components = explorerContext.sm;
         }
 
+        NativeMemoryDiagnostics.Token compactBuild = memoryDiagnostics == null ? null : memoryDiagnostics.begin(
+                memoryPhase + "_compact_build", compositionCounts());
         CompactState c = new CompactState(explorerContext.stateCount, cs.name,
                 compositionEngine.getExploredStates(), compTrans, actionName, explorerContext.endSequence, coder,
                 statePlusActionToComponentStates, components, stateToComponentStates);
+        if (memoryDiagnostics != null) memoryDiagnostics.end(compactBuild, compositionCounts());
+        if (cs.differentialCapture != null && cs.differentialCapture.getProduct() == null) {
+            NativeMemoryDiagnostics.Token capture = memoryDiagnostics == null ? null : memoryDiagnostics.begin(
+                    memoryPhase + "_capture", compositionCounts());
+            cs.differentialCapture.setProduct(c);
+            cs.differentialCapture.setProductToComponentStates(getCompositionStateToComponentStates());
+            if (memoryDiagnostics != null) memoryDiagnostics.end(capture, NativeMemoryDiagnostics.counts(
+                    "captured_tuple_entries", cs.differentialCapture.getProductToComponentStates().size()));
+        }
         if (dohiding) {
             if (cs.hidden != null) {
                 if (!cs.exposeNotHide)
@@ -285,7 +330,19 @@ public class Analyser implements Animator, Automata {
         compositionEngine.teardown();
         compTrans = null;
         explorerContext.compTrans = null;
+        if (memoryDiagnostics != null) memoryDiagnostics.end(product, NativeMemoryDiagnostics.counts(
+                "compact_states", c.maxStates,
+                "state_tuple_entries", explorerContext.stateToComponentStates.size(),
+                "state_action_tuple_entries", explorerContext.statePlusActionToComponentStates.size()));
         return c;
+    }
+
+    /** Sizes only: diagnostics must never introduce another transition traversal or correspondence clone. */
+    private Map<String, Long> compositionCounts() {
+        return NativeMemoryDiagnostics.counts("states", explorerContext.stateCount,
+                "transition_records", compTrans == null ? 0 : compTrans.size(),
+                "state_tuple_entries", explorerContext.stateToComponentStates.size(),
+                "state_action_tuple_entries", explorerContext.statePlusActionToComponentStates.size());
     }
 
     public boolean analyse(FluentTrace tracer) {

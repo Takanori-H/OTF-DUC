@@ -26,6 +26,9 @@ import MTSSynthesis.controller.model.ControllerGoal;
 import MTSSynthesis.controller.model.gr.GRGame;
 import MTSTools.ac.ic.doc.mtstools.model.impl.MTSImpl;
 import ltsa.lts.CompactState;
+import MTSSynthesis.controller.differential.nativeintegration.NativeSynthesisCapture;
+import MTSSynthesis.controller.differential.nativeintegration.NativeGenerationTiming;
+import MTSSynthesis.controller.differential.nativeintegration.NativeMemoryDiagnostics;
 
 public class LTSControllerSynthesiserImpl<S,A> implements LTSControllerSynthesiser<S,A> {
 
@@ -36,36 +39,71 @@ public class LTSControllerSynthesiserImpl<S,A> implements LTSControllerSynthesis
 	 */
 	@Override
 	public MTS<StrategyState<S, Integer>, A> synthesiseGR(MTS<S, A> plant, ControllerGoal<A> goal) {
+        return synthesiseGR(plant, goal, null);
+    }
+
+    public MTS<StrategyState<S, Integer>, A> synthesiseGR(MTS<S, A> plant, ControllerGoal<A> goal,
+            NativeSynthesisCapture<S, A> capture) {
+        NativeMemoryDiagnostics diagnostics = capture == null ? null : capture.getMemoryDiagnostics();
+        long phaseStart = capture == null ? 0L : System.nanoTime();
+        if (capture != null) capture.setPlant(plant);
 
 		//TODO: Remove this when ConcurrencyGRGameSolver is ready.
 		int maxLazyness = goal.getLazyness();
 		GameSolver<S, Integer> solver;
 		GRGameSolver<S> gSolver;
 		
+        NativeMemoryDiagnostics.Token gameBuild = diagnostics == null ? null : diagnostics.begin(
+                "native_game_build", NativeMemoryDiagnostics.counts("plant_states", plant.getStates().size()));
+        game = new GRGameBuilder<S, A>().buildGRGameFrom(plant, goal);
+        if (diagnostics != null) diagnostics.end(gameBuild, NativeMemoryDiagnostics.counts("game_states", game.getStates().size()));
+        if (capture != null) {
+            capture.setGame(game);
+            capture.addNanos(NativeSynthesisCapture.GAME_UPDATE, System.nanoTime() - phaseStart);
+            phaseStart = System.nanoTime();
+        }
+        NativeMemoryDiagnostics.Token ranks = diagnostics == null ? null : diagnostics.begin(
+                "native_rank_setup", NativeMemoryDiagnostics.counts("game_states", game.getStates().size()));
 		if(maxLazyness > 0 ){
-			game = new GRGameBuilder<S, A>().buildGRGameFrom(plant, goal);
 			GRRankSystem<S> system = new GRRankSystem<S>(game.getStates(), game.getGoal().getGuarantees(), game.getGoal().getAssumptions(), game.getGoal().getFailures());
 			gSolver = new LazyGRGameSolver<S>(game, system, maxLazyness);
 			solver = gSolver;
 		}else{
-			game = new GRGameBuilder<S, A>().buildGRGameFrom(plant, goal);
 			GRRankSystem<S> system = new GRRankSystem<S>(game.getStates(), game.getGoal().getGuarantees(), game.getGoal().getAssumptions(), game.getGoal().getFailures());
 			gSolver = new PerfectInfoGRGameSolver<S>(game, system);
 			solver = gSolver;
 		}
 		
+        if (diagnostics != null) diagnostics.end(ranks, NativeMemoryDiagnostics.counts("game_states", game.getStates().size()));
+        NativeMemoryDiagnostics.Token solve = diagnostics == null ? null : diagnostics.begin(
+                "native_solve", NativeMemoryDiagnostics.counts("game_states", game.getStates().size()));
 		solver.solveGame();
+        if (diagnostics != null) diagnostics.end(solve, NativeMemoryDiagnostics.counts("game_states", game.getStates().size()));
+        if (capture != null) {
+            NativeMemoryDiagnostics.Token winningCapture = diagnostics == null ? null : diagnostics.begin(
+                    "native_winning_capture", NativeMemoryDiagnostics.counts("plant_states", plant.getStates().size()));
+            Set<S> winning = new HashSet<>();
+            for (S state : plant.getStates()) {
+                if (solver.isWinning(state)) winning.add(state);
+            }
+            capture.setWinningStates(winning);
+            if (diagnostics != null) diagnostics.end(winningCapture, NativeMemoryDiagnostics.counts("winning_states", winning.size()));
+        }
 
 		GRGameSolver<S> grSolver = gSolver;
 		MTS<StrategyState<S, Integer>, A> result = null;
 
 		if(!solver.isWinning(plant.getInitialState())){
+            if (capture != null) {
+                capture.addNanos(NativeSynthesisCapture.REQUIREMENTS_ANALYSIS, System.nanoTime() - phaseStart);
+            }
 			return null;
 		}else{
 			MTSImpl<?, ?> mtsImplOfPlant = (MTSImpl<?, ?>) plant;
 
             if(((MTSImpl) plant).getStateToComponentStates()!=null){
-
+                NativeMemoryDiagnostics.Token winningMetadata = diagnostics == null ? null : diagnostics.begin(
+                        "native_winning_metadata", NativeMemoryDiagnostics.counts("plant_states", plant.getStates().size()));
                 // Set winning states in plant
                 Set<Long> winningStatesOfPlant = new HashSet<Long>();
                 Set<Long> winningStatesOfOriginalEnv = new HashSet<>();
@@ -77,14 +115,32 @@ public class LTSControllerSynthesiserImpl<S,A> implements LTSControllerSynthesis
                 }
                 plant.setWinningStatesOfOriginalEnv(winningStatesOfOriginalEnv);
                 plant.setWinningStates(winningStatesOfPlant);
+                if (diagnostics != null) diagnostics.end(winningMetadata, NativeMemoryDiagnostics.counts(
+                        "plant_winning_states", winningStatesOfPlant.size(),
+                        "environment_winning_states", winningStatesOfOriginalEnv.size()));
             }
 
 
+            if (capture != null) {
+                capture.addNanos(NativeSynthesisCapture.REQUIREMENTS_ANALYSIS, System.nanoTime() - phaseStart);
+                phaseStart = System.nanoTime();
+            }
+            NativeGenerationTiming.Stamp generationStart = capture == null ? null
+                    : capture.getGenerationTiming().start();
+            NativeMemoryDiagnostics.Token controllerBuild = diagnostics == null ? null : diagnostics.begin(
+                    "native_controller_build", NativeMemoryDiagnostics.counts("game_states", game.getStates().size()));
 			Strategy<S, Integer> strategy = solver.buildStrategy();
 			//TODO refactor permissive
 			Set<Pair<StrategyState<S, Integer>, StrategyState<S, Integer>>> worseRank = grSolver.getWorseRank();
 			result = GameStrategyToMTSBuilder.getInstance().buildMTSFrom(plant, strategy, worseRank, maxLazyness);
 			result.removeUnreachableStates();
+            if (diagnostics != null) diagnostics.end(controllerBuild, NativeMemoryDiagnostics.counts(
+                    "controller_states", result.getStates().size()));
+            if (capture != null) {
+                capture.setStrategyController(result);
+                capture.getGenerationTiming().finishGenerationSegment("controller_build", generationStart);
+                capture.addNanos(NativeSynthesisCapture.CONTROLLER_GENERATION, System.nanoTime() - phaseStart);
+            }
 
 			return result;
 		}

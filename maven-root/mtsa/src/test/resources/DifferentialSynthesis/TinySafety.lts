@@ -1,0 +1,20 @@
+// Control labels: idle, start, shortcut.
+// Uncontrollable labels: finish, retry, fail.
+// K=0: old environment, K=1: safe addition, K=2: incompatible addition.
+PLANT(K=0) = (idle -> PLANT | start -> WORKING | shortcut -> WORKING),
+WORKING = (finish -> PLANT
+           | when (K==1) retry -> WORKING
+           | when (K==2) fail -> WORKING) + {retry,fail}.
+
+// One fixed safety requirement: neither shortcut nor fail may occur.
+SAFETY = (idle -> SAFETY | start -> SAFETY | finish -> SAFETY
+          | retry -> SAFETY | shortcut -> ERROR | fail -> ERROR).
+
+||ENV_OLD = (PLANT(0)).
+||ENV_GOOD = (PLANT(1)).
+||ENV_BAD = (PLANT(2)).
+||GAME_OLD = (PLANT(0) || SAFETY).
+||GAME_GOOD = (PLANT(1) || SAFETY).
+||GAME_BAD = (PLANT(2) || SAFETY).
+// Future-extension reference only: rebuild without the safety monitor.
+||GAME_RELAXED = (PLANT(2)).

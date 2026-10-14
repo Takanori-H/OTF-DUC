@@ -10,6 +10,7 @@ import ltsa.control.ControlTierDefinition;
 import ltsa.control.ControllerDefinition;
 import ltsa.control.ControllerGoalDefinition;
 import ltsa.dispatcher.TransitionSystemDispatcher;
+import ltsa.differential.nativeintegration.NativeDifferentialOptions;
 import ltsa.exploration.ExplorerDefinition;
 import ltsa.lts.chart.*;
 import ltsa.lts.chart.util.TriggeredScenarioTransformationException;
@@ -737,6 +738,19 @@ public class LTSCompiler {
                         c.isCompositional = isCompositional;
                         c.isMonolithicDirector = isMonolithicDirector;
                         c.isPartialOrderReduction = isPartialOrderReduction;
+                        if (c.differentialOptions != null) {
+                            if (!makeController || c.goal == null) {
+                                error("differential options require a controller composite with a goal");
+                            }
+                            if (makeDet || makeMin || makeProp || makeComp || makeOptimistic
+                                    || makePessimistic || makeClousure || makeAbstract
+                                    || makeRTCController || makeRTCAnalysisController || checkCompatible
+                                    || makeComponent || probabilistic || isMDP || isEnactment
+                                    || makeStarEnv || makePlant || makeControlledDet || isHeuristic
+                                    || isCompositional || isMonolithicDirector || isPartialOrderReduction) {
+                                error("differential options cannot be combined with other composition operations");
+                            }
+                        }
                         c.setMakeComponent(makeComponent);
                         c.compositionType = compositionType;
 
@@ -809,12 +823,59 @@ public class LTSCompiler {
             next_symbol();
             this.parseComponentAlphabet(c);
         }
+        if (current.kind == Symbol.IDENTIFIER && "differential".equals(current.toString())) {
+            c.differentialOptions = parseDifferentialOptions();
+        }
         current_is(Symbol.DOT, "dot expected");
         return c;
     }
 
     private void parseComponentAlphabet(CompositionExpression c) {
         c.setComponentAlphabet(this.labelSet());
+    }
+
+    /** Contextual target metadata: parsing must not load, synthesize, or save a snapshot. */
+    private NativeDifferentialOptions parseDifferentialOptions() {
+        next_symbol();
+        current_is(Symbol.LCURLY, "{ expected after differential");
+        next_symbol();
+        Map<String, String> values = new LinkedHashMap<String, String>();
+        while (current.kind != Symbol.RCURLY) {
+            current_is(Symbol.IDENTIFIER, "differential option name expected");
+            String key = current.toString();
+            if (!"mode".equals(key) && !"snapshot".equals(key)
+                    && !"delta".equals(key) && !"output".equals(key)) {
+                error("Unknown differential option: " + key);
+            }
+            if (values.containsKey(key)) {
+                error("Duplicate differential option: " + key);
+            }
+            next_symbol();
+            current_is(Symbol.BECOMES, "= expected after differential option " + key);
+            next_symbol();
+            current_is("mode".equals(key) ? Symbol.IDENTIFIER : Symbol.STRING_VALUE,
+                    "mode".equals(key) ? "differential mode name expected"
+                            : "quoted path expected for differential " + key);
+            values.put(key, current.toString());
+            next_symbol();
+            if (current.kind != Symbol.RCURLY) {
+                current_is(Symbol.COMMA, ", or } expected after differential option");
+                next_symbol();
+                if (current.kind == Symbol.RCURLY) {
+                    error("differential option expected after comma");
+                }
+            }
+        }
+        next_symbol();
+        try {
+            return new NativeDifferentialOptions(
+                    NativeDifferentialOptions.parseMode(values.get("mode")),
+                    values.get("snapshot"), values.get("delta"), values.get("output"),
+                    currentDirectory);
+        } catch (IllegalArgumentException ex) {
+            error(ex.getMessage());
+            return null; // Diagnostics.fatal throws.
+        }
     }
 
     private CompositeBody compositebody() {

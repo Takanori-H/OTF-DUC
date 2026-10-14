@@ -193,6 +193,12 @@ public class MappingEnvironmentGenerator {
         for (FlattenedRule fr : flatRules) {
             Integer startNode = oldM.getStateId(fr.oldLabel);
             Integer endNode = newM.getStateId(fr.newLabel);
+            if (Integer.valueOf(Declaration.ERROR).equals(startNode)
+                    || Integer.valueOf(Declaration.ERROR).equals(endNode)) {
+                Diagnostics.fatal("Relation endpoints must be ordinary states, not ERROR: "
+                        + fr.oldLabel + " -> " + fr.newLabel
+                        + " in mapping component " + mapEnvName + ".");
+            }
             if (startNode == null || endNode == null) {
                 output.outln("Warning: State label not found: " + fr.oldLabel + " -> " + fr.newLabel);
                 continue;
@@ -480,7 +486,8 @@ public class MappingEnvironmentGenerator {
             String action = srcAlpha[current.event];
             int newEventIdx = getIndex(action, destAlpha);
             if (newEventIdx != -1) {
-                head = EventStateUtils.add(head, new EventState(newEventIdx, current.next + offset));
+                int next = current.next == Declaration.ERROR ? Declaration.ERROR : current.next + offset;
+                head = EventStateUtils.add(head, new EventState(newEventIdx, next));
             }
             current = current.list;
         }
@@ -508,17 +515,17 @@ public class MappingEnvironmentGenerator {
 
         // メインの遷移リストを走査
         while (current != null) {
-            // 行き先が到達可能(otnに含まれる)場合のみ追加
-            if (otn.containsKey(current.next)) {
-                int newNext = otn.get(current.next);
+            // ERROR は通常状態とは別の終端値なので、到達可能状態の番号付けから除外する。
+            if (current.next == Declaration.ERROR || otn.containsKey(current.next)) {
+                int newNext = current.next == Declaration.ERROR ? Declaration.ERROR : otn.get(current.next);
                 newHead = EventStateUtils.add(newHead, new EventState(current.event, newNext));
             }
 
             // 非決定性遷移 (nondet) のリストも走査して追加
             EventState nd = current.nondet;
             while (nd != null) {
-                if (otn.containsKey(nd.next)) {
-                    int newNdNext = otn.get(nd.next);
+                if (nd.next == Declaration.ERROR || otn.containsKey(nd.next)) {
+                    int newNdNext = nd.next == Declaration.ERROR ? Declaration.ERROR : otn.get(nd.next);
                     newHead = EventStateUtils.add(newHead, new EventState(current.event, newNdNext));
                 }
                 nd = nd.nondet;

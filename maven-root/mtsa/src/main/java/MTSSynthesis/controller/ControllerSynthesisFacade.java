@@ -7,6 +7,7 @@ import MTSSynthesis.controller.model.ControlProblem;
 import MTSSynthesis.controller.model.ControllerGoal;
 import MTSSynthesis.controller.model.gr.GRGame;
 import ltsa.lts.CompactState;
+import MTSSynthesis.controller.differential.nativeintegration.NativeSynthesisCapture;
 
 public class ControllerSynthesisFacade<S, A, M> {
 	//TODO Dependency Injection
@@ -23,6 +24,11 @@ public class ControllerSynthesisFacade<S, A, M> {
 		MTS<StrategyState<S, Integer>, A> synthesised = synthesiser.synthesiseGR(mts, goal);
 		return synthesised;
 	}
+
+    public MTS<StrategyState<S, Integer>, A> synthesiseControllerWithPlantInformation(MTS<S, A> mts,
+            ControllerGoal<A> goal, CompactState controller, NativeSynthesisCapture<S, A> capture) {
+        return synthesiser.synthesiseGR(mts, goal, capture);
+    }
 
 	public boolean checkAssumptionsCompatibility(MTS<S, A> mts, ControllerGoal<A> goal) {
 		return synthesiser.checkGRAssumptionsCompatibility(mts, goal);

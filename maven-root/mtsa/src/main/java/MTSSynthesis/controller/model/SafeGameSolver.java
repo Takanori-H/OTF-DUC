@@ -41,7 +41,7 @@ public class SafeGameSolver<S, A> implements GameSolver<S,Integer> {
 			S state = losing.poll();
 
 			if (losingStates.contains(state)) {
-				break;
+				continue;
 			}
 
 			losingStates.add(state);			

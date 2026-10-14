@@ -95,15 +95,21 @@ final class ExperimentCampaignProvenance {
             return new ArrayList<ExperimentCase>(config.cases);
         }
 
-        Map<String, Map<String, List<ExperimentCase>>> byVariantAndExample =
-                new LinkedHashMap<String, Map<String, List<ExperimentCase>>>();
+        Map<List<String>, Map<String, List<ExperimentCase>>> byVariantAndExample =
+                new LinkedHashMap<List<String>, Map<String, List<ExperimentCase>>>();
         for (ExperimentCase experimentCase : config.cases) {
             String variant = normalizeGroupingValue(experimentCase.variant);
             String example = normalizeGroupingValue(experimentCase.example);
-            Map<String, List<ExperimentCase>> byExample = byVariantAndExample.get(variant);
+            String nativeGroup = experimentCase.isNativeDifferentialSynthesis()
+                    ? ("native_differential_prepare".equalsIgnoreCase(experimentCase.method)
+                        ? "native-differential-prepare" : "native-differential-update") : "";
+            List<String> groupKey = java.util.Arrays.asList(variant,
+                    experimentCase.isDifferentialSynthesis() ? "differential-synthesis" : nativeGroup,
+                    experimentCase.isDifferentialSynthesis() ? experimentCase.effectiveMeasurementScope() : "");
+            Map<String, List<ExperimentCase>> byExample = byVariantAndExample.get(groupKey);
             if (byExample == null) {
                 byExample = new LinkedHashMap<String, List<ExperimentCase>>();
-                byVariantAndExample.put(variant, byExample);
+                byVariantAndExample.put(groupKey, byExample);
             }
             List<ExperimentCase> group = byExample.get(example);
             if (group == null) {
@@ -117,6 +123,54 @@ final class ExperimentCampaignProvenance {
         boolean traditionalFirst = runIndex % 2 == 0;
         for (Map<String, List<ExperimentCase>> byExample : byVariantAndExample.values()) {
             for (List<ExperimentCase> group : byExample.values()) {
+                if (group.get(0).isNativeDifferentialSynthesis()) {
+                    Map<String, ExperimentCase> byMethod = new LinkedHashMap<>();
+                    for (ExperimentCase experimentCase : group) {
+                        String key = normalizeGroupingValue(experimentCase.method);
+                        if (byMethod.put(key, experimentCase) != null) {
+                            throw new IllegalArgumentException("Native differential order requires distinct methods "
+                                    + "for each (variant, example)");
+                        }
+                    }
+                    List<ExperimentCase> cycle = new ArrayList<>();
+                    for (String method : new String[] {"native_differential_prepare", "native_differential_full",
+                            "native_differential_analysis_reuse", "native_differential_differential"}) {
+                        if (byMethod.containsKey(method)) cycle.add(byMethod.get(method));
+                    }
+                    int offset = (runIndex - 1) % cycle.size();
+                    for (int i = 0; i < cycle.size(); i++) ordered.add(cycle.get((i + offset) % cycle.size()));
+                    continue;
+                }
+                if (group.get(0).isDifferentialSynthesis()) {
+                    Map<String, ExperimentCase> byMethod = new LinkedHashMap<>();
+                    for (ExperimentCase experimentCase : group) {
+                        if (byMethod.put(experimentCase.method, experimentCase) != null) {
+                            throw new IllegalArgumentException(
+                                    "alternateMethodOrderByRun allows one differential case per method "
+                                            + "for each (variant, example, measurementScope).");
+                        }
+                    }
+                    if (group.size() == 2 && byMethod.containsKey("FULL")
+                            && byMethod.containsKey("DIFFERENTIAL")) {
+                        ordered.add(byMethod.get(traditionalFirst ? "FULL" : "DIFFERENTIAL"));
+                        ordered.add(byMethod.get(traditionalFirst ? "DIFFERENTIAL" : "FULL"));
+                    } else {
+                        List<ExperimentCase> cycle = new ArrayList<>();
+                        for (String method : new String[] {"FULL", "DIFFERENTIAL", "FROM_SCRATCH"}) {
+                            if (byMethod.containsKey(method)) {
+                                cycle.add(byMethod.get(method));
+                            }
+                        }
+                        if (cycle.size() != group.size()) {
+                            throw new IllegalArgumentException("Unknown differential method in execution order.");
+                        }
+                        int offset = (runIndex - 1) % cycle.size();
+                        for (int i = 0; i < cycle.size(); i++) {
+                            ordered.add(cycle.get((i + offset) % cycle.size()));
+                        }
+                    }
+                    continue;
+                }
                 ExperimentCase stepwise = null;
                 ExperimentCase traditional = null;
                 int stepwiseCount = 0;
@@ -175,10 +229,15 @@ final class ExperimentCampaignProvenance {
         appendHashRow(hashCsv, "config_original", config.configFile);
         appendHashRow(hashCsv, "config_sanitized_snapshot", configSnapshot);
         Set<String> seenLts = new LinkedHashSet<String>();
+        Set<String> seenScenarios = new LinkedHashSet<String>();
         for (ExperimentCase experimentCase : config.cases) {
             String canonical = experimentCase.lts.getCanonicalPath();
             if (seenLts.add(canonical)) {
                 appendHashRow(hashCsv, "lts", experimentCase.lts);
+            }
+            if (experimentCase.isDifferentialSynthesis()
+                    && seenScenarios.add(experimentCase.scenario.getCanonicalPath())) {
+                appendHashRow(hashCsv, "differential_synthesis_scenario", experimentCase.scenario);
             }
         }
         File launcher = launcherArtifact();

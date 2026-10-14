@@ -1,0 +1,37 @@
+// Fixed requirement: fail must never occur.
+// Controllable: idle, start. All other labels are uncontrollable.
+// Alphabets are fixed across versions to avoid synchronization changes.
+
+NS_PLANT(IN=0,OUT=1,BAD=0) = (idle -> NS_PLANT | start -> WORKING),
+WORKING = (finish -> NS_PLANT | when (IN==1) divert -> RECOVERY),
+RECOVERY = (when (OUT==1) wait -> RECOVERY
+            | when (OUT==1) resume -> WORKING
+            | when (BAD==1) fail -> RECOVERY) + {divert,wait,resume,fail}.
+
+BATCH_PLANT(A=0,R=0,F=0) = (idle -> BATCH_PLANT | start -> WORKING
+                            | when (A==1) alarm -> WORKING),
+WORKING = (finish -> BATCH_PLANT | when (R==1) retry -> WORKING
+            | when (F==1) fail -> WORKING) + {alarm,retry,fail}.
+
+// Its alphabet contains only fail; other plant actions interleave freely.
+SAFETY = (fail -> ERROR).
+CLOCK = (tick -> TOCK), TOCK = (tock -> CLOCK).
+
+||NS_ENV_OLD = (NS_PLANT(0,1,0)).
+||NS_ENV_GOOD = (NS_PLANT(1,1,0)).
+||NS_GAME_OLD = (NS_PLANT(0,1,0) || SAFETY).
+||NS_GAME_GOOD = (NS_PLANT(1,1,0) || SAFETY).
+// Incomplete graph update: entry is present, outgoing edges are missing.
+||NS_GAME_PARTIAL = (NS_PLANT(1,0,0) || SAFETY).
+||NS_GAME_BAD = (NS_PLANT(1,1,1) || SAFETY).
+
+||B_GAME_OLD = (BATCH_PLANT(0,0,0) || SAFETY).
+||B_GAME_ALARM = (BATCH_PLANT(1,0,0) || SAFETY).
+||B_GAME_RETRY = (BATCH_PLANT(0,1,0) || SAFETY).
+||B_GAME_GOOD = (BATCH_PLANT(1,1,0) || SAFETY).
+||B_GAME_FAIL = (BATCH_PLANT(0,0,1) || SAFETY).
+||B_GAME_BAD = (BATCH_PLANT(1,1,1) || SAFETY).
+
+// Same local divert addition replicated by parallel composition.
+||P_GAME_OLD = (NS_PLANT(0,1,0) || CLOCK || SAFETY).
+||P_GAME_GOOD = (NS_PLANT(1,1,0) || CLOCK || SAFETY).

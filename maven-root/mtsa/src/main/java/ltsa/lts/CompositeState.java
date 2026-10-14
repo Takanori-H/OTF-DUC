@@ -8,6 +8,9 @@ import java.util.Set;
 import java.util.Vector;
 
 import MTSSynthesis.controller.model.ControllerGoal;
+import MTSSynthesis.controller.differential.nativeintegration.NativeSynthesisCapture;
+import ltsa.differential.nativeintegration.NativeDifferentialOptions;
+import ltsa.differential.nativeintegration.NativeDifferentialResult;
 import MTSTools.ac.ic.doc.mtstools.model.operations.DCS.gr1.Statistics;
 import ltsa.dispatcher.TransitionSystemDispatcher;
 
@@ -34,6 +37,9 @@ public class CompositeState{
 	public boolean makeCompose = false; // force composition if true
 	public boolean isProperty = false;
 	public boolean makeController = false;
+	public NativeDifferentialOptions differentialOptions;
+	public NativeDifferentialResult differentialResult;
+	public NativeSynthesisCapture<Long, String> differentialCapture;
 	public boolean makeRTCController = false;
 	public boolean makeRTCAnalysisController = false;
 	public boolean checkCompatible = false;
@@ -595,6 +601,8 @@ public class CompositeState{
     c.makeOptimistic = makeOptimistic;
     c.makePessimistic = makePessimistic;
     c.makeController = makeController;
+    c.differentialOptions = differentialOptions;
+    // A clone has its own execution; never carry a mutable synthesis capture.
     c.setMakeComponent(isMakeComponent());
     c.setComponentAlphabet(getComponentAlphabet());
     c.goal = goal;

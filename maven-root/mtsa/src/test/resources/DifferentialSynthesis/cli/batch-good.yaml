@@ -1,0 +1,7 @@
+controllableActions: [idle, start]
+states:
+  initial: {trace: []}
+  working: {trace: [start]}
+transitions:
+  - {from: initial, action: alarm, to: working}
+  - {from: working, action: retry, to: working}

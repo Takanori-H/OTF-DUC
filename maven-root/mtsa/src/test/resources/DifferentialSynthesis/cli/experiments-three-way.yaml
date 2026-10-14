@@ -1,0 +1,124 @@
+# Run from maven-root/mtsa; paths follow the existing batch runner convention.
+outputDir: ../../../Experiment/differential-synthesis/three-way-example
+runs: 3
+timeoutMinutes: 5
+requireFreshOutputDir: true
+alternateMethodOrderByRun: true
+validateMemoryQuality: true
+notifyOn: never
+javaOptions:
+  - -Xmx1g
+  - -Dfile.encoding=UTF-8
+  - -Djava.awt.headless=true
+  - -Dmtsa.evaluation.enabled=false
+  - -Dmtsa.evaluation.memorySampling.enabled=true
+  - -Dmtsa.evaluation.rssSampling.enabled=true
+cases:
+  - id: batch-good-full
+    example: batch-good
+    mode: differential-synthesis
+    method: FULL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-good.yaml
+  - id: batch-good-differential
+    example: batch-good
+    mode: differential-synthesis
+    method: DIFFERENTIAL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-good.yaml
+  - id: batch-good-from_scratch
+    example: batch-good
+    mode: differential-synthesis
+    method: FROM_SCRATCH
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-good.yaml
+  - id: recovery-good-full
+    example: recovery-good
+    mode: differential-synthesis
+    method: FULL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: NS_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/recovery-good.yaml
+  - id: recovery-good-differential
+    example: recovery-good
+    mode: differential-synthesis
+    method: DIFFERENTIAL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: NS_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/recovery-good.yaml
+  - id: recovery-good-from_scratch
+    example: recovery-good
+    mode: differential-synthesis
+    method: FROM_SCRATCH
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: NS_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/recovery-good.yaml
+  - id: batch-incompatible-full
+    example: batch-incompatible
+    mode: differential-synthesis
+    method: FULL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-incompatible.yaml
+  - id: batch-incompatible-differential
+    example: batch-incompatible
+    mode: differential-synthesis
+    method: DIFFERENTIAL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-incompatible.yaml
+  - id: batch-incompatible-from_scratch
+    example: batch-incompatible
+    mode: differential-synthesis
+    method: FROM_SCRATCH
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-incompatible.yaml
+  - id: batch-unrealizable-full
+    example: batch-unrealizable
+    mode: differential-synthesis
+    method: FULL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-unrealizable.yaml
+  - id: batch-unrealizable-differential
+    example: batch-unrealizable
+    mode: differential-synthesis
+    method: DIFFERENTIAL
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-unrealizable.yaml
+  - id: batch-unrealizable-from_scratch
+    example: batch-unrealizable
+    mode: differential-synthesis
+    method: FROM_SCRATCH
+    measurementScope: update
+    variant: fixed-safety
+    lts: src/test/resources/DifferentialSynthesis/BatchSafety.lts
+    target: B_GAME_OLD
+    scenario: src/test/resources/DifferentialSynthesis/cli/batch-unrealizable.yaml

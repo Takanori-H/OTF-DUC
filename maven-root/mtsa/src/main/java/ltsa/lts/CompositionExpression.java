@@ -6,6 +6,7 @@ import ltsa.ac.ic.doc.mtstools.util.fsp.MTSToAutomataConverter;
 import ltsa.control.ControllerGoalDefinition;
 import ltsa.control.util.GoalDefToControllerGoal;
 import ltsa.dispatcher.TransitionSystemDispatcher;
+import ltsa.differential.nativeintegration.NativeDifferentialOptions;
 import ltsa.lts.chart.TriggeredScenarioDefinition;
 import ltsa.lts.chart.util.TriggeredScenarioTransformationException;
 import ltsa.lts.distribution.DistributionDefinition;
@@ -172,6 +173,7 @@ public class CompositionExpression {
     boolean makeAbstract = false;
     int compositionType = -1;
     boolean makeController = false;
+    NativeDifferentialOptions differentialOptions;
     boolean makeRTCController = false;
     boolean makeRTCAnalysisController = false;
     boolean makeMDP = false;
@@ -347,6 +349,7 @@ public class CompositionExpression {
         c.isProbabilistic = isProbabilistic; //TODO assign correct value
         c.makeEnactment = makeEnactment;
         c.makeController = makeController;
+        c.differentialOptions = differentialOptions;
         c.makeRTCController = makeRTCController;
         c.makeRTCAnalysisController = makeRTCAnalysisController;
         c.checkCompatible = checkCompatible;
